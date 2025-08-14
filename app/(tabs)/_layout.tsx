@@ -24,7 +24,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Dashboard',
+          title: 'Actions & Ideas',
           tabBarIcon: ({ size, color }) => (
             <BarChart3 size={size} color={color} />
           ),
@@ -33,7 +33,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="roles"
         options={{
-          title: 'Roles',
+          title: 'Role Bank',
           tabBarIcon: ({ size, color }) => (
             <User size={size} color={color} />
           ),
@@ -42,7 +42,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="wellness"
         options={{
-          title: 'Wellness',
+          title: 'Wellness Bank',
           tabBarIcon: ({ size, color }) => (
             <Heart size={size} color={color} />
           ),
@@ -51,7 +51,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="goals"
         options={{
-          title: 'Goals',
+          title: 'Goal Bank',
           tabBarIcon: ({ size, color }) => (
             <Target size={size} color={color} />
           ),
