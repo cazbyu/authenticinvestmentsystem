@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Menu, Plus, Search } from 'lucide-react-native';
-import { supabase } from '../lib/supabase'; 
 
 interface HeaderProps {
   title: string;
