@@ -35,7 +35,6 @@ export function Header({ activeView, onViewChange, onSortPress, authenticScore =
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              styles.leftToggle,
               activeView === 'deposits' && styles.activeToggle
             ]}
             onPress={() => onViewChange('deposits')}
@@ -51,7 +50,6 @@ export function Header({ activeView, onViewChange, onSortPress, authenticScore =
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              styles.rightToggle,
               activeView === 'ideas' && styles.activeToggle
             ]}
             onPress={() => onViewChange('ideas')}
@@ -65,8 +63,10 @@ export function Header({ activeView, onViewChange, onSortPress, authenticScore =
           </TouchableOpacity>
         </View>
         
+        {/* Updated Sort Button to look like a toggle */}
         <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
-          <ArrowUpDown size={20} color="#ffffff" />
+          <Text style={styles.toggleText}>Sort</Text>
+          <ArrowUpDown size={16} color="#ffffff" style={{ marginLeft: 6 }}/>
         </TouchableOpacity>
       </View>
     </View>
@@ -127,34 +127,32 @@ const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16,
+    borderRadius: 16, // Smaller border radius
     padding: 2,
   },
   toggleButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  leftToggle: {
-    marginRight: 2,
-  },
-  rightToggle: {
-    marginLeft: 2,
+    paddingHorizontal: 16, // Reduced horizontal padding
+    paddingVertical: 6,  // Reduced vertical padding
+    borderRadius: 14, // Smaller border radius
   },
   activeToggle: {
     backgroundColor: '#ffffff',
   },
   toggleText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 12, // Smaller font size
     fontWeight: '600',
   },
   activeToggleText: {
     color: '#0078d4',
   },
+  // New style for the sort button to match the toggle
   sortButton: {
-    padding: 8,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8, // Adjusted to vertically align text
+    borderRadius: 16,
   },
 });
