@@ -127,11 +127,11 @@ const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16, // Smaller border radius
+    borderRadius: 10, // Smaller border radius
     padding: 2,
   },
   toggleButton: {
-    paddingHorizontal: 16, // Reduced horizontal padding
+    paddingHorizontal: 10, // Reduced horizontal padding
     paddingVertical: 6,  // Reduced vertical padding
     borderRadius: 14, // Smaller border radius
   },
