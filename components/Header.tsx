@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-// import { supabase } from '../lib/supabase'; // Make sure this path is correct
+import { supabase } from '../lib/supabase'; 
 import { FontAwesome5 } from '@expo/vector-icons';
 
 // The Header now accepts props to control its state from the parent
