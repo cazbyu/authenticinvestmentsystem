@@ -1,68 +1,157 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Menu, Plus, Search } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import { supabase } from '../lib/supabase'; // Make sure this path is correct
+import { FontAwesome5 } from '@expo/vector-icons';
 
+// The Header now accepts props to control its state from the parent
 interface HeaderProps {
-  title: string;
-  onAdd?: () => void;
+  activeView: 'deposits' | 'ideas';
+  onViewChange: (view: 'deposits' | 'ideas') => void;
+  onSortPress: () => void;
 }
 
-export function Header({ title, onAdd }: HeaderProps) {
+const Header: React.FC<HeaderProps> = ({ activeView, onViewChange, onSortPress }) => {
+  const router = useRouter();
+  const [totalScore, setTotalScore] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTotalScore = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.rpc('get_total_score', {
+          p_time_period: 'all_time',
+        });
+        if (error) throw error;
+        setTotalScore(data);
+      } catch (error) {
+        console.error("Error fetching total score:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTotalScore();
+  }, []);
+
+  const handleScorePress = () => {
+    router.push('/ledger');
+  };
+
   return (
-    <View style={styles.header}>
-      <View style={styles.leftSection}>
-        <TouchableOpacity style={styles.menuButton}>
-          <Menu size={24} color="#ffffff" />
+    <View style={styles.headerContainer}>
+      {/* Top section with title and score */}
+      <View style={styles.topSection}>
+         <FontAwesome5 name="bars" size={24} color="#343a40" />
+        <Text style={styles.headerTitle}>Authentic Investments</Text>
+        <TouchableOpacity onPress={handleScorePress} style={styles.scoreContainer}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#343a40" />
+          ) : (
+            <Text style={styles.scoreValue}>+ {totalScore.toFixed(1)}</Text>
+          )}
         </TouchableOpacity>
-        <Text style={styles.title}>{title}</Text>
       </View>
-      
-      <View style={styles.rightSection}>
-        <TouchableOpacity style={styles.iconButton}>
-          <Search size={20} color="#ffffff" />
-        </TouchableOpacity>
-        
-        {onAdd && (
-          <TouchableOpacity style={styles.iconButton} onPress={onAdd}>
-            <Plus size={20} color="#ffffff" />
+
+      {/* Bottom section with toggle and sort */}
+      <View style={styles.bottomSection}>
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity
+            style={[styles.toggleButton, activeView === 'deposits' && styles.activeButton]}
+            onPress={() => onViewChange('deposits')}
+          >
+            <Text style={[styles.toggleText, activeView === 'deposits' && styles.activeText]}>Deposits</Text>
           </TouchableOpacity>
-        )}
+          <TouchableOpacity
+            style={[styles.toggleButton, activeView === 'ideas' && styles.activeButton]}
+            onPress={() => onViewChange('ideas')}
+          >
+            <Text style={[styles.toggleText, activeView === 'ideas' && styles.activeText]}>Ideas</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
+          <Text style={styles.sortText}>Sort</Text>
+          <FontAwesome5 name="sort-amount-down" size={14} color="#fff" />
+        </TouchableOpacity>
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  header: {
-    backgroundColor: '#0078d4',
+  headerContainer: {
+    paddingTop: 40, // For status bar
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: '#ADD8E6', // Light blue background
+    borderBottomWidth: 1,
+    borderBottomColor: '#dee2e6',
+  },
+  topSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 60,
+    marginBottom: 16,
   },
-  leftSection: {
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#343a40',
+  },
+  scoreContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  scoreValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#343a40',
+  },
+  bottomSection: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    flex: 1,
   },
-  rightSection: {
+  toggleContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  menuButton: {
-    marginRight: 16,
-    padding: 4,
-  },
-  iconButton: {
-    padding: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 20,
   },
-  title: {
-    color: '#ffffff',
-    fontSize: 18,
+  toggleButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  activeButton: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleText: {
     fontWeight: '600',
+    color: '#495057',
+  },
+  activeText: {
+    color: '#007bff',
+  },
+  sortButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6c757d',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  sortText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginRight: 6,
   },
 });
+
+export default Header;
