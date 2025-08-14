@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
-import DatePicker from "react-datepicker";
 import { format } from "date-fns";
-import { toast } from "sonner";
-import "react-datepicker/dist/react-datepicker.css";
 import { generateJoinRows } from '../../utils/relationshipHelpers';
 import { upsertTaskEventAndJoins } from '../../services/taskEventService';
 
@@ -368,11 +365,11 @@ if (noteJoins && noteJoins[0]?.note_id) {
 
     await upsertTaskEventAndJoins({ form, user, mode });
 
-    toast.success(mode === "edit" ? "Updated successfully!" : "Created successfully!");
+    console.log(mode === "edit" ? "Updated successfully!" : "Created successfully!");
     onSubmitSuccess();
     onClose();
   } catch (err) {
-    toast.error("Error saving: " + (err instanceof Error ? err.message : String(err)));
+    console.error("Error saving: " + (err instanceof Error ? err.message : String(err)));
   } finally {
     setLoading(false);
   }
@@ -488,21 +485,13 @@ if (noteJoins && noteJoins[0]?.note_id) {
               {/* Date + All Day (always visible) */}
               <div>
                 <label className="block text-xs mb-1">Due Date</label>
-                <DatePicker
-          selected={form.dueDate ? new Date(form.dueDate + "T00:00:00") : null}
-          onChange={date =>
-            setForm(f => ({
-              ...f,
-              dueDate: date ? format(date, "yyyy-MM-dd") : "",
-            }))
-          }
-          dateFormat="MMM dd, yyyy"
-          className="border rounded px-2 py-1 text-xs w-full"
-          placeholderText="Select date"
-          calendarClassName="text-xs"
-          popperClassName="small-datepicker-popup"
-          formatWeekDay={name => name.charAt(0)}
-        />
+                <input
+                  type="date"
+                  name="dueDate"
+                  value={form.dueDate}
+                  onChange={handleChange}
+                  className="border rounded px-2 py-1 text-xs w-full"
+                />
                 <div className="mt-1">
                   <label className="flex items-center gap-2 text-xs">
                     <input
