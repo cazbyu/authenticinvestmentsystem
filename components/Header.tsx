@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   toggleButton: {
     paddingHorizontal: 16, // Reduced horizontal padding
     paddingVertical: 6,  // Reduced vertical padding
-    borderRadius: 10, // Smaller border radius
+    borderRadius: 14, // Smaller border radius
   },
   activeToggle: {
     backgroundColor: '#ffffff',
