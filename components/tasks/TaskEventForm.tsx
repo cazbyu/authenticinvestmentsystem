@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
         zIndex: 1000,
     },
     timeOptionPopup: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-    timeOptionTextPopup: { textAlign: 'center', fontSize: 12 },
+    timeOptionTextPopup: { textAlign: 'center', fontSize: 10 },
     dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
     dayText: { fontSize: 8 },
     selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
