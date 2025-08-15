@@ -318,8 +318,8 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
         {/* Pop-up Mini Calendar Modal */}
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
-            <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}>
-              <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+            <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}> 
+              <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Calendar
                   onDayPress={onCalendarDayPress}
                   markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
@@ -389,8 +389,8 @@ const styles = StyleSheet.create({
     anytimeLabel: { fontSize: 14 },
     calendarPopup: {
         position: 'absolute',
-        width: 240,
-        maxHeight: 280,
+        width: 200,
+        maxHeight: 220,
         backgroundColor: '#ffffff',
         borderRadius: 8,
         borderWidth: 1,
@@ -419,9 +419,9 @@ const styles = StyleSheet.create({
     },
     timeOptionPopup: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
     timeOptionTextPopup: { textAlign: 'center' },
-    dayContainer: { width: 24, height: 16, justifyContent: 'center', alignItems: 'center' },
-    dayText: { fontSize: 10 },
-    selectedDay: { backgroundColor: '#0078d4', borderRadius: 14, width: 28, height: 28 },
+    dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+    dayText: { fontSize: 8 },
+    selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
     selectedDayText: { color: 'white' },
     todayText: { color: '#0078d4', fontWeight: 'bold' },
     disabledDayText: { color: '#d9e1e8' },
