@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Modal, FlatList } from 'react-native';
-import { Calendar } from 'react-native-calendars';
+import { CalendarList } from 'react-native-calendars';
 import { supabase } from "@/lib/supabase";
 import { X } from 'lucide-react-native';
 
@@ -232,15 +232,17 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                         <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
                       </TouchableOpacity>
                       
-                      <TouchableOpacity ref={timeInputRef} style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]} onPress={() => { timeInputRef.current?.measure((fx, fy, width, height, px, py) => { setTimePickerPosition({ x: px, y: py, width, height }); setShowTimePicker(true); }); }} disabled={formData.isAnytime}>
-                        <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
-                        <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.time}</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
-                        <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
-                        <Text style={styles.anytimeLabel}>Anytime</Text>
-                      </TouchableOpacity>
+                      <View style={styles.timeAndAnytimeContainer}>
+                        <TouchableOpacity ref={timeInputRef} style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]} onPress={() => { timeInputRef.current?.measure((fx, fy, width, height, px, py) => { setTimePickerPosition({ x: px, y: py, width, height }); setShowTimePicker(true); }); }} disabled={formData.isAnytime}>
+                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
+                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.time}</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
+                          <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
+                          <Text style={styles.anytimeLabel}>Anytime</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </>
                 )}
@@ -260,19 +262,23 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
             <View onStartShouldSetResponder={() => true} style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height + 2, left: datePickerPosition.x }]}>
-              <Calendar
-                onDayPress={onCalendarDayPress}
-                markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
-                dayComponent={CustomDayComponent}
-                hideExtraDays={true}
-              />
+              <View style={{height: 280}}>
+                <CalendarList
+                  onDayPress={onCalendarDayPress}
+                  markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
+                  dayComponent={CustomDayComponent}
+                  hideExtraDays={true}
+                  pastScrollRange={12}
+                  futureScrollRange={12}
+                />
+              </View>
             </View>
           </TouchableOpacity>
         </Modal>
 
         <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
-                <View style={[styles.timePickerPopup, { top: timePickerPosition.y + timePickerPosition.height + 2, left: timePickerPosition.x }]}>
+                <View onStartShouldSetResponder={() => true} style={[styles.timePickerPopup, { top: timePickerPosition.y + timePickerPosition.height + 2, left: timePickerPosition.x }]}>
                     <FlatList data={timeOptions} keyExtractor={(item) => item} renderItem={({ item }) => (<TouchableOpacity style={styles.timeOptionPopup} onPress={() => onTimeSelect(item)}><Text style={styles.timeOptionTextPopup}>{item}</Text></TouchableOpacity>)} />
                 </View>
             </TouchableOpacity>
@@ -304,22 +310,23 @@ const styles = StyleSheet.create({
     toggleChipActive: { backgroundColor: '#0078d4' },
     toggleChipText: { color: '#374151', fontWeight: '500' },
     toggleChipTextActive: { color: 'white', fontWeight: '600' },
-    compactDateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    compactDateTimeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
     compactDateButton: { flex: 0, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f8fafc' },
     dateTextInput: { fontSize: 14, fontWeight: '500', padding: 0 },
-    compactTimeButton: { flex: 0, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f0f9ff' },
+    timeAndAnytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 8, flex: 1 },
+    compactTimeButton: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f0f9ff' },
     compactInputLabel: { fontSize: 10, color: '#6b7280', marginBottom: 2 },
     compactInputValue: { fontSize: 14, fontWeight: '500' },
     disabledButton: { backgroundColor: '#f3f4f6' },
     disabledText: { color: '#9ca3af' },
-    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' },
+    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
     checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 3, marginRight: 6, justifyContent: 'center', alignItems: 'center' },
     checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
     checkmark: { color: 'white', fontSize: 12, fontWeight: 'bold' },
     anytimeLabel: { fontSize: 14 },
     calendarPopup: {
         position: 'absolute',
-        width: 280,
+        width: 250, // Made smaller
         backgroundColor: '#ffffff',
         borderRadius: 8,
         borderWidth: 1,
@@ -332,7 +339,7 @@ const styles = StyleSheet.create({
     },
     timePickerPopup: {
         position: 'absolute',
-        width: 120, // Made narrower
+        width: 110, // Made narrower
         maxHeight: 200,
         backgroundColor: '#ffffff',
         borderRadius: 8,
@@ -345,10 +352,10 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     timeOptionPopup: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-    timeOptionTextPopup: { textAlign: 'center' },
-    dayContainer: { width: 32, height: 28, justifyContent: 'center', alignItems: 'center' },
+    timeOptionTextPopup: { textAlign: 'center', fontSize: 14 },
+    dayContainer: { width: 32, height: 24, justifyContent: 'center', alignItems: 'center' }, // Reduced height
     dayText: { fontSize: 12 },
-    selectedDay: { backgroundColor: '#0078d4', borderRadius: 14, width: 28, height: 28 },
+    selectedDay: { backgroundColor: '#0078d4', borderRadius: 12, width: 24, height: 24 }, // Made smaller
     selectedDayText: { color: 'white' },
     todayText: { color: '#0078d4', fontWeight: 'bold' },
     disabledDayText: { color: '#d9e1e8' },
