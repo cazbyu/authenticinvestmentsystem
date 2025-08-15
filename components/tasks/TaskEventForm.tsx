@@ -330,7 +330,7 @@ const toDateString = (date: Date) => {
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Calendar
                   onDayPress={onCalendarDayPress}
-                  markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
+                  markedDates={{ [toDateString(formData.dueDate)]: { selected: true } }}
                   dayComponent={CustomDayComponent}
                   hideExtraDays={true}
                 />
