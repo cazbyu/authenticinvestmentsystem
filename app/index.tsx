@@ -45,3 +45,16 @@ export default function Index() {
 
   return <Redirect href="/login" />;
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+});
