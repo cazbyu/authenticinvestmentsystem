@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     },
     calendarPopup: {
       position: 'absolute',
-      width: 200,
+      width: 220,
       backgroundColor: '#ffffff',
       borderRadius: 8,
       padding: 8,
