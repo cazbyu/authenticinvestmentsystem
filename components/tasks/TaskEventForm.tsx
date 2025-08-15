@@ -26,6 +26,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
     notes: '',
     dueDate: new Date(),
     time: '9:00 AM',
+    isAnytime: false,
     is_urgent: false,
     is_important: false,
     is_authentic_deposit: false,
@@ -45,7 +46,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
   const [loading, setLoading] = useState(false);
   
   // Calendar and time picker state
-  const [showCalendar, setShowCalendar] = useState(false);
+  const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Generate time options in 15-minute increments
@@ -96,12 +97,20 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
   const onCalendarDayPress = (day: any) => {
     const selectedDate = new Date(day.dateString);
     setFormData(prev => ({ ...prev, dueDate: selectedDate }));
-    setShowCalendar(false);
+    setShowMiniCalendar(false);
   };
 
   const onTimeSelect = (timeOption: { value: string; label: string }) => {
     setFormData(prev => ({ ...prev, time: timeOption.label }));
     setShowTimePicker(false);
+  };
+
+  const formatDateForInput = (date: Date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
 
   const handleSubmit = async () => {
@@ -191,104 +200,87 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
 
             {formData.schedulingType !== 'depositIdea' && (
               <>
-                <View style={styles.switchRow}>
-                  <View style={styles.switchContainer}>
-                    <Text style={styles.switchLabel}>Urgent</Text>
-                    <Switch value={formData.is_urgent} onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))} />
+                <View style={styles.compactSwitchRow}>
+                  <View style={styles.compactSwitchContainer}>
+                    <Text style={styles.compactSwitchLabel}>Urgent</Text>
+                    <Switch 
+                      value={formData.is_urgent} 
+                      onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))}
+                      trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
+                      thumbColor={formData.is_urgent ? '#ffffff' : '#f4f3f4'}
+                    />
                   </View>
-                  <View style={styles.switchContainer}>
-                    <Text style={styles.switchLabel}>Important</Text>
-                    <Switch value={formData.is_important} onValueChange={(val) => setFormData(prev => ({...prev, is_important: val}))} />
+                  <View style={styles.compactSwitchContainer}>
+                    <Text style={styles.compactSwitchLabel}>Important</Text>
+                    <Switch 
+                      value={formData.is_important} 
+                      onValueChange={(val) => setFormData(prev => ({...prev, is_important: val}))}
+                      trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
+                      thumbColor={formData.is_important ? '#ffffff' : '#f4f3f4'}
+                    />
                   </View>
                 </View>
                 
-                <View style={styles.switchRow}>
-                  <View style={styles.switchContainer}>
-                    <Text style={styles.switchLabel}>Authentic Deposit</Text>
-                    <Switch value={formData.is_authentic_deposit} onValueChange={(val) => setFormData(prev => ({...prev, is_authentic_deposit: val}))} />
+                <View style={styles.compactSwitchRow}>
+                  <View style={styles.compactSwitchContainer}>
+                    <Text style={styles.compactSwitchLabel}>Authentic Deposit</Text>
+                    <Switch 
+                      value={formData.is_authentic_deposit} 
+                      onValueChange={(val) => setFormData(prev => ({...prev, is_authentic_deposit: val}))}
+                      trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
+                      thumbColor={formData.is_authentic_deposit ? '#ffffff' : '#f4f3f4'}
+                    />
                   </View>
-                  <View style={styles.switchContainer}>
-                    <Text style={styles.switchLabel}>12-Week Goal</Text>
-                    <Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} />
+                  <View style={styles.compactSwitchContainer}>
+                    <Text style={styles.compactSwitchLabel}>12-Week Goal</Text>
+                    <Switch 
+                      value={formData.is_twelve_week_goal} 
+                      onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))}
+                      trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
+                      thumbColor={formData.is_twelve_week_goal ? '#ffffff' : '#f4f3f4'}
+                    />
                   </View>
                 </View>
                 
-                {/* Date and Time Row */}
                 {formData.schedulingType === 'task' && (
                   <>
-                    <Text style={styles.sectionTitle}>Schedule</Text>
-                    <View style={styles.dateTimeRow}>
+                    <Text style={styles.compactSectionTitle}>Schedule</Text>
+                    <View style={styles.compactDateTimeRow}>
                       <TouchableOpacity 
-                        style={[styles.dateTimeButton, styles.dateButton]}
-                        onPress={() => setShowCalendar(true)}
+                        style={styles.compactDateButton}
+                        onPress={() => setShowMiniCalendar(true)}
                       >
-                        <Text style={styles.dateTimeLabel}>Due Date</Text>
-                        <Text style={styles.dateTimeValue}>
-                          {formData.dueDate.toLocaleDateString()}
+                        <Text style={styles.compactInputLabel}>Due Date</Text>
+                        <Text style={styles.compactInputValue}>
+                          {formatDateForInput(formData.dueDate)}
                         </Text>
                       </TouchableOpacity>
                       
                       <TouchableOpacity 
-                        style={[styles.dateTimeButton, styles.timeButton]}
+                        style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
                         onPress={() => setShowTimePicker(true)}
+                        disabled={formData.isAnytime}
                       >
-                        <Text style={styles.dateTimeLabel}>Complete by</Text>
-                        <Text style={styles.dateTimeValue}>
+                        <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
+                        <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>
                           {formData.time}
                         </Text>
                       </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.anytimeContainer}
+                        onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}
+                      >
+                        <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}>
+                          {formData.isAnytime && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.anytimeLabel}>Anytime</Text>
+                      </TouchableOpacity>
                     </View>
                     
-                    {/* Inline Calendar */}
-                    {showCalendar && (
-                      <View style={styles.calendarContainer}>
-                        <Calendar
-                          onDayPress={onCalendarDayPress}
-                          markedDates={{
-                            [formData.dueDate.toISOString().split('T')[0]]: {
-                              selected: true,
-                              selectedColor: '#0078d4',
-                            },
-                          }}
-                          theme={{
-                            backgroundColor: '#ffffff',
-                            calendarBackground: '#ffffff',
-                            textSectionTitleColor: '#b6c1cd',
-                            selectedDayBackgroundColor: '#0078d4',
-                            selectedDayTextColor: '#ffffff',
-                            todayTextColor: '#0078d4',
-                            dayTextColor: '#2d4150',
-                            textDisabledColor: '#d9e1e8',
-                            arrowColor: '#0078d4',
-                            monthTextColor: '#0078d4',
-                            textDayFontWeight: '300',
-                            textMonthFontWeight: 'bold',
-                            textDayHeaderFontWeight: '300',
-                            textDayFontSize: 16,
-                            textMonthFontSize: 16,
-                            textDayHeaderFontSize: 13
-                          }}
-                        />
-                      </View>
-                    )}
-                  </>
-                )}
-                
-                {/* Event Date Picker for Events */}
-                {formData.schedulingType === 'event' && (
-                  <>
-                    <Text style={styles.sectionTitle}>Event Date</Text>
-                    <TouchableOpacity 
-                      style={styles.dateButton}
-                      onPress={() => setShowCalendar(true)}
-                    >
-                      <Text style={styles.dateButtonText}>
-                        {formData.dueDate.toLocaleDateString()}
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    {showCalendar && (
-                      <View style={styles.calendarContainer}>
+                    {/* Mini Calendar */}
+                    {showMiniCalendar && (
+                      <View style={styles.miniCalendarContainer}>
                         <Calendar
                           onDayPress={onCalendarDayPress}
                           markedDates={{
@@ -389,10 +381,10 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
           animationType="slide"
           onRequestClose={() => setShowTimePicker(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.timePickerModal}>
+          <View style={styles.timeModalOverlay}>
+            <View style={styles.timePickerContainer}>
               <View style={styles.timePickerHeader}>
-                <Text style={styles.timePickerTitle}>Select Time</Text>
+                <Text style={styles.timePickerTitle}>Complete by</Text>
                 <TouchableOpacity onPress={() => setShowTimePicker(false)}>
                   <X size={24} color="#6b7280" />
                 </TouchableOpacity>
@@ -416,8 +408,8 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                     </Text>
                   </TouchableOpacity>
                 )}
-                style={styles.timeOptionsList}
                 showsVerticalScrollIndicator={false}
+                style={styles.timeList}
               />
             </View>
           </View>
@@ -436,10 +428,11 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 18, fontWeight: '600' },
     formContent: { padding: 16 },
     input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16 },
-    switchRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
-    switchContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'space-between', paddingHorizontal: 8 },
-    switchLabel: { fontSize: 14, fontWeight: '500', color: '#374151' },
+    compactSwitchRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 },
+    compactSwitchContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'space-between', paddingHorizontal: 8 },
+    compactSwitchLabel: { fontSize: 13, fontWeight: '500', color: '#374151' },
     sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8, marginTop: 8 },
+    compactSectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6, marginTop: 12, color: '#1f2937' },
     selectionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
     chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f3f4f6' },
     chipSelected: { backgroundColor: '#0078d4' },
@@ -452,33 +445,62 @@ const styles = StyleSheet.create({
     toggleChipActive: { backgroundColor: '#0078d4' },
     toggleChipText: { color: '#374151', fontWeight: '500' },
     toggleChipTextActive: { color: 'white', fontWeight: '600' },
-    dateTimeRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-    dateTimeButton: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, backgroundColor: '#ffffff' },
-    dateButton: { backgroundColor: '#f8fafc' },
-    timeButton: { backgroundColor: '#f0f9ff' },
-    dateTimeLabel: { fontSize: 12, fontWeight: '500', color: '#6b7280', marginBottom: 4 },
-    dateTimeValue: { fontSize: 16, fontWeight: '600', color: '#1f2937' },
-    calendarContainer: { marginBottom: 16, backgroundColor: '#ffffff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb' },
-    dateButton: {
-      borderWidth: 1,
-      borderColor: '#d1d5db',
-      borderRadius: 8,
-      padding: 12,
-      backgroundColor: '#ffffff',
-      marginBottom: 16,
+    compactDateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+    compactDateButton: { 
+      flex: 0, 
+      minWidth: 100,
+      borderWidth: 1, 
+      borderColor: '#d1d5db', 
+      borderRadius: 6, 
+      padding: 8, 
+      backgroundColor: '#f8fafc' 
     },
-    dateButtonText: {
-      fontSize: 16,
-      color: '#1f2937',
+    compactTimeButton: { 
+      flex: 0, 
+      minWidth: 90,
+      borderWidth: 1, 
+      borderColor: '#d1d5db', 
+      borderRadius: 6, 
+      padding: 8, 
+      backgroundColor: '#f0f9ff' 
     },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
-    timePickerModal: { backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
+    compactInputLabel: { fontSize: 10, fontWeight: '500', color: '#6b7280', marginBottom: 2 },
+    compactInputValue: { fontSize: 13, fontWeight: '600', color: '#1f2937' },
+    disabledButton: { backgroundColor: '#f3f4f6', opacity: 0.6 },
+    disabledText: { color: '#9ca3af' },
+    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
+    checkbox: { 
+      width: 16, 
+      height: 16, 
+      borderWidth: 1, 
+      borderColor: '#d1d5db', 
+      borderRadius: 3, 
+      marginRight: 6,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#ffffff'
+    },
+    checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
+    checkmark: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
+    anytimeLabel: { fontSize: 12, color: '#374151', fontWeight: '500' },
+    miniCalendarContainer: { 
+      marginBottom: 12, 
+      backgroundColor: '#ffffff', 
+      borderRadius: 8, 
+      padding: 6, 
+      borderWidth: 1, 
+      borderColor: '#e5e7eb',
+      maxWidth: '90%',
+      alignSelf: 'center'
+    },
+    timeModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+    timePickerContainer: { backgroundColor: '#ffffff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '60%' },
     timePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-    timePickerTitle: { fontSize: 18, fontWeight: '600', color: '#1f2937' },
-    timeOptionsList: { maxHeight: 400 },
-    timeOption: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+    timePickerTitle: { fontSize: 16, fontWeight: '600', color: '#1f2937' },
+    timeList: { maxHeight: 300 },
+    timeOption: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
     selectedTimeOption: { backgroundColor: '#eff6ff' },
-    timeOptionText: { fontSize: 16, color: '#374151' },
+    timeOptionText: { fontSize: 15, color: '#374151' },
     selectedTimeOptionText: { color: '#0078d4', fontWeight: '600' },
 });
 
