@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     anytimeLabel: { fontSize: 14 },
     calendarPopup: {
         position: 'absolute',
-        width: 280, // Made smaller
+        width: 220, // Made smaller
         backgroundColor: '#ffffff',
         borderRadius: 8,
         borderWidth: 1,
