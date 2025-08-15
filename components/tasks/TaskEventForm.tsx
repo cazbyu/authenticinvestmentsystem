@@ -47,6 +47,7 @@ const CustomDayComponent = ({ date, state, marking, onPress }) => {
 // --- MAIN FORM COMPONENT ---
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
   const dateInputRef = useRef<TouchableOpacity>(null);
+  const timeInputRef = useRef<TouchableOpacity>(null);
 
   // Helper function to get default time (current time + 1 hour, rounded to nearest 15 min)
   const getDefaultTime = () => {
@@ -269,9 +270,15 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                       </View>
                       
                       <View>
-                        <TouchableOpacity 
+                        <TouchableOpacity
+                          ref={timeInputRef}
                           style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
-                          onPress={() => setShowTimePicker(!showTimePicker)}
+                          onPress={() => {
+                            timeInputRef.current?.measure((_, __, w, h, px, py) => {
+                              setTimePickerPosition({ x: px, y: py, width: w, height: h });
+                              setShowTimePicker(!showTimePicker);
+                            });
+                          }}
                           disabled={formData.isAnytime}
                         >
                           <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
@@ -325,7 +332,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
         {/* Pop-up Time Picker Modal */}
         <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
-                <View style={styles.timePickerPopup}>
+                <View style={[styles.timePickerPopup, { top: timePickerPosition.y, left: timePickerPosition.x + timePickerPosition.width + 8 }]}> 
                     <FlatList
                         data={timeOptions}
                         keyExtractor={(item) => item}
@@ -394,8 +401,8 @@ const styles = StyleSheet.create({
     },
     timePickerPopup: {
         position: 'absolute',
-        width: 140, // Made narrower
-        maxHeight: 200,
+        width: 100, // Made narrower
+        maxHeight: 160,
         backgroundColor: '#ffffff',
         borderRadius: 8,
         borderWidth: 1,
