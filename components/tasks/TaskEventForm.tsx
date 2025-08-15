@@ -191,6 +191,29 @@ const toDateString = (date: Date) => {
     return combined.toISOString();
   };
 
+  const timeStringToMinutes = (time: string) => {
+    const [timePart, period] = time.split(' ');
+    let [hours, minutes] = timePart.split(':').map(Number);
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  };
+
+  const formatDuration = (totalMinutes: number) => {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const parts = [] as string[];
+    if (hours > 0) parts.push(`${hours} hr${hours > 1 ? 's' : ''}`);
+    if (minutes > 0) parts.push(`${minutes} min`);
+    return parts.join(' ') || '0 min';
+  };
+
+  const getDurationLabel = (start: string, end: string) => {
+    let diff = timeStringToMinutes(end) - timeStringToMinutes(start);
+    if (diff <= 0) diff += 24 * 60;
+    return formatDuration(diff);
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -434,11 +457,16 @@ const toDateString = (date: Date) => {
                     <FlatList
                         data={timeOptions}
                         keyExtractor={(item) => item}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity style={styles.timeOptionPopup} onPress={() => onTimeSelect(item)}>
-                                <Text style={styles.timeOptionTextPopup}>{item}</Text>
-                            </TouchableOpacity>
-                        )}
+                        renderItem={({ item }) => {
+                            const label = activeTimeField === 'endTime'
+                                ? `${item} (${getDurationLabel(formData.startTime, item)})`
+                                : item;
+                            return (
+                                <TouchableOpacity style={styles.timeOptionPopup} onPress={() => onTimeSelect(item)}>
+                                    <Text style={styles.timeOptionTextPopup}>{label}</Text>
+                                </TouchableOpacity>
+                            );
+                        }}
                     />
                 </View>
             </TouchableOpacity>
