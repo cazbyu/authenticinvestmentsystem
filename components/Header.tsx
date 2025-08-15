@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { Menu, ArrowUpDown } from 'lucide-react-native';
+import { Menu, ArrowUpDown, ChevronLeft } from 'lucide-react-native';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -16,17 +17,23 @@ interface HeaderProps {
 
 export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85 }: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
+  const router = useRouter();
+  const canGoBack = router.canGoBack();
 
-  const openDrawer = () => {
-    navigation.openDrawer();
+  const handleLeftButtonPress = () => {
+    if (canGoBack) {
+      router.back();
+    } else {
+      navigation.openDrawer();
+    }
   };
 
   return (
     <View style={styles.container}>
       {/* Top section with menu and score */}
       <View style={styles.topSection}>
-        <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
-          <Menu size={24} color="#ffffff" />
+        <TouchableOpacity style={styles.menuButton} onPress={handleLeftButtonPress}>
+          {canGoBack ? <ChevronLeft size={24} color="#ffffff" /> : <Menu size={24} color="#ffffff" />}
         </TouchableOpacity>
         
         <View style={styles.titleSection}>
