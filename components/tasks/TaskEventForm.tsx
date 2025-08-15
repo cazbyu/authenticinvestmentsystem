@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
+import { Modal, FlatList } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Calendar } from 'react-native-calendars';
 import { supabase } from "@/lib/supabase";
 import { X } from 'lucide-react-native';
 
@@ -23,6 +25,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
     title: '',
     notes: '',
     dueDate: new Date(),
+    time: '9:00 AM',
     is_urgent: false,
     is_important: false,
     is_authentic_deposit: false,
@@ -41,9 +44,26 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
 
   const [loading, setLoading] = useState(false);
   
-  // Date picker state
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  // Calendar and time picker state
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
+  // Generate time options in 15-minute increments
+  const generateTimeOptions = () => {
+    const times = [];
+    for (let hour = 0; hour < 24; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+        const ampm = hour < 12 ? 'AM' : 'PM';
+        const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+        times.push({ value: time24, label: time12 });
+      }
+    }
+    return times;
+  };
+
+  const timeOptions = generateTimeOptions();
   // Fetch all the options for the form selects
   useEffect(() => {
     const fetchOptions = async () => {
@@ -73,11 +93,15 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
     });
   };
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setFormData(prev => ({ ...prev, dueDate: selectedDate }));
-    }
+  const onCalendarDayPress = (day: any) => {
+    const selectedDate = new Date(day.dateString);
+    setFormData(prev => ({ ...prev, dueDate: selectedDate }));
+    setShowCalendar(false);
+  };
+
+  const onTimeSelect = (timeOption: { value: string; label: string }) => {
+    setFormData(prev => ({ ...prev, time: timeOption.label }));
+    setShowTimePicker(false);
   };
 
   const handleSubmit = async () => {
@@ -167,41 +191,134 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
 
             {formData.schedulingType !== 'depositIdea' && (
               <>
-                <View style={styles.switchContainer}>
-                    <Text>Urgent</Text>
+                <View style={styles.switchRow}>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>Urgent</Text>
                     <Switch value={formData.is_urgent} onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))} />
-                </View>
-                <View style={styles.switchContainer}>
-                    <Text>Important</Text>
+                  </View>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>Important</Text>
                     <Switch value={formData.is_important} onValueChange={(val) => setFormData(prev => ({...prev, is_important: val}))} />
+                  </View>
                 </View>
-                <View style={styles.switchContainer}>
-                    <Text>Authentic Deposit</Text>
+                
+                <View style={styles.switchRow}>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>Authentic Deposit</Text>
                     <Switch value={formData.is_authentic_deposit} onValueChange={(val) => setFormData(prev => ({...prev, is_authentic_deposit: val}))} />
-                </View>
-                <View style={styles.switchContainer}>
-                    <Text>12-Week Goal</Text>
+                  </View>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.switchLabel}>12-Week Goal</Text>
                     <Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} />
+                  </View>
                 </View>
                 
-                {/* Date Picker */}
-                <Text style={styles.sectionTitle}>Due Date</Text>
-                <TouchableOpacity 
-                  style={styles.dateButton}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {formData.dueDate.toLocaleDateString()}
-                  </Text>
-                </TouchableOpacity>
+                {/* Date and Time Row */}
+                {formData.schedulingType === 'task' && (
+                  <>
+                    <Text style={styles.sectionTitle}>Schedule</Text>
+                    <View style={styles.dateTimeRow}>
+                      <TouchableOpacity 
+                        style={[styles.dateTimeButton, styles.dateButton]}
+                        onPress={() => setShowCalendar(true)}
+                      >
+                        <Text style={styles.dateTimeLabel}>Due Date</Text>
+                        <Text style={styles.dateTimeValue}>
+                          {formData.dueDate.toLocaleDateString()}
+                        </Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.dateTimeButton, styles.timeButton]}
+                        onPress={() => setShowTimePicker(true)}
+                      >
+                        <Text style={styles.dateTimeLabel}>Complete by</Text>
+                        <Text style={styles.dateTimeValue}>
+                          {formData.time}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {/* Inline Calendar */}
+                    {showCalendar && (
+                      <View style={styles.calendarContainer}>
+                        <Calendar
+                          onDayPress={onCalendarDayPress}
+                          markedDates={{
+                            [formData.dueDate.toISOString().split('T')[0]]: {
+                              selected: true,
+                              selectedColor: '#0078d4',
+                            },
+                          }}
+                          theme={{
+                            backgroundColor: '#ffffff',
+                            calendarBackground: '#ffffff',
+                            textSectionTitleColor: '#b6c1cd',
+                            selectedDayBackgroundColor: '#0078d4',
+                            selectedDayTextColor: '#ffffff',
+                            todayTextColor: '#0078d4',
+                            dayTextColor: '#2d4150',
+                            textDisabledColor: '#d9e1e8',
+                            arrowColor: '#0078d4',
+                            monthTextColor: '#0078d4',
+                            textDayFontWeight: '300',
+                            textMonthFontWeight: 'bold',
+                            textDayHeaderFontWeight: '300',
+                            textDayFontSize: 16,
+                            textMonthFontSize: 16,
+                            textDayHeaderFontSize: 13
+                          }}
+                        />
+                      </View>
+                    )}
+                  </>
+                )}
                 
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={formData.dueDate}
-                    mode="date"
-                    display="default"
-                    onChange={onDateChange}
-                  />
+                {/* Event Date Picker for Events */}
+                {formData.schedulingType === 'event' && (
+                  <>
+                    <Text style={styles.sectionTitle}>Event Date</Text>
+                    <TouchableOpacity 
+                      style={styles.dateButton}
+                      onPress={() => setShowCalendar(true)}
+                    >
+                      <Text style={styles.dateButtonText}>
+                        {formData.dueDate.toLocaleDateString()}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    {showCalendar && (
+                      <View style={styles.calendarContainer}>
+                        <Calendar
+                          onDayPress={onCalendarDayPress}
+                          markedDates={{
+                            [formData.dueDate.toISOString().split('T')[0]]: {
+                              selected: true,
+                              selectedColor: '#0078d4',
+                            },
+                          }}
+                          theme={{
+                            backgroundColor: '#ffffff',
+                            calendarBackground: '#ffffff',
+                            textSectionTitleColor: '#b6c1cd',
+                            selectedDayBackgroundColor: '#0078d4',
+                            selectedDayTextColor: '#ffffff',
+                            todayTextColor: '#0078d4',
+                            dayTextColor: '#2d4150',
+                            textDisabledColor: '#d9e1e8',
+                            arrowColor: '#0078d4',
+                            monthTextColor: '#0078d4',
+                            textDayFontWeight: '300',
+                            textMonthFontWeight: 'bold',
+                            textDayHeaderFontWeight: '300',
+                            textDayFontSize: 16,
+                            textMonthFontSize: 16,
+                            textDayHeaderFontSize: 13
+                          }}
+                        />
+                      </View>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -264,6 +381,48 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
             />
 
         </ScrollView>
+        
+        {/* Time Picker Modal */}
+        <Modal
+          visible={showTimePicker}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowTimePicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.timePickerModal}>
+              <View style={styles.timePickerHeader}>
+                <Text style={styles.timePickerTitle}>Select Time</Text>
+                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                  <X size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={timeOptions}
+                keyExtractor={(item) => item.value}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.timeOption,
+                      formData.time === item.label && styles.selectedTimeOption
+                    ]}
+                    onPress={() => onTimeSelect(item)}
+                  >
+                    <Text style={[
+                      styles.timeOptionText,
+                      formData.time === item.label && styles.selectedTimeOptionText
+                    ]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                style={styles.timeOptionsList}
+                showsVerticalScrollIndicator={false}
+              />
+            </View>
+          </View>
+        </Modal>
+        
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
             <Text style={styles.submitButtonText}>{loading ? 'Saving...' : 'Save Action'}</Text>
         </TouchableOpacity>
@@ -277,7 +436,9 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 18, fontWeight: '600' },
     formContent: { padding: 16 },
     input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16 },
-    switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingHorizontal: 4 },
+    switchRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
+    switchContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'space-between', paddingHorizontal: 8 },
+    switchLabel: { fontSize: 14, fontWeight: '500', color: '#374151' },
     sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8, marginTop: 8 },
     selectionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
     chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f3f4f6' },
@@ -291,6 +452,13 @@ const styles = StyleSheet.create({
     toggleChipActive: { backgroundColor: '#0078d4' },
     toggleChipText: { color: '#374151', fontWeight: '500' },
     toggleChipTextActive: { color: 'white', fontWeight: '600' },
+    dateTimeRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+    dateTimeButton: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, backgroundColor: '#ffffff' },
+    dateButton: { backgroundColor: '#f8fafc' },
+    timeButton: { backgroundColor: '#f0f9ff' },
+    dateTimeLabel: { fontSize: 12, fontWeight: '500', color: '#6b7280', marginBottom: 4 },
+    dateTimeValue: { fontSize: 16, fontWeight: '600', color: '#1f2937' },
+    calendarContainer: { marginBottom: 16, backgroundColor: '#ffffff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e5e7eb' },
     dateButton: {
       borderWidth: 1,
       borderColor: '#d1d5db',
@@ -303,6 +471,15 @@ const styles = StyleSheet.create({
       fontSize: 16,
       color: '#1f2937',
     },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+    timePickerModal: { backgroundColor: '#ffffff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
+    timePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+    timePickerTitle: { fontSize: 18, fontWeight: '600', color: '#1f2937' },
+    timeOptionsList: { maxHeight: 400 },
+    timeOption: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+    selectedTimeOption: { backgroundColor: '#eff6ff' },
+    timeOptionText: { fontSize: 16, color: '#374151' },
+    selectedTimeOptionText: { color: '#0078d4', fontWeight: '600' },
 });
 
 export default TaskEventForm;
