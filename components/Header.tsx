@@ -1,6 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { Menu, ArrowUpDown } from 'lucide-react-native';
+
+type DrawerNavigation = DrawerNavigationProp<any>;
 
 interface HeaderProps {
   activeView: 'deposits' | 'ideas';
@@ -10,11 +14,17 @@ interface HeaderProps {
 }
 
 export function Header({ activeView, onViewChange, onSortPress, authenticScore = 85 }: HeaderProps) {
+  const navigation = useNavigation<DrawerNavigation>();
+
+  const openDrawer = () => {
+    navigation.openDrawer();
+  };
+
   return (
     <View style={styles.container}>
       {/* Top section with menu and score */}
       <View style={styles.topSection}>
-        <TouchableOpacity style={styles.menuButton}>
+        <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
           <Menu size={24} color="#ffffff" />
         </TouchableOpacity>
         

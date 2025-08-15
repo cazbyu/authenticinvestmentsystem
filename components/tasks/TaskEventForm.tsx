@@ -1,13 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from "@/lib/supabase";
 import { X } from 'lucide-react-native';
-import { Calendar } from 'react-native-calendars';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-
-// Complete the auth session
-WebBrowser.maybeCompleteAuthSession();
 
 // --- TYPE DEFINITIONS ---
 interface TaskEventFormProps {
@@ -21,12 +16,6 @@ interface Role { id: string; label: string; }
 interface Domain { id: string; name: string; }
 interface KeyRelationship { id: string; name: string; role_id: string; }
 interface TwelveWeekGoal { id: string; title: string; }
-
-// Google OAuth configuration
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID'; // Replace with your actual client ID
-const redirectUri = AuthSession.makeRedirectUri({
-  scheme: 'your-app-scheme', // Replace with your app scheme
-});
 
 // --- THE COMPONENT ---
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
@@ -52,36 +41,8 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
 
   const [loading, setLoading] = useState(false);
   
-  // Google Calendar integration state
-  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
-  const [addToGoogleCalendar, setAddToGoogleCalendar] = useState(false);
-  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
-
-  // Google OAuth request
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: GOOGLE_CLIENT_ID,
-      scopes: ['https://www.googleapis.com/auth/calendar.events'],
-      redirectUri,
-      responseType: AuthSession.ResponseType.Token,
-    },
-    {
-      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-    }
-  );
-
-  // Handle Google OAuth response
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { access_token } = response.params;
-      setGoogleAccessToken(access_token);
-      setIsConnectingGoogle(false);
-      Alert.alert('Success', 'Connected to Google Calendar!');
-    } else if (response?.type === 'error') {
-      setIsConnectingGoogle(false);
-      Alert.alert('Error', 'Failed to connect to Google Calendar');
-    }
-  }, [response]);
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Fetch all the options for the form selects
   useEffect(() => {
@@ -112,53 +73,10 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
     });
   };
 
-  const connectToGoogle = async () => {
-    setIsConnectingGoogle(true);
-    try {
-      await promptAsync();
-    } catch (error) {
-      setIsConnectingGoogle(false);
-      Alert.alert('Error', 'Failed to connect to Google Calendar');
-    }
-  };
-
-  const pushToGoogleCalendar = async (taskData: any) => {
-    if (!googleAccessToken) return;
-
-    try {
-      const startDateTime = new Date(formData.dueDate);
-      const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour duration
-
-      const event = {
-        summary: formData.title,
-        description: formData.notes,
-        start: {
-          dateTime: startDateTime.toISOString(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
-        end: {
-          dateTime: endDateTime.toISOString(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
-      };
-
-      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${googleAccessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create Google Calendar event');
-      }
-
-      Alert.alert('Success', 'Event added to Google Calendar!');
-    } catch (error) {
-      console.error('Error adding to Google Calendar:', error);
-      Alert.alert('Error', 'Failed to add event to Google Calendar');
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setFormData(prev => ({ ...prev, dueDate: selectedDate }));
     }
   };
 
@@ -206,11 +124,6 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
         if (domainJoins.length > 0) await supabase.from('0007-ap-universal-domains-join').insert(domainJoins);
         if (krJoins.length > 0) await supabase.from('0007-ap-universal-key-relationships-join').insert(krJoins);
 
-        // 3. Push to Google Calendar if enabled
-        if (addToGoogleCalendar && googleAccessToken) {
-          await pushToGoogleCalendar(taskData);
-        }
-
         onSubmitSuccess();
         onClose();
 
@@ -222,20 +135,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
     }
   };
 
-  const onDayPress = (day: any) => {
-    const selectedDate = new Date(day.dateString);
-    setFormData(prev => ({ ...prev, dueDate: selectedDate }));
-  };
-
   const filteredKeyRelationships = keyRelationships.filter(kr => formData.selectedRoleIds.includes(kr.role_id));
-
-  // Format date for calendar marking
-  const markedDates = {
-    [formData.dueDate.toISOString().split('T')[0]]: {
-      selected: true,
-      selectedColor: '#0078d4',
-    },
-  };
 
   return (
     <View style={styles.formContainer}>
@@ -265,32 +165,6 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
               ))}
             </View>
 
-            {/* Google Calendar Connection */}
-            <View style={styles.googleSection}>
-              {!googleAccessToken ? (
-                <TouchableOpacity 
-                  style={styles.googleConnectButton} 
-                  onPress={connectToGoogle}
-                  disabled={isConnectingGoogle}
-                >
-                  <Text style={styles.googleConnectButtonText}>
-                    {isConnectingGoogle ? 'Connecting...' : 'Connect to Google Calendar'}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.googleConnectedContainer}>
-                  <Text style={styles.googleConnectedText}>✓ Connected to Google Calendar</Text>
-                  <View style={styles.switchContainer}>
-                    <Text>Add to Google Calendar</Text>
-                    <Switch 
-                      value={addToGoogleCalendar} 
-                      onValueChange={setAddToGoogleCalendar} 
-                    />
-                  </View>
-                </View>
-              )}
-            </View>
-
             {formData.schedulingType !== 'depositIdea' && (
               <>
                 <View style={styles.switchContainer}>
@@ -310,34 +184,25 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                     <Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} />
                 </View>
                 
-                {/* Calendar View */}
-                <Text style={styles.sectionTitle}>Select Due Date</Text>
-                <Calendar
-                  onDayPress={onDayPress}
-                  markedDates={markedDates}
-                  theme={{
-                    backgroundColor: '#ffffff',
-                    calendarBackground: '#ffffff',
-                    textSectionTitleColor: '#b6c1cd',
-                    selectedDayBackgroundColor: '#0078d4',
-                    selectedDayTextColor: '#ffffff',
-                    todayTextColor: '#0078d4',
-                    dayTextColor: '#2d4150',
-                    textDisabledColor: '#d9e1e8',
-                    dotColor: '#00adf5',
-                    selectedDotColor: '#ffffff',
-                    arrowColor: '#0078d4',
-                    disabledArrowColor: '#d9e1e8',
-                    monthTextColor: '#0078d4',
-                    indicatorColor: '#0078d4',
-                    textDayFontWeight: '300',
-                    textMonthFontWeight: 'bold',
-                    textDayHeaderFontWeight: '300',
-                    textDayFontSize: 16,
-                    textMonthFontSize: 16,
-                    textDayHeaderFontSize: 13
-                  }}
-                />
+                {/* Date Picker */}
+                <Text style={styles.sectionTitle}>Due Date</Text>
+                <TouchableOpacity 
+                  style={styles.dateButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={styles.dateButtonText}>
+                    {formData.dueDate.toLocaleDateString()}
+                  </Text>
+                </TouchableOpacity>
+                
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={formData.dueDate}
+                    mode="date"
+                    display="default"
+                    onChange={onDateChange}
+                  />
+                )}
               </>
             )}
 
@@ -426,30 +291,17 @@ const styles = StyleSheet.create({
     toggleChipActive: { backgroundColor: '#0078d4' },
     toggleChipText: { color: '#374151', fontWeight: '500' },
     toggleChipTextActive: { color: 'white', fontWeight: '600' },
-    googleSection: { marginBottom: 16 },
-    googleConnectButton: { 
-      backgroundColor: '#4285f4', 
-      padding: 12, 
-      borderRadius: 8, 
-      alignItems: 'center' 
+    dateButton: {
+      borderWidth: 1,
+      borderColor: '#d1d5db',
+      borderRadius: 8,
+      padding: 12,
+      backgroundColor: '#ffffff',
+      marginBottom: 16,
     },
-    googleConnectButtonText: { 
-      color: 'white', 
-      fontSize: 16, 
-      fontWeight: '600' 
-    },
-    googleConnectedContainer: { 
-      backgroundColor: '#f0f9ff', 
-      padding: 12, 
-      borderRadius: 8, 
-      borderWidth: 1, 
-      borderColor: '#0078d4' 
-    },
-    googleConnectedText: { 
-      color: '#0078d4', 
-      fontSize: 14, 
-      fontWeight: '600', 
-      marginBottom: 8 
+    dateButtonText: {
+      fontSize: 16,
+      color: '#1f2937',
     },
 });
 
