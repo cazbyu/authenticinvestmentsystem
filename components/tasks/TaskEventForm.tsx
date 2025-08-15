@@ -621,5 +621,31 @@ const styles = StyleSheet.create({
       fontWeight: '600',
     },
 });
+// Add these styles to your StyleSheet at the bottom
 
+dayContainer: {
+  width: 32,
+  height: 32, // <-- Controls the vertical space
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+dayText: {
+  fontSize: 12,
+  color: '#2d4150',
+},
+selectedDay: {
+  backgroundColor: '#0078d4',
+  borderRadius: 16,
+},
+selectedDayText: {
+  color: '#ffffff',
+  fontWeight: 'bold',
+},
+todayText: {
+  color: '#0078d4',
+  fontWeight: 'bold',
+},
+disabledDayText: {
+  color: '#d9e1e8',
+},
 export default TaskEventForm;
