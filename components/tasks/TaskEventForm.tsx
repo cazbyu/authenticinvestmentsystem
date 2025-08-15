@@ -46,6 +46,14 @@ const CustomDayComponent = ({ date, state, marking, onPress }) => {
 
 // --- MAIN FORM COMPONENT ---
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
+
+const toDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
   const dateInputRef = useRef<TouchableOpacity>(null);
   const timeInputRef = useRef<TouchableOpacity>(null);
 
