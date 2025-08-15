@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Modal, FlatList } from 'react-native';
-import { CalendarList } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import { supabase } from "@/lib/supabase";
 import { X } from 'lucide-react-native';
 
@@ -18,6 +18,7 @@ interface KeyRelationship { id: string; name: string; role_id: string; }
 interface TwelveWeekGoal { id: string; title: string; }
 
 // --- CUSTOM DAY COMPONENT for CALENDAR ---
+// This component gives us precise control over the calendar's appearance
 const CustomDayComponent = ({ date, state, marking, onPress }) => {
   const isSelected = marking?.selected;
   const isToday = state === 'today';
@@ -46,8 +47,8 @@ const CustomDayComponent = ({ date, state, marking, onPress }) => {
 // --- MAIN FORM COMPONENT ---
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
   const dateInputRef = useRef<TouchableOpacity>(null);
-  const timeInputRef = useRef<TouchableOpacity>(null);
 
+  // Helper function to get default time (current time + 1 hour, rounded to nearest 15 min)
   const getDefaultTime = () => {
     const now = new Date();
     now.setHours(now.getHours() + 1);
@@ -129,13 +130,15 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
   const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds', id: string) => {
     setFormData(prev => {
       const currentSelection = prev[field] as string[];
-      const newSelection = currentSelection.includes(id) ? currentSelection.filter(itemId => itemId !== id) : [...currentSelection, id];
+      const newSelection = currentSelection.includes(id)
+        ? currentSelection.filter(itemId => itemId !== id)
+        : [...currentSelection, id];
       return { ...prev, [field]: newSelection };
     });
   };
 
   const onCalendarDayPress = (day: any) => {
-    const selectedDate = new Date(day.timestamp);
+    const selectedDate = new Date(day.timestamp); // Use timestamp for timezone consistency
     setFormData(prev => ({ ...prev, dueDate: selectedDate }));
     setDateInputValue(formatDateForInput(selectedDate));
     setShowMiniCalendar(false);
@@ -146,7 +149,13 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
     setShowTimePicker(false);
   };
 
-  const formatDateForInput = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatDateForInput = (date: Date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
 
   const handleDateInputChange = (text: string) => {
     setDateInputValue(text);
@@ -162,21 +171,26 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not found");
 
-        const { data: taskData, error: taskError } = await supabase.from('0007-ap-tasks').insert({
-            user_id: user.id,
-            title: formData.title,
-            is_urgent: formData.is_urgent,
-            is_important: formData.is_important,
-            is_authentic_deposit: formData.is_authentic_deposit,
-            is_twelve_week_goal: formData.is_twelve_week_goal,
-            goal_12wk_id: formData.selectedGoalId,
-            due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString() : null,
-            status: 'pending',
-            type: formData.schedulingType,
-        }).select().single();
+        const { data: taskData, error: taskError } = await supabase
+            .from('0007-ap-tasks')
+            .insert({
+                user_id: user.id,
+                title: formData.title,
+                is_urgent: formData.is_urgent,
+                is_important: formData.is_important,
+                is_authentic_deposit: formData.is_authentic_deposit,
+                is_twelve_week_goal: formData.is_twelve_week_goal,
+                goal_12wk_id: formData.selectedGoalId,
+                due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString() : null,
+                status: 'pending',
+                type: formData.schedulingType,
+            })
+            .select()
+            .single();
 
         if (taskError) throw taskError;
         if (!taskData) throw new Error("Failed to create task");
+
         const taskId = taskData.id;
 
         const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
@@ -195,6 +209,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
 
         onSubmitSuccess();
         onClose();
+
     } catch (error) {
         console.error("Error creating task:", error);
         Alert.alert('Error', 'Failed to create task');
@@ -211,38 +226,63 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
             <Text style={styles.modalTitle}>{mode === 'create' ? 'New Action' : 'Edit Action'}</Text>
             <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
         </View>
-        <ScrollView style={styles.formContent} keyboardShouldPersistTaps="handled">
+        <ScrollView style={styles.formContent}>
             <TextInput style={styles.input} placeholder="Action Title" value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
             
             <View style={styles.schedulingToggle}>
-              {['task', 'event', 'depositIdea'].map(type => (<TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}><Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text></TouchableOpacity>))}
+              {['task', 'event', 'depositIdea'].map(type => (
+                <TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}>
+                  <Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             {formData.schedulingType !== 'depositIdea' && (
               <>
-                <View style={styles.compactSwitchRow}><View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Urgent</Text><Switch value={formData.is_urgent} onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))} /></View><View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Important</Text><Switch value={formData.is_important} onValueChange={(val) => setFormData(prev => ({...prev, is_important: val}))} /></View></View>
-                <View style={styles.compactSwitchRow}><View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Authentic Deposit</Text><Switch value={formData.is_authentic_deposit} onValueChange={(val) => setFormData(prev => ({...prev, is_authentic_deposit: val}))} /></View><View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>12-Week Goal</Text><Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} /></View></View>
+                <View style={styles.compactSwitchRow}>
+                  <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Urgent</Text><Switch value={formData.is_urgent} onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))} /></View>
+                  <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Important</Text><Switch value={formData.is_important} onValueChange={(val) => setFormData(prev => ({...prev, is_important: val}))} /></View>
+                </View>
+                <View style={styles.compactSwitchRow}>
+                  <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Authentic Deposit</Text><Switch value={formData.is_authentic_deposit} onValueChange={(val) => setFormData(prev => ({...prev, is_authentic_deposit: val}))} /></View>
+                  <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>12-Week Goal</Text><Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} /></View>
+                </View>
                 
                 {formData.schedulingType === 'task' && (
                   <>
                     <Text style={styles.compactSectionTitle}>Schedule</Text>
                     <View style={styles.compactDateTimeRow}>
-                      <TouchableOpacity ref={dateInputRef} style={styles.compactDateButton} onPress={() => { dateInputRef.current?.measure((fx, fy, width, height, px, py) => { setDatePickerPosition({ x: px, y: py, width, height }); setShowMiniCalendar(true); }); }}>
-                        <Text style={styles.compactInputLabel}>Due Date</Text>
-                        <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
-                      </TouchableOpacity>
+                      <View>
+                        <TouchableOpacity 
+                          ref={dateInputRef}
+                          style={styles.compactDateButton}
+                          onPress={() => {
+                            dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
+                              setDatePickerPosition({ x: px, y: py, width, height });
+                              setShowMiniCalendar(!showMiniCalendar);
+                            });
+                          }}
+                        >
+                          <Text style={styles.compactInputLabel}>Due Date</Text>
+                          <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
+                        </TouchableOpacity>
+                      </View>
                       
-                      <View style={styles.timeAndAnytimeContainer}>
-                        <TouchableOpacity ref={timeInputRef} style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]} onPress={() => { timeInputRef.current?.measure((fx, fy, width, height, px, py) => { setTimePickerPosition({ x: px, y: py, width, height }); setShowTimePicker(true); }); }} disabled={formData.isAnytime}>
+                      <View>
+                        <TouchableOpacity 
+                          style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
+                          onPress={() => setShowTimePicker(!showTimePicker)}
+                          disabled={formData.isAnytime}
+                        >
                           <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
                           <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.time}</Text>
                         </TouchableOpacity>
-                        
-                        <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
-                          <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
-                          <Text style={styles.anytimeLabel}>Anytime</Text>
-                        </TouchableOpacity>
                       </View>
+                      
+                      <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
+                        <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
+                        <Text style={styles.anytimeLabel}>Anytime</Text>
+                      </TouchableOpacity>
                     </View>
                   </>
                 )}
@@ -250,36 +290,51 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
             )}
 
             <Text style={styles.sectionTitle}>Roles</Text>
-            <View style={styles.selectionGrid}>{roles.map(role => (<TouchableOpacity key={role.id} style={[styles.chip, formData.selectedRoleIds.includes(role.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedRoleIds', role.id)}><Text style={formData.selectedRoleIds.includes(role.id) ? styles.chipTextSelected : styles.chipText}>{role.label}</Text></TouchableOpacity>))}</View>
-            {filteredKeyRelationships.length > 0 && (<><Text style={styles.sectionTitle}>Key Relationships</Text><View style={styles.selectionGrid}>{filteredKeyRelationships.map(kr => (<TouchableOpacity key={kr.id} style={[styles.chip, formData.selectedKeyRelationshipIds.includes(kr.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}><Text style={formData.selectedKeyRelationshipIds.includes(kr.id) ? styles.chipTextSelected : styles.chipText}>{kr.name}</Text></TouchableOpacity>))}</View></>)}
+            <View style={styles.selectionGrid}>
+                {roles.map(role => (<TouchableOpacity key={role.id} style={[styles.chip, formData.selectedRoleIds.includes(role.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedRoleIds', role.id)}><Text style={formData.selectedRoleIds.includes(role.id) ? styles.chipTextSelected : styles.chipText}>{role.label}</Text></TouchableOpacity>))}
+            </View>
+
+            {filteredKeyRelationships.length > 0 && (
+                <><Text style={styles.sectionTitle}>Key Relationships</Text><View style={styles.selectionGrid}>{filteredKeyRelationships.map(kr => (<TouchableOpacity key={kr.id} style={[styles.chip, formData.selectedKeyRelationshipIds.includes(kr.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}><Text style={formData.selectedKeyRelationshipIds.includes(kr.id) ? styles.chipTextSelected : styles.chipText}>{kr.name}</Text></TouchableOpacity>))}</View></>
+            )}
+
             <Text style={styles.sectionTitle}>Domains</Text>
-            <View style={styles.selectionGrid}>{domains.map(domain => (<TouchableOpacity key={domain.id} style={[styles.chip, formData.selectedDomainIds.includes(domain.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}><Text style={formData.selectedDomainIds.includes(domain.id) ? styles.chipTextSelected : styles.chipText}>{domain.name}</Text></TouchableOpacity>))}</View>
+            <View style={styles.selectionGrid}>
+                {domains.map(domain => (<TouchableOpacity key={domain.id} style={[styles.chip, formData.selectedDomainIds.includes(domain.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}><Text style={formData.selectedDomainIds.includes(domain.id) ? styles.chipTextSelected : styles.chipText}>{domain.name}</Text></TouchableOpacity>))}
+            </View>
+
             <TextInput style={[styles.input, { height: 100 }]} placeholder="Notes..." value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
         </ScrollView>
         
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}><Text style={styles.submitButtonText}>{loading ? 'Saving...' : 'Save Action'}</Text></TouchableOpacity>
 
+        {/* Pop-up Mini Calendar Modal */}
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
-            <View onStartShouldSetResponder={() => true} style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height + 2, left: datePickerPosition.x }]}>
-              <View style={{height: 280}}>
-                <CalendarList
-                  onDayPress={onCalendarDayPress}
-                  markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
-                  dayComponent={CustomDayComponent}
-                  hideExtraDays={true}
-                  pastScrollRange={12}
-                  futureScrollRange={12}
-                />
-              </View>
+            <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}>
+              <Calendar
+                onDayPress={onCalendarDayPress}
+                markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
+                dayComponent={CustomDayComponent}
+                hideExtraDays={true}
+              />
             </View>
           </TouchableOpacity>
         </Modal>
 
+        {/* Pop-up Time Picker Modal */}
         <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
-                <View onStartShouldSetResponder={() => true} style={[styles.timePickerPopup, { top: timePickerPosition.y + timePickerPosition.height + 2, left: timePickerPosition.x }]}>
-                    <FlatList data={timeOptions} keyExtractor={(item) => item} renderItem={({ item }) => (<TouchableOpacity style={styles.timeOptionPopup} onPress={() => onTimeSelect(item)}><Text style={styles.timeOptionTextPopup}>{item}</Text></TouchableOpacity>)} />
+                <View style={styles.timePickerPopup}>
+                    <FlatList
+                        data={timeOptions}
+                        keyExtractor={(item) => item}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity style={styles.timeOptionPopup} onPress={() => onTimeSelect(item)}>
+                                <Text style={styles.timeOptionTextPopup}>{item}</Text>
+                            </TouchableOpacity>
+                        )}
+                    />
                 </View>
             </TouchableOpacity>
         </Modal>
@@ -310,23 +365,22 @@ const styles = StyleSheet.create({
     toggleChipActive: { backgroundColor: '#0078d4' },
     toggleChipText: { color: '#374151', fontWeight: '500' },
     toggleChipTextActive: { color: 'white', fontWeight: '600' },
-    compactDateTimeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    compactDateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
     compactDateButton: { flex: 0, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f8fafc' },
     dateTextInput: { fontSize: 14, fontWeight: '500', padding: 0 },
-    timeAndAnytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 8, flex: 1 },
-    compactTimeButton: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f0f9ff' },
+    compactTimeButton: { flex: 0, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f0f9ff' },
     compactInputLabel: { fontSize: 10, color: '#6b7280', marginBottom: 2 },
     compactInputValue: { fontSize: 14, fontWeight: '500' },
     disabledButton: { backgroundColor: '#f3f4f6' },
     disabledText: { color: '#9ca3af' },
-    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
+    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' },
     checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 3, marginRight: 6, justifyContent: 'center', alignItems: 'center' },
     checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
     checkmark: { color: 'white', fontSize: 12, fontWeight: 'bold' },
     anytimeLabel: { fontSize: 14 },
     calendarPopup: {
         position: 'absolute',
-        width: 250, // Made smaller
+        width: 280, // Made smaller
         backgroundColor: '#ffffff',
         borderRadius: 8,
         borderWidth: 1,
@@ -336,10 +390,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 5,
+        zIndex: 1000,
     },
     timePickerPopup: {
         position: 'absolute',
-        width: 110, // Made narrower
+        width: 140, // Made narrower
         maxHeight: 200,
         backgroundColor: '#ffffff',
         borderRadius: 8,
@@ -350,12 +405,13 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 5,
+        zIndex: 1000,
     },
     timeOptionPopup: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-    timeOptionTextPopup: { textAlign: 'center', fontSize: 14 },
-    dayContainer: { width: 32, height: 24, justifyContent: 'center', alignItems: 'center' }, // Reduced height
+    timeOptionTextPopup: { textAlign: 'center' },
+    dayContainer: { width: 32, height: 28, justifyContent: 'center', alignItems: 'center' },
     dayText: { fontSize: 12 },
-    selectedDay: { backgroundColor: '#0078d4', borderRadius: 12, width: 24, height: 24 }, // Made smaller
+    selectedDay: { backgroundColor: '#0078d4', borderRadius: 14, width: 28, height: 28 },
     selectedDayText: { color: 'white' },
     todayText: { color: '#0078d4', fontWeight: 'bold' },
     disabledDayText: { color: '#d9e1e8' },
