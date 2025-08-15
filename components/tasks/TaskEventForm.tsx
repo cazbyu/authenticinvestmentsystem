@@ -200,6 +200,8 @@ const toDateString = (date: Date) => {
   };
 
   const formatDuration = (totalMinutes: number) => {
+    const hours = Math.round((totalMinutes / 60) * 100) / 100;
+    return `${hours} hr${hours === 1 ? '' : 's'}`
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     const parts = [] as string[];
