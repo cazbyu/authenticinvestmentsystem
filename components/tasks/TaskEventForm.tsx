@@ -56,11 +56,13 @@ const toDateString = (date: Date) => {
   
   const dateInputRef = useRef<TouchableOpacity>(null);
   const timeInputRef = useRef<TouchableOpacity>(null);
+  const startTimeInputRef = useRef<TouchableOpacity>(null);
+  const endTimeInputRef = useRef<TouchableOpacity>(null);
 
-  // Helper function to get default time (current time + 1 hour, rounded to nearest 15 min)
-  const getDefaultTime = () => {
+  // Helper function to get default time (current time + offset hours, rounded to nearest 15 min)
+  const getDefaultTime = (addHours: number = 1) => {
     const now = new Date();
-    now.setHours(now.getHours() + 1);
+    now.setHours(now.getHours() + addHours);
     const minutes = Math.ceil(now.getMinutes() / 15) * 15;
     now.setMinutes(minutes, 0, 0);
     const hour12 = now.getHours() === 0 ? 12 : now.getHours() > 12 ? now.getHours() - 12 : now.getHours();
@@ -73,6 +75,8 @@ const toDateString = (date: Date) => {
     notes: '',
     dueDate: new Date(),
     time: getDefaultTime(),
+    startTime: getDefaultTime(),
+    endTime: getDefaultTime(2),
     isAnytime: false,
     is_urgent: false,
     is_important: false,
@@ -95,7 +99,8 @@ const toDateString = (date: Date) => {
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [dateInputValue, setDateInputValue] = useState('');
-  
+  const [activeTimeField, setActiveTimeField] = useState<'time' | 'startTime' | 'endTime' | null>(null);
+
   const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -154,7 +159,9 @@ const toDateString = (date: Date) => {
   };
 
   const onTimeSelect = (time: string) => {
-    setFormData(prev => ({ ...prev, time }));
+    if (activeTimeField) {
+      setFormData(prev => ({ ...prev, [activeTimeField]: time }));
+    }
     setShowTimePicker(false);
   };
 
@@ -174,26 +181,43 @@ const toDateString = (date: Date) => {
     }
   };
 
+  const combineDateAndTime = (date: Date, time: string) => {
+    const [timePart, period] = time.split(' ');
+    let [hours, minutes] = timePart.split(':').map(Number);
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    const combined = new Date(date);
+    combined.setHours(hours, minutes, 0, 0);
+    return combined.toISOString();
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not found");
 
+        const payload: any = {
+            user_id: user.id,
+            title: formData.title,
+            is_urgent: formData.is_urgent,
+            is_important: formData.is_important,
+            is_authentic_deposit: formData.is_authentic_deposit,
+            is_twelve_week_goal: formData.is_twelve_week_goal,
+            goal_12wk_id: formData.selectedGoalId,
+            status: 'pending',
+            type: formData.schedulingType,
+            due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString() : null,
+        };
+
+        if (formData.schedulingType === 'event' && !formData.isAnytime) {
+            payload.start_time = combineDateAndTime(formData.dueDate, formData.startTime);
+            payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
+        }
+
         const { data: taskData, error: taskError } = await supabase
             .from('0007-ap-tasks')
-            .insert({
-                user_id: user.id,
-                title: formData.title,
-                is_urgent: formData.is_urgent,
-                is_important: formData.is_important,
-                is_authentic_deposit: formData.is_authentic_deposit,
-                is_twelve_week_goal: formData.is_twelve_week_goal,
-                goal_12wk_id: formData.selectedGoalId,
-                due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString() : null,
-                status: 'pending',
-                type: formData.schedulingType,
-            })
+            .insert(payload)
             .select()
             .single();
 
@@ -284,7 +308,8 @@ const toDateString = (date: Date) => {
                           onPress={() => {
                             timeInputRef.current?.measure((_, __, w, h, px, py) => {
                               setTimePickerPosition({ x: px, y: py, width: w, height: h });
-                              setShowTimePicker(!showTimePicker);
+                              setActiveTimeField('time');
+                              setShowTimePicker(true);
                             });
                           }}
                           disabled={formData.isAnytime}
@@ -294,6 +319,69 @@ const toDateString = (date: Date) => {
                         </TouchableOpacity>
                       </View>
                       
+                      <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
+                        <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
+                        <Text style={styles.anytimeLabel}>Anytime</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+                {formData.schedulingType === 'event' && (
+                  <>
+                    <Text style={styles.compactSectionTitle}>Schedule</Text>
+                    <View style={styles.compactDateTimeRow}>
+                      <View>
+                        <TouchableOpacity
+                          ref={dateInputRef}
+                          style={styles.compactDateButton}
+                          onPress={() => {
+                            dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
+                              setDatePickerPosition({ x: px, y: py, width, height });
+                              setShowMiniCalendar(!showMiniCalendar);
+                            });
+                          }}
+                        >
+                          <Text style={styles.compactInputLabel}>Date</Text>
+                          <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
+                        </TouchableOpacity>
+                      </View>
+
+                      <View>
+                        <TouchableOpacity
+                          ref={startTimeInputRef}
+                          style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
+                          onPress={() => {
+                            startTimeInputRef.current?.measure((_, __, w, h, px, py) => {
+                              setTimePickerPosition({ x: px, y: py, width: w, height: h });
+                              setActiveTimeField('startTime');
+                              setShowTimePicker(true);
+                            });
+                          }}
+                          disabled={formData.isAnytime}
+                        >
+                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Start</Text>
+                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.startTime}</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View>
+                        <TouchableOpacity
+                          ref={endTimeInputRef}
+                          style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
+                          onPress={() => {
+                            endTimeInputRef.current?.measure((_, __, w, h, px, py) => {
+                              setTimePickerPosition({ x: px, y: py, width: w, height: h });
+                              setActiveTimeField('endTime');
+                              setShowTimePicker(true);
+                            });
+                          }}
+                          disabled={formData.isAnytime}
+                        >
+                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>End</Text>
+                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.endTime}</Text>
+                        </TouchableOpacity>
+                      </View>
+
                       <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
                         <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
                         <Text style={styles.anytimeLabel}>Anytime</Text>
