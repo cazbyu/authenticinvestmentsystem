@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     compactInputValue: { fontSize: 14, fontWeight: '500' },
     disabledButton: { backgroundColor: '#f3f4f6' },
     disabledText: { color: '#9ca3af' },
-    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' },
+    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
     checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 3, marginRight: 6, justifyContent: 'center', alignItems: 'center' },
     checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
     checkmark: { color: 'white', fontSize: 12, fontWeight: 'bold' },
