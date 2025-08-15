@@ -66,7 +66,7 @@ const toDateString = (date: Date) => {
     const minutes = Math.ceil(now.getMinutes() / 15) * 15;
     now.setMinutes(minutes, 0, 0);
     const hour12 = now.getHours() === 0 ? 12 : now.getHours() > 12 ? now.getHours() - 12 : now.getHours();
-    const ampm = now.getHours() < 12 ? 'AM' : 'PM';
+    const ampm = now.getHours() < 12 ? 'am' : 'pm';
     return `${hour12}:${now.getMinutes().toString().padStart(2, '0')} ${ampm}`;
   };
 
@@ -113,7 +113,7 @@ const toDateString = (date: Date) => {
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
         const hour12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-        const ampm = hour < 12 ? 'AM' : 'PM';
+        const ampm = hour < 12 ? 'am' : 'pm';
         const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
         times.push(time12);
       }
@@ -184,8 +184,8 @@ const toDateString = (date: Date) => {
   const combineDateAndTime = (date: Date, time: string) => {
     const [timePart, period] = time.split(' ');
     let [hours, minutes] = timePart.split(':').map(Number);
-    if (period === 'PM' && hours < 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
+    if (period === 'pm' && hours < 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
     const combined = new Date(date);
     combined.setHours(hours, minutes, 0, 0);
     return combined.toISOString();
@@ -194,8 +194,8 @@ const toDateString = (date: Date) => {
   const timeStringToMinutes = (time: string) => {
     const [timePart, period] = time.split(' ');
     let [hours, minutes] = timePart.split(':').map(Number);
-    if (period === 'PM' && hours < 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
+    if (period === 'pm' && hours < 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
     return hours * 60 + minutes;
   };
 
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
         zIndex: 1000,
     },
     timeOptionPopup: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-    timeOptionTextPopup: { textAlign: 'center' },
+    timeOptionTextPopup: { textAlign: 'center', fontSize: 12 },
     dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
     dayText: { fontSize: 8 },
     selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
