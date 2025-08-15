@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Rocket, X, FileText, Paperclip, Users } from 'lucide-react-native';
+import { Rocket, X, FileText, Paperclip, Users, Plus } from 'lucide-react-native';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { Header } from '@/components/Header';
+import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { supabase } from '@/lib/supabase';
 
 interface Task {
@@ -27,7 +29,13 @@ interface TaskCardProps {
   onComplete: (taskId: string) => void;
 }
 
-function TaskCard({ task, onComplete }: TaskCardProps) {
+interface TaskCardProps {
+  task: Task;
+  onComplete: (taskId: string) => void;
+  onLongPress?: () => void;
+}
+
+function TaskCard({ task, onComplete, onLongPress }: TaskCardProps) {
   const getBorderColor = () => {
     if (task.status === "completed") return "#3b82f6"; // blue
     if (task.is_urgent && task.is_important) return "#ef4444"; // red
@@ -43,7 +51,11 @@ function TaskCard({ task, onComplete }: TaskCardProps) {
   };
 
   return (
-    <View style={[styles.taskCard, { borderLeftColor: getBorderColor() }]}>
+    <TouchableOpacity 
+      style={[styles.taskCard, { borderLeftColor: getBorderColor() }]}
+      onLongPress={onLongPress}
+      delayLongPress={200}
+    >
       <View style={styles.taskContent}>
         <View style={styles.taskHeader}>
           <Text style={styles.taskTitle} numberOfLines={2}>
@@ -116,7 +128,7 @@ function TaskCard({ task, onComplete }: TaskCardProps) {
           <Rocket size={18} color="#0078d4" />
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -124,6 +136,7 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
+  const [isFormModalVisible, setIsFormModalVisible] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -260,6 +273,25 @@ export default function Dashboard() {
     }
   };
 
+  const handleFormSubmitSuccess = () => {
+    setIsFormModalVisible(false);
+    fetchData(); // Refresh the task list
+  };
+
+  const handleDragEnd = ({ data }: { data: Task[] }) => {
+    setTasks(data);
+  };
+
+  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => (
+    <View style={[isActive && styles.draggingItem]}>
+      <TaskCard
+        task={item}
+        onComplete={handleCompleteTask}
+        onLongPress={drag}
+      />
+    </View>
+  );
+
   const sortOptions = [
     { value: 'due_date', label: 'Due Date' },
     { value: 'priority', label: 'Priority' },
@@ -275,29 +307,61 @@ export default function Dashboard() {
         authenticScore={85}
       />
       
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.taskList}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading...</Text>
+      <View style={styles.content}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        ) : tasks.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              No {activeView} found
+            </Text>
+          </View>
+        ) : activeView === 'deposits' ? (
+          <DraggableFlatList
+            data={tasks}
+            renderItem={renderDraggableItem}
+            keyExtractor={(item) => item.id}
+            onDragEnd={handleDragEnd}
+            contentContainerStyle={styles.taskList}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.taskList}>
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onComplete={handleCompleteTask}
+                />
+              ))}
             </View>
-          ) : tasks.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                No {activeView} found
-              </Text>
-            </View>
-          ) : (
-            tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onComplete={handleCompleteTask}
-              />
-            ))
-          )}
-        </View>
-      </ScrollView>
+          </ScrollView>
+        )}
+      </View>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setIsFormModalVisible(true)}
+      >
+        <Plus size={24} color="#ffffff" />
+      </TouchableOpacity>
+
+      {/* Task Creation Form Modal */}
+      <Modal
+        visible={isFormModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <TaskEventForm
+          mode="create"
+          onSubmitSuccess={handleFormSubmitSuccess}
+          onClose={() => setIsFormModalVisible(false)}
+        />
+      </Modal>
 
       {/* Sort Modal */}
       <Modal
@@ -354,11 +418,20 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
   },
   taskList: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 20,
+  },
+  draggingItem: {
+    opacity: 0.8,
+    transform: [{ scale: 1.02 }],
   },
   taskCard: {
     backgroundColor: '#ffffff',
@@ -453,6 +526,25 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: '#f0f9ff',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#0078d4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   loadingContainer: {
     padding: 40,
