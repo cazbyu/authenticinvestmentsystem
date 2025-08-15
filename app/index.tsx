@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 export default function Index() {
   const [session, setSession] = useState(null);
@@ -8,20 +9,34 @@ export default function Index() {
 
   useEffect(() => {
     const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setLoading(false);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error fetching session:', error);
+        }
+        setSession(session);
+      } catch (error) {
+        console.error('Unexpected error:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchSession();
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
+
+    return () => subscription?.unsubscribe();
   }, []);
 
   if (loading) {
-    return null; // Or a loading spinner
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
   }
 
   if (session && session.user) {
@@ -29,4 +44,3 @@ export default function Index() {
   }
 
   return <Redirect href="/login" />;
-}

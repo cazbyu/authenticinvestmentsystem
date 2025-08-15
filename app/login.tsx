@@ -1,54 +1,252 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
+
+// Complete the auth session for OAuth
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  // Google OAuth configuration
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: 'myapp',
+  });
 
-    if (error) {
-      Alert.alert('Login Error', error.message);
-    } else {
-      // Navigate to the main app screen after successful login
-      router.replace('/(tabs)/dashboard');
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+      scopes: ['openid', 'profile', 'email'],
+      redirectUri,
+      responseType: AuthSession.ResponseType.Code,
+      additionalParameters: {},
+      extraParams: {
+        access_type: 'offline',
+      },
+    },
+    {
+      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
     }
-    setLoading(false);
+  );
+
+  React.useEffect(() => {
+    if (response?.type === 'success') {
+      const { code } = response.params;
+      handleGoogleSignIn(code);
+    }
+  }, [response]);
+
+  const handleGoogleSignIn = async (code: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+        },
+      });
+
+      if (error) {
+        Alert.alert('Google Sign In Error', error.message);
+      } else {
+        router.replace('/(tabs)/dashboard');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to sign in with Google');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        Alert.alert('Login Error', error.message);
+      } else {
+        router.replace('/(tabs)/dashboard');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    if (!email || !password || !confirmPassword || !fullName) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        Alert.alert('Sign Up Error', error.message);
+      } else {
+        Alert.alert(
+          'Success',
+          'Account created successfully! Please check your email to verify your account.',
+          [
+            {
+              text: 'OK',
+              onPress: () => setIsSignUp(false),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignInPress = async () => {
+    try {
+      await promptAsync();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to initiate Google sign in');
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Welcome Back</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          <Text style={styles.buttonText}>{loading ? 'Signing In...' : 'Sign In'}</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.content}>
+          <Text style={styles.title}>
+            {isSignUp ? 'Create Account' : 'Welcome Back'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {isSignUp 
+              ? 'Sign up to start your authentic investment journey' 
+              : 'Sign in to continue your authentic investment journey'
+            }
+          </Text>
+
+          {isSignUp && (
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              value={fullName}
+              onChangeText={setFullName}
+              autoCapitalize="words"
+            />
+          )}
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+          
+          {isSignUp && (
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+          )}
+          
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={isSignUp ? handleSignUp : handleLogin} 
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading 
+                ? (isSignUp ? 'Creating Account...' : 'Signing In...') 
+                : (isSignUp ? 'Create Account' : 'Sign In')
+              }
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.googleButton} 
+            onPress={handleGoogleSignInPress}
+            disabled={loading}
+          >
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.switchButton}
+            onPress={() => {
+              setIsSignUp(!isSignUp);
+              setEmail('');
+              setPassword('');
+              setConfirmPassword('');
+              setFullName('');
+            }}
+          >
+            <Text style={styles.switchButtonText}>
+              {isSignUp 
+                ? 'Already have an account? Sign In' 
+                : "Don't have an account? Sign Up"
+              }
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -57,6 +255,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   content: {
@@ -67,7 +268,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1f2937',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 24,
   },
   input: {
     backgroundColor: '#ffffff',
@@ -83,10 +291,48 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 16,
   },
   buttonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#d1d5db',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  googleButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  googleButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  switchButton: {
+    alignItems: 'center',
+  },
+  switchButtonText: {
+    color: '#0078d4',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
