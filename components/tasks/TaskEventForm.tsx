@@ -313,6 +313,30 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                                   selectedColor: '#0078d4',
                                 },
                               }}
+                              // Add this new component right before your TaskEventForm component
+const CustomDayComponent = ({ date, state, marking, onPress }) => {
+  const isSelected = marking?.selected;
+  const isToday = state === 'today';
+  
+  return (
+    <TouchableOpacity 
+      onPress={() => onPress(date)} 
+      style={[
+        styles.dayContainer, 
+        isSelected && styles.selectedDay
+      ]}
+    >
+      <Text style={[
+        styles.dayText,
+        isToday && !isSelected && styles.todayText,
+        isSelected && styles.selectedDayText,
+        state === 'disabled' && styles.disabledDayText
+      ]}>
+        {date.day}
+      </Text>
+    </TouchableOpacity>
+  );
+};
                               formatWeekDay={(name) => name.charAt(0)}
                               theme={{
                                 backgroundColor: '#ffffff',
