@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import { Header } from '@/components/Header';
 
 // Complete the auth session
 WebBrowser.maybeCompleteAuthSession();
@@ -63,9 +64,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-      </View>
+      <Header title="Settings" />
       
       <ScrollView style={styles.content}>
         {/* Google Calendar Section */}
@@ -142,17 +141,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   content: {
     flex: 1,

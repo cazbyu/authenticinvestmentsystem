@@ -7,13 +7,14 @@ import { Menu, ArrowUpDown } from 'lucide-react-native';
 type DrawerNavigation = DrawerNavigationProp<any>;
 
 interface HeaderProps {
-  activeView: 'deposits' | 'ideas';
-  onViewChange: (view: 'deposits' | 'ideas') => void;
-  onSortPress: () => void;
+  title?: string;
+  activeView?: 'deposits' | 'ideas';
+  onViewChange?: (view: 'deposits' | 'ideas') => void;
+  onSortPress?: () => void;
   authenticScore?: number;
 }
 
-export function Header({ activeView, onViewChange, onSortPress, authenticScore = 85 }: HeaderProps) {
+export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85 }: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
 
   const openDrawer = () => {
@@ -29,8 +30,8 @@ export function Header({ activeView, onViewChange, onSortPress, authenticScore =
         </TouchableOpacity>
         
         <View style={styles.titleSection}>
-          <Text style={styles.title}>Authentic</Text>
-          <Text style={styles.subtitle}>Investments</Text>
+          <Text style={styles.title}>{title || 'Authentic'}</Text>
+          {!title && <Text style={styles.subtitle}>Investments</Text>}
         </View>
         
         <View style={styles.scoreContainer}>
@@ -40,45 +41,47 @@ export function Header({ activeView, onViewChange, onSortPress, authenticScore =
       </View>
       
       {/* Bottom section with toggle and sort */}
-      <View style={styles.bottomSection}>
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeView === 'deposits' && styles.activeToggle
-            ]}
-            onPress={() => onViewChange('deposits')}
-          >
-            <Text style={[
-              styles.toggleText,
-              activeView === 'deposits' && styles.activeToggleText
-            ]}>
-              Deposits
-            </Text>
-          </TouchableOpacity>
+      {activeView && onViewChange && onSortPress && (
+        <View style={styles.bottomSection}>
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                activeView === 'deposits' && styles.activeToggle
+              ]}
+              onPress={() => onViewChange('deposits')}
+            >
+              <Text style={[
+                styles.toggleText,
+                activeView === 'deposits' && styles.activeToggleText
+              ]}>
+                Deposits
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                activeView === 'ideas' && styles.activeToggle
+              ]}
+              onPress={() => onViewChange('ideas')}
+            >
+              <Text style={[
+                styles.toggleText,
+                activeView === 'ideas' && styles.activeToggleText
+              ]}>
+                Ideas
+              </Text>
+            </TouchableOpacity>
+          </View>
           
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeView === 'ideas' && styles.activeToggle
-            ]}
-            onPress={() => onViewChange('ideas')}
-          >
-            <Text style={[
-              styles.toggleText,
-              activeView === 'ideas' && styles.activeToggleText
-            ]}>
-              Ideas
-            </Text>
+          {/* Updated Sort Button to look like a toggle */}
+          <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
+            <Text style={styles.toggleText}>Sort</Text>
+            <ArrowUpDown size={16} color="#ffffff" style={{ marginLeft: 6 }}/>
           </TouchableOpacity>
         </View>
-        
-        {/* Updated Sort Button to look like a toggle */}
-        <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
-          <Text style={styles.toggleText}>Sort</Text>
-          <ArrowUpDown size={16} color="#ffffff" style={{ marginLeft: 6 }}/>
-        </TouchableOpacity>
-      </View>
+      )}
     </View>
   );
 }

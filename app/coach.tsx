@@ -1,13 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Header } from '@/components/Header';
 
 export default function CoachScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Coach Chat</Text>
-      </View>
+      <Header title="Coach Chat" />
       
       <View style={styles.content}>
         <Text style={styles.placeholderText}>Coach Chat feature coming soon!</Text>
@@ -20,17 +19,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   content: {
     flex: 1,
