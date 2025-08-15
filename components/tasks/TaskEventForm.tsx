@@ -319,12 +319,14 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
             <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}>
-              <Calendar
-                onDayPress={onCalendarDayPress}
-                markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
-                dayComponent={CustomDayComponent}
-                hideExtraDays={true}
-              />
+              <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
+                <Calendar
+                  onDayPress={onCalendarDayPress}
+                  markedDates={{ [formData.dueDate.toISOString().split('T')[0]]: { selected: true } }}
+                  dayComponent={CustomDayComponent}
+                  hideExtraDays={true}
+                />
+              </ScrollView>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -387,7 +389,8 @@ const styles = StyleSheet.create({
     anytimeLabel: { fontSize: 14 },
     calendarPopup: {
         position: 'absolute',
-        width: 280, // Made smaller
+        width: 240,
+        maxHeight: 280,
         backgroundColor: '#ffffff',
         borderRadius: 8,
         borderWidth: 1,
@@ -416,8 +419,8 @@ const styles = StyleSheet.create({
     },
     timeOptionPopup: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
     timeOptionTextPopup: { textAlign: 'center' },
-    dayContainer: { width: 32, height: 28, justifyContent: 'center', alignItems: 'center' },
-    dayText: { fontSize: 12 },
+    dayContainer: { width: 24, height: 16, justifyContent: 'center', alignItems: 'center' },
+    dayText: { fontSize: 10 },
     selectedDay: { backgroundColor: '#0078d4', borderRadius: 14, width: 28, height: 28 },
     selectedDayText: { color: 'white' },
     todayText: { color: '#0078d4', fontWeight: 'bold' },
