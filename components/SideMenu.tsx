@@ -1,6 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { Calendar, MessageCircle, Settings, LogOut } from 'lucide-react-native';
+
+const menuItems = [
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
   { id: 'coach', title: 'Coach Chat', icon: MessageCircle, route: '/coach' },
   { id: 'settings', title: 'Settings', icon: Settings, route: '/settings' },
