@@ -59,6 +59,10 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [dateInputValue, setDateInputValue] = useState('');
+  
+  // Position state for dynamic popover positioning
+  const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   // Initialize date input value
   useEffect(() => {
@@ -277,6 +281,10 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                         <TouchableOpacity 
                           style={styles.compactDateButton}
                           onPress={() => setShowMiniCalendar(!showMiniCalendar)}
+                          onLayout={(event) => {
+                            const { x, y, width, height } = event.nativeEvent.layout;
+                            setDatePickerPosition({ x, y, width, height });
+                          }}
                         >
                           <Text style={styles.compactInputLabel}>Due Date</Text>
                           <TextInput
@@ -290,7 +298,13 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                         
                         {/* Pop-up Mini Calendar */}
                         {showMiniCalendar && (
-                          <View style={styles.calendarPopup}>
+                          <View style={[
+                            styles.calendarPopup,
+                            {
+                              top: datePickerPosition.height + 5,
+                              left: 0,
+                            }
+                          ]}>
                             <Calendar
                               onDayPress={onCalendarDayPress}
                               markedDates={{
@@ -314,9 +328,9 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                                 textDayFontWeight: '300',
                                 textMonthFontWeight: 'bold',
                                 textDayHeaderFontWeight: '300',
-                                textDayFontSize: 12,
-                                textMonthFontSize: 14,
-                                textDayHeaderFontSize: 10
+                                textDayFontSize: 9,
+                                textMonthFontSize: 11,
+                                textDayHeaderFontSize: 8
                               }}
                             />
                           </View>
@@ -329,6 +343,10 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                           style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
                           onPress={() => setShowTimePicker(!showTimePicker)}
                           disabled={formData.isAnytime}
+                          onLayout={(event) => {
+                            const { x, y, width, height } = event.nativeEvent.layout;
+                            setTimePickerPosition({ x, y, width, height });
+                          }}
                         >
                           <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
                           <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>
@@ -338,7 +356,13 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                         
                         {/* Pop-up Time Picker */}
                         {showTimePicker && (
-                          <View style={styles.timePickerPopup}>
+                          <View style={[
+                            styles.timePickerPopup,
+                            {
+                              top: timePickerPosition.height + 5,
+                              left: 0,
+                            }
+                          ]}>
                             <FlatList
                               data={timeOptions}
                               keyExtractor={(item) => item.value}
@@ -524,8 +548,6 @@ const styles = StyleSheet.create({
     },
     calendarPopup: {
       position: 'absolute',
-      top: 50,
-      left: 0,
       width: 300,
       backgroundColor: '#ffffff',
       borderRadius: 8,
@@ -541,9 +563,7 @@ const styles = StyleSheet.create({
     },
     timePickerPopup: {
       position: 'absolute',
-      top: 50,
-      left: 0,
-      width: 150,
+      width: 120,
       maxHeight: 200,
       backgroundColor: '#ffffff',
       borderRadius: 8,
