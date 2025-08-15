@@ -1,645 +1,184 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "../../supabaseClient";
-import { format } from "date-fns";
-import { generateJoinRows } from '../../utils/relationshipHelpers';
-import { upsertTaskEventAndJoins } from '../../services/taskEventService';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch } from 'react-native';
+import { supabase } from "@/lib/supabase";
+import { X } from 'lucide-react-native';
 
-// ----- TYPES -----
+// --- TYPE DEFINITIONS ---
 interface TaskEventFormProps {
   mode: "create" | "edit";
-  initialData?: Partial<FormData>;
+  initialData?: Partial<any>;
   onSubmitSuccess: () => void;
   onClose: () => void;
 }
 
-interface FormData {
-  id?: string;
-  title: string;
-  dueDate: string;
-  startTime: string;
-  endTime: string;
-  isAllDay: boolean;
-  selectedRoleIds: string[];
-  selectedDomainIds: string[];
-  selectedKeyRelationshipIds: string[];
-  notes: string;
-  urgent?: boolean;
-  important?: boolean;
-  authenticDeposit?: boolean;
-  twelveWeekGoalChecked?: boolean;
-  twelveWeekGoalId?: string;
-  schedulingType?: "task" | "event" | "depositIdea";
-}
-
 interface Role { id: string; label: string; }
 interface Domain { id: string; name: string; }
-interface KeyRelationship { id: string; name: string; role_id: string; }
-interface TwelveWeekGoal { id: string; title: string; }
 
-// Helper function to combine date and time into a UTC timestamp
-const convertToUTC = (date: string, time: string): string | null => {
-  if (!date || !time) return null;
-  // Creates a date object in the user's local timezone
-  const localDate = new Date(`${date}T${time}:00`);
-  // Converts the local time to the equivalent UTC time in ISO format
-  return localDate.toISOString();
-};
-
-// Helper function to format time
-const convertToTimeFormat = (time: string): string | null => {
-  if (!time) return null;
-  return `${time}:00`;
-};
-
-const defaultForm: FormData = {
-  title: "",
-  dueDate: format(new Date(), "yyyy-MM-dd"),
-  startTime: "09:00",
-  endTime: "10:00",
-  isAllDay: false,
-  selectedRoleIds: [],
-  selectedDomainIds: [],
-  selectedKeyRelationshipIds: [],
-  notes: "",
-  urgent: false,
-  important: false,
-  authenticDeposit: false,
-  twelveWeekGoalChecked: false,
-  twelveWeekGoalId: "",
-  schedulingType: "task",
-};
-
-const TaskEventForm: React.FC<TaskEventFormProps> = ({
-  mode,
-  initialData,
-  onSubmitSuccess,
-  onClose,
-}) => {
-  // ---- STATE ----
-  const [form, setForm] = useState<FormData>({
-    ...defaultForm,
-    ...initialData,
+// --- THE COMPONENT ---
+const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    is_urgent: false,
+    is_important: false,
+    selectedRoleIds: [] as string[],
+    selectedDomainIds: [] as string[],
+    // ... add other form fields as needed
   });
-
-console.log("TaskEventForm initialData", initialData);
-console.log("TaskEventForm form.schedulingType", form.schedulingType);
-  
- useEffect(() => {
-  if (initialData) {
-    setForm((prev) => ({
-      ...prev,
-      ...initialData,
-    }));
-  }
-}, [initialData]);
-
-useEffect(() => {
-  if (mode === "edit" && initialData && initialData.id) {
-    fetchTaskData(initialData.id);
-  }
-  // eslint-disable-next-line
-}, [mode, initialData?.id]);
-
   const [roles, setRoles] = useState<Role[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
-  const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
-  const [twelveWeekGoals, setTwelveWeekGoals] = useState<TwelveWeekGoal[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showRoleError, setShowRoleError] = useState(false);
 
-  
-  const fetchTaskData = async (taskId: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Fetch main task (no relationships)
-const { data: task, error } = await supabase
-  .from('0007-ap-tasks')
-  .select('*')
-  .eq('id', taskId)
-  .eq('user_id', user.id)
-  .single();
-
-if (error || !task) {
-  console.error('Error fetching task data:', error);
-  return;
-}
-
-// Fetch universal role joins
-const { data: roleJoins } = await supabase
-  .from('0007-ap-universal-roles-join')
-  .select('role_id')
-  .eq('parent_id', taskId)
-  .eq('parent_type', 'task')
-  .eq('user_id', user.id);
-
-// Fetch universal domain joins
-const { data: domainJoins } = await supabase
-  .from('0007-ap-universal-domains-join')
-  .select('domain_id')
-  .eq('parent_id', taskId)
-  .eq('parent_type', 'task')
-  .eq('user_id', user.id);
-
-// Fetch universal note joins (if multiple, only grab first for now)
-const { data: noteJoins } = await supabase
-  .from('0007-ap-universal-notes-join')
-  .select('note_id')
-  .eq('parent_id', taskId)
-  .eq('parent_type', 'task')
-  .eq('user_id', user.id);
-
-      // Fetch universal key relationship joins
-const { data: keyRelationshipJoins } = await supabase
-  .from('0007-ap-universal-key-relationships-join')
-  .select('key_relationship_id')
-  .eq('parent_id', taskId)
-  .eq('parent_type', 'task')
-  .eq('user_id', user.id);
-
-// Fetch actual note content if you want to display it
-let noteContent = '';
-if (noteJoins && noteJoins[0]?.note_id) {
-  const { data: noteRows } = await supabase
-    .from('0007-ap-notes')
-    .select('content')
-    .eq('id', noteJoins[0].note_id)
-    .single();
-  noteContent = noteRows?.content || '';
-}
-
-      // Update form with task data
-      setForm(prev => ({
-  ...prev,
-  title: task.title || '',
-  dueDate: task.due_date || prev.dueDate,
-  startTime: task.start_time ? new Date(task.start_time).toTimeString().slice(0, 5) : prev.startTime,
-  endTime: task.end_time ? new Date(task.end_time).toTimeString().slice(0, 5) : prev.endTime,
-  isAllDay: task.is_all_day || false,
-  urgent: task.is_urgent || false,
-  important: task.is_important || false,
-  authenticDeposit: task.is_authentic_deposit || false,
-  twelveWeekGoalChecked: task.is_twelve_week_goal || false,
-  twelveWeekGoalId: task.goal_12wk_id || "",
-  notes: noteContent,
-  selectedRoleIds: roleJoins?.map(r => r.role_id) || [],
-  selectedDomainIds: domainJoins?.map(d => d.domain_id) || [],
-  selectedKeyRelationshipIds: keyRelationshipJoins?.map(k => k.key_relationship_id) || [],
-  
-}));
-
-    } catch (error) {
-      console.error('Error fetching task data:', error);
-    }
-  };
-
-  const fetchDepositIdeaData = async (depositIdeaId: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Fetch deposit idea with ALL relationships: roles, domains, key relationships, and notes
-      const { data: depositIdea, error } = await supabase
-        .from('0007-ap-deposit-ideas')
-        .select('*')
-        .eq('id', depositIdeaId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (error || !depositIdea) {
-        console.error('Error fetching deposit idea data:', error);
-        return;
-      }
-
-      // Fetch roles linked to this deposit idea
-      const { data: rolesData } = await supabase
-        .from('0007-ap-roles-deposit-ideas')
-        .select('role_id')
-        .eq('deposit_idea_id', depositIdeaId);
-
-      // Fetch domains linked to this deposit idea
-      const { data: domainsData } = await supabase
-        .from('0007-ap-deposit-idea-domains')
-        .select('domain_id')
-        .eq('deposit_idea_id', depositIdeaId);
-
-      // Fetch key relationships linked to this deposit idea
-      const { data: keyRelationshipsData } = await supabase
-        .from('0007-ap-deposit-idea-key-relationships')
-        .select('key_relationship_id')
-        .eq('deposit_idea_id', depositIdeaId);
-
-      // Fetch notes linked to this deposit idea
-      const { data: notesData } = await supabase
-        .from('0007-ap-note-deposit-ideas')
-        .select(`
-          note:0007-ap-notes(content)
-        `)
-        .eq('deposit_idea_id', depositIdeaId);
-
-      const noteContent = notesData?.[0]?.note?.content || '';
-
-      // Update form with all existing selections
-      setForm(prev => ({
-        ...prev,
-        title: depositIdea.title || '',
-        notes: noteContent,
-        selectedRoleIds: rolesData?.map((r: any) => r.role_id) || [],
-        selectedDomainIds: domainsData?.map((d: any) => d.domain_id) || [],
-        twelveWeekGoalId: depositIdea.goal_12wk_id || "",
-        selectedKeyRelationshipIds: keyRelationshipsData?.map((kr: any) => kr.key_relationship_id) || [],
-      }));
-
-    } catch (error) {
-      console.error('Error fetching deposit idea data:', error);
-    }
-  };
-
-  // Generates time options for 24 hours in 15-min increments
-  const generateTimeOptions = () => {
-    const options = [];
-    for (let h = 0; h < 24; h++) {
-      for (let m = 0; m < 60; m += 15) {
-        const value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        const hour12 = h % 12 === 0 ? 12 : h % 12;
-        const ampm = h < 12 ? 'AM' : 'PM';
-        const label = `${hour12}:${m.toString().padStart(2, '0')} ${ampm}`;
-        options.push({ value, label });
-      }
-    }
-    return options;
-  };
-  const timeOptions = generateTimeOptions();
-
-  // Builds end time options, showing duration in parentheses
-  function getEndTimeOptions(startTime: string) {
-    if (!startTime) return [];
-    const startIdx = timeOptions.findIndex(opt => opt.value === startTime);
-    return timeOptions.slice(startIdx + 1).map(opt => {
-      const [sh, sm] = startTime.split(':').map(Number);
-      const [eh, em] = opt.value.split(':').map(Number);
-      const minutes = (eh * 60 + em) - (sh * 60 + sm);
-      const hrs = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      let dur = '';
-      if (hrs > 0) dur += `${hrs} hr${hrs > 1 ? 's' : ''}`;
-      if (mins > 0) dur += `${hrs > 0 ? ' ' : ''}${mins} min${mins > 1 ? 's' : ''}`;
-      if (!dur) dur = '0 min';
-      return {
-        value: opt.value,
-        label: `${opt.label} (${dur})`,
-      };
-    });
-  }
-
-  // ----- FETCH OPTIONS -----
+  // Fetch roles and domains for the selection fields
   useEffect(() => {
-    (async () => {
+    const fetchOptions = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: roleData } = await supabase.from("0007-ap-roles").select("id,label").eq("user_id", user.id).eq("is_active", true);
-      const { data: domainData } = await supabase.from("0007-ap-domains").select("id,name");
-      const { data: relationshipData } = await supabase.from("0007-ap-key-relationships").select("id,name,role_id").eq("user_id", user.id);
-      const { data: goalData } = await supabase.from("0007-ap-goals-12wk").select("id,title").eq("user_id", user.id).eq("status", "active").order('created_at', { ascending: false });
-
+      const { data: roleData } = await supabase.from("roles").select("id,label").eq("user_id", user.id).eq("is_active", true);
+      const { data: domainData } = await supabase.from("domains").select("id,name");
+      
       setRoles(roleData || []);
       setDomains(domainData || []);
-      setKeyRelationships(relationshipData || []);
-      setTwelveWeekGoals(goalData || []);
-    })();
+    };
+    fetchOptions();
   }, []);
 
-  // Calculate default due date for 12-week goal tasks
-  useEffect(() => {
-    if (initialData?.twelveWeekGoalChecked && initialData?.weekNumber && initialData?.cycleStartDate) {
-      const cycleStart = new Date(initialData.cycleStartDate + 'T00:00:00Z');
-      const weekStart = new Date(cycleStart);
-      weekStart.setDate(cycleStart.getDate() + ((initialData.weekNumber - 1) * 7));
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      
-      setForm(prev => ({
-        ...prev,
-        dueDate: weekEnd.toISOString().split('T')[0]
-      }));
-    }
-  }, [initialData?.twelveWeekGoalChecked, initialData?.weekNumber, initialData?.cycleStartDate]);
-
-  // ----- FORM CHANGE HANDLERS -----
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    if (type === "checkbox") {
-      const checked = (e.target as HTMLInputElement).checked;
-      setForm((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
-    }
-  };
-
-  const handleMultiSelect = (field: keyof FormData, id: string) => {
-    setForm((prev) => {
-      const arr = prev[field] as string[];
-      return {
-        ...prev,
-        [field]: arr.includes(id) ? arr.filter((v) => v !== id) : [...arr, id],
-      };
+  const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds', id: string) => {
+    setFormData(prev => {
+      const currentSelection = prev[field] as string[];
+      const newSelection = currentSelection.includes(id)
+        ? currentSelection.filter(itemId => itemId !== id)
+        : [...currentSelection, id];
+      return { ...prev, [field]: newSelection };
     });
   };
 
-  useEffect(() => {
-    if (form.selectedRoleIds.length > 0) {
-      setShowRoleError(false);
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not found");
+
+        // 1. Insert the main task
+        const { data: taskData, error: taskError } = await supabase
+            .from('0007-ap-tasks')
+            .insert({
+                user_id: user.id,
+                title: formData.title,
+                is_urgent: formData.is_urgent,
+                is_important: formData.is_important,
+                status: 'pending',
+                type: 'task', // Or determine this dynamically
+            })
+            .select()
+            .single();
+
+        if (taskError) throw taskError;
+        if (!taskData) throw new Error("Failed to create task");
+
+        const taskId = taskData.id;
+
+        // 2. Insert into join tables
+        const roleJoins = formData.selectedRoleIds.map(role_id => ({
+            parent_id: taskId,
+            parent_type: 'task',
+            role_id: role_id,
+            user_id: user.id,
+        }));
+
+        const domainJoins = formData.selectedDomainIds.map(domain_id => ({
+            parent_id: taskId,
+            parent_type: 'task',
+            domain_id: domain_id,
+            user_id: user.id,
+        }));
+        
+        if (roleJoins.length > 0) {
+            const { error: roleError } = await supabase.from('0007-ap-universal-roles-join').insert(roleJoins);
+            if (roleError) throw roleError;
+        }
+
+        if (domainJoins.length > 0) {
+            const { error: domainError } = await supabase.from('0007-ap-universal-domains-join').insert(domainJoins);
+            if (domainError) throw domainError;
+        }
+
+        onSubmitSuccess(); // This will refetch the data on the dashboard
+        onClose(); // Close the modal
+
+    } catch (error) {
+        console.error("Error creating task:", error);
+        // You could show an alert to the user here
+    } finally {
+        setLoading(false);
     }
-  }, [form.selectedRoleIds]);
+  };
 
-   // ----- SUBMIT -----
-   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
 
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not signed in");
-
-    await upsertTaskEventAndJoins({ form, user, mode });
-
-    console.log(mode === "edit" ? "Updated successfully!" : "Created successfully!");
-    onSubmitSuccess();
-    onClose();
-  } catch (err) {
-    console.error("Error saving: " + (err instanceof Error ? err.message : String(err)));
-  } finally {
-    setLoading(false);
-  }
-};
-        
-  // ----- RENDER -----
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-100 rounded-t-lg">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {mode === "edit" ? "Edit" : "Create"}{" "}
-            {form.schedulingType === "event" ? "Event" : form.schedulingType === "depositIdea" ? "Deposit Idea" : "Task"}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">×</button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* Title */}
-          <input
-            type="text"
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            required
-            placeholder={
-              form.schedulingType === "event" ? "Enter event title..." : 
-              form.schedulingType === "depositIdea" ? "Enter deposit idea title..." : 
-              "Enter task title..."
-            }
-            className="w-full px-3 py-2 text-base border border-gray-300 rounded-md mt-2 mb-0"
-          />
+    <View style={styles.formContainer}>
+        <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{mode === 'create' ? 'New Action' : 'Edit Action'}</Text>
+            <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
+        </View>
+        <ScrollView style={styles.formContent}>
+            <TextInput
+                style={styles.input}
+                placeholder="Action Title"
+                value={formData.title}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
+            />
+            
+            <View style={styles.switchContainer}>
+                <Text>Urgent</Text>
+                <Switch value={formData.is_urgent} onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))} />
+            </View>
+            <View style={styles.switchContainer}>
+                <Text>Important</Text>
+                <Switch value={formData.is_important} onValueChange={(val) => setFormData(prev => ({...prev, is_important: val}))} />
+            </View>
 
-          {/* Toggle Tabs: Left Justified Below Title */}
-          <div className="flex justify-start items-center mb-1">
-            {["event", "task", "depositIdea"].map(type => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setForm(f => ({ ...f, schedulingType: type as "event" | "task" | "depositIdea" }))}
-                className={`
-                  px-2 py-0.5 rounded-full mx-1 text-xs font-medium transition
-                  ${form.schedulingType === type
-                    ? "bg-blue-600 text-white shadow"
-                    : "bg-gray-100 text-gray-700 hover:bg-blue-200"}
-                `}
-                style={{ minWidth: "35px" }}
-              >
-                {type === "event" ? "Event" : type === "depositIdea" ? "Deposit Idea" : "Task"}
-              </button>
-            ))}
-          </div>
-
-          {/* Notes - Show immediately after title for Deposit Ideas */}
-          {form.schedulingType === "depositIdea" && (
-            <div>
-              <label className="block text-sm mb-1">Notes</label>
-              <textarea name="notes" value={form.notes} onChange={handleChange} rows={2} className="w-full border rounded px-2 py-1" placeholder="Describe your authentic deposit idea..." />
-            </div>
-          )}
-
-          {/* Flags - Hide for Deposit Ideas */}
-          {form.schedulingType !== "depositIdea" && (
-            <div className="flex flex-wrap items-center gap-4 mb-2">
-              <label className="flex items-center gap-1 text-xs">
-                <input type="checkbox" name="urgent" checked={!!form.urgent} onChange={handleChange} className="h-4 w-4" />
-                Urgent
-              </label>
-              <label className="flex items-center gap-1 text-xs">
-                <input type="checkbox" name="important" checked={!!form.important} onChange={handleChange} className="h-4 w-4" />
-                Important
-              </label>
-              <label className="flex items-center gap-1 text-xs">
-                <input type="checkbox" name="authenticDeposit" checked={!!form.authenticDeposit} onChange={handleChange} className="h-4 w-4" />
-                Authentic Deposit
-              </label>
-              <label className="flex items-center gap-1 text-xs">
-                <input type="checkbox" name="twelveWeekGoalChecked" checked={!!form.twelveWeekGoalChecked} onChange={handleChange} className="h-4 w-4" />
-                12-Week Goal
-              </label>
-            </div>
-          )}
-
-          {/* 12-Week Goal selection - Hide for Deposit Ideas */}
-          {form.schedulingType !== "depositIdea" && form.twelveWeekGoalChecked && (
-            <div>
-              <label className="block text-sm mb-1">Choose 12-Week Goal</label>
-              <select
-                name="twelveWeekGoalId"
-                value={form.twelveWeekGoalId || ""}
-                onChange={handleChange}
-                className="w-full text-sm border border-gray-300 rounded-md px-2 py-1"
-              >
-                <option value="">Select Goal...</option>
-                {twelveWeekGoals.map(goal => (
-                  <option key={goal.id} value={goal.id}>{goal.title}</option>
+            <Text style={styles.sectionTitle}>Roles</Text>
+            <View style={styles.selectionGrid}>
+                {roles.map(role => (
+                    <TouchableOpacity key={role.id} style={[styles.chip, formData.selectedRoleIds.includes(role.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedRoleIds', role.id)}>
+                        <Text style={formData.selectedRoleIds.includes(role.id) ? styles.chipTextSelected : styles.chipText}>{role.label}</Text>
+                    </TouchableOpacity>
                 ))}
-              </select>
-            </div>
-          )}
+            </View>
 
-          {/* Date, All Day, and Time fields - Hide for Deposit Ideas */}
-          {form.schedulingType !== "depositIdea" && (
-            <div
-              className={
-                form.schedulingType === "event" && !form.isAllDay
-                  ? "grid grid-cols-3 gap-x-4 mb-2"
-                  : !form.isAllDay
-                  ? "grid grid-cols-2 gap-x-4 mb-2"
-                  : "grid grid-cols-1 mb-2"
-              }
-            >
-              {/* Date + All Day (always visible) */}
-              <div>
-                <label className="block text-xs mb-1">Due Date</label>
-                <input
-                  type="date"
-                  name="dueDate"
-                  value={form.dueDate}
-                  onChange={handleChange}
-                  className="border rounded px-2 py-1 text-xs w-full"
-                />
-                <div className="mt-1">
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      name="isAllDay"
-                      checked={form.isAllDay}
-                      onChange={handleChange}
-                      className="h-4 w-4"
-                    />
-                    All Day
-                  </label>
-                </div>
-              </div>
-              {/* Start Time (shown if not All Day) */}
-        {!form.isAllDay && (
-          <div>
-            <label className="block text-xs mb-1">
-              {form.schedulingType === "task" ? "Complete by" : "Start Time"}
-            </label>
-            <select
-              name="startTime"
-              value={form.startTime}
-              onChange={handleChange}
-              className="border rounded px-2 py-1 text-xs w-full"
-            >
-              <option value="">--</option>
-              {timeOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        {/* End Time (shown if Event and not All Day) */}
-        {form.schedulingType === "event" && !form.isAllDay && (
-          <div>
-            <label className="block text-xs mb-1">End Time</label>
-            <select
-              name="endTime"
-              value={form.endTime}
-              onChange={handleChange}
-              className="border rounded px-2 py-1 text-xs w-full"
-              disabled={!form.startTime}
-            >
-              <option value="">--</option>
-              {getEndTimeOptions(form.startTime).map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
-            </div>
-          )}
-
-          {/* Roles */}
-          <div>
-            <label className="block text-sm mb-1">
-              Roles {form.schedulingType === "depositIdea" && <span className="text-red-500">*</span>}
-            </label>
-            <div className="grid grid-cols-2 gap-2 border rounded-md p-2">
-              {roles.map(role => (
-                <label key={role.id} className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" checked={form.selectedRoleIds.includes(role.id)} onChange={() => handleMultiSelect("selectedRoleIds", role.id)} className="h-4 w-4" />
-                  <span className="text-xs">{role.label}</span>
-                </label>
-              ))}
-            </div>
-            {form.schedulingType === "depositIdea" && form.selectedRoleIds.length === 0 && (
-              <p className="text-xs text-red-600 mt-1">At least one role must be selected for deposit ideas</p>
-            )}
-          </div>
-
-          {/* Domains */}
-          <div>
-            <label className="block text-sm mb-1">Domains</label>
-            <div className="grid grid-cols-2 gap-2 border rounded-md p-2">
-              {domains.map(domain => (
-                <label key={domain.id} className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" checked={form.selectedDomainIds.includes(domain.id)} onChange={() => handleMultiSelect("selectedDomainIds", domain.id)} className="h-4 w-4" />
-                  <span className="text-xs">{domain.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Key Relationships */}
-          {form.selectedRoleIds.length > 0 && (
-            <div>
-              <label className="block text-sm mb-1">Choose Key Relationship</label>
-              <div className="grid grid-cols-2 gap-2 border border-gray-200 p-2 rounded-md">
-                {keyRelationships.filter(kr => form.selectedRoleIds.includes(kr.role_id)).map(kr => (
-                  <label key={kr.id} className="flex items-center gap-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.selectedKeyRelationshipIds.includes(kr.id)}
-                      onChange={() => handleMultiSelect("selectedKeyRelationshipIds", kr.id)}
-                      className="h-4 w-4"
-                    />
-                    <span className="text-xs">{kr.name}</span>
-                  </label>
+            <Text style={styles.sectionTitle}>Domains</Text>
+            <View style={styles.selectionGrid}>
+                {domains.map(domain => (
+                    <TouchableOpacity key={domain.id} style={[styles.chip, formData.selectedDomainIds.includes(domain.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}>
+                        <Text style={formData.selectedDomainIds.includes(domain.id) ? styles.chipTextSelected : styles.chipText}>{domain.name}</Text>
+                    </TouchableOpacity>
                 ))}
-                {keyRelationships.filter(kr => form.selectedRoleIds.includes(kr.role_id)).length === 0 && (
-                  <div className="text-gray-400 text-xs italic px-2 py-2">
-                    No Key Relationships for selected roles yet.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+            </View>
 
-          {/* Notes - Show at bottom for Tasks/Events */}
-          {form.schedulingType !== "depositIdea" && (
-            <div>
-              <label className="block text-sm mb-1">Notes</label>
-              <textarea name="notes" value={form.notes} onChange={handleChange} rows={2} className="w-full border rounded px-2 py-1" />
-            </div>
-          )}
-
-          {/* Submit */}
-          <div className="flex justify-end gap-2 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600">Cancel</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
-              {loading ? (mode === "edit" ? "Updating..." : "Creating...") : (mode === "edit" ? "Update" : "Create")}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Role Error Popup */}
-      {showRoleError && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm mx-4 shadow-xl">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Role Required</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              A Role must be selected for Deposit Ideas
-            </p>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowRoleError(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        </ScrollView>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
+            <Text style={styles.submitButtonText}>{loading ? 'Saving...' : 'Save Action'}</Text>
+        </TouchableOpacity>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+    formContainer: { flex: 1, backgroundColor: 'white' },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
+    modalTitle: { fontSize: 18, fontWeight: '600' },
+    formContent: { padding: 16 },
+    input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16 },
+    switchContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingHorizontal: 4 },
+    sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+    selectionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f3f4f6' },
+    chipSelected: { backgroundColor: '#0078d4' },
+    chipText: { color: '#374151' },
+    chipTextSelected: { color: 'white' },
+    submitButton: { backgroundColor: '#0078d4', padding: 16, alignItems: 'center', margin: 16, borderRadius: 8 },
+    submitButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },
+});
 
 export default TaskEventForm;
