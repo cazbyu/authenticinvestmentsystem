@@ -5,11 +5,7 @@ import { useRouter } from 'expo-router';
 import { Calendar, MessageCircle, Settings, User, Heart, Target, ChartBar as BarChart3, LogOut } from 'lucide-react-native';
 
 const menuItems = [
-  { id: 'dashboard', title: 'Actions & Ideas', icon: BarChart3, route: '/(tabs)/dashboard' },
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
-  { id: 'roles', title: 'Role Bank', icon: User, route: '/(tabs)/roles' },
-  { id: 'wellness', title: 'Wellness Bank', icon: Heart, route: '/(tabs)/wellness' },
-  { id: 'goals', title: 'Goal Bank', icon: Target, route: '/(tabs)/goals' },
   { id: 'coach', title: 'Coach Chat', icon: MessageCircle, route: '/coach' },
   { id: 'settings', title: 'Settings', icon: Settings, route: '/settings' },
 ];
