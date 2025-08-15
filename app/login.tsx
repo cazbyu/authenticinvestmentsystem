@@ -23,9 +23,11 @@ export default function LoginScreen() {
     scheme: 'myapp',
   });
 
+  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
+
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
-      clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+      clientId: googleClientId,
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
       responseType: AuthSession.ResponseType.Code,
@@ -74,6 +76,11 @@ export default function LoginScreen() {
       return;
     }
 
+    if (!supabase) {
+      Alert.alert('Error', 'Authentication service not available. Please check configuration.');
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -106,6 +113,11 @@ export default function LoginScreen() {
 
     if (password.length < 6) {
       Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
+    if (!supabase) {
+      Alert.alert('Error', 'Authentication service not available. Please check configuration.');
       return;
     }
 
@@ -143,6 +155,11 @@ export default function LoginScreen() {
   };
 
   const handleGoogleSignInPress = async () => {
+    if (!googleClientId) {
+      Alert.alert('Error', 'Google sign-in not configured. Please check your environment variables.');
+      return;
+    }
+
     try {
       await promptAsync();
     } catch (error) {
