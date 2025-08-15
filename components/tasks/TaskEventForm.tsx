@@ -302,7 +302,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                             styles.calendarPopup,
                             {
                               top: datePickerPosition.height + 5,
-                              left: 0,
+                              left: datePickerPosition.width + 5,
                             }
                           ]}>
                             <Calendar
