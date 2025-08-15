@@ -449,7 +449,7 @@ const toDateString = (date: Date) => {
         {/* Pop-up Time Picker Modal */}
         <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
-                <View style={[styles.timePickerPopup, { top: timePickerPosition.y, left: timePickerPosition.x + timePickerPosition.width + 8 }]}> 
+                <View style={[styles.timePickerPopup, { top: timePickerPosition.y, left: timePickerPosition.x + timePickerPosition.width + 8 }]}>
                     <FlatList
                         data={timeOptions}
                         keyExtractor={(item) => item}
@@ -458,7 +458,11 @@ const toDateString = (date: Date) => {
                                 ? `${item} (${getDurationLabel(formData.startTime, item)})`
                                 : item;
                             return (
-                                <TouchableOpacity style={styles.timeOptionPopup} onPress={() => onTimeSelect(item)}>
+                                <TouchableOpacity 
+                                    style={styles.timeOptionPopup} 
+                                    onPress={() => onTimeSelect(item)}
+                                    activeOpacity={0.1}
+                                >
                                     <Text style={styles.timeOptionTextPopup}>{label}</Text>
                                 </TouchableOpacity>
                             );
@@ -524,7 +528,7 @@ const styles = StyleSheet.create({
     },
     timePickerPopup: {
         position: 'absolute',
-        width: 100, // Made narrower
+        width: 160, // Wider to fit time and duration on one line
         maxHeight: 160,
         backgroundColor: '#ffffff',
         borderRadius: 8,
@@ -537,8 +541,6 @@ const styles = StyleSheet.create({
         elevation: 5,
         zIndex: 1000,
     },
-    timeOptionPopup: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-    timeOptionTextPopup: { textAlign: 'center', fontSize: 10 },
     dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
     dayText: { fontSize: 8 },
     selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
