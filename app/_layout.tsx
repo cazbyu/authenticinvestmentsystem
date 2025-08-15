@@ -3,6 +3,7 @@ import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { SideMenu } from '@/components/SideMenu';
+import '@/lib/calendarLocale';
 
 export default function RootLayout() {
   useFrameworkReady();
