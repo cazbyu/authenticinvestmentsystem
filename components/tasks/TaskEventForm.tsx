@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
-import { Modal, FlatList } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { Modal, FlatList, Dimensions } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { supabase } from "@/lib/supabase";
 import { X } from 'lucide-react-native';
@@ -21,11 +20,22 @@ interface TwelveWeekGoal { id: string; title: string; }
 
 // --- THE COMPONENT ---
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
+  // Helper function to get default time (current time + 1 hour, rounded to nearest 15 min)
+  const getDefaultTime = () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    const minutes = Math.ceil(now.getMinutes() / 15) * 15;
+    now.setMinutes(minutes, 0, 0);
+    const hour12 = now.getHours() === 0 ? 12 : now.getHours() > 12 ? now.getHours() - 12 : now.getHours();
+    const ampm = now.getHours() < 12 ? 'AM' : 'PM';
+    return `${hour12}:${now.getMinutes().toString().padStart(2, '0')} ${ampm}`;
+  };
+
   const [formData, setFormData] = useState({
     title: '',
     notes: '',
     dueDate: new Date(),
-    time: '9:00 AM',
+    time: getDefaultTime(),
     isAnytime: false,
     is_urgent: false,
     is_important: false,
@@ -48,6 +58,12 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
   // Calendar and time picker state
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [dateInputValue, setDateInputValue] = useState('');
+
+  // Initialize date input value
+  useEffect(() => {
+    setDateInputValue(formatDateForInput(formData.dueDate));
+  }, [formData.dueDate]);
 
   // Generate time options in 15-minute increments
   const generateTimeOptions = () => {
@@ -97,6 +113,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
   const onCalendarDayPress = (day: any) => {
     const selectedDate = new Date(day.dateString);
     setFormData(prev => ({ ...prev, dueDate: selectedDate }));
+    setDateInputValue(formatDateForInput(selectedDate));
     setShowMiniCalendar(false);
   };
 
@@ -111,6 +128,15 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const handleDateInputChange = (text: string) => {
+    setDateInputValue(text);
+    // Try to parse the entered date
+    const parsedDate = new Date(text);
+    if (!isNaN(parsedDate.getTime())) {
+      setFormData(prev => ({ ...prev, dueDate: parsedDate }));
+    }
   };
 
   const handleSubmit = async () => {
@@ -246,26 +272,98 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                   <>
                     <Text style={styles.compactSectionTitle}>Schedule</Text>
                     <View style={styles.compactDateTimeRow}>
-                      <TouchableOpacity 
-                        style={styles.compactDateButton}
-                        onPress={() => setShowMiniCalendar(true)}
-                      >
-                        <Text style={styles.compactInputLabel}>Due Date</Text>
-                        <Text style={styles.compactInputValue}>
-                          {formatDateForInput(formData.dueDate)}
-                        </Text>
-                      </TouchableOpacity>
+                      {/* Date Picker Container */}
+                      <View style={styles.datePickerContainer}>
+                        <TouchableOpacity 
+                          style={styles.compactDateButton}
+                          onPress={() => setShowMiniCalendar(!showMiniCalendar)}
+                        >
+                          <Text style={styles.compactInputLabel}>Due Date</Text>
+                          <TextInput
+                            style={styles.dateTextInput}
+                            value={dateInputValue}
+                            onChangeText={handleDateInputChange}
+                            placeholder="Select date"
+                            placeholderTextColor="#9ca3af"
+                          />
+                        </TouchableOpacity>
+                        
+                        {/* Pop-up Mini Calendar */}
+                        {showMiniCalendar && (
+                          <View style={styles.calendarPopup}>
+                            <Calendar
+                              onDayPress={onCalendarDayPress}
+                              markedDates={{
+                                [formData.dueDate.toISOString().split('T')[0]]: {
+                                  selected: true,
+                                  selectedColor: '#0078d4',
+                                },
+                              }}
+                              formatWeekDay={(name) => name.charAt(0)}
+                              theme={{
+                                backgroundColor: '#ffffff',
+                                calendarBackground: '#ffffff',
+                                textSectionTitleColor: '#b6c1cd',
+                                selectedDayBackgroundColor: '#0078d4',
+                                selectedDayTextColor: '#ffffff',
+                                todayTextColor: '#0078d4',
+                                dayTextColor: '#2d4150',
+                                textDisabledColor: '#d9e1e8',
+                                arrowColor: '#0078d4',
+                                monthTextColor: '#0078d4',
+                                textDayFontWeight: '300',
+                                textMonthFontWeight: 'bold',
+                                textDayHeaderFontWeight: '300',
+                                textDayFontSize: 12,
+                                textMonthFontSize: 14,
+                                textDayHeaderFontSize: 10
+                              }}
+                            />
+                          </View>
+                        )}
+                      </View>
                       
-                      <TouchableOpacity 
-                        style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
-                        onPress={() => setShowTimePicker(true)}
-                        disabled={formData.isAnytime}
-                      >
-                        <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
-                        <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>
-                          {formData.time}
-                        </Text>
-                      </TouchableOpacity>
+                      {/* Time Picker Container */}
+                      <View style={styles.timePickerContainer}>
+                        <TouchableOpacity 
+                          style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
+                          onPress={() => setShowTimePicker(!showTimePicker)}
+                          disabled={formData.isAnytime}
+                        >
+                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
+                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>
+                            {formData.time}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        {/* Pop-up Time Picker */}
+                        {showTimePicker && (
+                          <View style={styles.timePickerPopup}>
+                            <FlatList
+                              data={timeOptions}
+                              keyExtractor={(item) => item.value}
+                              renderItem={({ item }) => (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.timeOptionPopup,
+                                    formData.time === item.label && styles.selectedTimeOptionPopup
+                                  ]}
+                                  onPress={() => onTimeSelect(item)}
+                                >
+                                  <Text style={[
+                                    styles.timeOptionTextPopup,
+                                    formData.time === item.label && styles.selectedTimeOptionTextPopup
+                                  ]}>
+                                    {item.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                              showsVerticalScrollIndicator={false}
+                              style={styles.timeListPopup}
+                            />
+                          </View>
+                        )}
+                      </View>
                       
                       <TouchableOpacity 
                         style={styles.anytimeContainer}
@@ -277,39 +375,6 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
                         <Text style={styles.anytimeLabel}>Anytime</Text>
                       </TouchableOpacity>
                     </View>
-                    
-                    {/* Mini Calendar */}
-                    {showMiniCalendar && (
-                      <View style={styles.miniCalendarContainer}>
-                        <Calendar
-                          onDayPress={onCalendarDayPress}
-                          markedDates={{
-                            [formData.dueDate.toISOString().split('T')[0]]: {
-                              selected: true,
-                              selectedColor: '#0078d4',
-                            },
-                          }}
-                          theme={{
-                            backgroundColor: '#ffffff',
-                            calendarBackground: '#ffffff',
-                            textSectionTitleColor: '#b6c1cd',
-                            selectedDayBackgroundColor: '#0078d4',
-                            selectedDayTextColor: '#ffffff',
-                            todayTextColor: '#0078d4',
-                            dayTextColor: '#2d4150',
-                            textDisabledColor: '#d9e1e8',
-                            arrowColor: '#0078d4',
-                            monthTextColor: '#0078d4',
-                            textDayFontWeight: '300',
-                            textMonthFontWeight: 'bold',
-                            textDayHeaderFontWeight: '300',
-                            textDayFontSize: 16,
-                            textMonthFontSize: 16,
-                            textDayHeaderFontSize: 13
-                          }}
-                        />
-                      </View>
-                    )}
                   </>
                 )}
               </>
@@ -374,47 +439,6 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
 
         </ScrollView>
         
-        {/* Time Picker Modal */}
-        <Modal
-          visible={showTimePicker}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowTimePicker(false)}
-        >
-          <View style={styles.timeModalOverlay}>
-            <View style={styles.timePickerContainer}>
-              <View style={styles.timePickerHeader}>
-                <Text style={styles.timePickerTitle}>Complete by</Text>
-                <TouchableOpacity onPress={() => setShowTimePicker(false)}>
-                  <X size={24} color="#6b7280" />
-                </TouchableOpacity>
-              </View>
-              <FlatList
-                data={timeOptions}
-                keyExtractor={(item) => item.value}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.timeOption,
-                      formData.time === item.label && styles.selectedTimeOption
-                    ]}
-                    onPress={() => onTimeSelect(item)}
-                  >
-                    <Text style={[
-                      styles.timeOptionText,
-                      formData.time === item.label && styles.selectedTimeOptionText
-                    ]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                showsVerticalScrollIndicator={false}
-                style={styles.timeList}
-              />
-            </View>
-          </View>
-        </Modal>
-        
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}>
             <Text style={styles.submitButtonText}>{loading ? 'Saving...' : 'Save Action'}</Text>
         </TouchableOpacity>
@@ -455,6 +479,13 @@ const styles = StyleSheet.create({
       padding: 8, 
       backgroundColor: '#f8fafc' 
     },
+    dateTextInput: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#1f2937',
+      padding: 0,
+      margin: 0,
+    },
     compactTimeButton: { 
       flex: 0, 
       minWidth: 90,
@@ -483,25 +514,68 @@ const styles = StyleSheet.create({
     checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
     checkmark: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
     anytimeLabel: { fontSize: 12, color: '#374151', fontWeight: '500' },
-    miniCalendarContainer: { 
-      marginBottom: 12, 
-      backgroundColor: '#ffffff', 
-      borderRadius: 8, 
-      padding: 6, 
-      borderWidth: 1, 
-      borderColor: '#e5e7eb',
-      maxWidth: '90%',
-      alignSelf: 'center'
+    datePickerContainer: {
+      position: 'relative',
+      zIndex: 1000,
     },
-    timeModalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
-    timePickerContainer: { backgroundColor: '#ffffff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '60%' },
-    timePickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-    timePickerTitle: { fontSize: 16, fontWeight: '600', color: '#1f2937' },
-    timeList: { maxHeight: 300 },
-    timeOption: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
-    selectedTimeOption: { backgroundColor: '#eff6ff' },
-    timeOptionText: { fontSize: 15, color: '#374151' },
-    selectedTimeOptionText: { color: '#0078d4', fontWeight: '600' },
+    timePickerContainer: {
+      position: 'relative',
+      zIndex: 999,
+    },
+    calendarPopup: {
+      position: 'absolute',
+      top: 50,
+      left: 0,
+      width: 300,
+      backgroundColor: '#ffffff',
+      borderRadius: 8,
+      padding: 8,
+      borderWidth: 1,
+      borderColor: '#e5e7eb',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+      zIndex: 1001,
+    },
+    timePickerPopup: {
+      position: 'absolute',
+      top: 50,
+      left: 0,
+      width: 150,
+      maxHeight: 200,
+      backgroundColor: '#ffffff',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#e5e7eb',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+      zIndex: 1000,
+    },
+    timeListPopup: {
+      maxHeight: 180,
+    },
+    timeOptionPopup: {
+      padding: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f3f4f6',
+    },
+    selectedTimeOptionPopup: {
+      backgroundColor: '#eff6ff',
+    },
+    timeOptionTextPopup: {
+      fontSize: 13,
+      color: '#374151',
+      textAlign: 'center',
+    },
+    selectedTimeOptionTextPopup: {
+      color: '#0078d4',
+      fontWeight: '600',
+    },
 });
 
 export default TaskEventForm;
