@@ -201,7 +201,13 @@ const toDateString = (date: Date) => {
 
   const formatDuration = (totalMinutes: number) => {
     const hours = Math.round((totalMinutes / 60) * 100) / 100;
-    return `${hours} hr${hours === 1 ? '' : 's'}`;
+    return `${hours} hr${hours === 1 ? '' : 's'}`
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const parts = [] as string[];
+    if (hours > 0) parts.push(`${hours} hr${hours > 1 ? 's' : ''}`);
+    if (minutes > 0) parts.push(`${minutes} min`);
+    return parts.join(' ') || '0 min';
   };
 
   const getDurationLabel = (start: string, end: string) => {
