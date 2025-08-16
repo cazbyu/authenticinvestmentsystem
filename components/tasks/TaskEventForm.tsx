@@ -252,10 +252,10 @@ const toDateString = (date: Date) => {
         const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
         
         if (formData.notes) {
-            const { data: noteData, error: noteError } = await supabase.from('0007-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
-            if (noteError) throw noteError;
-            await supabase.from('0007-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
-        }
+    const { data: noteData, error: noteError } = await supabase.from('0007-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+    if (noteError) throw noteError;
+    await supabase.from('0007-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+}
 
         if (roleJoins.length > 0) await supabase.from('0007-ap-universal-roles-join').insert(roleJoins);
         if (domainJoins.length > 0) await supabase.from('0007-ap-universal-domains-join').insert(domainJoins);
