@@ -29,12 +29,28 @@ export default function LoginScreen() {
   };
 
   const handleSignUp = async () => {
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
+  setLoading(true);
+  
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+    options: {
+      data: {
+        // We pass the full_name here so our trigger can use it
+        full_name: fullName.trim() 
+      }
     }
+  });
 
-    setLoading(true);
+  if (error) {
+    Alert.alert('Sign Up Error', error.message);
+  } else {
+    Alert.alert('Success!', 'Please check your email to verify your account.');
+    setIsSignUp(false); // Switch back to the login view
+  }
+  
+  setLoading(false);
+};
     
     // Step 1: Create the user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
