@@ -236,30 +236,34 @@ const toDateString = (date: Date) => {
             payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
         }
 
-        const { data: taskData, error: taskError } = await supabase
-            .from('0007-ap-tasks')
-            .insert(payload)
-            .select()
-            .single();
+        // inside the handleSubmit function in TaskEventForm.tsx
+const { data: taskData, error: taskError } = await supabase
+    .from('0008-ap-tasks') // Changed from 0007
+    .insert(payload)
+    .select()
+    .single();
 
-        if (taskError) throw taskError;
-        if (!taskData) throw new Error("Failed to create task");
+if (taskError) throw taskError;
+if (!taskData) throw new Error("Failed to create task");
 
-        const taskId = taskData.id;
+const taskId = taskData.id;
 
-        const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
-        const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
-        const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
-        
-        if (formData.notes) {
-    const { data: noteData, error: noteError } = await supabase.from('0007-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+// Generate join rows for each relationship
+const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
+const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
+const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
+
+// Handle notes (assuming a new 0008-ap-notes table)
+if (formData.notes) {
+    const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
     if (noteError) throw noteError;
-    await supabase.from('0007-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+    await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
 }
 
-        if (roleJoins.length > 0) await supabase.from('0007-ap-universal-roles-join').insert(roleJoins);
-        if (domainJoins.length > 0) await supabase.from('0007-ap-universal-domains-join').insert(domainJoins);
-        if (krJoins.length > 0) await supabase.from('0007-ap-universal-key-relationships-join').insert(krJoins);
+// Insert into new universal join tables
+if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
 
         onSubmitSuccess();
         onClose();
