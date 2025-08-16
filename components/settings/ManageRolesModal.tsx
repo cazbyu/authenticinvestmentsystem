@@ -14,7 +14,7 @@ import {
 import { X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
-// --- (Interfaces remain the same) ---
+// Interfaces
 interface ManageRolesModalProps {
   visible: boolean;
   onClose: () => void;
@@ -30,6 +30,7 @@ interface UserRole {
   is_active: boolean;
   user_id: string;
   preset_role_id?: string;
+  category?: string; // Add category to UserRole
 }
 
 export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
@@ -55,7 +56,6 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   }, [visible, presetRoles.length]);
 
   const fetchData = async () => {
-    // ... (fetchData function remains the same)
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -77,14 +77,18 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   };
 
   const handleAddCustomRole = async () => {
-    // ... (handleAddCustomRole function remains the same)
     if (!customRoleLabel.trim()) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { data, error } = await supabase
       .from('0007-ap-roles')
-      .insert({ label: customRoleLabel.trim(), user_id: user.id, is_active: true })
+      .insert({
+        label: customRoleLabel.trim(),
+        user_id: user.id,
+        is_active: true,
+        category: 'Custom' // <-- Assign 'Custom' category
+      })
       .select()
       .single();
     
@@ -103,41 +107,28 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
 
     if (existingUserRole) {
-      // --- OPTIMISTIC UI FIX ---
-      // 1. Immediately update the screen
-      const updatedRoles = userRoles.map(r => 
-        r.id === existingUserRole.id ? { ...r, is_active: !r.is_active } : r
-      );
-      setUserRoles(updatedRoles);
-      
-      // 2. Update the database in the background
-      await supabase
+      const { error } = await supabase
         .from('0007-ap-roles')
         .update({ is_active: !existingUserRole.is_active })
         .eq('id', existingUserRole.id);
 
+      if (error) Alert.alert('Error updating role', error.message);
+      else await fetchData();
     } else {
-      // Create the new role and assume it's active
-      const newRole = { 
-          label: presetRole.label, 
-          user_id: user.id, 
-          preset_role_id: presetRole.id, 
-          is_active: true 
-      };
+      const { error } = await supabase.from('0007-ap-roles').insert({
+        label: presetRole.label,
+        user_id: user.id,
+        preset_role_id: presetRole.id,
+        is_active: true,
+        category: presetRole.category // <-- Copy category from preset role
+      });
 
-      // 1. Immediately update the screen
-      // (We add a temporary ID for the key, Supabase will create the real one)
-      setUserRoles([...userRoles, { ...newRole, id: `temp-${Date.now()}` }]);
-      
-      // 2. Insert into the database in the background, then refetch to get the real ID
-      const { error } = await supabase.from('0007-ap-roles').insert(newRole);
       if (error) Alert.alert('Error activating role', error.message);
-      else await fetchData(); // Refetch here to sync the real ID
+      else await fetchData();
     }
   };
 
   const toggleCategory = (category: string) => {
-    // ... (toggleCategory function remains the same)
     setCollapsedCategories(prev =>
       prev.includes(category)
         ? prev.filter(c => c !== category)
@@ -147,6 +138,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const customRoles = userRoles.filter(role => !role.preset_role_id);
 
+  // --- (The JSX remains the same as the previous version) ---
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -158,14 +150,97 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         </View>
 
         <ScrollView style={styles.content}>
-            {/* ... The JSX in the return() statement remains exactly the same ... */}
+          {loading ? <ActivityIndicator size="large" color="#0078d4" /> : (
+            <>
+              {Object.keys(groupedPresetRoles).length > 0 && (
+                <View style={styles.categoryContainer}>
+                  <Text style={styles.mainSectionTitle}>Commonly Predefined Roles</Text>
+                  {Object.entries(groupedPresetRoles).map(([category, rolesInCategory]) => {
+                    const isCollapsed = collapsedCategories.includes(category);
+                    return (
+                      <View key={category} style={styles.subCategoryContainer}>
+                        <TouchableOpacity style={styles.sectionHeader} onPress={() => toggleCategory(category)}>
+                          <Text style={styles.sectionTitle}>{category}</Text>
+                          {isCollapsed ? <ChevronDown size={20} color="#374151" /> : <ChevronUp size={20} color="#374151" />}
+                        </TouchableOpacity>
+                        {!isCollapsed && (
+                          <View style={styles.rolesList}>
+                            {rolesInCategory.map(pRole => {
+                              const userVersion = userRoles.find(uRole => uRole.preset_role_id === pRole.id);
+                              const isActive = userVersion ? userVersion.is_active : false;
+                              return (
+                                <View key={pRole.id} style={styles.roleItem}>
+                                  <Text style={styles.roleLabel}>{pRole.label}</Text>
+                                  <Switch
+                                    value={isActive}
+                                    onValueChange={() => handleTogglePresetRole(pRole)}
+                                  />
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              <View style={styles.categoryContainer}>
+                <Text style={styles.mainSectionTitle}>Customized Roles</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Add a custom role..."
+                    value={customRoleLabel}
+                    onChangeText={setCustomRoleLabel}
+                  />
+                  <TouchableOpacity style={styles.addButton} onPress={handleAddCustomRole}>
+                    <Text style={styles.addButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+                {customRoles.length > 0 && (
+                  <View style={styles.rolesList}>
+                    {customRoles.map(role => (
+                      <View key={role.id} style={styles.roleItem}>
+                        <Text style={styles.roleLabel}>{role.label}</Text>
+                         <Switch
+                            value={role.is_active}
+                            onValueChange={async () => {
+                                await supabase.from('0007-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
+                                await fetchData();
+                            }}
+                          />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </ScrollView>
       </View>
     </Modal>
   );
 }
 
-// --- (Styles remain the same) ---
+// --- (Styles remain the same as the previous version) ---
 const styles = StyleSheet.create({
-  //...
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: 'white' },
+  headerTitle: { fontSize: 18, fontWeight: '600' },
+  closeButton: { padding: 4 },
+  content: { paddingHorizontal: 16 },
+  mainSectionTitle: { fontSize: 18, fontWeight: '700', color: '#1f2937', marginBottom: 16, marginTop: 8},
+  categoryContainer: { marginBottom: 16 },
+  subCategoryContainer: { marginBottom: 8 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingVertical: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#374151' },
+  inputContainer: { flexDirection: 'row', marginBottom: 8 },
+  input: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginRight: 8, backgroundColor: 'white' },
+  addButton: { backgroundColor: '#0078d4', paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
+  addButtonText: { color: 'white', fontWeight: '600' },
+  rolesList: { backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden' },
+  roleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  roleLabel: { fontSize: 16, flex: 1, color: '#1f2937' },
 });
