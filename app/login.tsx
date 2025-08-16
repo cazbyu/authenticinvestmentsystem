@@ -57,11 +57,12 @@ export default function LoginScreen() {
       Alert.alert('Sign Up Error', authError.message);
     } else if (authData.user) {
       // The trigger we created in Supabase will automatically create the profile.
-      // We just need to let the user know.
+      // We just need to let the user know and reset the view.
       Alert.alert(
         'Success!', 
         'Please check your email to verify your account, then you can sign in.',
-        [{ text: 'OK', onPress: () => setIsSignUp(false) }] // Switch back to login
+        // This part is new: it adds a button to the alert that switches back to the login form
+        [{ text: 'OK', onPress: () => setIsSignUp(false) }] 
       );
     }
     
