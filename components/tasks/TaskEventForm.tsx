@@ -560,8 +560,8 @@ const styles = StyleSheet.create({
     selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
     selectedDayText: { color: 'white' },
     todayText: { color: '#0078d4', fontWeight: 'bold' },
-    disabledDayText: { color: '#d9e1e8' }, // <-- Make sure there is a comma here
-   checkboxGrid: {
+    disabledDayText: { color: '#d9e1e8' },
+    checkboxGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'space-between',
