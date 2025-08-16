@@ -86,22 +86,24 @@ export default function LoginScreen() {
           </Text>
 
           {isSignUp && (
-            <TextInput
-      style={styles.input}
-      placeholder="First Name"
-      value={firstName}
-      onChangeText={setFirstName}
-      autoCapitalize="words"
-    
-    <TextInput
-      style={styles.input}
-      placeholder="Last Name"
-      value={lastName}
-      onChangeText={setLastName}
-      autoCapitalize="words"
-            />
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="First Name"
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Last Name"
+                value={lastName}
+                onChangeText={setLastName}
+                autoCapitalize="words"
+              />
+            </>
           )}
-          
+
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -110,7 +112,7 @@ export default function LoginScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
           />
-          
+
           <TextInput
             style={styles.input}
             placeholder="Password"
