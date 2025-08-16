@@ -421,13 +421,13 @@ const toDateString = (date: Date) => {
             )}
 
             <Text style={styles.sectionTitle}>Domains</Text>
-            <View style={styles.checkboxContainer}>
+            <View style={styles.checkboxGrid}>
               {domains.map(domain => {
                 const isSelected = formData.selectedDomainIds.includes(domain.id);
                 return (
                   <TouchableOpacity 
                     key={domain.id} 
-                    style={styles.checkRow} 
+                    style={styles.checkItem} 
                     onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
                   >
                     <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
