@@ -11,20 +11,19 @@ import {
   Switch,
   ActivityIndicator
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { X, ChevronDown, ChevronUp } from 'lucide-react-native'; // Import Chevrons
 import { supabase } from '@/lib/supabase';
 
+// --- (Interfaces remain the same) ---
 interface ManageRolesModalProps {
   visible: boolean;
   onClose: () => void;
 }
-
 interface PresetRole {
   id: string;
   label: string;
   category: string;
 }
-
 interface UserRole {
   id: string;
   label: string;
@@ -33,11 +32,14 @@ interface UserRole {
   preset_role_id?: string;
 }
 
+
 export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   const [presetRoles, setPresetRoles] = useState<PresetRole[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [customRoleLabel, setCustomRoleLabel] = useState('');
   const [loading, setLoading] = useState(false);
+  // --- New state for collapsible sections ---
+  const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
 
   useEffect(() => {
     if (visible) {
@@ -46,6 +48,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   }, [visible]);
 
   const fetchData = async () => {
+    // ... (fetchData function remains the same)
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -67,6 +70,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   };
 
   const handleAddCustomRole = async () => {
+    // ... (handleAddCustomRole function remains the same)
     if (!customRoleLabel.trim()) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -100,19 +104,31 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       if (error) Alert.alert('Error updating role', error.message);
       else await fetchData();
     } else {
+      // --- THIS IS THE FIX for is_active ---
       const { error } = await supabase.from('0007-ap-roles').insert({
         label: presetRole.label,
         user_id: user.id,
         preset_role_id: presetRole.id,
-        is_active: true
+        is_active: true // <-- Explicitly set to true on creation
       });
+      // ------------------------------------
 
       if (error) Alert.alert('Error activating role', error.message);
       else await fetchData();
     }
   };
 
+  // --- New function to handle collapsing ---
+  const toggleCategory = (category: string) => {
+    setCollapsedCategories(prev =>
+      prev.includes(category)
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
+
   const groupedPresetRoles = useMemo(() => {
+    // ... (groupedPresetRoles remains the same)
     return presetRoles.reduce((acc, role) => {
       (acc[role.category] = acc[role.category] || []).push(role);
       return acc;
@@ -134,27 +150,39 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         <ScrollView style={styles.content}>
           {loading ? <ActivityIndicator size="large" color="#0078d4" /> : (
             <>
-              {Object.entries(groupedPresetRoles).map(([category, rolesInCategory]) => (
-                <View key={category} style={styles.categoryContainer}>
-                  <Text style={styles.sectionTitle}>{category}</Text>
-                  <View style={styles.rolesList}>
-                    {rolesInCategory.map(pRole => {
-                      const userVersion = userRoles.find(uRole => uRole.preset_role_id === pRole.id);
-                      const isActive = userVersion ? userVersion.is_active : false;
-                      return (
-                        <View key={pRole.id} style={styles.roleItem}>
-                          <Text style={styles.roleLabel}>{pRole.label}</Text>
-                          <Switch
-                            value={isActive}
-                            onValueChange={() => handleTogglePresetRole(pRole)}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
+              {Object.entries(groupedPresetRoles).map(([category, rolesInCategory]) => {
+                const isCollapsed = collapsedCategories.includes(category);
+                return (
+                  <View key={category} style={styles.categoryContainer}>
+                    {/* --- Updated Category Header --- */}
+                    <TouchableOpacity style={styles.sectionHeader} onPress={() => toggleCategory(category)}>
+                      <Text style={styles.sectionTitle}>{category}</Text>
+                      {isCollapsed ? <ChevronDown size={20} color="#374151" /> : <ChevronUp size={20} color="#374151" />}
+                    </TouchableOpacity>
 
+                    {/* --- Collapsible Role List --- */}
+                    {!isCollapsed && (
+                      <View style={styles.rolesList}>
+                        {rolesInCategory.map(pRole => {
+                          const userVersion = userRoles.find(uRole => uRole.preset_role_id === pRole.id);
+                          const isActive = userVersion ? userVersion.is_active : false;
+                          return (
+                            <View key={pRole.id} style={styles.roleItem}>
+                              <Text style={styles.roleLabel}>{pRole.label}</Text>
+                              <Switch
+                                value={isActive}
+                                onValueChange={() => handleTogglePresetRole(pRole)}
+                              />
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
+              {/* --- Custom Roles Section (remains the same) --- */}
               <View style={styles.categoryContainer}>
                 <Text style={styles.sectionTitle}>Custom Roles</Text>
                 <View style={styles.inputContainer}>
@@ -175,7 +203,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                         <Text style={styles.roleLabel}>{role.label}</Text>
                          <Switch
                             value={role.is_active}
-                            onValueChange={async () => { // Simplified toggle for custom roles
+                            onValueChange={async () => {
                                 await supabase.from('0007-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
                                 await fetchData();
                             }}
@@ -194,13 +222,21 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 }
 
 const styles = StyleSheet.create({
+  // ... (container, header, etc. styles remain the same)
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: 'white' },
   headerTitle: { fontSize: 18, fontWeight: '600' },
   closeButton: { padding: 4 },
   content: { paddingHorizontal: 16 },
-  categoryContainer: { marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  categoryContainer: { marginBottom: 16 },
+  // --- New Style for the header ---
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#374151' },
   inputContainer: { flexDirection: 'row', marginBottom: 8 },
   input: { flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginRight: 8, backgroundColor: 'white' },
   addButton: { backgroundColor: '#0078d4', paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
