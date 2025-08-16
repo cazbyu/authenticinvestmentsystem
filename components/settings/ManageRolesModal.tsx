@@ -101,29 +101,43 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
 
     if (existingUserRole) {
+      // --- OPTIMISTIC UI for EXISTING roles ---
+      // 1. Instantly update the screen's state
       const updatedRoles = userRoles.map(r => 
         r.id === existingUserRole.id ? { ...r, is_active: !r.is_active } : r
       );
       setUserRoles(updatedRoles);
       
+      // 2. Update the database in the background
       await supabase
         .from('0007-ap-roles')
         .update({ is_active: !existingUserRole.is_active })
         .eq('id', existingUserRole.id);
 
     } else {
+      // --- OPTIMISTIC UI for NEW roles ---
       const newRole = { 
-          label: presetRole.label, 
-          user_id: user.id, 
-          preset_role_id: presetRole.id, 
-          is_active: true 
+        label: presetRole.label, 
+        user_id: user.id, 
+        preset_role_id: presetRole.id, 
+        is_active: true 
       };
 
+      // 1. Instantly update the screen's state with a temporary role
+      // (We use a temporary ID for the key, Supabase will create the real one)
       setUserRoles([...userRoles, { ...newRole, id: `temp-${Date.now()}` }]);
       
+      // 2. Insert into the database in the background, then refetch to get the real ID
       const { error } = await supabase.from('0007-ap-roles').insert(newRole);
-      if (error) Alert.alert('Error activating role', error.message);
-      else await fetchData();
+      
+      if (error) {
+        Alert.alert('Error activating role', error.message);
+        // If it fails, revert the change
+        setUserRoles(userRoles.filter(r => r.preset_role_id !== presetRole.id));
+      } else {
+        // Silently refetch to sync the real ID from the database
+        await fetchData(); 
+      }
     }
   };
 
@@ -205,8 +219,10 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                          <Switch
                             value={role.is_active}
                             onValueChange={async () => {
+                                // This can also be made optimistic
+                                const updatedRoles = userRoles.map(r => r.id === role.id ? { ...r, is_active: !r.is_active } : r);
+                                setUserRoles(updatedRoles);
                                 await supabase.from('0007-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
-                                await fetchData();
                             }}
                           />
                       </View>
