@@ -92,7 +92,7 @@ export default function LoginScreen() {
       value={firstName}
       onChangeText={setFirstName}
       autoCapitalize="words"
-    />
+    
     <TextInput
       style={styles.input}
       placeholder="Last Name"
