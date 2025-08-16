@@ -561,6 +561,27 @@ const styles = StyleSheet.create({
     selectedDayText: { color: 'white' },
     todayText: { color: '#0078d4', fontWeight: 'bold' },
     disabledDayText: { color: '#d9e1e8' },
+
+, // <-- Make sure there is a comma here
+    checkboxContainer: {
+      backgroundColor: '#ffffff',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#d1d5db',
+      padding: 8,
+      marginBottom: 16,
+    },
+    checkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    checkLabel: {
+      fontSize: 16,
+      color: '#374151',
+      marginLeft: 12,
+    }
+  
 });
 
 export default TaskEventForm;
