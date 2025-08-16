@@ -101,43 +101,65 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
 
     if (existingUserRole) {
-      // --- OPTIMISTIC UI for EXISTING roles ---
-      // 1. Instantly update the screen's state
+      // Optimistically update the UI immediately
       const updatedRoles = userRoles.map(r => 
         r.id === existingUserRole.id ? { ...r, is_active: !r.is_active } : r
       );
       setUserRoles(updatedRoles);
       
-      // 2. Update the database in the background
-      await supabase
+      // Update database in background without awaiting
+      supabase
         .from('0007-ap-roles')
         .update({ is_active: !existingUserRole.is_active })
-        .eq('id', existingUserRole.id);
+        .eq('id', existingUserRole.id)
+        .then(({ error }) => {
+          if (error) {
+            // Revert on error
+            const revertedRoles = userRoles.map(r => 
+              r.id === existingUserRole.id ? { ...r, is_active: existingUserRole.is_active } : r
+            );
+            setUserRoles(revertedRoles);
+            Alert.alert('Error updating role', error.message);
+          }
+        });
 
     } else {
-      // --- OPTIMISTIC UI for NEW roles ---
-      const newRole = { 
+      // Create optimistic new role immediately
+      const tempId = `temp-${Date.now()}`;
+      const optimisticRole = { 
+        id: tempId,
         label: presetRole.label, 
         user_id: user.id, 
         preset_role_id: presetRole.id, 
         is_active: true 
       };
 
-      // 1. Instantly update the screen's state with a temporary role
-      // (We use a temporary ID for the key, Supabase will create the real one)
-      setUserRoles([...userRoles, { ...newRole, id: `temp-${Date.now()}` }]);
+      // Add to UI immediately
+      setUserRoles([...userRoles, optimisticRole]);
       
-      // 2. Insert into the database in the background, then refetch to get the real ID
-      const { error } = await supabase.from('0007-ap-roles').insert(newRole);
-      
-      if (error) {
-        Alert.alert('Error activating role', error.message);
-        // If it fails, revert the change
-        setUserRoles(userRoles.filter(r => r.preset_role_id !== presetRole.id));
-      } else {
-        // Silently refetch to sync the real ID from the database
-        await fetchData(); 
-      }
+      // Insert into database in background
+      supabase
+        .from('0007-ap-roles')
+        .insert({
+          label: presetRole.label, 
+          user_id: user.id, 
+          preset_role_id: presetRole.id, 
+          is_active: true 
+        })
+        .select()
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            // Remove optimistic role on error
+            setUserRoles(prev => prev.filter(r => r.id !== tempId));
+            Alert.alert('Error activating role', error.message);
+          } else if (data) {
+            // Replace temp role with real one
+            setUserRoles(prev => prev.map(r => 
+              r.id === tempId ? data : r
+            ));
+          }
+        });
     }
   };
 
