@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
 import { Calendar, MessageCircle, Settings, LogOut } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase'; // <-- Import Supabase
 
 const menuItems = [
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
@@ -18,18 +18,17 @@ export function SideMenu() {
     router.push(route as any);
   };
 
+  // --- ADD THIS FUNCTION ---
   const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Error signing out:', error);
-      } else {
-        router.replace('/login');
-      }
-    } catch (error) {
-      console.error('Unexpected error during sign out:', error);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      Alert.alert('Error signing out', error.message);
+    } else {
+      // This will clear the local session and send the user to the login screen
+      router.replace('/login'); 
     }
   };
+  // -------------------------
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,10 +54,12 @@ export function SideMenu() {
       </ScrollView>
       
       <View style={styles.footer}>
+        {/* --- UPDATE THIS BUTTON --- */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
           <LogOut size={20} color="#dc2626" />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
+        {/* -------------------------- */}
       </View>
     </SafeAreaView>
   );
