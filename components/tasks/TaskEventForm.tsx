@@ -226,7 +226,9 @@ const toDateString = (date: Date) => {
             goal_12wk_id: formData.selectedGoalId,
             status: 'pending',
             type: formData.schedulingType,
-            due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString() : null,
+            due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString().split('T')[0] : null,
+            deposit_idea: formData.schedulingType === 'depositIdea',
+            is_all_day: formData.isAnytime,
         };
 
         if (formData.schedulingType === 'event' && !formData.isAnytime) {
