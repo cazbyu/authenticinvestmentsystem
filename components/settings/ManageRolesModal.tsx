@@ -82,7 +82,13 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
     const { data, error } = await supabase
       .from('0007-ap-roles')
-      .insert({ label: customRoleLabel.trim(), user_id: user.id, is_active: true })
+      .insert({ 
+        label: customRoleLabel.trim(), 
+        user_id: user.id, 
+        is_active: true,
+        category: 'Other',
+        created_at: new Date().toISOString()
+      })
       .select()
       .single();
     
@@ -110,7 +116,10 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       // Update database in background without awaiting
       supabase
         .from('0007-ap-roles')
-        .update({ is_active: !existingUserRole.is_active })
+        .update({ 
+          is_active: !existingUserRole.is_active,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', existingUserRole.id)
         .then(({ error }) => {
           if (error) {
@@ -144,7 +153,9 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
           label: presetRole.label, 
           user_id: user.id, 
           preset_role_id: presetRole.id, 
-          is_active: true 
+          is_active: true,
+          category: presetRole.category,
+          created_at: new Date().toISOString()
         })
         .select()
         .single()
@@ -244,7 +255,10 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                                 // This can also be made optimistic
                                 const updatedRoles = userRoles.map(r => r.id === role.id ? { ...r, is_active: !r.is_active } : r);
                                 setUserRoles(updatedRoles);
-                                await supabase.from('0007-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
+                                await supabase.from('0007-ap-roles').update({ 
+                                  is_active: !role.is_active,
+                                  updated_at: new Date().toISOString()
+                                }).eq('id', role.id);
                             }}
                           />
                       </View>
