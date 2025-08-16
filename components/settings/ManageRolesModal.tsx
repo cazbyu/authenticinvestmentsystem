@@ -14,7 +14,7 @@ import {
 import { X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
-// --- (Interfaces remain the same) ---
+// Interfaces
 interface ManageRolesModalProps {
   visible: boolean;
   onClose: () => void;
@@ -30,15 +30,14 @@ interface UserRole {
   is_active: boolean;
   user_id: string;
   preset_role_id?: string;
+  category?: string; // Add category to UserRole
 }
-
 
 export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   const [presetRoles, setPresetRoles] = useState<PresetRole[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [customRoleLabel, setCustomRoleLabel] = useState('');
   const [loading, setLoading] = useState(false);
-  // State to manage collapsed sections, initialized to be empty (all expanded)
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
 
   const groupedPresetRoles = useMemo(() => {
@@ -51,11 +50,10 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   useEffect(() => {
     if (visible) {
       fetchData().then(() => {
-        // After data is fetched, set all categories to be collapsed by default
         setCollapsedCategories(Object.keys(groupedPresetRoles));
       });
     }
-  }, [visible, presetRoles.length]); // Re-run if presetRoles changes to get categories
+  }, [visible, presetRoles.length]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -85,7 +83,12 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
     const { data, error } = await supabase
       .from('0007-ap-roles')
-      .insert({ label: customRoleLabel.trim(), user_id: user.id, is_active: true })
+      .insert({
+        label: customRoleLabel.trim(),
+        user_id: user.id,
+        is_active: true,
+        category: 'Custom' // <-- Assign 'Custom' category
+      })
       .select()
       .single();
     
@@ -116,7 +119,8 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         label: presetRole.label,
         user_id: user.id,
         preset_role_id: presetRole.id,
-        is_active: true
+        is_active: true,
+        category: presetRole.category // <-- Copy category from preset role
       });
 
       if (error) Alert.alert('Error activating role', error.message);
@@ -134,6 +138,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const customRoles = userRoles.filter(role => !role.preset_role_id);
 
+  // --- (The JSX remains the same as the previous version) ---
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -219,6 +224,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   );
 }
 
+// --- (Styles remain the same as the previous version) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: 'white' },
