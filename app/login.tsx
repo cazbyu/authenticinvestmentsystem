@@ -18,43 +18,13 @@ export default function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
-  // Google OAuth configuration
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'myapp',
-  });
-
-  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
-
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: googleClientId,
-      scopes: ['openid', 'profile', 'email'],
-      redirectUri,
-      responseType: AuthSession.ResponseType.Code,
-      additionalParameters: {},
-      extraParams: {
-        access_type: 'offline',
-      },
-    },
-    {
-      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-    }
-  );
-
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { code } = response.params;
-      handleGoogleSignIn(code);
-    }
-  }, [response]);
-
-  const handleGoogleSignIn = async (code: string) => {
+  const handleGoogleSignInPress = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUri,
+          redirectTo: AuthSession.makeRedirectUri({ scheme: 'myapp' }),
         },
       });
 
@@ -151,19 +121,6 @@ export default function LoginScreen() {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleSignInPress = async () => {
-    if (!googleClientId) {
-      Alert.alert('Error', 'Google sign-in not configured. Please check your environment variables.');
-      return;
-    }
-
-    try {
-      await promptAsync();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to initiate Google sign in');
     }
   };
 
