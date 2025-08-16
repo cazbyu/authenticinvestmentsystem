@@ -421,8 +421,22 @@ const toDateString = (date: Date) => {
             )}
 
             <Text style={styles.sectionTitle}>Domains</Text>
-            <View style={styles.selectionGrid}>
-                {domains.map(domain => (<TouchableOpacity key={domain.id} style={[styles.chip, formData.selectedDomainIds.includes(domain.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}><Text style={formData.selectedDomainIds.includes(domain.id) ? styles.chipTextSelected : styles.chipText}>{domain.name}</Text></TouchableOpacity>))}
+            <View style={styles.checkboxContainer}>
+              {domains.map(domain => {
+                const isSelected = formData.selectedDomainIds.includes(domain.id);
+                return (
+                  <TouchableOpacity 
+                    key={domain.id} 
+                    style={styles.checkRow} 
+                    onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
+                  >
+                    <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkLabel}>{domain.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <TextInput style={[styles.input, { height: 100 }]} placeholder="Notes..." value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
