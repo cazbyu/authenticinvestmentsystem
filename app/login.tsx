@@ -42,12 +42,13 @@ export default function LoginScreen() {
 
     setLoading(true);
     
-    // Create the user in Supabase
+    // Step 1: Create the user in Supabase's secure "auth.users" table
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
         data: {
+          // Pass the names so our database trigger can use them
           first_name: firstName.trim(),
           last_name: lastName.trim()
         }
@@ -57,20 +58,19 @@ export default function LoginScreen() {
     if (authError) {
       Alert.alert('Sign Up Error', authError.message);
     } else if (authData.user) {
-      // --- THIS IS THE IMPROVED PART ---
+      // The trigger we created in Supabase will automatically create the profile.
+      // We just need to let the user know and reset the form.
       Alert.alert(
         'Success!', 
         'Please check your email to verify your account, then you can sign in.'
       );
-      // Reset the form fields
+      // Reset the form fields and switch to the login view
       setEmail('');
       setPassword('');
       setConfirmPassword('');
       setFirstName('');
       setLastName('');
-      // Switch back to the login view
       setIsSignUp(false); 
-      // ---------------------------------
     }
     
     setLoading(false);
