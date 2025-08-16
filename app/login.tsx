@@ -86,11 +86,18 @@ export default function LoginScreen() {
 
           {isSignUp && (
             <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              value={fullName}
-              onChangeText={setFullName}
-              autoCapitalize="words"
+      style={styles.input}
+      placeholder="First Name"
+      value={firstName}
+      onChangeText={setFirstName}
+      autoCapitalize="words"
+    />
+    <TextInput
+      style={styles.input}
+      placeholder="Last Name"
+      value={lastName}
+      onChangeText={setLastName}
+      autoCapitalize="words"
             />
           )}
           
