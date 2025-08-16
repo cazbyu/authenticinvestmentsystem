@@ -14,7 +14,7 @@ import {
 import { X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
-// Interfaces
+// --- (Interfaces remain the same) ---
 interface ManageRolesModalProps {
   visible: boolean;
   onClose: () => void;
@@ -30,7 +30,6 @@ interface UserRole {
   is_active: boolean;
   user_id: string;
   preset_role_id?: string;
-  category?: string; // Add category to UserRole
 }
 
 export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
@@ -83,12 +82,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
     const { data, error } = await supabase
       .from('0007-ap-roles')
-      .insert({
-        label: customRoleLabel.trim(),
-        user_id: user.id,
-        is_active: true,
-        category: 'Custom' // <-- Assign 'Custom' category
-      })
+      .insert({ label: customRoleLabel.trim(), user_id: user.id, is_active: true })
       .select()
       .single();
     
@@ -107,22 +101,27 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
 
     if (existingUserRole) {
-      const { error } = await supabase
+      const updatedRoles = userRoles.map(r => 
+        r.id === existingUserRole.id ? { ...r, is_active: !r.is_active } : r
+      );
+      setUserRoles(updatedRoles);
+      
+      await supabase
         .from('0007-ap-roles')
         .update({ is_active: !existingUserRole.is_active })
         .eq('id', existingUserRole.id);
 
-      if (error) Alert.alert('Error updating role', error.message);
-      else await fetchData();
     } else {
-      const { error } = await supabase.from('0007-ap-roles').insert({
-        label: presetRole.label,
-        user_id: user.id,
-        preset_role_id: presetRole.id,
-        is_active: true,
-        category: presetRole.category // <-- Copy category from preset role
-      });
+      const newRole = { 
+          label: presetRole.label, 
+          user_id: user.id, 
+          preset_role_id: presetRole.id, 
+          is_active: true 
+      };
 
+      setUserRoles([...userRoles, { ...newRole, id: `temp-${Date.now()}` }]);
+      
+      const { error } = await supabase.from('0007-ap-roles').insert(newRole);
       if (error) Alert.alert('Error activating role', error.message);
       else await fetchData();
     }
@@ -138,7 +137,6 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const customRoles = userRoles.filter(role => !role.preset_role_id);
 
-  // --- (The JSX remains the same as the previous version) ---
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -224,7 +222,6 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   );
 }
 
-// --- (Styles remain the same as the previous version) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: 'white' },
