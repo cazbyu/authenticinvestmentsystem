@@ -425,30 +425,30 @@ export default function Dashboard() {
       if (activeView === 'deposits') {
         // Fetch non-completed tasks and events with all relationships
         const { data, error } = await supabase
-          .from('0007-ap-tasks')
-          .select(`
-            *,
-            task_roles:0007-ap-universal-roles-join(
-              role:0007-ap-roles(id, label)
-            ),
-            task_domains:0007-ap-universal-domains-join(
-              domain:0007-ap-domains(id, name)
-            ),
-            task_goals:0007-ap-universal-goals-join(
-              goal:0007-ap-goals-12wk(id, title)
-            ),
-            task_notes:0007-ap-universal-notes-join(note_id),
-            task_delegates:0007-ap-universal-delegates-join(delegate_id)
-          `)
-          .eq('user_id', user.id)
-          .neq('status', 'completed')
-          .neq('status', 'cancelled')
-          .in('type', ['task', 'event'])
-          .eq('0007-ap-universal-roles-join.parent_type', 'task')
-          .eq('0007-ap-universal-domains-join.parent_type', 'task')
-          .eq('0007-ap-universal-goals-join.parent_type', 'task')
-          .eq('0007-ap-universal-notes-join.parent_type', 'task')
-          .eq('0007-ap-universal-delegates-join.parent_type', 'task');
+  .from('0007-ap-tasks')
+  .select(`
+    *,
+    task_roles:0007-ap-universal-roles-join!inner(
+      role:0007-ap-roles(id, label)
+    ),
+    task_domains:0007-ap-universal-domains-join!inner(
+      domain:0007-ap-domains(id, name)
+    ),
+    task_goals:0007-ap-universal-goals-join!inner(
+      goal:0007-ap-goals-12wk(id, title)
+    ),
+    task_notes:0007-ap-universal-notes-join!inner(note_id),
+    task_delegates:0007-ap-universal-delegates-join!inner(delegate_id)
+  `)
+  .eq('user_id', user.id)
+  .neq('status', 'completed')
+  .neq('status', 'cancelled')
+  .in('type', ['task', 'event'])
+  .eq('task_roles.parent_type', 'task')
+  .eq('task_domains.parent_type', 'task')
+  .eq('task_goals.parent_type', 'task')
+  .eq('task_notes.parent_type', 'task')
+  .eq('task_delegates.parent_type', 'task');
         
         if (error) {
           console.error('Error fetching deposits:', error);
