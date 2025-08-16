@@ -563,23 +563,23 @@ const styles = StyleSheet.create({
     disabledDayText: { color: '#d9e1e8' },
 
 , // <-- Make sure there is a comma here
-    checkboxContainer: {
-      backgroundColor: '#ffffff',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#d1d5db',
-      padding: 8,
+   checkboxGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
       marginBottom: 16,
     },
-    checkRow: {
+    checkItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 8,
+      width: '48%', // Creates two columns, adjust as needed
+      marginBottom: 12,
     },
     checkLabel: {
-      fontSize: 16,
+      fontSize: 14, // Slightly smaller for a tighter grid
       color: '#374151',
-      marginLeft: 12,
+      marginLeft: 8,
+      flexShrink: 1, // Allows text to wrap if needed
     }
   
 });
