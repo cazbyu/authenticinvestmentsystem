@@ -49,7 +49,8 @@ export default function LoginScreen() {
       options: {
         data: {
           // Pass the full_name so our database trigger can use it
-          full_name: fullName.trim() 
+          first_name: firstName.trim(), // use first_name
+          last_name: lastName.trim()    // use last_name 
         }
       }
     });
