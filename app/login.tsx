@@ -29,57 +29,40 @@ export default function LoginScreen() {
   };
 
   const handleSignUp = async () => {
-  setLoading(true);
-  
-  const { data, error } = await supabase.auth.signUp({
-    email: email.trim(),
-    password,
-    options: {
-      data: {
-        // We pass the full_name here so our trigger can use it
-        full_name: fullName.trim() 
-      }
+    // Basic validation to make sure fields are not empty
+    if (!email || !password || !confirmPassword || !fullName) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
     }
-  });
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match.');
+      return;
+    }
 
-  if (error) {
-    Alert.alert('Sign Up Error', error.message);
-  } else {
-    Alert.alert('Success!', 'Please check your email to verify your account.');
-    setIsSignUp(false); // Switch back to the login view
-  }
-  
-  setLoading(false);
-};
+    setLoading(true);
     
-    // Step 1: Create the user in Supabase Auth
+    // Step 1: Create the user in Supabase's secure "auth.users" table
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: {
+        data: {
+          // Pass the full_name so our database trigger can use it
+          full_name: fullName.trim() 
+        }
+      }
     });
 
     if (authError) {
       Alert.alert('Sign Up Error', authError.message);
-      setLoading(false);
-      return;
-    }
-
-    // Step 2: If auth user is created, insert into your public table
-    if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('0008-ap-users') // Your custom table
-        .insert({ 
-          id: authData.user.id, // This links it to the auth user
-          email: email.trim(),
-          name: fullName.trim(),
-        });
-
-      if (profileError) {
-        Alert.alert('Profile Creation Error', profileError.message);
-      } else {
-        Alert.alert('Success!', 'Please check your email to verify your account, then you can sign in.');
-        setIsSignUp(false); // Switch back to the login view
-      }
+    } else if (authData.user) {
+      // The trigger we created in Supabase will automatically create the profile.
+      // We just need to let the user know.
+      Alert.alert(
+        'Success!', 
+        'Please check your email to verify your account, then you can sign in.',
+        [{ text: 'OK', onPress: () => setIsSignUp(false) }] // Switch back to login
+      );
     }
     
     setLoading(false);
