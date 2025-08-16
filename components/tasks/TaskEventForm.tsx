@@ -412,8 +412,22 @@ const toDateString = (date: Date) => {
             )}
 
             <Text style={styles.sectionTitle}>Roles</Text>
-            <View style={styles.selectionGrid}>
-                {roles.map(role => (<TouchableOpacity key={role.id} style={[styles.chip, formData.selectedRoleIds.includes(role.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedRoleIds', role.id)}><Text style={formData.selectedRoleIds.includes(role.id) ? styles.chipTextSelected : styles.chipText}>{role.label}</Text></TouchableOpacity>))}
+            <View style={styles.checkboxGrid}>
+              {roles.map(role => {
+                const isSelected = formData.selectedRoleIds.includes(role.id);
+                return (
+                  <TouchableOpacity 
+                    key={role.id} 
+                    style={styles.checkItem} 
+                    onPress={() => handleMultiSelect('selectedRoleIds', role.id)}
+                  >
+                    <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkLabel}>{role.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {filteredKeyRelationships.length > 0 && (
