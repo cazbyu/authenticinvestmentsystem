@@ -193,62 +193,75 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
 
-  // Fetches tasks from Supabase based on the active view
+  // Fetches tasks from Supabase using a more robust, multi-query strategy
   const fetchData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let query = supabase
-        .from('0008-ap-tasks') // <-- UPDATED to 0008
-        .select(`
-          *,
-          task_roles:0008-ap-universal-roles-join!parent_id(role:0007-ap-roles(id, label)),
-          task_domains:0008-ap-universal-domains-join!parent_id(domain:0007-ap-domains(id, name)),
-          task_goals:0008-ap-universal-goals-join!parent_id(goal:0007-ap-goals-12wk(id, title)),
-          task_notes:0008-ap-universal-notes-join!parent_id(note_id),
-          task_delegates:0008-ap-universal-delegates-join!parent_id(delegate_id)
-        `)
+      // 1. Fetch the main tasks
+      let taskQuery = supabase
+        .from('0008-ap-tasks')
+        .select('*')
         .eq('user_id', user.id)
         .neq('status', 'completed')
         .neq('status', 'cancelled');
 
       if (activeView === 'deposits') {
-        query = query.in('type', ['task', 'event']);
+        taskQuery = taskQuery.in('type', ['task', 'event']);
       } else {
-        query = query.eq('type', 'depositIdea');
+        taskQuery = taskQuery.eq('type', 'depositIdea');
       }
       
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error(`Error fetching ${activeView}:`, error);
-        Alert.alert('Error', `Failed to fetch ${activeView}.`);
+      const { data: tasksData, error: tasksError } = await taskQuery;
+      if (tasksError) throw tasksError;
+      if (!tasksData) {
+        setTasks([]);
         return;
       }
 
-      // Transforms the fetched data to match the Task interface
-      const transformedTasks = data?.map(task => ({
-        ...task,
-        roles: task.task_roles?.map((tr: any) => tr.role).filter(Boolean) || [],
-        domains: task.task_domains?.map((td: any) => td.domain).filter(Boolean) || [],
-        goals: task.task_goals?.map((tg: any) => tg.goal).filter(Boolean) || [],
-        has_notes: (task.task_notes?.length || 0) > 0,
-        has_attachments: false, // Placeholder
-        has_delegates: (task.task_delegates?.length || 0) > 0,
-      })) || [];
+      const taskIds = tasksData.map(t => t.id);
 
-      // Sorts tasks based on the selected option
+      // 2. Fetch all relationships for these tasks in parallel
+      const [
+        { data: rolesData },
+        { data: domainsData },
+        { data: goalsData },
+        { data: notesData },
+        { data: delegatesData }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0007-ap-roles(id, label)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0007-ap-goals-12wk(id, title)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
+      ]);
+
+      // 3. Map relationships back to their tasks
+      const transformedTasks = tasksData.map(task => {
+        return {
+          ...task,
+          roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+          goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === task.id),
+          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+          has_attachments: false, // Placeholder
+        };
+      });
+
+      // 4. Sort the final combined data
       let sortedTasks = [...transformedTasks];
       if (sortOption === 'due_date') sortedTasks.sort((a, b) => (new Date(a.due_date).getTime() || 0) - (new Date(b.due_date).getTime() || 0));
       else if (sortOption === 'priority') sortedTasks.sort((a, b) => ((b.is_urgent ? 2 : 0) + (b.is_important ? 1 : 0)) - ((a.is_urgent ? 2 : 0) + (a.is_important ? 1 : 0)));
       else if (sortOption === 'title') sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
 
       setTasks(sortedTasks);
+
     } catch (error) {
-      console.error('Error in fetchData:', error);
-      Alert.alert('Error', 'An unexpected error occurred.');
+      console.error(`Error fetching ${activeView}:`, error);
+      Alert.alert('Error', `Failed to fetch ${activeView}.`);
     } finally {
       setLoading(false);
     }
