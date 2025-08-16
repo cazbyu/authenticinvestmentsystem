@@ -31,7 +31,7 @@ export default function LoginScreen() {
 
   const handleSignUp = async () => {
     // Basic validation to make sure fields are not empty
-    if (!email || !password || !confirmPassword || !fullName) {
+    if (!email || !password || !confirmPassword || !firstName || !lastName) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
     }
