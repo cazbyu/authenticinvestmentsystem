@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     checkItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      width: '48%', // Creates two columns, adjust as needed
+      width: '23%', // Creates four columns
       marginBottom: 12,
     },
     checkLabel: {
