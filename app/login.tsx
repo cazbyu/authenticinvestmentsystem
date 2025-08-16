@@ -2,12 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
-
-// Complete the auth session for OAuth
-WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -18,110 +13,60 @@ export default function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
-  const handleGoogleSignInPress = async () => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: AuthSession.makeRedirectUri({ scheme: 'myapp' }),
-        },
-      });
-
-      if (error) {
-        Alert.alert('Google Sign In Error', error.message);
-      } else {
-        router.replace('/(tabs)/dashboard');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to sign in with Google');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    if (!supabase) {
-      Alert.alert('Error', 'Authentication service not available. Please check configuration.');
-      return;
-    }
-
     setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
-      if (error) {
-        Alert.alert('Login Error', error.message);
-      } else {
-        router.replace('/(tabs)/dashboard');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
-    } finally {
-      setLoading(false);
+    if (error) {
+      Alert.alert('Login Error', error.message);
+    } else {
+      router.replace('/(tabs)/dashboard');
     }
+    setLoading(false);
   };
 
   const handleSignUp = async () => {
-    if (!email || !password || !confirmPassword || !fullName) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-
-    if (!supabase) {
-      Alert.alert('Error', 'Authentication service not available. Please check configuration.');
-      return;
-    }
-
     setLoading(true);
-    try {
-      const { error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: {
-            full_name: fullName.trim(),
-          },
-        },
-      });
+    
+    // Step 1: Create the user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
 
-      if (error) {
-        Alert.alert('Sign Up Error', error.message);
-      } else {
-        Alert.alert(
-          'Success',
-          'Account created successfully! Please check your email to verify your account.',
-          [
-            {
-              text: 'OK',
-              onPress: () => setIsSignUp(false),
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
-    } finally {
+    if (authError) {
+      Alert.alert('Sign Up Error', authError.message);
       setLoading(false);
+      return;
     }
+
+    // Step 2: If auth user is created, insert into your public table
+    if (authData.user) {
+      const { error: profileError } = await supabase
+        .from('0008-ap-users') // Your custom table
+        .insert({ 
+          id: authData.user.id, // This links it to the auth user
+          email: email.trim(),
+          name: fullName.trim(),
+        });
+
+      if (profileError) {
+        Alert.alert('Profile Creation Error', profileError.message);
+      } else {
+        Alert.alert('Success!', 'Please check your email to verify your account, then you can sign in.');
+        setIsSignUp(false); // Switch back to the login view
+      }
+    }
+    
+    setLoading(false);
   };
 
   return (
@@ -187,29 +132,11 @@ export default function LoginScreen() {
               }
             </Text>
           </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity 
-            style={styles.googleButton} 
-            onPress={handleGoogleSignInPress}
-            disabled={loading}
-          >
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
+          
           <TouchableOpacity 
             style={styles.switchButton}
             onPress={() => {
               setIsSignUp(!isSignUp);
-              setEmail('');
-              setPassword('');
-              setConfirmPassword('');
-              setFullName('');
             }}
           >
             <Text style={styles.switchButtonText}>
@@ -272,37 +199,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#d1d5db',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#6b7280',
-    fontSize: 14,
-  },
-  googleButton: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  googleButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   switchButton: {
     alignItems: 'center',
+    marginTop: 16,
   },
   switchButtonText: {
     color: '#0078d4',
