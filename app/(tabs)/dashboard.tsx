@@ -217,19 +217,20 @@ export default function Dashboard() {
 
       const { data: tasksData, error: tasksError } = await taskQuery;
       if (tasksError) throw tasksError;
-      if (!tasksData) {
+      if (!tasksData || tasksData.length === 0) {
         setTasks([]);
+        setLoading(false);
         return;
       }
 
       const taskIds = tasksData.map(t => t.id);
 
       const [
-        { data: rolesData },
-        { data: domainsData },
-        { data: goalsData },
-        { data: notesData },
-        { data: delegatesData }
+        { data: rolesData, error: rolesError },
+        { data: domainsData, error: domainsError },
+        { data: goalsData, error: goalsError },
+        { data: notesData, error: notesError },
+        { data: delegatesData, error: delegatesError }
       ] = await Promise.all([
         supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
         supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
@@ -237,6 +238,12 @@ export default function Dashboard() {
         supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
         supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
       ]);
+
+      if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (goalsError) throw goalsError;
+      if (notesError) throw notesError;
+      if (delegatesError) throw delegatesError;
 
       const transformedTasks = tasksData.map(task => {
         return {
