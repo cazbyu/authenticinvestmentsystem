@@ -48,11 +48,9 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   useEffect(() => {
     if (visible) {
-      fetchData().then(() => {
-        setCollapsedCategories(Object.keys(groupedPresetRoles));
-      });
+      fetchData();
     }
-  }, [visible, presetRoles.length]);
+  }, [visible]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -72,7 +70,9 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     if (presetError || userError) {
       Alert.alert('Error fetching data', presetError?.message || userError?.message);
     } else {
+      const categories = Array.from(new Set((presetData || []).map(r => r.category)));
       setPresetRoles(presetData || []);
+      setCollapsedCategories(categories);
       setUserRoles(userData || []);
     }
     setLoading(false);
