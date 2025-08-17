@@ -252,7 +252,7 @@ const toDateString = (date: Date) => {
         if (mode === 'edit' && initialData?.id) {
             // Update existing task
             const { data, error } = await supabase
-                .from('0007-ap-tasks')
+                .from('0008-ap-tasks')
                 .update(payload)
                 .eq('id', initialData.id)
                 .select()
@@ -262,7 +262,7 @@ const toDateString = (date: Date) => {
         } else {
             // Create new task
             const { data, error } = await supabase
-                .from('0007-ap-tasks')
+                .from('0008-ap-tasks')
                 .insert(payload)
                 .select()
                 .single();
