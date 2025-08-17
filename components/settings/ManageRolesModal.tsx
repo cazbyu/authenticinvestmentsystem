@@ -37,7 +37,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   const [presetRoles, setPresetRoles] = useState<PresetRole[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [customRoleLabel, setCustomRoleLabel] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
 
   const groupedPresetRoles = useMemo(() => {
@@ -63,30 +63,35 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      Alert.alert("Error", "You must be logged in to manage roles.");
-      setLoading(false);
-      return;
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert("Error", "You must be logged in to manage roles.");
+        setLoading(false);
+        return;
+      }
 
-    const { data: presetData, error: presetError } = await supabase
-      .from('0008-ap-preset-roles')
-      .select('id, label, category');
+      const { data: presetData, error: presetError } = await supabase
+        .from('0008-ap-preset-roles')
+        .select('id, label, category');
 
-    const { data: userData, error: userError } = await supabase
-      .from('0008-ap-roles')
-      .select('*')
-      .eq('user_id', user.id);
+      if (presetError) throw presetError;
 
-    if (presetError || userError) {
-      console.error("Error fetching data:", presetError || userError);
-      Alert.alert('Error fetching data', presetError?.message || userError?.message);
-    } else {
+      const { data: userData, error: userError } = await supabase
+        .from('0008-ap-roles')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (userError) throw userError;
+
       setPresetRoles(presetData || []);
       setUserRoles(userData || []);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      Alert.alert('Error fetching data', error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAddCustomRole = async () => {
@@ -128,16 +133,18 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       if (error) Alert.alert('Error updating role', error.message);
       else await fetchData();
     } else {
-      const { error } = await supabase.from('0008-ap-roles').insert({
+      const { data: newRole, error } = await supabase.from('0008-ap-roles').insert({
         label: presetRole.label,
         user_id: user.id,
         preset_role_id: presetRole.id,
         is_active: true,
         category: presetRole.category
-      });
+      }).select().single();
 
       if (error) Alert.alert('Error activating role', error.message);
-      else await fetchData();
+      else if (newRole) {
+        setUserRoles([...userRoles, newRole]);
+      }
     }
   };
 
