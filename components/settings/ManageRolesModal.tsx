@@ -14,7 +14,7 @@ import {
 import { X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
-// --- (Interfaces remain the same) ---
+// Interfaces
 interface ManageRolesModalProps {
   visible: boolean;
   onClose: () => void;
@@ -28,8 +28,9 @@ interface UserRole {
   id: string;
   label: string;
   is_active: boolean;
-  profile_id: string;
+  user_id: string;
   preset_role_id?: string;
+  category?: string; // Add category to UserRole
 }
 
 export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
@@ -48,9 +49,11 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   useEffect(() => {
     if (visible) {
-      fetchData();
+      fetchData().then(() => {
+        setCollapsedCategories(Object.keys(groupedPresetRoles));
+      });
     }
-  }, [visible]);
+  }, [visible, presetRoles.length]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -61,18 +64,13 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       return;
     }
 
-    const { data: presetData, error: presetError } = await supabase.from('0008-ap-preset-roles').select('id, label, category');
-    const { data: userData, error: userError } = await supabase
-      .from('0008-ap-roles')
-      .select('*')
-      .eq('profile_id', user.id);
+    const { data: presetData, error: presetError } = await supabase.from('0007-ap-preset-roles').select('id, label, category');
+    const { data: userData, error: userError } = await supabase.from('0007-ap-roles').select('*').eq('user_id', user.id);
 
     if (presetError || userError) {
       Alert.alert('Error fetching data', presetError?.message || userError?.message);
     } else {
-      const categories = Array.from(new Set((presetData || []).map(r => r.category)));
       setPresetRoles(presetData || []);
-      setCollapsedCategories(categories);
       setUserRoles(userData || []);
     }
     setLoading(false);
@@ -84,13 +82,12 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('0008-ap-roles')
-      .insert({ 
-        label: customRoleLabel.trim(), 
-        profile_id: user.id,
+      .from('0007-ap-roles')
+      .insert({
+        label: customRoleLabel.trim(),
+        user_id: user.id,
         is_active: true,
-        category: 'Other',
-        created_at: new Date().toISOString()
+        category: 'Custom' // <-- Assign 'Custom' category
       })
       .select()
       .single();
@@ -110,70 +107,24 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
 
     if (existingUserRole) {
-      // Optimistically update the UI immediately
-      const updatedRoles = userRoles.map(r => 
-        r.id === existingUserRole.id ? { ...r, is_active: !r.is_active } : r
-      );
-      setUserRoles(updatedRoles);
-      
-      // Update database in background without awaiting
-      supabase
-        .from('0008-ap-roles')
-        .update({ 
-          is_active: !existingUserRole.is_active,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingUserRole.id)
-        .then(({ error }) => {
-          if (error) {
-            // Revert on error
-            const revertedRoles = userRoles.map(r => 
-              r.id === existingUserRole.id ? { ...r, is_active: existingUserRole.is_active } : r
-            );
-            setUserRoles(revertedRoles);
-            Alert.alert('Error updating role', error.message);
-          }
-        });
+      const { error } = await supabase
+        .from('0007-ap-roles')
+        .update({ is_active: !existingUserRole.is_active })
+        .eq('id', existingUserRole.id);
 
+      if (error) Alert.alert('Error updating role', error.message);
+      else await fetchData();
     } else {
-      // Create optimistic new role immediately
-      const tempId = `temp-${Date.now()}`;
-      const optimisticRole = { 
-        id: tempId,
-        label: presetRole.label, 
-        profile_id: user.id,
-        preset_role_id: presetRole.id, 
-        is_active: true 
-      };
+      const { error } = await supabase.from('0007-ap-roles').insert({
+        label: presetRole.label,
+        user_id: user.id,
+        preset_role_id: presetRole.id,
+        is_active: true,
+        category: presetRole.category // <-- Copy category from preset role
+      });
 
-      // Add to UI immediately
-      setUserRoles([...userRoles, optimisticRole]);
-      
-      // Insert into database in background
-      supabase
-        .from('0008-ap-roles')
-        .insert({
-          label: presetRole.label, 
-        profile_id: user.id,
-          preset_role_id: presetRole.id, 
-          is_active: true,
-          category: presetRole.category,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single()
-        .then(({ data, error }) => {
-          if (error) {
-            // Remove optimistic role on error
-            setUserRoles(prev => prev.filter(r => r.id !== tempId));
-            Alert.alert('Error activating role', error.message);
-          } else if (data) {
-            // Replace temp role with real one
-            setUserRoles(prev => prev.map(r => 
-              r.id === tempId ? data : r
-            ));
-          }
-        });
+      if (error) Alert.alert('Error activating role', error.message);
+      else await fetchData();
     }
   };
 
@@ -187,6 +138,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const customRoles = userRoles.filter(role => !role.preset_role_id);
 
+  // --- (The JSX remains the same as the previous version) ---
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -255,29 +207,8 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                          <Switch
                             value={role.is_active}
                             onValueChange={async () => {
-                                const previousIsActive = role.is_active;
-                                // Optimistically update the role's active state
-                                setUserRoles(prev =>
-                                  prev.map(r =>
-                                    r.id === role.id ? { ...r, is_active: !previousIsActive } : r
-                                  )
-                                );
-                                const { error } = await supabase
-                                  .from('0008-ap-roles')
-                                  .update({
-                                    is_active: !previousIsActive,
-                                    updated_at: new Date().toISOString()
-                                  })
-                                  .eq('id', role.id);
-                                if (error) {
-                                  // Revert to the previous state on error
-                                  setUserRoles(prev =>
-                                    prev.map(r =>
-                                      r.id === role.id ? { ...r, is_active: previousIsActive } : r
-                                    )
-                                  );
-                                  Alert.alert('Error updating role', error.message);
-                                }
+                                await supabase.from('0007-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
+                                await fetchData();
                             }}
                           />
                       </View>
@@ -293,6 +224,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   );
 }
 
+// --- (Styles remain the same as the previous version) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: 'white' },
