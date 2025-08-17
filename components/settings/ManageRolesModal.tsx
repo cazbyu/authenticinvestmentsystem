@@ -28,9 +28,9 @@ interface UserRole {
   id: string;
   label: string;
   is_active: boolean;
-  profile_id: string;
+  user_id: string;
   preset_role_id?: string;
-  category?: string;
+  category?: string; // Add category to UserRole
 }
 
 export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
@@ -64,8 +64,8 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       return;
     }
 
-    const { data: presetData, error: presetError } = await supabase.from('0008-ap-preset-roles').select('id, label, category');
-    const { data: userData, error: userError } = await supabase.from('0008-ap-roles').select('*').eq('profile_id', user.id);
+    const { data: presetData, error: presetError } = await supabase.from('0007-ap-preset-roles').select('id, label, category');
+    const { data: userData, error: userError } = await supabase.from('0007-ap-roles').select('*').eq('user_id', user.id);
 
     if (presetError || userError) {
       Alert.alert('Error fetching data', presetError?.message || userError?.message);
@@ -82,16 +82,16 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('0008-ap-roles')
+      .from('0007-ap-roles')
       .insert({
         label: customRoleLabel.trim(),
-        profile_id: user.id,
+        user_id: user.id,
         is_active: true,
-        category: 'Custom'
+        category: 'Custom' // <-- Assign 'Custom' category
       })
       .select()
       .single();
-
+    
     if (error) {
       Alert.alert('Error adding custom role', error.message);
     } else if (data) {
@@ -99,28 +99,28 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       setCustomRoleLabel('');
     }
   };
-
+  
   const handleTogglePresetRole = async (presetRole: PresetRole) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
+    
     const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
 
     if (existingUserRole) {
       const { error } = await supabase
-        .from('0008-ap-roles')
+        .from('0007-ap-roles')
         .update({ is_active: !existingUserRole.is_active })
         .eq('id', existingUserRole.id);
 
       if (error) Alert.alert('Error updating role', error.message);
       else await fetchData();
     } else {
-      const { error } = await supabase.from('0008-ap-roles').insert({
+      const { error } = await supabase.from('0007-ap-roles').insert({
         label: presetRole.label,
-        profile_id: user.id,
+        user_id: user.id,
         preset_role_id: presetRole.id,
         is_active: true,
-        category: presetRole.category
+        category: presetRole.category // <-- Copy category from preset role
       });
 
       if (error) Alert.alert('Error activating role', error.message);
@@ -138,6 +138,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const customRoles = userRoles.filter(role => !role.preset_role_id);
 
+  // --- (The JSX remains the same as the previous version) ---
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -206,7 +207,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                          <Switch
                             value={role.is_active}
                             onValueChange={async () => {
-                                await supabase.from('0008-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
+                                await supabase.from('0007-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
                                 await fetchData();
                             }}
                           />
@@ -223,6 +224,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   );
 }
 
+// --- (Styles remain the same as the previous version) ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: 'white' },
