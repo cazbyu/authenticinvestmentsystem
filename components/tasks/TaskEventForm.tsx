@@ -278,10 +278,10 @@ const taskId = taskData.id;
         // If editing, first delete existing relationships
         if (mode === 'edit' && initialData?.id) {
             await Promise.all([
-                supabase.from('0007-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0007-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0007-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0007-ap-universal-notes-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
             ]);
         }
 
@@ -294,13 +294,13 @@ const taskId = taskData.id;
         if (formData.notes) {
             const { data: noteData, error: noteError } = await supabase.from('0007-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
             if (noteError) throw noteError;
-            await supabase.from('0007-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+            await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
         }
 
         // Insert into universal join tables
-        if (roleJoins.length > 0) await supabase.from('0007-ap-universal-roles-join').insert(roleJoins);
-        if (domainJoins.length > 0) await supabase.from('0007-ap-universal-domains-join').insert(domainJoins);
-        if (krJoins.length > 0) await supabase.from('0007-ap-universal-key-relationships-join').insert(krJoins);
+        if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+        if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+        if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
 
         onSubmitSuccess();
         onClose();
