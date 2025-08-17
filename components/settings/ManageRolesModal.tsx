@@ -37,10 +37,11 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   const [presetRoles, setPresetRoles] = useState<PresetRole[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [customRoleLabel, setCustomRoleLabel] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
 
   const groupedPresetRoles = useMemo(() => {
+    if (!presetRoles) return {};
     return presetRoles.reduce((acc, role) => {
       (acc[role.category] = acc[role.category] || []).push(role);
       return acc;
@@ -49,11 +50,16 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   useEffect(() => {
     if (visible) {
-      fetchData().then(() => {
-        setCollapsedCategories(Object.keys(groupedPresetRoles));
-      });
+      fetchData();
     }
-  }, [visible, presetRoles.length]);
+  }, [visible]);
+
+  useEffect(() => {
+    if (Object.keys(groupedPresetRoles).length > 0) {
+      setCollapsedCategories(Object.keys(groupedPresetRoles));
+    }
+  }, [presetRoles]);
+
 
   const fetchData = async () => {
     setLoading(true);
@@ -64,10 +70,17 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       return;
     }
 
-    const { data: presetData, error: presetError } = await supabase.from('0008-ap-preset-roles').select('id, label, category');
-    const { data: userData, error: userError } = await supabase.from('0008-ap-roles').select('*').eq('user_id', user.id);
+    const { data: presetData, error: presetError } = await supabase
+      .from('0008-ap-preset-roles')
+      .select('id, label, category');
+
+    const { data: userData, error: userError } = await supabase
+      .from('0008-ap-roles')
+      .select('*')
+      .eq('user_id', user.id);
 
     if (presetError || userError) {
+      console.error("Error fetching data:", presetError || userError);
       Alert.alert('Error fetching data', presetError?.message || userError?.message);
     } else {
       setPresetRoles(presetData || []);
@@ -151,7 +164,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         <ScrollView style={styles.content}>
           {loading ? <ActivityIndicator size="large" color="#0078d4" /> : (
             <>
-              {Object.keys(groupedPresetRoles).length > 0 && (
+              {Object.keys(groupedPresetRoles).length > 0 ? (
                 <View style={styles.categoryContainer}>
                   <Text style={styles.mainSectionTitle}>Commonly Predefined Roles</Text>
                   {Object.entries(groupedPresetRoles).map(([category, rolesInCategory]) => {
@@ -183,7 +196,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                     );
                   })}
                 </View>
-              )}
+              ) : <Text>No preset roles found.</Text>}
 
               <View style={styles.categoryContainer}>
                 <Text style={styles.mainSectionTitle}>Customized Roles</Text>
