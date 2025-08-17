@@ -127,13 +127,15 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
               <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Roles:</Text><View style={styles.tagContainer}>{task.roles.map((role) => (<View key={role.id} style={[styles.tag, styles.roleTag]}><Text style={styles.tagText}>{role.label}</Text></View>))}</View></View>
             )}
           </View>
-          <View style={styles.rightSection}>
+          <View style={styles.middleSection}>
             {task.domains && task.domains.length > 0 && (
               <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Domains:</Text><View style={styles.tagContainer}>{task.domains.map((domain) => (<View key={domain.id} style={[styles.tag, styles.domainTag]}><Text style={styles.tagText}>{domain.name}</Text></View>))}</View></View>
             )}
             {task.goals && task.goals.length > 0 && (
               <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Goals:</Text><View style={styles.tagContainer}>{task.goals.map((goal) => (<View key={goal.id} style={[styles.tag, styles.goalTag]}><Text style={styles.tagText}>{goal.title}</Text></View>))}</View></View>
             )}
+          </View>
+          <View style={styles.iconsSection}>
             <View style={styles.statusIcons}>
               {task.has_notes && <FileText size={12} color="#6b7280" />}
               {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
@@ -337,7 +339,8 @@ const styles = StyleSheet.create({
   dueDate: { fontSize: 14, color: '#6b7280', fontWeight: '400' },
   taskBody: { flexDirection: 'row', marginBottom: 4 },
   leftSection: { flex: 1, marginRight: 8 },
-  rightSection: { flex: 1 },
+  middleSection: { flex: 1, marginRight: 8 },
+  iconsSection: { width: 30, justifyContent: 'flex-start', alignItems: 'center' },
   tagSection: { marginBottom: 4 },
   tagSectionLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', marginBottom: 4 },
   tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
@@ -346,7 +349,7 @@ const styles = StyleSheet.create({
   domainTag: { backgroundColor: '#fed7aa' },
   goalTag: { backgroundColor: '#bfdbfe' },
   tagText: { fontSize: 10, fontWeight: '500', color: '#374151' },
-  statusIcons: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  statusIcons: { flexDirection: 'column', alignItems: 'center', gap: 2 },
   taskActions: { alignItems: 'center', gap: 8 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
   celebrationOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8 },
