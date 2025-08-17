@@ -64,9 +64,17 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       return;
     }
 
-    const { data: presetData, error: presetError } = await supabase.from('0008-ap-preset-roles').select('id, label, category');
+    const { data: presetData, error: presetError } = await supabase
+      .from('0008-ap-preset-roles')
+      .select('id, label, category');
+    
+    console.log('Preset roles data:', presetData);
+    console.log('Preset roles error:', presetError);
+    
     const { data: userData, error: userError } = await supabase.from('0008-ap-roles').select('*').eq('profile_id', user.id);
 
+    console.log('User roles data:', userData);
+    console.log('User roles error:', userError);
     if (presetError || userError) {
       Alert.alert('Error fetching data', presetError?.message || userError?.message);
     } else {
@@ -152,6 +160,13 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         <ScrollView style={styles.content}>
           {loading ? <ActivityIndicator size="large" color="#0078d4" /> : (
             <>
+              <Text style={styles.debugText}>
+                Debug: Found {presetRoles.length} preset roles, {userRoles.length} user roles
+              </Text>
+              <Text style={styles.debugText}>
+                Categories: {Object.keys(groupedPresetRoles).join(', ')}
+              </Text>
+              
               {Object.keys(groupedPresetRoles).length > 0 && (
                 <View style={styles.categoryContainer}>
                   <Text style={styles.mainSectionTitle}>Commonly Predefined Roles</Text>
@@ -243,4 +258,5 @@ const styles = StyleSheet.create({
   rolesList: { backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden' },
   roleItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
   roleLabel: { fontSize: 16, flex: 1, color: '#1f2937' },
+  debugText: { fontSize: 12, color: '#6b7280', marginBottom: 8, fontFamily: 'monospace' },
 });
