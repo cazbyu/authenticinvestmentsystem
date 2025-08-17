@@ -193,26 +193,17 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
 
-  // Fetches tasks from Supabase using a simplified query for diagnostics
+  // Fetches tasks from Supabase using a more robust, multi-query strategy
   const fetchData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch tasks with their related roles, domains, and goals
+      // 1. Fetch the main tasks
       let taskQuery = supabase
-        .from('0007-ap-tasks')
-        .select(`
-          *,
-          task_roles:0007-ap-universal-roles-join!inner(
-            role:0007-ap-roles(id, label)
-          ),
-          task_domains:0007-ap-universal-domains-join!inner(
-            domain:0007-ap-domains(id, name)
-          ),
-          task_goals:0007-ap-goals-12wk(id, title)
-        `)
+        .from('0008-ap-tasks')
+        .select('*')
         .eq('user_id', user.id)
         .neq('status', 'completed')
         .neq('status', 'cancelled');
@@ -224,30 +215,53 @@ export default function Dashboard() {
       }
       
       const { data: tasksData, error: tasksError } = await taskQuery;
-      
-      if (tasksError) {
-        console.error(`Error fetching ${activeView}:`, tasksError);
-        Alert.alert('Error', `Failed to fetch ${activeView}.`);
-        setTasks([]); // Clear tasks on error
+      if (tasksError) throw tasksError;
+      if (!tasksData) {
+        setTasks([]);
         return;
       }
-      
-      // Transform the data to match the expected format
-      const transformedTasks = (tasksData || []).map(task => ({
-        ...task,
-        roles: task.task_roles?.map(tr => tr.role).filter(Boolean) || [],
-        domains: task.task_domains?.map(td => td.domain).filter(Boolean) || [],
-        goals: task.task_goals ? [task.task_goals] : [],
-        has_notes: false, // TODO: Implement notes checking
-        has_attachments: false, // TODO: Implement attachments checking
-        has_delegates: false, // TODO: Implement delegates checking
-      }));
-      
-      setTasks(transformedTasks);
+
+      const taskIds = tasksData.map(t => t.id);
+
+      // 2. Fetch all relationships for these tasks in parallel
+      const [
+        { data: rolesData },
+        { data: domainsData },
+        { data: goalsData },
+        { data: notesData },
+        { data: delegatesData }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0007-ap-roles(id, label)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0007-ap-goals-12wk(id, title)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
+      ]);
+
+      // 3. Map relationships back to their tasks
+      const transformedTasks = tasksData.map(task => {
+        return {
+          ...task,
+          roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+          goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === task.id),
+          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+          has_attachments: false, // Placeholder
+        };
+      });
+
+      // 4. Sort the final combined data
+      let sortedTasks = [...transformedTasks];
+      if (sortOption === 'due_date') sortedTasks.sort((a, b) => (new Date(a.due_date).getTime() || 0) - (new Date(b.due_date).getTime() || 0));
+      else if (sortOption === 'priority') sortedTasks.sort((a, b) => ((b.is_urgent ? 2 : 0) + (b.is_important ? 1 : 0)) - ((a.is_urgent ? 2 : 0) + (a.is_important ? 1 : 0)));
+      else if (sortOption === 'title') sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
+
+      setTasks(sortedTasks);
 
     } catch (error) {
-      console.error('Error in fetchData:', error);
-      Alert.alert('Error', 'An unexpected error occurred.');
+      console.error(`Error fetching ${activeView}:`, error);
+      Alert.alert('Error', `Failed to fetch ${activeView}.`);
     } finally {
       setLoading(false);
     }
