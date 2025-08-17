@@ -17,49 +17,14 @@ interface Domain { id: string; name: string; }
 interface KeyRelationship { id: string; name: string; role_id: string; }
 interface TwelveWeekGoal { id: string; title: string; }
 
-// --- CUSTOM DAY COMPONENT for CALENDAR ---
-// This component gives us precise control over the calendar's appearance
-const CustomDayComponent = ({ date, state, marking, onPress }) => {
-  const isSelected = marking?.selected;
-  const isToday = state === 'today';
-  
-  return (
-    <TouchableOpacity 
-      onPress={() => onPress(date)} 
-      style={[
-        styles.dayContainer, 
-        isSelected && styles.selectedDay
-      ]}
-    >
-      <Text style={[
-        styles.dayText,
-        isToday && !isSelected && styles.todayText,
-        isSelected && styles.selectedDayText,
-        state === 'disabled' && styles.disabledDayText
-      ]}>
-        {date.day}
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
-
 // --- MAIN FORM COMPONENT ---
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
-
-const toDateString = (date: Date) => {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
   
   const dateInputRef = useRef<TouchableOpacity>(null);
   const timeInputRef = useRef<TouchableOpacity>(null);
   const startTimeInputRef = useRef<TouchableOpacity>(null);
   const endTimeInputRef = useRef<TouchableOpacity>(null);
 
-  // Helper function to get default time (current time + offset hours, rounded to nearest 15 min)
   const getDefaultTime = (addHours: number = 1) => {
     const now = new Date();
     now.setHours(now.getHours() + addHours);
@@ -70,31 +35,23 @@ const toDateString = (date: Date) => {
     return `${hour12}:${now.getMinutes().toString().padStart(2, '0')} ${ampm}`;
   };
 
-  // Helper function to convert timestamp to time string
-  const timestampToTimeString = (timestamp?: string) => {
-    if (!timestamp) return getDefaultTime();
-    const date = new Date(timestamp);
-    const hour12 = date.getHours() === 0 ? 12 : date.getHours() > 12 ? date.getHours() - 12 : date.getHours();
-    const ampm = date.getHours() < 12 ? 'am' : 'pm';
-    return `${hour12}:${date.getMinutes().toString().padStart(2, '0')} ${ampm}`;
-  };
-
   const [formData, setFormData] = useState({
+    id: initialData?.id || undefined,
     title: initialData?.title || '',
-    notes: initialData?.notes || '',
+    notes: '', // Will be fetched for edit mode
     dueDate: initialData?.due_date ? new Date(initialData.due_date) : new Date(),
-    time: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
-    startTime: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
-    endTime: initialData?.end_time ? timestampToTimeString(initialData.end_time) : getDefaultTime(2),
+    time: getDefaultTime(),
+    startTime: getDefaultTime(),
+    endTime: getDefaultTime(2),
     isAnytime: initialData?.is_all_day || false,
     is_urgent: initialData?.is_urgent || false,
     is_important: initialData?.is_important || false,
     is_authentic_deposit: initialData?.is_authentic_deposit || false,
     is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
-    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea') || 'task',
-    selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
-    selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
-    selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
+    schedulingType: initialData?.type || 'task' as 'task' | 'event' | 'depositIdea',
+    selectedRoleIds: [] as string[],
+    selectedDomainIds: [] as string[],
+    selectedKeyRelationshipIds: [] as string[],
     selectedGoalId: initialData?.goal_12wk_id || null as string | null,
   });
   
@@ -102,16 +59,61 @@ const toDateString = (date: Date) => {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
   const [twelveWeekGoals, setTwelveWeekGoals] = useState<TwelveWeekGoal[]>([]);
-
   const [loading, setLoading] = useState(false);
-  
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [dateInputValue, setDateInputValue] = useState('');
   const [activeTimeField, setActiveTimeField] = useState<'time' | 'startTime' | 'endTime' | null>(null);
-
   const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
+  // --- NEW: Effect to fetch data for edit mode ---
+  useEffect(() => {
+    const fetchEditData = async () => {
+      if (mode === 'edit' && initialData?.id) {
+        setLoading(true);
+        const taskId = initialData.id;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch all relationships in parallel
+        const [
+          { data: roleJoins },
+          { data: domainJoins },
+          { data: krJoins },
+          { data: noteJoins }
+        ] = await Promise.all([
+            supabase.from('0008-ap-universal-roles-join').select('role_id').eq('parent_id', taskId),
+            supabase.from('0008-ap-universal-domains-join').select('domain_id').eq('parent_id', taskId),
+            supabase.from('0008-ap-universal-key-relationships-join').select('key_relationship_id').eq('parent_id', taskId),
+            supabase.from('0008-ap-universal-notes-join').select('note_id').eq('parent_id', taskId).limit(1)
+        ]);
+        
+        // Fetch note content if a note exists
+        let noteContent = '';
+        if (noteJoins && noteJoins.length > 0) {
+            const { data: note } = await supabase.from('0008-ap-notes').select('content').eq('id', noteJoins[0].note_id).single();
+            noteContent = note?.content || '';
+        }
+        
+        // Populate the form with all fetched data
+        setFormData(prev => ({
+            ...prev,
+            notes: noteContent,
+            selectedRoleIds: roleJoins?.map(r => r.role_id) || [],
+            selectedDomainIds: domainJoins?.map(d => d.domain_id) || [],
+            selectedKeyRelationshipIds: krJoins?.map(k => k.key_relationship_id) || [],
+        }));
+        setLoading(false);
+      }
+    };
+
+    fetchEditData();
+  }, [mode, initialData]);
+
 
   useEffect(() => {
     setDateInputValue(formatDateForInput(formData.dueDate));
@@ -161,7 +163,7 @@ const toDateString = (date: Date) => {
   };
 
   const onCalendarDayPress = (day: any) => {
-    const selectedDate = new Date(day.timestamp); // Use timestamp for timezone consistency
+    const selectedDate = new Date(day.timestamp);
     setFormData(prev => ({ ...prev, dueDate: selectedDate }));
     setDateInputValue(formatDateForInput(selectedDate));
     setShowMiniCalendar(false);
@@ -175,11 +177,7 @@ const toDateString = (date: Date) => {
   };
 
   const formatDateForInput = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: 'numeric'
-    });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const handleDateInputChange = (text: string) => {
@@ -199,26 +197,8 @@ const toDateString = (date: Date) => {
     combined.setHours(hours, minutes, 0, 0);
     return combined.toISOString();
   };
-
-  const timeStringToMinutes = (time: string) => {
-    const [timePart, period] = time.split(' ');
-    let [hours, minutes] = timePart.split(':').map(Number);
-    if (period === 'pm' && hours < 12) hours += 12;
-    if (period === 'am' && hours === 12) hours = 0;
-    return hours * 60 + minutes;
-  };
-
-  const formatDuration = (totalMinutes: number) => {
-    const hours = Math.round((totalMinutes / 60) * 100) / 100;
-    return `${hours} hr${hours === 1 ? '' : 's'}`;
-  };
-
-  const getDurationLabel = (start: string, end: string) => {
-    let diff = timeStringToMinutes(end) - timeStringToMinutes(start);
-    if (diff <= 0) diff += 24 * 60;
-    return formatDuration(diff);
-  };
-
+  
+  // --- IMPROVED: This function now handles both create and update ---
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -226,6 +206,7 @@ const toDateString = (date: Date) => {
         if (!user) throw new Error("User not found");
 
         const payload: any = {
+            id: formData.id, // Pass ID for updates
             user_id: user.id,
             title: formData.title,
             is_urgent: formData.is_urgent,
@@ -236,9 +217,7 @@ const toDateString = (date: Date) => {
             status: 'pending',
             type: formData.schedulingType,
             due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString().split('T')[0] : null,
-            deposit_idea: formData.schedulingType === 'depositIdea',
             is_all_day: formData.isAnytime,
-            updated_at: new Date().toISOString(),
         };
 
         if (formData.schedulingType === 'event' && !formData.isAnytime) {
@@ -246,74 +225,75 @@ const toDateString = (date: Date) => {
             payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
         }
 
-        let taskData;
-        let taskError;
+        // Use upsert for create/update logic
+        const { data: taskData, error: taskError } = await supabase
+            .from('0008-ap-tasks')
+            .upsert(payload)
+            .select()
+            .single();
 
-        if (mode === 'edit' && initialData?.id) {
-            // Update existing task
-            const { data, error } = await supabase
-                .from('0007-ap-tasks')
-                .update(payload)
-                .eq('id', initialData.id)
-                .select()
-                .single();
-            taskData = data;
-            taskError = error;
-        } else {
-            // Create new task
-            const { data, error } = await supabase
-                .from('0007-ap-tasks')
-                .insert(payload)
-                .select()
-                .single();
-            taskData = data;
-            taskError = error;
-        }
+        if (taskError) throw taskError;
+        const taskId = taskData.id;
 
-if (taskError) throw taskError;
-if (!taskData) throw new Error("Failed to create task");
-
-const taskId = taskData.id;
-
-        // If editing, first delete existing relationships
-        if (mode === 'edit' && initialData?.id) {
-            await Promise.all([
-                supabase.from('0007-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0007-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0007-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0007-ap-universal-notes-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-            ]);
-        }
-
-        // Generate join rows for each relationship
+        // --- Handle relationships by deleting old and inserting new ---
+        // This is a simple and effective way to manage edits
+        await Promise.all([
+            supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId),
+            supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId),
+            supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId),
+            supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', taskId),
+        ]);
+        
+        // --- Re-insert all current relationships ---
         const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
         const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
         const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
-
-        // Handle notes
+        
         if (formData.notes) {
-            const { data: noteData, error: noteError } = await supabase.from('0007-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
-            if (noteError) throw noteError;
-            await supabase.from('0007-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+            const { data: noteData } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+            if (noteData) {
+              await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+            }
         }
 
-        // Insert into universal join tables
-        if (roleJoins.length > 0) await supabase.from('0007-ap-universal-roles-join').insert(roleJoins);
-        if (domainJoins.length > 0) await supabase.from('0007-ap-universal-domains-join').insert(domainJoins);
-        if (krJoins.length > 0) await supabase.from('0007-ap-universal-key-relationships-join').insert(krJoins);
+        if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+        if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+        if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
 
         onSubmitSuccess();
         onClose();
 
     } catch (error) {
-        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} task:`, error);
-        Alert.alert('Error', `Failed to ${mode === 'edit' ? 'update' : 'create'} task`);
+        console.error("Error saving task:", error);
+        Alert.alert('Error', `Failed to save task: ${error.message}`);
     } finally {
         setLoading(false);
     }
   };
 
   const filteredKeyRelationships = keyRelationships.filter(kr => formData.selectedRoleIds.includes(kr.role_id));
+  const toDateString = (date: Date) => date.toISOString().split('T')[0];
+  const timeStringToMinutes = (time: string) => {
+    const [timePart, period] = time.split(' ');
+    let [hours, minutes] = timePart.split(':').map(Number);
+    if (period === 'pm' && hours < 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  };
+  const formatDuration = (totalMinutes: number) => {
+    const hours = Math.round((totalMinutes / 60) * 100) / 100;
+    return `${hours} hr${hours === 1 ? '' : 's'}`;
+  };
+  const getDurationLabel = (start: string, end: string) => {
+    let diff = timeStringToMinutes(end) - timeStringToMinutes(start);
+    if (diff <= 0) diff += 24 * 60;
+    return formatDuration(diff);
+  };
+  const CustomDayComponent = ({ date, state, marking, onPress }) => {
+    const isSelected = marking?.selected;
+    const isToday = state === 'today';
+    return (<TouchableOpacity onPress={() => onPress(date)} style={[styles.dayContainer, isSelected && styles.selectedDay]}><Text style={[styles.dayText, isToday && !isSelected && styles.todayText, isSelected && styles.selectedDayText, state === 'disabled' && styles.disabledDayText]}>{date.day}</Text></TouchableOpacity>);
+  };
 
   return (
     <View style={styles.formContainer}>
@@ -323,15 +303,9 @@ const taskId = taskData.id;
         </View>
         <ScrollView style={styles.formContent}>
             <TextInput style={styles.input} placeholder="Action Title" value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
-            
             <View style={styles.schedulingToggle}>
-              {['task', 'event', 'depositIdea'].map(type => (
-                <TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}>
-                  <Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
-                </TouchableOpacity>
-              ))}
+              {['task', 'event', 'depositIdea'].map(type => (<TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}><Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text></TouchableOpacity>))}
             </View>
-
             {formData.schedulingType !== 'depositIdea' && (
               <>
                 <View style={styles.compactSwitchRow}>
@@ -342,49 +316,13 @@ const taskId = taskData.id;
                   <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Authentic Deposit</Text><Switch value={formData.is_authentic_deposit} onValueChange={(val) => setFormData(prev => ({...prev, is_authentic_deposit: val}))} /></View>
                   <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>12-Week Goal</Text><Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} /></View>
                 </View>
-                
                 {formData.schedulingType === 'task' && (
                   <>
                     <Text style={styles.compactSectionTitle}>Schedule</Text>
                     <View style={styles.compactDateTimeRow}>
-                      <View>
-                        <TouchableOpacity 
-                          ref={dateInputRef}
-                          style={styles.compactDateButton}
-                          onPress={() => {
-                            dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
-                              setDatePickerPosition({ x: px, y: py, width, height });
-                              setShowMiniCalendar(!showMiniCalendar);
-                            });
-                          }}
-                        >
-                          <Text style={styles.compactInputLabel}>Due Date</Text>
-                          <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
-                        </TouchableOpacity>
-                      </View>
-                      
-                      <View>
-                        <TouchableOpacity
-                          ref={timeInputRef}
-                          style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
-                          onPress={() => {
-                            timeInputRef.current?.measure((_, __, w, h, px, py) => {
-                              setTimePickerPosition({ x: px, y: py, width: w, height: h });
-                              setActiveTimeField('time');
-                              setShowTimePicker(true);
-                            });
-                          }}
-                          disabled={formData.isAnytime}
-                        >
-                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
-                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.time}</Text>
-                        </TouchableOpacity>
-                      </View>
-                      
-                      <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
-                        <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
-                        <Text style={styles.anytimeLabel}>Anytime</Text>
-                      </TouchableOpacity>
+                      <View><TouchableOpacity ref={dateInputRef} style={styles.compactDateButton} onPress={() => { dateInputRef.current?.measure((_, __, w, h, px, py) => { setDatePickerPosition({ x: px, y: py, width: w, height: h }); setShowMiniCalendar(!showMiniCalendar); }); }}><Text style={styles.compactInputLabel}>Due Date</Text><TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} /></TouchableOpacity></View>
+                      <View><TouchableOpacity ref={timeInputRef} style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]} onPress={() => { timeInputRef.current?.measure((_, __, w, h, px, py) => { setTimePickerPosition({ x: px, y: py, width: w, height: h }); setActiveTimeField('time'); setShowTimePicker(true); }); }} disabled={formData.isAnytime}><Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text><Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.time}</Text></TouchableOpacity></View>
+                      <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}><View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View><Text style={styles.anytimeLabel}>Anytime</Text></TouchableOpacity>
                     </View>
                   </>
                 )}
@@ -392,156 +330,25 @@ const taskId = taskData.id;
                   <>
                     <Text style={styles.compactSectionTitle}>Schedule</Text>
                     <View style={styles.compactDateTimeRow}>
-                      <View>
-                        <TouchableOpacity
-                          ref={dateInputRef}
-                          style={styles.compactDateButton}
-                          onPress={() => {
-                            dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
-                              setDatePickerPosition({ x: px, y: py, width, height });
-                              setShowMiniCalendar(!showMiniCalendar);
-                            });
-                          }}
-                        >
-                          <Text style={styles.compactInputLabel}>Date</Text>
-                          <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
-                        </TouchableOpacity>
-                      </View>
-
-                      <View>
-                        <TouchableOpacity
-                          ref={startTimeInputRef}
-                          style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
-                          onPress={() => {
-                            startTimeInputRef.current?.measure((_, __, w, h, px, py) => {
-                              setTimePickerPosition({ x: px, y: py, width: w, height: h });
-                              setActiveTimeField('startTime');
-                              setShowTimePicker(true);
-                            });
-                          }}
-                          disabled={formData.isAnytime}
-                        >
-                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Start</Text>
-                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.startTime}</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      <View>
-                        <TouchableOpacity
-                          ref={endTimeInputRef}
-                          style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]}
-                          onPress={() => {
-                            endTimeInputRef.current?.measure((_, __, w, h, px, py) => {
-                              setTimePickerPosition({ x: px, y: py, width: w, height: h });
-                              setActiveTimeField('endTime');
-                              setShowTimePicker(true);
-                            });
-                          }}
-                          disabled={formData.isAnytime}
-                        >
-                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>End</Text>
-                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.endTime}</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
-                        <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
-                        <Text style={styles.anytimeLabel}>Anytime</Text>
-                      </TouchableOpacity>
+                      <View><TouchableOpacity ref={dateInputRef} style={styles.compactDateButton} onPress={() => { dateInputRef.current?.measure((_, __, w, h, px, py) => { setDatePickerPosition({ x: px, y: py, width: w, height: h }); setShowMiniCalendar(!showMiniCalendar); }); }}><Text style={styles.compactInputLabel}>Date</Text><TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} /></TouchableOpacity></View>
+                      <View><TouchableOpacity ref={startTimeInputRef} style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]} onPress={() => { startTimeInputRef.current?.measure((_, __, w, h, px, py) => { setTimePickerPosition({ x: px, y: py, width: w, height: h }); setActiveTimeField('startTime'); setShowTimePicker(true); }); }} disabled={formData.isAnytime}><Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Start</Text><Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.startTime}</Text></TouchableOpacity></View>
+                      <View><TouchableOpacity ref={endTimeInputRef} style={[styles.compactTimeButton, formData.isAnytime && styles.disabledButton]} onPress={() => { endTimeInputRef.current?.measure((_, __, w, h, px, py) => { setTimePickerPosition({ x: px, y: py, width: w, height: h }); setActiveTimeField('endTime'); setShowTimePicker(true); }); }} disabled={formData.isAnytime}><Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>End</Text><Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.endTime}</Text></TouchableOpacity></View>
+                      <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}><View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View><Text style={styles.anytimeLabel}>Anytime</Text></TouchableOpacity>
                     </View>
                   </>
                 )}
               </>
             )}
-
             <Text style={styles.sectionTitle}>Roles</Text>
-            <View style={styles.checkboxGrid}>
-              {roles.map(role => {
-                const isSelected = formData.selectedRoleIds.includes(role.id);
-                return (
-                  <TouchableOpacity 
-                    key={role.id} 
-                    style={styles.checkItem} 
-                    onPress={() => handleMultiSelect('selectedRoleIds', role.id)}
-                  >
-                    <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                    <Text style={styles.checkLabel}>{role.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {filteredKeyRelationships.length > 0 && (
-                <><Text style={styles.sectionTitle}>Key Relationships</Text><View style={styles.selectionGrid}>{filteredKeyRelationships.map(kr => (<TouchableOpacity key={kr.id} style={[styles.chip, formData.selectedKeyRelationshipIds.includes(kr.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}><Text style={formData.selectedKeyRelationshipIds.includes(kr.id) ? styles.chipTextSelected : styles.chipText}>{kr.name}</Text></TouchableOpacity>))}</View></>
-            )}
-
+            <View style={styles.checkboxGrid}>{roles.map(role => (<TouchableOpacity key={role.id} style={styles.checkItem} onPress={() => handleMultiSelect('selectedRoleIds', role.id)}><View style={[styles.checkbox, formData.selectedRoleIds.includes(role.id) && styles.checkedBox]}>{formData.selectedRoleIds.includes(role.id) && <Text style={styles.checkmark}>✓</Text>}</View><Text style={styles.checkLabel}>{role.label}</Text></TouchableOpacity>))}</View>
+            {filteredKeyRelationships.length > 0 && (<><Text style={styles.sectionTitle}>Key Relationships</Text><View style={styles.selectionGrid}>{filteredKeyRelationships.map(kr => (<TouchableOpacity key={kr.id} style={[styles.chip, formData.selectedKeyRelationshipIds.includes(kr.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}><Text style={formData.selectedKeyRelationshipIds.includes(kr.id) ? styles.chipTextSelected : styles.chipText}>{kr.name}</Text></TouchableOpacity>))}</View></>)}
             <Text style={styles.sectionTitle}>Domains</Text>
-            <View style={styles.checkboxGrid}>
-              {domains.map(domain => {
-                const isSelected = formData.selectedDomainIds.includes(domain.id);
-                return (
-                  <TouchableOpacity 
-                    key={domain.id} 
-                    style={styles.checkItem} 
-                    onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
-                  >
-                    <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                    <Text style={styles.checkLabel}>{domain.name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
+            <View style={styles.checkboxGrid}>{domains.map(domain => (<TouchableOpacity key={domain.id} style={styles.checkItem} onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}><View style={[styles.checkbox, formData.selectedDomainIds.includes(domain.id) && styles.checkedBox]}>{formData.selectedDomainIds.includes(domain.id) && <Text style={styles.checkmark}>✓</Text>}</View><Text style={styles.checkLabel}>{domain.name}</Text></TouchableOpacity>))}</View>
             <TextInput style={[styles.input, { height: 100 }]} placeholder="Notes..." value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
         </ScrollView>
-        
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}><Text style={styles.submitButtonText}>{loading ? 'Saving...' : mode === 'edit' ? 'Update Action' : 'Save Action'}</Text></TouchableOpacity>
-
-        {/* Pop-up Mini Calendar Modal */}
-        <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
-            <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}> 
-              <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                <Calendar
-                  onDayPress={onCalendarDayPress}
-                  markedDates={{ [toDateString(formData.dueDate)]: { selected: true } }}
-                  dayComponent={CustomDayComponent}
-                  hideExtraDays={true}
-                />
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* Pop-up Time Picker Modal */}
-        <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}>
-            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
-                <View style={[styles.timePickerPopup, { top: timePickerPosition.y, left: timePickerPosition.x + timePickerPosition.width + 8 }]}>
-                    <FlatList
-                        data={timeOptions}
-                        keyExtractor={(item) => item}
-                        renderItem={({ item }) => {
-                            const label = activeTimeField === 'endTime'
-                                ? `${item} (${getDurationLabel(formData.startTime, item)})`
-                                : item;
-                            return (
-                                <TouchableOpacity 
-                                    style={styles.timeOptionPopup} 
-                                    onPress={() => onTimeSelect(item)}
-                                    activeOpacity={0.1}
-                                >
-                                    <Text style={styles.timeOptionTextPopup}>{label}</Text>
-                                </TouchableOpacity>
-                            );
-                        }}
-                    />
-                </View>
-            </TouchableOpacity>
-        </Modal>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}><Text style={styles.submitButtonText}>{loading ? 'Saving...' : 'Save Action'}</Text></TouchableOpacity>
+        <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}><TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}><View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}><ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled><Calendar onDayPress={onCalendarDayPress} markedDates={{ [toDateString(formData.dueDate)]: { selected: true } }} dayComponent={CustomDayComponent} hideExtraDays={true} /></ScrollView></View></TouchableOpacity></Modal>
+        <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}><TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}><View style={[styles.timePickerPopup, { top: timePickerPosition.y, left: timePickerPosition.x + timePickerPosition.width + 8 }]}><FlatList data={timeOptions} keyExtractor={(item) => item} renderItem={({ item }) => { const label = activeTimeField === 'endTime' ? `${item} (${getDurationLabel(formData.startTime, item)})` : item; return (<TouchableOpacity style={styles.timeOptionPopup} onPress={() => onTimeSelect(item)} activeOpacity={0.1}><Text style={styles.timeOptionTextPopup}>{label}</Text></TouchableOpacity>); }} /></View></TouchableOpacity></Modal>
     </View>
   );
 };
@@ -582,61 +389,17 @@ const styles = StyleSheet.create({
     checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
     checkmark: { color: 'white', fontSize: 12, fontWeight: 'bold' },
     anytimeLabel: { fontSize: 14 },
-    calendarPopup: {
-        position: 'absolute',
-        width: 200,
-        maxHeight: 220,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-        zIndex: 1000,
-    },
-    timePickerPopup: {
-        position: 'absolute',
-        width: 160, // Wider to fit time and duration on one line
-        maxHeight: 160,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-        zIndex: 1000,
-    },
+    calendarPopup: { position: 'absolute', width: 200, maxHeight: 220, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5, zIndex: 1000 },
+    timePickerPopup: { position: 'absolute', width: 160, maxHeight: 160, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 5, zIndex: 1000 },
     dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
     dayText: { fontSize: 8 },
     selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
     selectedDayText: { color: 'white' },
     todayText: { color: '#0078d4', fontWeight: 'bold' },
     disabledDayText: { color: '#d9e1e8' },
-    checkboxGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      marginBottom: 16,
-    },
-    checkItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      width: '23%', // Creates four columns
-      marginBottom: 12,
-    },
-    checkLabel: {
-      fontSize: 14, // Slightly smaller for a tighter grid
-      color: '#374151',
-      marginLeft: 8,
-      flexShrink: 1, // Allows text to wrap if needed
-    }
-  
+    checkboxGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 },
+    checkItem: { flexDirection: 'row', alignItems: 'center', width: '48%', marginBottom: 12 },
+    checkLabel: { fontSize: 14, color: '#374151', marginLeft: 8, flexShrink: 1 }
 });
 
 export default TaskEventForm;
