@@ -63,8 +63,8 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       return;
     }
 
-    const { data: presetData, error: presetError } = await supabase.from('0007-ap-preset-roles').select('id, label, category');
-    const { data: userData, error: userError } = await supabase.from('0007-ap-roles').select('*').eq('user_id', user.id);
+    const { data: presetData, error: presetError } = await supabase.from('0008-ap-preset-roles').select('id, label, category');
+    const { data: userData, error: userError } = await supabase.from('0008-ap-roles').select('*').eq('user_id', user.id);
 
     if (presetError || userError) {
       Alert.alert('Error fetching data', presetError?.message || userError?.message);
@@ -81,7 +81,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     if (!user) return;
 
     const { data, error } = await supabase
-      .from('0007-ap-roles')
+      .from('0008-ap-roles')
       .insert({ 
         label: customRoleLabel.trim(), 
         user_id: user.id, 
@@ -115,7 +115,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       
       // Update database in background without awaiting
       supabase
-        .from('0007-ap-roles')
+        .from('0008-ap-roles')
         .update({ 
           is_active: !existingUserRole.is_active,
           updated_at: new Date().toISOString()
@@ -148,7 +148,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       
       // Insert into database in background
       supabase
-        .from('0007-ap-roles')
+        .from('0008-ap-roles')
         .insert({
           label: presetRole.label, 
           user_id: user.id, 
@@ -255,7 +255,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                                 // This can also be made optimistic
                                 const updatedRoles = userRoles.map(r => r.id === role.id ? { ...r, is_active: !r.is_active } : r);
                                 setUserRoles(updatedRoles);
-                                await supabase.from('0007-ap-roles').update({ 
+                                await supabase.from('0008-ap-roles').update({
                                   is_active: !role.is_active,
                                   updated_at: new Date().toISOString()
                                 }).eq('id', role.id);
