@@ -99,22 +99,20 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('0008-ap-roles')
       .insert({
         label: customRoleLabel.trim(),
         user_id: user.id,
         is_active: true,
         category: 'Custom'
-      })
-      .select()
-      .single();
+      });
 
     if (error) {
       Alert.alert('Error adding custom role', error.message);
-    } else if (data) {
-      setUserRoles([data, ...userRoles]);
+    } else {
       setCustomRoleLabel('');
+      await fetchData(); // Refetch all roles to get the new one with its real ID
     }
   };
 
@@ -131,20 +129,18 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         .eq('id', existingUserRole.id);
 
       if (error) Alert.alert('Error updating role', error.message);
-      else await fetchData();
+      else await fetchData(); // Refetch all roles to update the state
     } else {
-      const { data: newRole, error } = await supabase.from('0008-ap-roles').insert({
+      const { error } = await supabase.from('0008-ap-roles').insert({
         label: presetRole.label,
         user_id: user.id,
         preset_role_id: presetRole.id,
         is_active: true,
         category: presetRole.category
-      }).select().single();
+      });
 
       if (error) Alert.alert('Error activating role', error.message);
-      else if (newRole) {
-        setUserRoles([...userRoles, newRole]);
-      }
+      else await fetchData(); // Refetch all roles to get the new one with its real ID
     }
   };
 
