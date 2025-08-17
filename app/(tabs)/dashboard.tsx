@@ -191,6 +191,7 @@ export default function Dashboard() {
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
@@ -293,9 +294,21 @@ export default function Dashboard() {
 
   // Other handlers
   const handleTaskDoublePress = (task: Task) => { setSelectedTask(task); setIsDetailModalVisible(true); };
-  const handleUpdateTask = (task: Task) => { Alert.alert('Update', 'Update functionality coming soon!'); setIsDetailModalVisible(false); };
+  const handleUpdateTask = (task: Task) => { 
+    setEditingTask(task); 
+    setIsDetailModalVisible(false); 
+    setIsFormModalVisible(true); 
+  };
   const handleDelegateTask = (task: Task) => { Alert.alert('Delegate', 'Delegation functionality coming soon!'); setIsDetailModalVisible(false); };
-  const handleFormSubmitSuccess = () => { setIsFormModalVisible(false); fetchData(); };
+  const handleFormSubmitSuccess = () => { 
+    setIsFormModalVisible(false); 
+    setEditingTask(null); 
+    fetchData(); 
+  };
+  const handleFormClose = () => {
+    setIsFormModalVisible(false);
+    setEditingTask(null);
+  };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <View style={[isActive && styles.draggingItem]}><TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} /></View>;
   const sortOptions = [{ value: 'due_date', label: 'Due Date' }, { value: 'priority', label: 'Priority' }, { value: 'title', label: 'Title' }];
@@ -311,7 +324,14 @@ export default function Dashboard() {
         }
       </View>
       <TouchableOpacity style={styles.fab} onPress={() => setIsFormModalVisible(true)}><Plus size={24} color="#ffffff" /></TouchableOpacity>
-      <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet"><TaskEventForm mode="create" onSubmitSuccess={handleFormSubmitSuccess} onClose={() => setIsFormModalVisible(false)} /></Modal>
+      <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <TaskEventForm 
+          mode={editingTask ? "edit" : "create"} 
+          initialData={editingTask} 
+          onSubmitSuccess={handleFormSubmitSuccess} 
+          onClose={handleFormClose} 
+        />
+      </Modal>
       <TaskDetailModal visible={isDetailModalVisible} task={selectedTask} onClose={() => setIsDetailModalVisible(false)} onUpdate={handleUpdateTask} onDelegate={handleDelegateTask} onCancel={handleCancelTask} />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>
         <View style={styles.modalOverlay}>

@@ -70,23 +70,32 @@ const toDateString = (date: Date) => {
     return `${hour12}:${now.getMinutes().toString().padStart(2, '0')} ${ampm}`;
   };
 
+  // Helper function to convert timestamp to time string
+  const timestampToTimeString = (timestamp?: string) => {
+    if (!timestamp) return getDefaultTime();
+    const date = new Date(timestamp);
+    const hour12 = date.getHours() === 0 ? 12 : date.getHours() > 12 ? date.getHours() - 12 : date.getHours();
+    const ampm = date.getHours() < 12 ? 'am' : 'pm';
+    return `${hour12}:${date.getMinutes().toString().padStart(2, '0')} ${ampm}`;
+  };
+
   const [formData, setFormData] = useState({
-    title: '',
-    notes: '',
-    dueDate: new Date(),
-    time: getDefaultTime(),
-    startTime: getDefaultTime(),
-    endTime: getDefaultTime(2),
-    isAnytime: false,
-    is_urgent: false,
-    is_important: false,
-    is_authentic_deposit: false,
-    is_twelve_week_goal: false,
-    schedulingType: 'task' as 'task' | 'event' | 'depositIdea',
-    selectedRoleIds: [] as string[],
-    selectedDomainIds: [] as string[],
-    selectedKeyRelationshipIds: [] as string[],
-    selectedGoalId: null as string | null,
+    title: initialData?.title || '',
+    notes: initialData?.notes || '',
+    dueDate: initialData?.due_date ? new Date(initialData.due_date) : new Date(),
+    time: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
+    startTime: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
+    endTime: initialData?.end_time ? timestampToTimeString(initialData.end_time) : getDefaultTime(2),
+    isAnytime: initialData?.is_all_day || false,
+    is_urgent: initialData?.is_urgent || false,
+    is_important: initialData?.is_important || false,
+    is_authentic_deposit: initialData?.is_authentic_deposit || false,
+    is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
+    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea') || 'task',
+    selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
+    selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
+    selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
+    selectedGoalId: initialData?.goal_12wk_id || null as string | null,
   });
   
   const [roles, setRoles] = useState<Role[]>([]);
@@ -229,6 +238,7 @@ const toDateString = (date: Date) => {
             due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString().split('T')[0] : null,
             deposit_idea: formData.schedulingType === 'depositIdea',
             is_all_day: formData.isAnytime,
+            updated_at: new Date().toISOString(),
         };
 
         if (formData.schedulingType === 'event' && !formData.isAnytime) {
@@ -236,41 +246,68 @@ const toDateString = (date: Date) => {
             payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
         }
 
-        // inside the handleSubmit function in TaskEventForm.tsx
-const { data: taskData, error: taskError } = await supabase
-    .from('0008-ap-tasks') // Changed from 0007
-    .insert(payload)
-    .select()
-    .single();
+        let taskData;
+        let taskError;
+
+        if (mode === 'edit' && initialData?.id) {
+            // Update existing task
+            const { data, error } = await supabase
+                .from('0007-ap-tasks')
+                .update(payload)
+                .eq('id', initialData.id)
+                .select()
+                .single();
+            taskData = data;
+            taskError = error;
+        } else {
+            // Create new task
+            const { data, error } = await supabase
+                .from('0007-ap-tasks')
+                .insert(payload)
+                .select()
+                .single();
+            taskData = data;
+            taskError = error;
+        }
 
 if (taskError) throw taskError;
 if (!taskData) throw new Error("Failed to create task");
 
 const taskId = taskData.id;
 
-// Generate join rows for each relationship
-const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
-const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
-const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
+        // If editing, first delete existing relationships
+        if (mode === 'edit' && initialData?.id) {
+            await Promise.all([
+                supabase.from('0007-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                supabase.from('0007-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                supabase.from('0007-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                supabase.from('0007-ap-universal-notes-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+            ]);
+        }
 
-// Handle notes (assuming a new 0008-ap-notes table)
-if (formData.notes) {
-    const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
-    if (noteError) throw noteError;
-    await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
-}
+        // Generate join rows for each relationship
+        const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
+        const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
+        const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
 
-// Insert into new universal join tables
-if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
-if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
-if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+        // Handle notes
+        if (formData.notes) {
+            const { data: noteData, error: noteError } = await supabase.from('0007-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+            if (noteError) throw noteError;
+            await supabase.from('0007-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+        }
+
+        // Insert into universal join tables
+        if (roleJoins.length > 0) await supabase.from('0007-ap-universal-roles-join').insert(roleJoins);
+        if (domainJoins.length > 0) await supabase.from('0007-ap-universal-domains-join').insert(domainJoins);
+        if (krJoins.length > 0) await supabase.from('0007-ap-universal-key-relationships-join').insert(krJoins);
 
         onSubmitSuccess();
         onClose();
 
     } catch (error) {
-        console.error("Error creating task:", error);
-        Alert.alert('Error', 'Failed to create task');
+        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} task:`, error);
+        Alert.alert('Error', `Failed to ${mode === 'edit' ? 'update' : 'create'} task`);
     } finally {
         setLoading(false);
     }
@@ -462,7 +499,7 @@ if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships
             <TextInput style={[styles.input, { height: 100 }]} placeholder="Notes..." value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
         </ScrollView>
         
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}><Text style={styles.submitButtonText}>{loading ? 'Saving...' : 'Save Action'}</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}><Text style={styles.submitButtonText}>{loading ? 'Saving...' : mode === 'edit' ? 'Update Action' : 'Save Action'}</Text></TouchableOpacity>
 
         {/* Pop-up Mini Calendar Modal */}
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
