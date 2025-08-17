@@ -255,13 +255,29 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                          <Switch
                             value={role.is_active}
                             onValueChange={async () => {
-                                // This can also be made optimistic
-                                const updatedRoles = userRoles.map(r => r.id === role.id ? { ...r, is_active: !r.is_active } : r);
-                                setUserRoles(updatedRoles);
-                                await supabase.from('0008-ap-roles').update({
-                                  is_active: !role.is_active,
-                                  updated_at: new Date().toISOString()
-                                }).eq('id', role.id);
+                                const previousIsActive = role.is_active;
+                                // Optimistically update the role's active state
+                                setUserRoles(prev =>
+                                  prev.map(r =>
+                                    r.id === role.id ? { ...r, is_active: !previousIsActive } : r
+                                  )
+                                );
+                                const { error } = await supabase
+                                  .from('0008-ap-roles')
+                                  .update({
+                                    is_active: !previousIsActive,
+                                    updated_at: new Date().toISOString()
+                                  })
+                                  .eq('id', role.id);
+                                if (error) {
+                                  // Revert to the previous state on error
+                                  setUserRoles(prev =>
+                                    prev.map(r =>
+                                      r.id === role.id ? { ...r, is_active: previousIsActive } : r
+                                    )
+                                  );
+                                  Alert.alert('Error updating role', error.message);
+                                }
                             }}
                           />
                       </View>
