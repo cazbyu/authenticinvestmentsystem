@@ -108,7 +108,7 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
   const points = calculatePoints();
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.taskCard, { borderLeftColor: getBorderColor() }]}
       onPress={handlePress}
       onLongPress={onLongPress}
@@ -196,18 +196,16 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
 
-  // Fetches tasks from Supabase using a more robust, multi-query strategy
   const fetchData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Fetch the main tasks
       let taskQuery = supabase
         .from('0008-ap-tasks')
         .select('*')
-        .eq('profile_id', user.id)
+        .eq('user_id', user.id)
         .neq('status', 'completed')
         .neq('status', 'cancelled');
 
@@ -216,7 +214,7 @@ export default function Dashboard() {
       } else {
         taskQuery = taskQuery.eq('type', 'depositIdea');
       }
-      
+
       const { data: tasksData, error: tasksError } = await taskQuery;
       if (tasksError) throw tasksError;
       if (!tasksData) {
@@ -226,7 +224,6 @@ export default function Dashboard() {
 
       const taskIds = tasksData.map(t => t.id);
 
-      // 2. Fetch all relationships for these tasks in parallel
       const [
         { data: rolesData },
         { data: domainsData },
@@ -241,7 +238,6 @@ export default function Dashboard() {
         supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
       ]);
 
-      // 3. Map relationships back to their tasks
       const transformedTasks = tasksData.map(task => {
         return {
           ...task,
@@ -250,11 +246,10 @@ export default function Dashboard() {
           goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
           has_notes: notesData?.some(n => n.parent_id === task.id),
           has_delegates: delegatesData?.some(d => d.parent_id === task.id),
-          has_attachments: false, // Placeholder
+          has_attachments: false,
         };
       });
 
-      // 4. Sort the final combined data
       let sortedTasks = [...transformedTasks];
       if (sortOption === 'due_date') sortedTasks.sort((a, b) => (new Date(a.due_date).getTime() || 0) - (new Date(b.due_date).getTime() || 0));
       else if (sortOption === 'priority') sortedTasks.sort((a, b) => ((b.is_urgent ? 2 : 0) + (b.is_important ? 1 : 0)) - ((a.is_urgent ? 2 : 0) + (a.is_important ? 1 : 0)));
@@ -274,14 +269,12 @@ export default function Dashboard() {
     fetchData();
   }, [activeView, sortOption]);
 
-  // Handles completing a task
   const handleCompleteTask = async (taskId: string) => {
     const { error } = await supabase.from('0008-ap-tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', taskId);
     if (error) Alert.alert('Error', 'Failed to complete task.');
     else fetchData();
   };
-  
-  // Handles canceling a task
+
   const handleCancelTask = async (task: Task) => {
     const { error } = await supabase.from('0008-ap-tasks').update({ status: 'cancelled' }).eq('id', task.id);
     if (error) Alert.alert('Error', 'Failed to cancel task.');
@@ -292,18 +285,17 @@ export default function Dashboard() {
     }
   };
 
-  // Other handlers
   const handleTaskDoublePress = (task: Task) => { setSelectedTask(task); setIsDetailModalVisible(true); };
-  const handleUpdateTask = (task: Task) => { 
-    setEditingTask(task); 
-    setIsDetailModalVisible(false); 
-    setIsFormModalVisible(true); 
+  const handleUpdateTask = (task: Task) => {
+    setEditingTask(task);
+    setIsDetailModalVisible(false);
+    setIsFormModalVisible(true);
   };
   const handleDelegateTask = (task: Task) => { Alert.alert('Delegate', 'Delegation functionality coming soon!'); setIsDetailModalVisible(false); };
-  const handleFormSubmitSuccess = () => { 
-    setIsFormModalVisible(false); 
-    setEditingTask(null); 
-    fetchData(); 
+  const handleFormSubmitSuccess = () => {
+    setIsFormModalVisible(false);
+    setEditingTask(null);
+    fetchData();
   };
   const handleFormClose = () => {
     setIsFormModalVisible(false);
@@ -325,11 +317,11 @@ export default function Dashboard() {
       </View>
       <TouchableOpacity style={styles.fab} onPress={() => setIsFormModalVisible(true)}><Plus size={24} color="#ffffff" /></TouchableOpacity>
       <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <TaskEventForm 
-          mode={editingTask ? "edit" : "create"} 
-          initialData={editingTask} 
-          onSubmitSuccess={handleFormSubmitSuccess} 
-          onClose={handleFormClose} 
+        <TaskEventForm
+          mode={editingTask ? "edit" : "create"}
+          initialData={editingTask}
+          onSubmitSuccess={handleFormSubmitSuccess}
+          onClose={handleFormClose}
         />
       </Modal>
       <TaskDetailModal visible={isDetailModalVisible} task={selectedTask} onClose={() => setIsDetailModalVisible(false)} onUpdate={handleUpdateTask} onDelegate={handleDelegateTask} onCancel={handleCancelTask} />
@@ -345,7 +337,6 @@ export default function Dashboard() {
   );
 }
 
-// --- Styles ---
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   content: { flex: 1 },
