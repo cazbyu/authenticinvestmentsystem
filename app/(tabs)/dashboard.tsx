@@ -234,9 +234,9 @@ export default function Dashboard() {
         { data: notesData },
         { data: delegatesData }
       ] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0007-ap-roles(id, label)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0007-ap-goals-12wk(id, title)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
         supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
         supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
       ]);

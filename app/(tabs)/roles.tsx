@@ -30,7 +30,7 @@ export default function Roles() {
 
     // Fetch only the roles for the current user that are marked as active
     const { data, error } = await supabase
-      .from('0007-ap-roles')
+      .from('0008-ap-roles')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true);
