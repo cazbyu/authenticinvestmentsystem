@@ -37,7 +37,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
   const [presetRoles, setPresetRoles] = useState<PresetRole[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [customRoleLabel, setCustomRoleLabel] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
 
   const groupedPresetRoles = useMemo(() => {
