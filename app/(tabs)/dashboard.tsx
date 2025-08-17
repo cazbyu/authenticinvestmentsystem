@@ -7,7 +7,7 @@ import { Header } from '@/components/Header';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { supabase } from '@/lib/supabase';
 
-// Interface for a Task
+// Interface for a Task, including its potential relationships
 interface Task {
   id: string;
   title: string;
@@ -37,13 +37,11 @@ interface TaskCardProps {
 }
 
 // --- TaskCard Component ---
-// Renders a single task item in the list
 function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProps) {
   const [lastTap, setLastTap] = useState(0);
   const celebrationAnim = new Animated.Value(0);
   const pointsAnim = new Animated.Value(0);
 
-  // Determines the border color based on task priority
   const getBorderColor = () => {
     if (task.status === "completed") return "#3b82f6";
     if (task.is_urgent && task.is_important) return "#ef4444";
@@ -52,7 +50,6 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
     return "#9ca3af";
   };
 
-  // Calculates points for completing a task
   const calculatePoints = () => {
     let points = 0;
     if (task.roles && task.roles.length > 0) points += task.roles.length;
@@ -66,14 +63,14 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
     return Math.round(points * 10) / 10;
   };
 
-  // Formats the due date string
   const formatDueDate = (date?: string) => {
     if (!date) return "";
     const d = new Date(date);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    // Add timeZone offset to display correct date
+    const correctedDate = new Date(d.valueOf() + d.getTimezoneOffset() * 60 * 1000);
+    return correctedDate.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
-  // Handles single and double tap gestures
   const handlePress = () => {
     const now = Date.now();
     const DOUBLE_PRESS_DELAY = 300;
@@ -84,7 +81,6 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
     }
   };
 
-  // Triggers celebration animation on task completion
   const triggerCelebration = () => {
     celebrationAnim.setValue(0);
     pointsAnim.setValue(0);
@@ -97,7 +93,6 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
     ]).start();
   };
 
-  // Handles the completion of a task
   const handleComplete = () => {
     triggerCelebration();
     setTimeout(() => {
@@ -127,7 +122,7 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
               <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Roles:</Text><View style={styles.tagContainer}>{task.roles.map((role) => (<View key={role.id} style={[styles.tag, styles.roleTag]}><Text style={styles.tagText}>{role.label}</Text></View>))}</View></View>
             )}
           </View>
-          <View style={styles.middleSection}>
+          <View style={styles.rightSection}>
             {task.domains && task.domains.length > 0 && (
               <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Domains:</Text><View style={styles.tagContainer}>{task.domains.map((domain) => (<View key={domain.id} style={[styles.tag, styles.domainTag]}><Text style={styles.tagText}>{domain.name}</Text></View>))}</View></View>
             )}
@@ -135,13 +130,11 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
               <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Goals:</Text><View style={styles.tagContainer}>{task.goals.map((goal) => (<View key={goal.id} style={[styles.tag, styles.goalTag]}><Text style={styles.tagText}>{goal.title}</Text></View>))}</View></View>
             )}
           </View>
-          <View style={styles.iconsSection}>
-            <View style={styles.statusIcons}>
-              {task.has_notes && <FileText size={12} color="#6b7280" />}
-              {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
-              {task.has_delegates && <Users size={12} color="#6b7280" />}
-            </View>
-          </View>
+        </View>
+        <View style={styles.statusIcons}>
+          {task.has_notes && <FileText size={14} color="#6b7280" />}
+          {task.has_attachments && <Paperclip size={14} color="#6b7280" />}
+          {task.has_delegates && <Users size={14} color="#6b7280" />}
         </View>
       </View>
       <View style={styles.taskActions}>
@@ -155,7 +148,6 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
 }
 
 // --- TaskDetailModal Component ---
-// Displays detailed information about a task in a modal
 function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCancel }) {
   if (!task) return null;
   const formatDateTime = (dateTime) => dateTime ? new Date(dateTime).toLocaleString() : 'Not set';
@@ -191,19 +183,17 @@ export default function Dashboard() {
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
 
-  // Fetches tasks from Supabase using a more robust, multi-query strategy
+  // Fetches tasks from Supabase using the robust, multi-query strategy
   const fetchData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Fetch the main tasks
       let taskQuery = supabase
         .from('0008-ap-tasks')
         .select('*')
@@ -225,8 +215,12 @@ export default function Dashboard() {
       }
 
       const taskIds = tasksData.map(t => t.id);
+      if (taskIds.length === 0) {
+        setTasks([]);
+        setLoading(false);
+        return;
+      }
 
-      // 2. Fetch all relationships for these tasks in parallel
       const [
         { data: rolesData },
         { data: domainsData },
@@ -241,20 +235,16 @@ export default function Dashboard() {
         supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
       ]);
 
-      // 3. Map relationships back to their tasks
-      const transformedTasks = tasksData.map(task => {
-        return {
-          ...task,
-          roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-          goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
-          has_notes: notesData?.some(n => n.parent_id === task.id),
-          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
-          has_attachments: false, // Placeholder
-        };
-      });
+      const transformedTasks = tasksData.map(task => ({
+        ...task,
+        roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+        domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+        goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+        has_notes: notesData?.some(n => n.parent_id === task.id),
+        has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+        has_attachments: false,
+      }));
 
-      // 4. Sort the final combined data
       let sortedTasks = [...transformedTasks];
       if (sortOption === 'due_date') sortedTasks.sort((a, b) => (new Date(a.due_date).getTime() || 0) - (new Date(b.due_date).getTime() || 0));
       else if (sortOption === 'priority') sortedTasks.sort((a, b) => ((b.is_urgent ? 2 : 0) + (b.is_important ? 1 : 0)) - ((a.is_urgent ? 2 : 0) + (a.is_important ? 1 : 0)));
@@ -274,14 +264,12 @@ export default function Dashboard() {
     fetchData();
   }, [activeView, sortOption]);
 
-  // Handles completing a task
   const handleCompleteTask = async (taskId: string) => {
     const { error } = await supabase.from('0008-ap-tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', taskId);
     if (error) Alert.alert('Error', 'Failed to complete task.');
     else fetchData();
   };
   
-  // Handles canceling a task
   const handleCancelTask = async (task: Task) => {
     const { error } = await supabase.from('0008-ap-tasks').update({ status: 'cancelled' }).eq('id', task.id);
     if (error) Alert.alert('Error', 'Failed to cancel task.');
@@ -292,23 +280,31 @@ export default function Dashboard() {
     }
   };
 
-  // Other handlers
-  const handleTaskDoublePress = (task: Task) => { setSelectedTask(task); setIsDetailModalVisible(true); };
-  const handleUpdateTask = (task: Task) => { 
-    setEditingTask(task); 
-    setIsDetailModalVisible(false); 
-    setIsFormModalVisible(true); 
+  const handleTaskDoublePress = (task: Task) => { 
+    setSelectedTask(task); 
+    setIsDetailModalVisible(true); 
   };
+
+  // --- IMPROVED: This now handles opening the form for editing ---
+  const handleUpdateTask = (task: Task) => {
+    setSelectedTask(task);
+    setIsDetailModalVisible(false); // Close the detail modal
+    setIsFormModalVisible(true); // Open the form modal
+  };
+  
   const handleDelegateTask = (task: Task) => { Alert.alert('Delegate', 'Delegation functionality coming soon!'); setIsDetailModalVisible(false); };
+  
   const handleFormSubmitSuccess = () => { 
     setIsFormModalVisible(false); 
-    setEditingTask(null); 
+    setSelectedTask(null); // Clear selected task after submission
     fetchData(); 
   };
-  const handleFormClose = () => {
-    setIsFormModalVisible(false);
-    setEditingTask(null);
+
+  const openCreateForm = () => {
+    setSelectedTask(null); // Ensure we're in create mode
+    setIsFormModalVisible(true);
   };
+
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <View style={[isActive && styles.draggingItem]}><TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} /></View>;
   const sortOptions = [{ value: 'due_date', label: 'Due Date' }, { value: 'priority', label: 'Priority' }, { value: 'title', label: 'Title' }];
@@ -323,13 +319,16 @@ export default function Dashboard() {
           : <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}><View style={styles.taskList}>{tasks.map(task => <TaskCard key={task.id} task={task} onComplete={handleCompleteTask} onDoublePress={handleTaskDoublePress} />)}</View></ScrollView>
         }
       </View>
-      <TouchableOpacity style={styles.fab} onPress={() => setIsFormModalVisible(true)}><Plus size={24} color="#ffffff" /></TouchableOpacity>
+      <TouchableOpacity style={styles.fab} onPress={openCreateForm}><Plus size={24} color="#ffffff" /></TouchableOpacity>
       <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskEventForm 
-          mode={editingTask ? "edit" : "create"} 
-          initialData={editingTask} 
+          mode={selectedTask ? 'edit' : 'create'}
+          initialData={selectedTask}
           onSubmitSuccess={handleFormSubmitSuccess} 
-          onClose={handleFormClose} 
+          onClose={() => {
+            setIsFormModalVisible(false);
+            setSelectedTask(null); // Clear selected task on close
+          }} 
         />
       </Modal>
       <TaskDetailModal visible={isDetailModalVisible} task={selectedTask} onClose={() => setIsDetailModalVisible(false)} onUpdate={handleUpdateTask} onDelegate={handleDelegateTask} onCancel={handleCancelTask} />
@@ -353,15 +352,14 @@ const styles = StyleSheet.create({
   taskList: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20 },
   draggingItem: { opacity: 0.8, transform: [{ scale: 1.02 }] },
   taskCard: { backgroundColor: '#ffffff', borderRadius: 8, borderLeftWidth: 4, marginBottom: 12, padding: 16, flexDirection: 'row', alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2, position: 'relative' },
-  taskContent: { flex: 1, marginRight: 8 },
-  taskHeader: { marginBottom: 8 },
+  taskContent: { flex: 1, marginRight: 12 },
+  taskHeader: { marginBottom: 12 },
   taskTitle: { fontSize: 16, fontWeight: '600', color: '#1f2937', lineHeight: 22 },
   dueDate: { fontSize: 14, color: '#6b7280', fontWeight: '400' },
-  taskBody: { flexDirection: 'row', marginBottom: 4 },
-  leftSection: { flex: 1, marginRight: 8 },
-  middleSection: { flex: 1, marginRight: 8 },
-  iconsSection: { width: 30, justifyContent: 'flex-start', alignItems: 'center' },
-  tagSection: { marginBottom: 4 },
+  taskBody: { flexDirection: 'row', marginBottom: 8 },
+  leftSection: { flex: 1, marginRight: 12 },
+  rightSection: { flex: 1 },
+  tagSection: { marginBottom: 8 },
   tagSectionLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', marginBottom: 4 },
   tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
@@ -369,9 +367,10 @@ const styles = StyleSheet.create({
   domainTag: { backgroundColor: '#fed7aa' },
   goalTag: { backgroundColor: '#bfdbfe' },
   tagText: { fontSize: 10, fontWeight: '500', color: '#374151' },
-  statusIcons: { flexDirection: 'column', alignItems: 'center', gap: 2 },
+  statusIcons: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   taskActions: { alignItems: 'center', gap: 8 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
+  completeButton: { padding: 8, borderRadius: 20, backgroundColor: '#f0f9ff' },
   celebrationOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8 },
   celebrationText: { fontSize: 24 },
   pointsAnimation: { position: 'absolute', top: '50%', right: 20, justifyContent: 'center', alignItems: 'center' },
