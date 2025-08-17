@@ -137,10 +137,10 @@ const toDateString = (date: Date) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: roleData } = await supabase.from("0007-ap-roles").select("id,label").eq("user_id", user.id).eq("is_active", true);
-      const { data: domainData } = await supabase.from("0007-ap-domains").select("id,name");
-      const { data: krData } = await supabase.from("0007-ap-key-relationships").select("id,name,role_id").eq("user_id", user.id);
-      const { data: goalData } = await supabase.from("0007-ap-goals-12wk").select("id,title").eq("user_id", user.id).eq("status", "active");
+      const { data: roleData } = await supabase.from("0008-ap-roles").select("id,label").eq("user_id", user.id).eq("is_active", true);
+      const { data: domainData } = await supabase.from("0008-ap-domains").select("id,name");
+      const { data: krData } = await supabase.from("0008-ap-key-relationships").select("id,name,role_id").eq("user_id", user.id);
+      const { data: goalData } = await supabase.from("0008-ap-goals-12wk").select("id,title").eq("user_id", user.id).eq("status", "active");
       
       setRoles(roleData || []);
       setDomains(domainData || []);
@@ -292,7 +292,7 @@ const taskId = taskData.id;
 
         // Handle notes
         if (formData.notes) {
-            const { data: noteData, error: noteError } = await supabase.from('0007-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+            const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
             if (noteError) throw noteError;
             await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
         }
