@@ -35,6 +35,7 @@ export default function Roles() {
 
     if (error) {
       console.error('Error fetching active roles:', error);
+      Alert.alert("Error", "Could not fetch roles. Please check your connection and database policies.");
     } else {
       const formattedRoles = data.map(role => ({
         id: role.id,
@@ -58,15 +59,15 @@ export default function Roles() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header
-        title="Role Bank"
+      <Header 
+        title="Role Bank" 
         onAdd={() => setModalVisible(true)}
       />
       <View style={styles.content}>
         {loading ? (
           <ActivityIndicator size="large" color="#0078d4" style={{ marginTop: 20 }}/>
         ) : roles.length === 0 ? (
-          <Text style={styles.emptyText}>No active roles found. Add one or activate a preset role in Settings!</Text>
+          <Text style={styles.emptyText}>No active roles found. Go to Settings to activate or create roles!</Text>
         ) : (
           <InvestmentList
             items={roles}
@@ -75,7 +76,7 @@ export default function Roles() {
           />
         )}
       </View>
-
+      
       <AddItemModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
