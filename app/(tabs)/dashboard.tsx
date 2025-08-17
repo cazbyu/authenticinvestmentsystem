@@ -134,12 +134,12 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
             {task.goals && task.goals.length > 0 && (
               <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Goals:</Text><View style={styles.tagContainer}>{task.goals.map((goal) => (<View key={goal.id} style={[styles.tag, styles.goalTag]}><Text style={styles.tagText}>{goal.title}</Text></View>))}</View></View>
             )}
+            <View style={styles.statusIcons}>
+              {task.has_notes && <FileText size={12} color="#6b7280" />}
+              {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
+              {task.has_delegates && <Users size={12} color="#6b7280" />}
+            </View>
           </View>
-        </View>
-        <View style={styles.statusIcons}>
-          {task.has_notes && <FileText size={14} color="#6b7280" />}
-          {task.has_attachments && <Paperclip size={14} color="#6b7280" />}
-          {task.has_delegates && <Users size={14} color="#6b7280" />}
         </View>
       </View>
       <View style={styles.taskActions}>
@@ -331,14 +331,14 @@ const styles = StyleSheet.create({
   taskList: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20 },
   draggingItem: { opacity: 0.8, transform: [{ scale: 1.02 }] },
   taskCard: { backgroundColor: '#ffffff', borderRadius: 8, borderLeftWidth: 4, marginBottom: 12, padding: 16, flexDirection: 'row', alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2, position: 'relative' },
-  taskContent: { flex: 1, marginRight: 12 },
-  taskHeader: { marginBottom: 12 },
+  taskContent: { flex: 1, marginRight: 8 },
+  taskHeader: { marginBottom: 8 },
   taskTitle: { fontSize: 16, fontWeight: '600', color: '#1f2937', lineHeight: 22 },
   dueDate: { fontSize: 14, color: '#6b7280', fontWeight: '400' },
-  taskBody: { flexDirection: 'row', marginBottom: 8 },
-  leftSection: { flex: 1, marginRight: 12 },
+  taskBody: { flexDirection: 'row', marginBottom: 4 },
+  leftSection: { flex: 1, marginRight: 8 },
   rightSection: { flex: 1 },
-  tagSection: { marginBottom: 8 },
+  tagSection: { marginBottom: 4 },
   tagSectionLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', marginBottom: 4 },
   tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
@@ -346,10 +346,9 @@ const styles = StyleSheet.create({
   domainTag: { backgroundColor: '#fed7aa' },
   goalTag: { backgroundColor: '#bfdbfe' },
   tagText: { fontSize: 10, fontWeight: '500', color: '#374151' },
-  statusIcons: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  statusIcons: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   taskActions: { alignItems: 'center', gap: 8 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
-  completeButton: { padding: 8, borderRadius: 20, backgroundColor: '#f0f9ff' },
   celebrationOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8 },
   celebrationText: { fontSize: 24 },
   pointsAnimation: { position: 'absolute', top: '50%', right: 20, justifyContent: 'center', alignItems: 'center' },
