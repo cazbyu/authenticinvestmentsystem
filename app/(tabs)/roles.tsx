@@ -32,7 +32,7 @@ export default function Roles() {
     const { data, error } = await supabase
       .from('0008-ap-roles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('profile_id', user.id)
       .eq('is_active', true);
 
     if (error) {

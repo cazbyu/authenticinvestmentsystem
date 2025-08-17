@@ -207,7 +207,7 @@ export default function Dashboard() {
       let taskQuery = supabase
         .from('0008-ap-tasks')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('profile_id', user.id)
         .neq('status', 'completed')
         .neq('status', 'cancelled');
 
