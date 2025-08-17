@@ -200,11 +200,19 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // --- DIAGNOSTIC QUERY ---
-      // This query is simplified to isolate the problem. It only fetches tasks.
+      // Fetch tasks with their related roles, domains, and goals
       let taskQuery = supabase
-        .from('0008-ap-tasks')
-        .select('*')
+        .from('0007-ap-tasks')
+        .select(`
+          *,
+          task_roles:0007-ap-universal-roles-join!inner(
+            role:0007-ap-roles(id, label)
+          ),
+          task_domains:0007-ap-universal-domains-join!inner(
+            domain:0007-ap-domains(id, name)
+          ),
+          task_goals:0007-ap-goals-12wk(id, title)
+        `)
         .eq('user_id', user.id)
         .neq('status', 'completed')
         .neq('status', 'cancelled');
@@ -224,8 +232,18 @@ export default function Dashboard() {
         return;
       }
       
-      // Since we are not fetching joins, we will just display the basic task info for now.
-      setTasks(tasksData || []);
+      // Transform the data to match the expected format
+      const transformedTasks = (tasksData || []).map(task => ({
+        ...task,
+        roles: task.task_roles?.map(tr => tr.role).filter(Boolean) || [],
+        domains: task.task_domains?.map(td => td.domain).filter(Boolean) || [],
+        goals: task.task_goals ? [task.task_goals] : [],
+        has_notes: false, // TODO: Implement notes checking
+        has_attachments: false, // TODO: Implement attachments checking
+        has_delegates: false, // TODO: Implement delegates checking
+      }));
+      
+      setTasks(transformedTasks);
 
     } catch (error) {
       console.error('Error in fetchData:', error);
