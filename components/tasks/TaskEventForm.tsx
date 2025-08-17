@@ -137,10 +137,10 @@ const toDateString = (date: Date) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: roleData } = await supabase.from("0008-ap-roles").select("id,label").eq("user_id", user.id).eq("is_active", true);
+        const { data: roleData } = await supabase.from("0008-ap-roles").select("id,label").eq("profile_id", user.id).eq("is_active", true);
       const { data: domainData } = await supabase.from("0008-ap-domains").select("id,name");
-      const { data: krData } = await supabase.from("0008-ap-key-relationships").select("id,name,role_id").eq("user_id", user.id);
-      const { data: goalData } = await supabase.from("0008-ap-goals-12wk").select("id,title").eq("user_id", user.id).eq("status", "active");
+        const { data: krData } = await supabase.from("0008-ap-key-relationships").select("id,name,role_id").eq("profile_id", user.id);
+        const { data: goalData } = await supabase.from("0008-ap-goals-12wk").select("id,title").eq("profile_id", user.id).eq("status", "active");
       
       setRoles(roleData || []);
       setDomains(domainData || []);
@@ -226,7 +226,7 @@ const toDateString = (date: Date) => {
         if (!user) throw new Error("User not found");
 
         const payload: any = {
-            user_id: user.id,
+            profile_id: user.id,
             title: formData.title,
             is_urgent: formData.is_urgent,
             is_important: formData.is_important,
@@ -286,15 +286,15 @@ const taskId = taskData.id;
         }
 
         // Generate join rows for each relationship
-        const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
-        const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
-        const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
+        const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, profile_id: user.id }));
+        const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, profile_id: user.id }));
+        const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, profile_id: user.id }));
 
         // Handle notes
         if (formData.notes) {
-            const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+            const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ profile_id: user.id, content: formData.notes }).select().single();
             if (noteError) throw noteError;
-            await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+            await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, profile_id: user.id });
         }
 
         // Insert into universal join tables

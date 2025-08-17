@@ -28,7 +28,7 @@ interface UserRole {
   id: string;
   label: string;
   is_active: boolean;
-  user_id: string;
+  profile_id: string;
   preset_role_id?: string;
 }
 
@@ -64,7 +64,10 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     }
 
     const { data: presetData, error: presetError } = await supabase.from('0008-ap-preset-roles').select('id, label, category');
-    const { data: userData, error: userError } = await supabase.from('0008-ap-roles').select('*').eq('user_id', user.id);
+    const { data: userData, error: userError } = await supabase
+      .from('0008-ap-roles')
+      .select('*')
+      .eq('profile_id', user.id);
 
     if (presetError || userError) {
       Alert.alert('Error fetching data', presetError?.message || userError?.message);
@@ -84,7 +87,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       .from('0008-ap-roles')
       .insert({ 
         label: customRoleLabel.trim(), 
-        user_id: user.id, 
+        profile_id: user.id,
         is_active: true,
         category: 'Other',
         created_at: new Date().toISOString()
@@ -138,7 +141,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       const optimisticRole = { 
         id: tempId,
         label: presetRole.label, 
-        user_id: user.id, 
+        profile_id: user.id,
         preset_role_id: presetRole.id, 
         is_active: true 
       };
@@ -151,7 +154,7 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         .from('0008-ap-roles')
         .insert({
           label: presetRole.label, 
-          user_id: user.id, 
+        profile_id: user.id,
           preset_role_id: presetRole.id, 
           is_active: true,
           category: presetRole.category,
