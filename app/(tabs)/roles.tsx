@@ -367,7 +367,7 @@ export default function Roles() {
                     style={styles.roleCompleteButton}
                     onPress={() => handleCompleteTask(task.id)}
                   >
-                    <User size={14} color="#0078d4" />
+                    <User size={16} color="#ffffff" />
                   </TouchableOpacity>
                 </View>
               </View>
