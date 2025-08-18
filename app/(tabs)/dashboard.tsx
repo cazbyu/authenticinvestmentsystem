@@ -465,12 +465,19 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db' 
   },
   pillTagText: { 
-    fontSize: 10, 
+    fontSize: 8, 
     fontWeight: '500', 
     color: '#374151' 
   },
   taskActions: { alignItems: 'center', gap: 8 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
+  completeButton: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#0078d4',
+    backgroundColor: '#ffffff',
+  },
   celebrationOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8 },
   celebrationText: { fontSize: 24 },
   pointsAnimation: { position: 'absolute', top: '50%', right: 20, justifyContent: 'center', alignItems: 'center' },
