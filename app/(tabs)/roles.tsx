@@ -1,17 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Header } from '@/components/Header';
-import { InvestmentList } from '@/components/InvestmentList';
 import { AddItemModal } from '@/components/AddItemModal';
 import { supabase } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
 
+const { width: screenWidth } = Dimensions.get('window');
+const isTablet = screenWidth > 768;
+
+interface Role {
+  id: string;
+  label: string;
+  category?: string;
+  is_active: boolean;
+}
+
 export default function Roles() {
   const [modalVisible, setModalVisible] = useState(false);
-  const [roles, setRoles] = useState([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const isFocused = useIsFocused();
+  const router = useRouter();
 
   useEffect(() => {
     if (isFocused) {
@@ -35,18 +46,9 @@ export default function Roles() {
 
     if (error) {
       console.error('Error fetching active roles:', error);
-      Alert.alert("Error", "Could not fetch roles. Please check your connection and database policies.");
+      console.log("Error", "Could not fetch roles. Please check your connection and database policies.");
     } else {
-      const formattedRoles = data.map(role => ({
-        id: role.id,
-        title: role.label,
-        subtitle: role.category || 'User-defined role',
-        category: role.category || 'Custom',
-        categoryColor: '#0078d4',
-        balance: 75,
-        lastActivity: 'N/A',
-      }));
-      setRoles(formattedRoles);
+      setRoles(data || []);
     }
     setLoading(false);
   };
@@ -57,23 +59,57 @@ export default function Roles() {
     fetchActiveRoles();
   };
 
+  const handleRolePress = (role: Role) => {
+    // Navigate to role account information
+    // This will be implemented when you provide additional information
+    console.log('Role pressed:', role);
+  };
+
+  const renderRoleCard = (role: Role) => {
+    return (
+      <TouchableOpacity
+        key={role.id}
+        style={[
+          styles.roleCard,
+          isTablet ? styles.roleCardTablet : styles.roleCardMobile
+        ]}
+        onPress={() => handleRolePress(role)}
+      >
+        <View style={styles.cardContent}>
+          <Text style={styles.roleTitle}>{role.label}</Text>
+          <Text style={styles.roleCategory}>{role.category || 'Custom'}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Header 
         title="Role Bank" 
-        onAdd={() => setModalVisible(true)}
       />
       <View style={styles.content}>
         {loading ? (
-          <ActivityIndicator size="large" color="#0078d4" style={{ marginTop: 20 }}/>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0078d4" />
+          </View>
         ) : roles.length === 0 ? (
-          <Text style={styles.emptyText}>No active roles found. Go to Settings to activate or create roles!</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No active roles found. Go to Settings to activate or create roles!</Text>
+          </View>
         ) : (
-          <InvestmentList
-            items={roles}
-            type="role"
-            onItemPress={(item) => console.log('Role pressed:', item)}
-          />
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <View style={[
+              styles.rolesGrid,
+              isTablet ? styles.rolesGridTablet : styles.rolesGridMobile
+            ]}>
+              {roles.map(renderRoleCard)}
+            </View>
+          </ScrollView>
         )}
       </View>
       
@@ -96,11 +132,76 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
   emptyText: {
     textAlign: 'center',
-    marginTop: 40,
     fontSize: 16,
     color: '#6b7280',
-    paddingHorizontal: 20,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  rolesGrid: {
+    gap: 16,
+  },
+  rolesGridMobile: {
+    flexDirection: 'column',
+  },
+  rolesGridTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  roleCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  roleCardMobile: {
+    width: '100%',
+    marginHorizontal: 0,
+  },
+  roleCardTablet: {
+    width: '48%',
+    marginHorizontal: 0,
+  },
+  cardContent: {
+    alignItems: 'center',
+  },
+  roleTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  roleCategory: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
   },
 });
