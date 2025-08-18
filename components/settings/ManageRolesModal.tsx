@@ -99,20 +99,44 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase
-      .from('0008-ap-roles')
-      .insert({
-        label: customRoleLabel.trim(),
-        user_id: user.id,
-        is_active: true,
-        category: 'Custom'
-      });
+    const newRoleLabel = customRoleLabel.trim();
+    
+    // Create temporary role for immediate UI feedback
+    const tempRole: UserRole = {
+      id: `temp-${Date.now()}`,
+      label: newRoleLabel,
+      is_active: true,
+      user_id: user.id,
+      category: 'Custom'
+    };
+    
+    setUserRoles(prev => [...prev, tempRole]);
+    setCustomRoleLabel('');
+    
+    try {
+      const { data, error } = await supabase
+        .from('0008-ap-roles')
+        .insert({
+          label: newRoleLabel,
+          user_id: user.id,
+          is_active: true,
+          category: 'Custom'
+        })
+        .select()
+        .single();
 
-    if (error) {
-      Alert.alert('Error adding custom role', error.message);
-    } else {
-      setCustomRoleLabel('');
-      await fetchData(); // Refetch all roles to get the new one with its real ID
+      if (error) throw error;
+      
+      // Replace temp role with real role from database
+      setUserRoles(prev => prev.map(role => 
+        role.id === tempRole.id ? data : role
+      ));
+    } catch (error) {
+      console.error('Error adding custom role:', error);
+      Alert.alert('Error', 'Failed to add custom role');
+      // Remove temp role and restore input on error
+      setUserRoles(prev => prev.filter(role => role.id !== tempRole.id));
+      setCustomRoleLabel(newRoleLabel);
     }
   };
 
@@ -121,26 +145,71 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
     if (!user) return;
 
     const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
+    const newActiveState = existingUserRole ? !existingUserRole.is_active : true;
 
+    // Optimistic update - immediately update UI
     if (existingUserRole) {
-      const { error } = await supabase
-        .from('0008-ap-roles')
-        .update({ is_active: !existingUserRole.is_active })
-        .eq('id', existingUserRole.id);
+      setUserRoles(prev => prev.map(role => 
+        role.id === existingUserRole.id 
+          ? { ...role, is_active: newActiveState }
+          : role
+      ));
+      
+      try {
+        const { error } = await supabase
+          .from('0008-ap-roles')
+          .update({ is_active: newActiveState })
+          .eq('id', existingUserRole.id);
 
-      if (error) Alert.alert('Error updating role', error.message);
-      else await fetchData(); // Refetch all roles to update the state
+        if (error) throw error;
+      } catch (error) {
+        console.error('Error updating preset role:', error);
+        Alert.alert('Error', 'Failed to update role');
+        // Revert optimistic update
+        setUserRoles(prev => prev.map(role => 
+          role.id === existingUserRole.id 
+            ? { ...role, is_active: !newActiveState }
+            : role
+        ));
+      }
     } else {
-      const { error } = await supabase.from('0008-ap-roles').insert({
+      // Create temporary role for immediate UI feedback
+      const tempRole: UserRole = {
+        id: `temp-${Date.now()}`, // Temporary ID
         label: presetRole.label,
+        is_active: true,
         user_id: user.id,
         preset_role_id: presetRole.id,
-        is_active: true,
         category: presetRole.category
-      });
+      };
+      
+      setUserRoles(prev => [...prev, tempRole]);
+      
+      try {
+        const { data, error } = await supabase
+          .from('0008-ap-roles')
+          .insert({
+            label: presetRole.label,
+            user_id: user.id,
+            preset_role_id: presetRole.id,
+            is_active: true,
+            category: presetRole.category
+          })
+          .select()
+          .single();
 
-      if (error) Alert.alert('Error activating role', error.message);
-      else await fetchData(); // Refetch all roles to get the new one with its real ID
+        if (error) throw error;
+        
+        // Replace temp role with real role from database
+        setUserRoles(prev => prev.map(role => 
+          role.id === tempRole.id ? data : role
+        ));
+      } catch (error) {
+        console.error('Error creating preset role:', error);
+        Alert.alert('Error', 'Failed to activate role');
+        // Remove temp role on error
+        setUserRoles(prev => prev.filter(role => role.id !== tempRole.id));
+      }
     }
   };
 
