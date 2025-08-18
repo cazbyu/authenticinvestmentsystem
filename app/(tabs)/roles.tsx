@@ -360,10 +360,12 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
         </View>
       </View>
       <View style={styles.taskActions}>
-        <Text style={styles.scoreText}>+{points}</Text>
-        <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-          <Rocket size={18} color="#0078d4" />
-        </TouchableOpacity>
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
+            <Rocket size={9} color="#0078d4" />
+          </TouchableOpacity>
+          <Text style={styles.scoreText}>+{points}</Text>
+        </View>
       </View>
       <Animated.View style={[styles.celebrationOverlay, { opacity: celebrationAnim, transform: [{ scale: celebrationAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.2, 1] }) }] }]} pointerEvents="none">
         <Text style={styles.celebrationText}>🎉 ⭐ 🎊</Text>
@@ -877,14 +879,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   scoreText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#0078d4',
   },
   completeButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 4,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#0078d4',
     backgroundColor: '#ffffff',
