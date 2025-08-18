@@ -115,87 +115,85 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
       onLongPress={onLongPress}
       delayLongPress={200}
     >
-      <View>
-        <View style={styles.taskContent}>
-          <View style={styles.taskHeader}>
-            <Text style={styles.taskTitle} numberOfLines={2}>
-              {task.title}
-              {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
-            </Text>
+      <View style={styles.taskContent}>
+        <View style={styles.taskHeader}>
+          <Text style={styles.taskTitle} numberOfLines={2}>
+            {task.title}
+            {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
+          </Text>
+        </View>
+        <View style={styles.taskBody}>
+          <View style={styles.leftSection}>
+            {task.roles && task.roles.length > 0 && (
+              <View style={styles.tagRow}>
+                <Text style={styles.tagRowLabel}>Roles:</Text>
+                <View style={styles.tagContainer}>
+                  {task.roles.slice(0, 3).map((role, index) => (
+                    <View key={role.id} style={[styles.pillTag, styles.rolePillTag]}>
+                      <Text style={styles.pillTagText}>{role.label}</Text>
+                    </View>
+                  ))}
+                  {task.roles.length > 3 && (
+                    <View style={[styles.pillTag, styles.morePillTag]}>
+                      <Text style={styles.pillTagText}>+{task.roles.length - 3}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
           </View>
-          <View style={styles.taskBody}>
-            <View style={styles.leftSection}>
-              {task.roles && task.roles.length > 0 && (
-                <View style={styles.tagRow}>
-                  <Text style={styles.tagRowLabel}>Roles:</Text>
-                  <View style={styles.tagContainer}>
-                    {task.roles.slice(0, 3).map((role, index) => (
-                      <View key={role.id} style={[styles.pillTag, styles.rolePillTag]}>
-                        <Text style={styles.pillTagText}>{role.label}</Text>
-                      </View>
-                    ))}
-                    {task.roles.length > 3 && (
-                      <View style={[styles.pillTag, styles.morePillTag]}>
-                        <Text style={styles.pillTagText}>+{task.roles.length - 3}</Text>
-                      </View>
-                    )}
-                  </View>
+          <View style={styles.middleSection}>
+            {task.domains && task.domains.length > 0 && (
+              <View style={styles.tagRow}>
+                <Text style={styles.tagRowLabel}>Domains:</Text>
+                <View style={styles.tagContainer}>
+                  {task.domains.slice(0, 3).map((domain, index) => (
+                    <View key={domain.id} style={[styles.pillTag, styles.domainPillTag]}>
+                      <Text style={styles.pillTagText}>{domain.name}</Text>
+                    </View>
+                  ))}
+                  {task.domains.length > 3 && (
+                    <View style={[styles.pillTag, styles.morePillTag]}>
+                      <Text style={styles.pillTagText}>+{task.domains.length - 3}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            <View style={styles.middleSection}>
-              {task.domains && task.domains.length > 0 && (
-                <View style={styles.tagRow}>
-                  <Text style={styles.tagRowLabel}>Domains:</Text>
-                  <View style={styles.tagContainer}>
-                    {task.domains.slice(0, 3).map((domain, index) => (
-                      <View key={domain.id} style={[styles.pillTag, styles.domainPillTag]}>
-                        <Text style={styles.pillTagText}>{domain.name}</Text>
-                      </View>
-                    ))}
-                    {task.domains.length > 3 && (
-                      <View style={[styles.pillTag, styles.morePillTag]}>
-                        <Text style={styles.pillTagText}>+{task.domains.length - 3}</Text>
-                      </View>
-                    )}
-                  </View>
+              </View>
+            )}
+            {task.goals && task.goals.length > 0 && (
+              <View style={styles.tagRow}>
+                <Text style={styles.tagRowLabel}>Goals:</Text>
+                <View style={styles.tagContainer}>
+                  {task.goals.slice(0, 3).map((goal, index) => (
+                    <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
+                      <Text style={styles.pillTagText}>{goal.title}</Text>
+                    </View>
+                  ))}
+                  {task.goals.length > 3 && (
+                    <View style={[styles.pillTag, styles.morePillTag]}>
+                      <Text style={styles.pillTagText}>+{task.goals.length - 3}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-              {task.goals && task.goals.length > 0 && (
-                <View style={styles.tagRow}>
-                  <Text style={styles.tagRowLabel}>Goals:</Text>
-                  <View style={styles.tagContainer}>
-                    {task.goals.slice(0, 3).map((goal, index) => (
-                      <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
-                        <Text style={styles.pillTagText}>{goal.title}</Text>
-                      </View>
-                    ))}
-                    {task.goals.length > 3 && (
-                      <View style={[styles.pillTag, styles.morePillTag]}>
-                        <Text style={styles.pillTagText}>+{task.goals.length - 3}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              )}
-            </View>
+              </View>
+            )}
           </View>
         </View>
-        <View style={styles.rightSection}>
-          <View style={styles.statusIcons}>
-            {task.has_notes && <FileText size={12} color="#6b7280" />}
-            {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
-            {task.has_delegates && <Users size={12} color="#6b7280" />}
-          </View>
-          <View style={styles.taskActions}>
-            <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-              <Rocket size={9} color="#0078d4" />
-            </TouchableOpacity>
-            <Text style={styles.scoreText}>+{points}</Text>
-          </View>
-        </View>
-        <Animated.View style={[styles.pointsAnimation, { opacity: pointsAnim, transform: [{ translateY: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) }] }]} pointerEvents="none"><Text style={styles.pointsAnimationText}>+{points}</Text></Animated.View>
       </View>
+      <View style={styles.rightSection}>
+        <View style={styles.statusIcons}>
+          {task.has_notes && <FileText size={12} color="#6b7280" />}
+          {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
+          {task.has_delegates && <Users size={12} color="#6b7280" />}
+        </View>
+        <View style={styles.taskActions}>
+          <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
+            <Rocket size={9} color="#0078d4" />
+          </TouchableOpacity>
+          <Text style={styles.scoreText}>+{points}</Text>
+        </View>
+      </View>
+      <Animated.View style={[styles.pointsAnimation, { opacity: pointsAnim, transform: [{ translateY: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) }] }]} pointerEvents="none"><Text style={styles.pointsAnimationText}>+{points}</Text></Animated.View>
     </TouchableOpacity>
   );
 }
