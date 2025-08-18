@@ -9,7 +9,7 @@ import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { supabase } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
 import { Animated } from 'react-native';
-import { Task, TaskCard } from '@/components/tasks/TaskCard'; // Import the new component
+import { Task, TaskCard } from '@/components/tasks/TaskCard';
 
 // Import TaskDetailModal from dashboard
 function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCancel }) {
