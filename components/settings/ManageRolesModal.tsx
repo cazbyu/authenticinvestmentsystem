@@ -219,11 +219,29 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                     {customRoles.map(role => (
                       <View key={role.id} style={styles.roleItem}>
                         <Text style={styles.roleLabel}>{role.label}</Text>
-                         <Switch
+                        <Switch
                             value={role.is_active}
-                            onValueChange={async () => {
-                                await supabase.from('0008-ap-roles').update({ is_active: !role.is_active }).eq('id', role.id);
-                                await fetchData();
+                            onValueChange={async (newValue) => {
+                              // Optimistically update UI
+                              setUserRoles(prev => prev.map(r => 
+                                r.id === role.id ? { ...r, is_active: newValue } : r
+                              ));
+                              
+                              try {
+                                const { error } = await supabase
+                                  .from('0008-ap-roles')
+                                  .update({ is_active: newValue })
+                                  .eq('id', role.id);
+                                
+                                if (error) throw error;
+                              } catch (error) {
+                                console.error('Error updating custom role:', error);
+                                Alert.alert('Error', 'Failed to update role');
+                                // Revert optimistic update
+                                setUserRoles(prev => prev.map(r => 
+                                  r.id === role.id ? { ...r, is_active: !newValue } : r
+                                ));
+                              }
                             }}
                           />
                       </View>
