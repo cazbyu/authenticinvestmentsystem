@@ -13,14 +13,19 @@ interface HeaderProps {
   onViewChange?: (view: 'deposits' | 'ideas') => void;
   onSortPress?: () => void;
   authenticScore?: number;
+  onBackPress?: () => void;
 }
 
-export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85 }: HeaderProps) {
+export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress }: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
   const canGoBack = router.canGoBack();
 
   const handleLeftButtonPress = () => {
+    if (onBackPress) {
+      onBackPress();
+      return;
+    }
     if (canGoBack) {
       router.back();
     } else {

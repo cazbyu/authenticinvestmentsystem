@@ -433,7 +433,7 @@ export default function Roles() {
             >
               <Plus size={24} color="#ffffff" />
             </TouchableOpacity>
-            </View>
+          </View>
         </SafeAreaView>
       </Modal>
       
