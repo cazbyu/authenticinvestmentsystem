@@ -404,6 +404,7 @@ export default function Roles() {
               if (selectedRole) fetchRoleTasks(selectedRole.id);
             }}
             onSortPress={handleSortPress}
+            onBackPress={() => setRoleAccountVisible(false)}
           />
           
           <View style={styles.content}>
