@@ -382,6 +382,7 @@ export default function Roles() {
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [roleTasks, setRoleTasks] = useState<Task[]>([]);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
@@ -514,9 +515,9 @@ export default function Roles() {
   };
 
   const handleUpdateTask = (task: Task) => {
-    // Implementation for updating task
+    setEditingTask(task);
     setIsDetailModalVisible(false);
-    console.log('Update task:', task);
+    setTimeout(() => setTaskFormVisible(true), 100); // Small delay to ensure modal transition
   };
 
   const handleDelegateTask = (task: Task) => {
@@ -655,13 +656,17 @@ export default function Roles() {
       {/* Task Form Modal */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskEventForm
-          mode="create"
-          initialData={selectedRole ? { selectedRoleIds: [selectedRole.id] } : undefined}
+          mode={editingTask ? "edit" : "create"}
+          initialData={editingTask || (selectedRole ? { selectedRoleIds: [selectedRole.id] } : undefined)}
           onSubmitSuccess={() => {
             setTaskFormVisible(false);
+            setEditingTask(null);
             if (selectedRole) fetchRoleTasks(selectedRole.id);
           }}
-          onClose={() => setTaskFormVisible(false)}
+          onClose={() => {
+            setTaskFormVisible(false);
+            setEditingTask(null);
+          }}
         />
       </Modal>
       
