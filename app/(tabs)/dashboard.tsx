@@ -537,11 +537,11 @@ const styles = StyleSheet.create({
     color: '#374151' 
   },
   taskActions: { alignItems: 'center', gap: 8 },
-  actionRow: { alignItems: 'center', gap: 8 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
   completeButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 4,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#0078d4',
     backgroundColor: '#ffffff',
