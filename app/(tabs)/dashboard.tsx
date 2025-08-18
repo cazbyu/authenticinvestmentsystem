@@ -194,6 +194,7 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
           </TouchableOpacity>
           <Text style={styles.scoreText}>+{points}</Text>
         </View>
+      </View>
       <Animated.View style={[styles.pointsAnimation, { opacity: pointsAnim, transform: [{ translateY: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) }] }]} pointerEvents="none"><Text style={styles.pointsAnimationText}>+{points}</Text></Animated.View>
     </TouchableOpacity>
   );
@@ -507,7 +508,6 @@ const styles = StyleSheet.create({
   statusIcons: { flexDirection: 'column', alignItems: 'center', gap: 2 },
   tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' },
   tagRowLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', marginRight: 6, flexShrink: 0 },
-  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, flex: 1 },
   pillTag: { 
     paddingHorizontal: 8, 
     paddingVertical: 2, 
@@ -537,11 +537,11 @@ const styles = StyleSheet.create({
     color: '#374151' 
   },
   taskActions: { alignItems: 'center', gap: 8 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionRow: { alignItems: 'center', gap: 8 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
   completeButton: {
-    padding: 4,
-    borderRadius: 10,
+    padding: 8,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: '#0078d4',
     backgroundColor: '#ffffff',
