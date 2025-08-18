@@ -10,6 +10,166 @@ import { supabase } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
 import { Animated } from 'react-native';
 
+// Import TaskDetailModal from dashboard
+function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCancel }) {
+  if (!task) return null;
+  
+  const [taskNotes, setTaskNotes] = useState([]);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+
+  useEffect(() => {
+    if (visible && task?.id) {
+      fetchTaskNotes();
+    }
+  }, [visible, task?.id]);
+
+  const fetchTaskNotes = async () => {
+    if (!task?.id) return;
+    
+    setLoadingNotes(true);
+    try {
+      const { data, error } = await supabase
+        .from('0008-ap-universal-notes-join')
+        .select(`
+          note:0008-ap-notes(
+            id,
+            content,
+            created_at
+          )
+        `)
+        .eq('parent_id', task.id)
+        .eq('parent_type', 'task');
+
+      if (error) throw error;
+      
+      const notes = data?.map(item => item.note).filter(Boolean) || [];
+      setTaskNotes(notes);
+    } catch (error) {
+      console.error('Error fetching task notes:', error);
+    } finally {
+      setLoadingNotes(false);
+    }
+  };
+
+  const formatDateTime = (dateTime) => dateTime ? new Date(dateTime).toLocaleString() : 'Not set';
+  
+  return (
+    <View style={taskDetailStyles.detailContainer}>
+      <View style={taskDetailStyles.detailHeader}>
+        <Text style={taskDetailStyles.detailTitle}>Task Details</Text>
+        <TouchableOpacity onPress={onClose}>
+          <X size={24} color="#1f2937" />
+        </TouchableOpacity>
+      </View>
+      <ScrollView style={taskDetailStyles.detailContent}>
+        <Text style={taskDetailStyles.detailTaskTitle}>{task.title}</Text>
+        <View style={taskDetailStyles.detailSection}>
+          <Text style={taskDetailStyles.detailLabel}>Due Date:</Text>
+          <Text style={taskDetailStyles.detailValue}>{formatDateTime(task.due_date)}</Text>
+        </View>
+        {task.start_time && (
+          <View style={taskDetailStyles.detailSection}>
+            <Text style={taskDetailStyles.detailLabel}>Start Time:</Text>
+            <Text style={taskDetailStyles.detailValue}>{formatDateTime(task.start_time)}</Text>
+          </View>
+        )}
+        {task.end_time && (
+          <View style={taskDetailStyles.detailSection}>
+            <Text style={taskDetailStyles.detailLabel}>End Time:</Text>
+            <Text style={taskDetailStyles.detailValue}>{formatDateTime(task.end_time)}</Text>
+          </View>
+        )}
+        <View style={taskDetailStyles.detailSection}>
+          <Text style={taskDetailStyles.detailLabel}>Priority:</Text>
+          <Text style={taskDetailStyles.detailValue}>
+            {task.is_urgent && task.is_important ? 'Urgent & Important' : 
+             !task.is_urgent && task.is_important ? 'Important' : 
+             task.is_urgent && !task.is_important ? 'Urgent' : 'Normal'}
+          </Text>
+        </View>
+        {task.roles?.length > 0 && (
+          <View style={taskDetailStyles.detailSection}>
+            <Text style={taskDetailStyles.detailLabel}>Roles:</Text>
+            <View style={taskDetailStyles.detailTagContainer}>
+              {task.roles.map(role => (
+                <View key={role.id} style={[taskDetailStyles.tag, taskDetailStyles.roleTag]}>
+                  <Text style={taskDetailStyles.tagText}>{role.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+        {task.domains?.length > 0 && (
+          <View style={taskDetailStyles.detailSection}>
+            <Text style={taskDetailStyles.detailLabel}>Domains:</Text>
+            <View style={taskDetailStyles.detailTagContainer}>
+              {task.domains.map(domain => (
+                <View key={domain.id} style={[taskDetailStyles.tag, taskDetailStyles.domainTag]}>
+                  <Text style={taskDetailStyles.tagText}>{domain.name}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+        {taskNotes.length > 0 && (
+          <View style={taskDetailStyles.detailSection}>
+            <Text style={taskDetailStyles.detailLabel}>Notes:</Text>
+            {loadingNotes ? (
+              <Text style={taskDetailStyles.detailValue}>Loading notes...</Text>
+            ) : (
+              <View style={taskDetailStyles.notesContainer}>
+                {taskNotes.map((note, index) => (
+                  <View key={note.id} style={taskDetailStyles.noteItem}>
+                    <Text style={taskDetailStyles.noteContent}>{note.content}</Text>
+                    <Text style={taskDetailStyles.noteDate}>
+                      {new Date(note.created_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+        {task.goals?.length > 0 && (
+          <View style={taskDetailStyles.detailSection}>
+            <Text style={taskDetailStyles.detailLabel}>Goals:</Text>
+            <View style={taskDetailStyles.detailTagContainer}>
+              {task.goals.map(goal => (
+                <View key={goal.id} style={[taskDetailStyles.tag, taskDetailStyles.goalTag]}>
+                  <Text style={taskDetailStyles.tagText}>{goal.title}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+      <View style={taskDetailStyles.detailActions}>
+        <TouchableOpacity 
+          style={[taskDetailStyles.detailButton, taskDetailStyles.updateButton]} 
+          onPress={() => onUpdate(task)}
+        >
+          <Edit size={16} color="#ffffff" />
+          <Text style={taskDetailStyles.detailButtonText}>Update</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[taskDetailStyles.detailButton, taskDetailStyles.delegateButton]} 
+          onPress={() => onDelegate(task)}
+        >
+          <UserX size={16} color="#ffffff" />
+          <Text style={taskDetailStyles.detailButtonText}>Delegate</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[taskDetailStyles.detailButton, taskDetailStyles.cancelButton]} 
+          onPress={() => onCancel(task)}
+        >
+          <Ban size={16} color="#ffffff" />
+          <Text style={taskDetailStyles.detailButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
 
@@ -211,7 +371,9 @@ export default function Roles() {
   const [modalVisible, setModalVisible] = useState(false);
   const [roleAccountVisible, setRoleAccountVisible] = useState(false);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [roleTasks, setRoleTasks] = useState<Task[]>([]);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
@@ -338,6 +500,39 @@ export default function Roles() {
     }
   };
 
+  const handleTaskDoublePress = (task: Task) => {
+    setSelectedTask(task);
+    setIsDetailModalVisible(true);
+  };
+
+  const handleUpdateTask = (task: Task) => {
+    // Implementation for updating task
+    setIsDetailModalVisible(false);
+    console.log('Update task:', task);
+  };
+
+  const handleDelegateTask = (task: Task) => {
+    // Implementation for delegating task
+    setIsDetailModalVisible(false);
+    console.log('Delegate task:', task);
+  };
+
+  const handleCancelTask = async (task: Task) => {
+    const { error } = await supabase.from('0008-ap-tasks').update({ 
+      status: 'cancelled' 
+    }).eq('id', task.id);
+    
+    if (error) {
+      console.log('Error', 'Failed to cancel task.');
+    } else {
+      console.log('Success', 'Task has been cancelled');
+      setIsDetailModalVisible(false);
+      if (selectedRole) {
+        await fetchRoleTasks(selectedRole.id);
+      }
+    }
+  };
+
   const renderRoleCard = (role: Role) => {
     return (
       <TouchableOpacity
@@ -421,7 +616,7 @@ export default function Roles() {
                     key={task.id}
                     task={task}
                     onComplete={handleCompleteTask}
-                    onDoublePress={(task) => console.log('Task double pressed:', task)}
+                    onDoublePress={handleTaskDoublePress}
                   />
                 ))}
               </ScrollView>
@@ -435,6 +630,18 @@ export default function Roles() {
             </TouchableOpacity>
           </View>
         </SafeAreaView>
+      </Modal>
+      
+      {/* Task Detail Modal */}
+      <Modal visible={isDetailModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <TaskDetailModal 
+          visible={isDetailModalVisible}
+          task={selectedTask}
+          onClose={() => setIsDetailModalVisible(false)}
+          onUpdate={handleUpdateTask}
+          onDelegate={handleDelegateTask}
+          onCancel={handleCancelTask}
+        />
       </Modal>
       
       {/* Task Form Modal */}
@@ -710,5 +917,128 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+});
+
+// Task Detail Modal Styles
+const taskDetailStyles = StyleSheet.create({
+  detailContainer: { 
+    flex: 1, 
+    backgroundColor: '#f8fafc' 
+  },
+  detailHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 16, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#e5e7eb', 
+    backgroundColor: '#ffffff' 
+  },
+  detailTitle: { 
+    fontSize: 18, 
+    fontWeight: '600', 
+    color: '#1f2937' 
+  },
+  detailContent: { 
+    flex: 1, 
+    padding: 16 
+  },
+  detailTaskTitle: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    color: '#1f2937', 
+    marginBottom: 20 
+  },
+  detailSection: { 
+    marginBottom: 16 
+  },
+  detailLabel: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#6b7280', 
+    marginBottom: 4 
+  },
+  detailValue: { 
+    fontSize: 16, 
+    color: '#1f2937' 
+  },
+  detailTagContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: 6, 
+    marginTop: 4 
+  },
+  tag: { 
+    paddingHorizontal: 8, 
+    paddingVertical: 2, 
+    borderRadius: 12 
+  },
+  roleTag: { 
+    backgroundColor: '#fce7f3' 
+  },
+  domainTag: { 
+    backgroundColor: '#fed7aa' 
+  },
+  goalTag: { 
+    backgroundColor: '#bfdbfe' 
+  },
+  tagText: { 
+    fontSize: 10, 
+    fontWeight: '500', 
+    color: '#374151' 
+  },
+  notesContainer: {
+    marginTop: 8,
+  },
+  noteItem: {
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0078d4',
+  },
+  noteContent: {
+    fontSize: 14,
+    color: '#1f2937',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  noteDate: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  detailActions: { 
+    flexDirection: 'row', 
+    padding: 16, 
+    gap: 12, 
+    borderTopWidth: 1, 
+    borderTopColor: '#e5e7eb', 
+    backgroundColor: '#ffffff' 
+  },
+  detailButton: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    paddingVertical: 12, 
+    borderRadius: 8, 
+    gap: 6 
+  },
+  updateButton: { 
+    backgroundColor: '#0078d4' 
+  },
+  delegateButton: { 
+    backgroundColor: '#7c3aed' 
+  },
+  cancelButton: { 
+    backgroundColor: '#dc2626' 
+  },
+  detailButtonText: { 
+    color: '#ffffff', 
+    fontSize: 14, 
+    fontWeight: '600' 
   },
 });
