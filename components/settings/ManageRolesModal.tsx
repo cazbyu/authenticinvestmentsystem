@@ -42,10 +42,32 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const groupedPresetRoles = useMemo(() => {
     if (!presetRoles) return {};
-    return presetRoles.reduce((acc, role) => {
+    const grouped = presetRoles.reduce((acc, role) => {
       (acc[role.category] = acc[role.category] || []).push(role);
       return acc;
     }, {} as Record<string, PresetRole[]>);
+    
+    // Define the desired category order
+    const categoryOrder = ['Family', 'Professional', 'Community', 'Recreation'];
+    
+    // Create ordered object with specified categories first, then others
+    const orderedGrouped: Record<string, PresetRole[]> = {};
+    
+    // Add categories in the specified order
+    categoryOrder.forEach(category => {
+      if (grouped[category]) {
+        orderedGrouped[category] = grouped[category];
+      }
+    });
+    
+    // Add any remaining categories not in the specified order
+    Object.keys(grouped).forEach(category => {
+      if (!categoryOrder.includes(category)) {
+        orderedGrouped[category] = grouped[category];
+      }
+    });
+    
+    return orderedGrouped;
   }, [presetRoles]);
 
   useEffect(() => {
