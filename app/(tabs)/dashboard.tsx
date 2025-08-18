@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   celebrationText: { fontSize: 24 },
   pointsAnimation: { position: 'absolute', top: '50%', right: 20, justifyContent: 'center', alignItems: 'center' },
   pointsAnimationText: { fontSize: 18, fontWeight: 'bold', color: '#16a34a' },
-  fab: { position: 'absolute', bottom: 20, right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#0078d4', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+  fab: { position: 'absolute', bottom: 20, right: 20, width: 48, height: 48, borderRadius: 24, backgroundColor: '#0078d4', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
   loadingContainer: { padding: 40, alignItems: 'center' },
   loadingText: { color: '#6b7280', fontSize: 16 },
   emptyContainer: { padding: 40, alignItems: 'center' },
