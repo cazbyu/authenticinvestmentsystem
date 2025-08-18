@@ -179,17 +179,15 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
                 </View>
               )}
             </View>
-            <View style={styles.iconsSection}>
-              <View style={styles.statusIcons}>
-                {task.has_notes && <FileText size={12} color="#6b7280" />}
-                {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
-                {task.has_delegates && <Users size={12} color="#6b7280" />}
-              </View>
-            </View>
           </View>
         </View>
-        <View style={styles.taskActions}>
-          <View style={styles.actionRow}>
+        <View style={styles.rightSection}>
+          <View style={styles.statusIcons}>
+            {task.has_notes && <FileText size={12} color="#6b7280" />}
+            {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
+            {task.has_delegates && <Users size={12} color="#6b7280" />}
+          </View>
+          <View style={styles.taskActions}>
             <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
               <Rocket size={9} color="#0078d4" />
             </TouchableOpacity>
@@ -498,7 +496,12 @@ const styles = StyleSheet.create({
   taskBody: { flexDirection: 'row', marginBottom: 4 },
   leftSection: { flex: 1, marginRight: 8 },
   middleSection: { flex: 1, marginRight: 8 },
-  iconsSection: { width: 30, justifyContent: 'flex-start', alignItems: 'center' },
+  rightSection: { 
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    minWidth: 60,
+  },
   tagSection: { marginBottom: 4 },
   tagSectionLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', marginBottom: 4 },
   tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
@@ -507,7 +510,12 @@ const styles = StyleSheet.create({
   domainTag: { backgroundColor: '#fed7aa' },
   goalTag: { backgroundColor: '#bfdbfe' },
   tagText: { fontSize: 10, fontWeight: '500', color: '#374151' },
-  statusIcons: { flexDirection: 'column', alignItems: 'center', gap: 2 },
+  statusIcons: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4, 
+    marginBottom: 8,
+  },
   tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' },
   tagRowLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', marginRight: 6, flexShrink: 0 },
   pillTag: { 
@@ -538,8 +546,11 @@ const styles = StyleSheet.create({
     fontWeight: '500', 
     color: '#374151' 
   },
-  taskActions: { alignItems: 'center', gap: 8 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  taskActions: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6,
+  },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
   completeButton: {
     padding: 4,
