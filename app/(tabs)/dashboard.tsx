@@ -252,9 +252,9 @@ export default function Dashboard() {
         .neq('status', 'cancelled');
 
       if (activeView === 'deposits') {
-        taskQuery = taskQuery.in('type', ['task', 'event']);
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       } else {
-        taskQuery = taskQuery.eq('type', 'depositIdea');
+        taskQuery = taskQuery.eq('deposit_idea', true);
       }
 
       const { data: tasksData, error: tasksError } = await taskQuery;
