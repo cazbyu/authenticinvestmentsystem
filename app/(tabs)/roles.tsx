@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Edit, UserX, Plus, ArrowUpDown, Bell, Search, Menu, User, FileText, ChartBar as BarChart3, Rocket, Paperclip, Users } from 'lucide-react-native';
+// lucide icons you use directly on this screen
+import { Plus, ArrowUpDown, Bell, Search, Menu, User, FileText, ChartBar as BarChart3, Rocket, Paperclip, Users, X, Ban } from 'lucide-react-native';
+// icons coming from your wrapper (so you only import once everywhere)
 import { Edit, UserX } from '@/ui/icons';
 import { Header } from '@/components/Header';
 import { AddItemModal } from '@/components/AddItemModal';
