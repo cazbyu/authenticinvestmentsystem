@@ -73,7 +73,8 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
       const { data: presetData, error: presetError } = await supabase
         .from('0008-ap-preset-roles')
-        .select('id, label, category');
+        .select('id, label, category, sort_order')
+        .order('sort_order', { ascending: true });
 
       if (presetError) throw presetError;
 
