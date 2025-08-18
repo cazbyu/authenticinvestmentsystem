@@ -432,13 +432,6 @@ export default function Roles() {
             >
               <Plus size={24} color="#ffffff" />
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.backButton} 
-              onPress={() => setRoleAccountVisible(false)}
-            >
-              <X size={24} color="#ffffff" />
-            </TouchableOpacity>
             </View>
         </SafeAreaView>
       </Modal>
@@ -709,22 +702,6 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: '#0078d4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6b7280',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
