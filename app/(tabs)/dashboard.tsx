@@ -76,8 +76,9 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
   // Handles single and double tap gestures
   const handlePress = () => {
     const now = Date.now();
-    const DOUBLE_PRESS_DELAY = 300;
+    const DOUBLE_PRESS_DELAY = 400;
     if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
+      setLastTap(0); // Reset to prevent triple-tap issues
       onDoublePress?.(task);
     } else {
       setLastTap(now);
@@ -337,7 +338,7 @@ export default function Dashboard() {
   const handleUpdateTask = (task: Task) => {
     setEditingTask(task);
     setIsDetailModalVisible(false);
-    setIsFormModalVisible(true);
+    setTimeout(() => setIsFormModalVisible(true), 100); // Small delay to ensure modal transition
   };
   const handleDelegateTask = (task: Task) => { Alert.alert('Delegate', 'Delegation functionality coming soon!'); setIsDetailModalVisible(false); };
   const handleFormSubmitSuccess = () => {
@@ -393,7 +394,7 @@ export default function Dashboard() {
       <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskEventForm
           mode={editingTask ? "edit" : "create"}
-          initialData={editingTask}
+          initialData={editingTask || undefined}
           onSubmitSuccess={handleFormSubmitSuccess}
           onClose={handleFormClose}
         />
