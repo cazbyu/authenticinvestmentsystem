@@ -7,11 +7,12 @@ module.exports = function(api) {
         'module-resolver',
         {
           alias: {
-            // This tells the app that "@" means the root directory
-            '@': './',
+            '@': '.',
           },
+          extensions: ['.js', '.jsx', '.ts', '.tsx'],
         },
       ],
+      // Make sure other plugins are listed here if you have any
     ],
   };
 };
