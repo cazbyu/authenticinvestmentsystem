@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { X, Plus, ArrowUpDown, Bell, Search, Menu, User, FileText, ChartBar as BarChart3, Rocket, Paperclip, Users } from 'lucide-react-native';
+import { Edit, X, Plus, ArrowUpDown, Bell, Search, Menu, User, FileText, ChartBar as BarChart3, Rocket, Paperclip, Users } from 'lucide-react-native';
 import { Header } from '@/components/Header';
 import { AddItemModal } from '@/components/AddItemModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
