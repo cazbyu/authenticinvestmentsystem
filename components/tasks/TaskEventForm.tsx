@@ -275,7 +275,7 @@ const taskId = taskData.id;
                 supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
                 supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
                 supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                // Don't delete existing notes - we want to keep them and add new ones
             ]);
         }
 
@@ -283,7 +283,8 @@ const taskId = taskData.id;
         const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
         const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
 
-        if (formData.notes) {
+        // Only add a new note if there's content in the notes field
+        if (formData.notes && formData.notes.trim()) {
             const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
             if (noteError) throw noteError;
             await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
