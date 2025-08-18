@@ -360,8 +360,34 @@ export default function Dashboard() {
       <View style={styles.content}>
         {loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
           : tasks.length === 0 ? <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
-          : activeView === 'deposits' ? <DraggableFlatList data={tasks} renderItem={renderDraggableItem} keyExtractor={(item) => item.id} onDragEnd={handleDragEnd} contentContainerStyle={styles.taskList} showsVerticalScrollIndicator={false} />
-          : <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}><View style={styles.taskList}>{tasks.map(task => <TaskCard key={task.id} task={task} onComplete={handleCompleteTask} onDoublePress={handleTaskDoublePress} />)}</View></ScrollView>
+          : activeView === 'deposits' ? 
+            <DraggableFlatList 
+              data={tasks} 
+              renderItem={renderDraggableItem} 
+              keyExtractor={(item) => item.id} 
+              onDragEnd={handleDragEnd} 
+              contentContainerStyle={styles.taskList} 
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              style={styles.draggableList}
+            />
+          : <ScrollView 
+              style={styles.scrollContent} 
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              contentContainerStyle={styles.scrollContentContainer}
+            >
+              <View style={styles.taskList}>
+                {tasks.map(task => 
+                  <TaskCard 
+                    key={task.id} 
+                    task={task} 
+                    onComplete={handleCompleteTask} 
+                    onDoublePress={handleTaskDoublePress} 
+                  />
+                )}
+              </View>
+            </ScrollView>
         }
       </View>
       <TouchableOpacity style={styles.fab} onPress={() => setIsFormModalVisible(true)}><Plus size={24} color="#ffffff" /></TouchableOpacity>
@@ -389,8 +415,10 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   content: { flex: 1 },
-  scrollContent: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
-  taskList: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20 },
+  draggableList: { flex: 1 },
+  scrollContent: { flex: 1 },
+  scrollContentContainer: { flexGrow: 1, paddingBottom: 100 },
+  taskList: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 },
   draggingItem: { opacity: 0.8, transform: [{ scale: 1.02 }] },
   taskCard: { backgroundColor: '#ffffff', borderRadius: 8, borderLeftWidth: 4, marginBottom: 12, padding: 16, flexDirection: 'row', alignItems: 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2, position: 'relative' },
   taskContent: { flex: 1, marginRight: 8 },
