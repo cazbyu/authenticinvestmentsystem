@@ -6,7 +6,7 @@ import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flat
 import { Header } from '@/components/Header';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { supabase } from '@/lib/supabase';
-import { Task, TaskCard } from '@/components/tasks/TaskCard'; // Import the new component
+import { Task, TaskCard } from '@/components/tasks/TaskCard';
 
 // --- TaskDetailModal Component ---
 // Displays detailed information about a task in a modal
