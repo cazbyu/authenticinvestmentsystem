@@ -124,15 +124,33 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
         <View style={styles.taskBody}>
           <View style={styles.leftSection}>
             {task.roles && task.roles.length > 0 && (
-              <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Roles:</Text><View style={styles.tagContainer}>{task.roles.map((role) => (<View key={role.id} style={[styles.tag, styles.roleTag]}><Text style={styles.tagText}>{role.label}</Text></View>))}</View></View>
+              <View style={styles.inlineTagSection}>
+                <Text style={styles.inlineTagLabel}>Roles: </Text>
+                <Text style={styles.inlineTagText}>
+                  {task.roles.slice(0, 3).map(role => `'${role.label}'`).join(' ')}
+                  {task.roles.length > 3 && ' +'}
+                </Text>
+              </View>
             )}
           </View>
           <View style={styles.middleSection}>
             {task.domains && task.domains.length > 0 && (
-              <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Domains:</Text><View style={styles.tagContainer}>{task.domains.map((domain) => (<View key={domain.id} style={[styles.tag, styles.domainTag]}><Text style={styles.tagText}>{domain.name}</Text></View>))}</View></View>
+              <View style={styles.inlineTagSection}>
+                <Text style={styles.inlineTagLabel}>Domains: </Text>
+                <Text style={styles.inlineTagText}>
+                  {task.domains.slice(0, 3).map(domain => `'${domain.name}'`).join(' ')}
+                  {task.domains.length > 3 && ' +'}
+                </Text>
+              </View>
             )}
             {task.goals && task.goals.length > 0 && (
-              <View style={styles.tagSection}><Text style={styles.tagSectionLabel}>Goals:</Text><View style={styles.tagContainer}>{task.goals.map((goal) => (<View key={goal.id} style={[styles.tag, styles.goalTag]}><Text style={styles.tagText}>{goal.title}</Text></View>))}</View></View>
+              <View style={styles.inlineTagSection}>
+                <Text style={styles.inlineTagLabel}>Goals: </Text>
+                <Text style={styles.inlineTagText}>
+                  {task.goals.slice(0, 3).map(goal => `'${goal.title}'`).join(' ')}
+                  {task.goals.length > 3 && ' +'}
+                </Text>
+              </View>
             )}
           </View>
           <View style={styles.iconsSection}>
@@ -368,6 +386,9 @@ const styles = StyleSheet.create({
   goalTag: { backgroundColor: '#bfdbfe' },
   tagText: { fontSize: 10, fontWeight: '500', color: '#374151' },
   statusIcons: { flexDirection: 'column', alignItems: 'center', gap: 2 },
+  inlineTagSection: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4, flexWrap: 'wrap' },
+  inlineTagLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', flexShrink: 0 },
+  inlineTagText: { fontSize: 10, fontWeight: '500', color: '#374151', flex: 1, lineHeight: 14 },
   taskActions: { alignItems: 'center', gap: 8 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
   celebrationOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8 },
