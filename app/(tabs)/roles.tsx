@@ -3,6 +3,7 @@ import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Edit, UserX, Plus, ArrowUpDown, Bell, Search, Menu, User, FileText, ChartBar as BarChart3, Rocket, Paperclip, Users } from 'lucide-react-native';
+import { Edit, UserX } from '@/ui/icons';
 import { Header } from '@/components/Header';
 import { AddItemModal } from '@/components/AddItemModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
