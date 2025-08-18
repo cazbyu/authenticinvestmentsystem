@@ -124,32 +124,56 @@ function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProp
         <View style={styles.taskBody}>
           <View style={styles.leftSection}>
             {task.roles && task.roles.length > 0 && (
-              <View style={styles.inlineTagSection}>
-                <Text style={styles.inlineTagLabel}>Roles: </Text>
-                <Text style={styles.inlineTagText}>
-                  {task.roles.slice(0, 3).map(role => `'${role.label}'`).join(' ')}
-                  {task.roles.length > 3 && ' +'}
-                </Text>
+              <View style={styles.tagRow}>
+                <Text style={styles.tagRowLabel}>Roles:</Text>
+                <View style={styles.tagContainer}>
+                  {task.roles.slice(0, 3).map((role, index) => (
+                    <View key={role.id} style={[styles.pillTag, styles.rolePillTag]}>
+                      <Text style={styles.pillTagText}>{role.label}</Text>
+                    </View>
+                  ))}
+                  {task.roles.length > 3 && (
+                    <View style={[styles.pillTag, styles.morePillTag]}>
+                      <Text style={styles.pillTagText}>+{task.roles.length - 3}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
           </View>
           <View style={styles.middleSection}>
             {task.domains && task.domains.length > 0 && (
-              <View style={styles.inlineTagSection}>
-                <Text style={styles.inlineTagLabel}>Domains: </Text>
-                <Text style={styles.inlineTagText}>
-                  {task.domains.slice(0, 3).map(domain => `'${domain.name}'`).join(' ')}
-                  {task.domains.length > 3 && ' +'}
-                </Text>
+              <View style={styles.tagRow}>
+                <Text style={styles.tagRowLabel}>Domains:</Text>
+                <View style={styles.tagContainer}>
+                  {task.domains.slice(0, 3).map((domain, index) => (
+                    <View key={domain.id} style={[styles.pillTag, styles.domainPillTag]}>
+                      <Text style={styles.pillTagText}>{domain.name}</Text>
+                    </View>
+                  ))}
+                  {task.domains.length > 3 && (
+                    <View style={[styles.pillTag, styles.morePillTag]}>
+                      <Text style={styles.pillTagText}>+{task.domains.length - 3}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
             {task.goals && task.goals.length > 0 && (
-              <View style={styles.inlineTagSection}>
-                <Text style={styles.inlineTagLabel}>Goals: </Text>
-                <Text style={styles.inlineTagText}>
-                  {task.goals.slice(0, 3).map(goal => `'${goal.title}'`).join(' ')}
-                  {task.goals.length > 3 && ' +'}
-                </Text>
+              <View style={styles.tagRow}>
+                <Text style={styles.tagRowLabel}>Goals:</Text>
+                <View style={styles.tagContainer}>
+                  {task.goals.slice(0, 3).map((goal, index) => (
+                    <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
+                      <Text style={styles.pillTagText}>{goal.title}</Text>
+                    </View>
+                  ))}
+                  {task.goals.length > 3 && (
+                    <View style={[styles.pillTag, styles.morePillTag]}>
+                      <Text style={styles.pillTagText}>+{task.goals.length - 3}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -386,9 +410,37 @@ const styles = StyleSheet.create({
   goalTag: { backgroundColor: '#bfdbfe' },
   tagText: { fontSize: 10, fontWeight: '500', color: '#374151' },
   statusIcons: { flexDirection: 'column', alignItems: 'center', gap: 2 },
-  inlineTagSection: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4, flexWrap: 'wrap' },
-  inlineTagLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', flexShrink: 0 },
-  inlineTagText: { fontSize: 10, fontWeight: '500', color: '#374151', flex: 1, lineHeight: 14 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' },
+  tagRowLabel: { fontSize: 10, fontWeight: '600', color: '#6b7280', marginRight: 6, flexShrink: 0 },
+  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, flex: 1 },
+  pillTag: { 
+    paddingHorizontal: 8, 
+    paddingVertical: 2, 
+    borderRadius: 12, 
+    borderWidth: 1,
+    alignSelf: 'flex-start'
+  },
+  rolePillTag: { 
+    backgroundColor: '#fce7f3', 
+    borderColor: '#f3e8ff' 
+  },
+  domainPillTag: { 
+    backgroundColor: '#fed7aa', 
+    borderColor: '#fdba74' 
+  },
+  goalPillTag: { 
+    backgroundColor: '#bfdbfe', 
+    borderColor: '#93c5fd' 
+  },
+  morePillTag: { 
+    backgroundColor: '#f3f4f6', 
+    borderColor: '#d1d5db' 
+  },
+  pillTagText: { 
+    fontSize: 10, 
+    fontWeight: '500', 
+    color: '#374151' 
+  },
   taskActions: { alignItems: 'center', gap: 8 },
   scoreText: { fontSize: 14, fontWeight: '600', color: '#0078d4' },
   celebrationOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8 },
