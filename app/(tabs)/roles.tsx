@@ -122,7 +122,15 @@ function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCance
                   <View key={note.id} style={taskDetailStyles.noteItem}>
                     <Text style={taskDetailStyles.noteContent}>{note.content}</Text>
                     <Text style={taskDetailStyles.noteDate}>
-                      {new Date(note.created_at).toLocaleDateString()}
+                      {new Date(note.created_at).toLocaleDateString('en-US', { 
+                        day: '2-digit', 
+                        month: 'short', 
+                        year: 'numeric' 
+                      })} ({new Date(note.created_at).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true 
+                      })})
                     </Text>
                   </View>
                 ))}
