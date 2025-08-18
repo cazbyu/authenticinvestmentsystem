@@ -248,8 +248,7 @@ export default function Dashboard() {
         .from('0008-ap-tasks')
         .select('*')
         .eq('user_id', user.id)
-        .neq('status', 'completed')
-        .neq('status', 'cancelled');
+        .not('status', 'in', '(completed,cancelled)');
 
       if (activeView === 'deposits') {
         taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
