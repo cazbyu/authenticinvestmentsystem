@@ -34,7 +34,7 @@ interface TaskCardProps {
 
 // --- TaskCard Component ---
 // Renders a single task item in the list
-export const TaskCard = React.forwardRef<TouchableOpacity, TaskCardProps>(
+export const TaskCard = React.forwardRef<View, TaskCardProps>(
   ({ task, onComplete, onLongPress, onDoublePress, isDragging }, ref) => {
     const [lastTap, setLastTap] = useState(0);
     const celebrationAnim = new Animated.Value(0);
