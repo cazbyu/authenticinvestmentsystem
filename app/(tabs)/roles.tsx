@@ -578,53 +578,48 @@ export default function Roles() {
                 {/* Key Relationships Section */}
                 <View style={styles.krSection}>
                   <Text style={styles.krSectionTitle}>Key Relationships</Text>
-                  {roleKeyRelationships.length === 0 ? (
-                    <TouchableOpacity 
-                      style={styles.addKRButton}
-                      onPress={() => setAddKRModalVisible(true)}
-                    >
-                      <Plus size={20} color="#0078d4" />
-                      <Text style={styles.addKRButtonText}>Add Key Relationships</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <>
-                      <View style={styles.krGrid}>
-                        {roleKeyRelationships.map(kr => {
-                          let imageUrl = null;
-                          if (kr.image_path) {
-                            try {
-                              const supabase = getSupabaseClient();
-                              imageUrl = supabase.storage
-                                .from('0008-key-relationship-images')
-                                .getPublicUrl(kr.image_path).data.publicUrl;
-                            } catch (error) {
-                              console.error('Error loading image URL:', error);
-                            }
+                  
+                  {roleKeyRelationships.length > 0 && (
+                    <View style={styles.krGrid}>
+                      {roleKeyRelationships.map(kr => {
+                        let imageUrl = null;
+                        if (kr.image_path) {
+                          try {
+                            const supabase = getSupabaseClient();
+                            imageUrl = supabase.storage
+                              .from('0008-key-relationship-images')
+                              .getPublicUrl(kr.image_path).data.publicUrl;
+                          } catch (error) {
+                            console.error('Error loading image URL:', error);
                           }
-                          return (
-                            <TouchableOpacity
-                              key={kr.id}
-                              style={styles.krCard}
-                              onPress={() => handleKRPress(kr)}
-                              onLongPress={() => handleEditKR(kr)}
-                            >
-                              <Text style={styles.krCardTitle}>{kr.name}</Text>
-                              {imageUrl && (
-                                <Image source={{ uri: imageUrl }} style={styles.krCardImage} />
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                      <TouchableOpacity 
-                        style={styles.addMoreKRButton}
-                        onPress={() => setAddKRModalVisible(true)}
-                      >
-                        <Plus size={16} color="#0078d4" />
-                        <Text style={styles.addMoreKRButtonText}>Add More</Text>
-                      </TouchableOpacity>
-                    </>
+                        }
+                        return (
+                          <TouchableOpacity
+                            key={kr.id}
+                            style={styles.krCard}
+                            onPress={() => handleKRPress(kr)}
+                            onLongPress={() => handleEditKR(kr)}
+                          >
+                            <Text style={styles.krCardTitle}>{kr.name}</Text>
+                            {imageUrl && (
+                              <Image source={{ uri: imageUrl }} style={styles.krCardImage} />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   )}
+                  
+                  {/* Universal Add Button - always available */}
+                  <TouchableOpacity 
+                    style={roleKeyRelationships.length === 0 ? styles.addKRButton : styles.addMoreKRButton}
+                    onPress={() => setAddKRModalVisible(true)}
+                  >
+                    <Plus size={roleKeyRelationships.length === 0 ? 20 : 16} color="#0078d4" />
+                    <Text style={roleKeyRelationships.length === 0 ? styles.addKRButtonText : styles.addMoreKRButtonText}>
+                      {roleKeyRelationships.length === 0 ? 'Add Key Relationships' : 'Add More'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </ScrollView>
             )}
