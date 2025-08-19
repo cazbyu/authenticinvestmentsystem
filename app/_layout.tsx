@@ -1,7 +1,6 @@
 
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import { useEffect } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
