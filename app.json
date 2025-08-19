@@ -3,13 +3,26 @@
     "name": "bolt-expo-nativewind",
     "slug": "bolt-expo-nativewind",
     "version": "1.0.0",
+    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
+    "jsEngine": "hermes",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.authenticinvestments"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.yourcompany.authenticinvestments"
     },
     "web": {
       "bundler": "metro",
@@ -19,7 +32,14 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with key relationships.",
+          "cameraPermission": "The app accesses your camera to let you take photos for key relationships."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
