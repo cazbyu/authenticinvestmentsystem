@@ -295,11 +295,6 @@ export default function Roles() {
     setEditKRModalVisible(true);
   };
 
-  const handleEditKR = (kr: KeyRelationship) => {
-    setEditingKR(kr);
-    setEditKRModalVisible(true);
-  };
-
   const fetchRoleTasks = async (roleId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
