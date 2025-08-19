@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { SideMenu } from '@/components/SideMenu';
 import '@/lib/calendarLocale';
+import 'react-native-gesture-handler';
+import 'react-native-reanimated';
 
 export default function RootLayout() {
   useFrameworkReady();
