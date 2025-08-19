@@ -19,3 +19,12 @@ export const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUr
     detectSessionInUrl: false,
   },
 }) : null;
+
+export function getSupabaseClient() {
+  if (!supabase) {
+    throw new Error(
+      'Supabase client is not initialized. Check EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.'
+    );
+  }
+  return supabase;
+}

@@ -1,9 +1,23 @@
 import { Redirect } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 export default function Index() {
+  let supabase: SupabaseClient;
+  try {
+    supabase = getSupabaseClient();
+  } catch (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>
+          {error instanceof Error ? error.message : 'Supabase client not available.'}
+        </Text>
+      </View>
+    );
+  }
+
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +43,7 @@ export default function Index() {
     });
 
     return () => subscription?.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   if (loading) {
     return (

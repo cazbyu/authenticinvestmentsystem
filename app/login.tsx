@@ -2,9 +2,25 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export default function LoginScreen() {
+  let supabase: SupabaseClient;
+  try {
+    supabase = getSupabaseClient();
+  } catch (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>
+            {error instanceof Error ? error.message : 'Supabase client not available.'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -223,5 +239,16 @@ const styles = StyleSheet.create({
     color: '#0078d4',
     fontSize: 14,
     fontWeight: '500',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
+    padding: 16,
   },
 });
