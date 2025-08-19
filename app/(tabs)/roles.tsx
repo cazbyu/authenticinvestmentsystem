@@ -640,29 +640,6 @@ export default function Roles() {
                       </View>
                     </TouchableOpacity>
                   ))}
-                    <TouchableOpacity
-                      key={kr.id}
-                      style={[
-                        styles.roleCard,
-                        isTablet ? styles.roleCardTablet : styles.roleCardMobile,
-                        hoveredCard === kr.id && styles.roleCardHovered
-                      ]}
-                      onPress={() => handleKRPress(kr)}
-                      onLongPress={() => handleEditKR(kr)}
-                      onPressIn={() => setHoveredCard(kr.id)}
-                      onPressOut={() => setHoveredCard(null)}
-                    >
-                      <View style={styles.cardContent}>
-                        {kr.image_url && (
-                          <Image source={{ uri: kr.image_url }} style={styles.krMainImage} />
-                        )}
-                        <Text style={styles.roleTitle}>{kr.name}</Text>
-                        <Text style={styles.roleCategory}>
-                          {roles.find(role => role.id === kr.role_id)?.label || 'Key Relationship'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
                 </View>
               </>
             )}
@@ -878,23 +855,6 @@ export default function Roles() {
           </View>
         </View>
       </Modal>
-      
-      {/* Edit KR Modal */}
-      <EditKRModal
-        visible={editKRModalVisible}
-        onClose={() => {
-          setEditKRModalVisible(false);
-          setEditingKR(null);
-        }}
-        onUpdate={() => {
-          fetchKeyRelationships();
-          if (selectedRole) {
-            fetchRoleKeyRelationships(selectedRole.id);
-          }
-        }}
-        keyRelationship={editingKR}
-        roleName={editingKR ? roles.find(r => r.id === editingKR.role_id)?.label : undefined}
-      />
       
       {/* Edit KR Modal */}
       <EditKRModal
