@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Calendar, MessageCircle, Settings, LogOut } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase'; // <-- Import Supabase
+import { getSupabaseClient } from '@/lib/supabase';
 
 const menuItems = [
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
@@ -20,12 +20,18 @@ export function SideMenu() {
 
   // --- ADD THIS FUNCTION ---
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert('Error signing out', error.message);
-    } else {
-      // This will clear the local session and send the user to the login screen
-      router.replace('/login'); 
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        Alert.alert('Error signing out', error.message);
+      } else {
+        // This will clear the local session and send the user to the login screen
+        router.replace('/login');
+      }
+    } catch (error) {
+      console.error('Error signing out:', error);
+      Alert.alert('Error', (error as Error).message);
     }
   };
   // -------------------------

@@ -12,7 +12,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { X, Camera, Upload, Trash2 } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 
 interface EditKRModalProps {
@@ -42,13 +42,20 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
       setName(keyRelationship.name || '');
       setDescription(keyRelationship.description || '');
       setImagePath(keyRelationship.image_path || null);
-      
+
       // Get public URL if image path exists
       if (keyRelationship.image_path) {
-        const { data } = supabase.storage
-          .from('0008-key-relationship-images')
-          .getPublicUrl(keyRelationship.image_path);
-        setImageUrl(data.publicUrl);
+        try {
+          const supabase = getSupabaseClient();
+          const { data } = supabase.storage
+            .from('0008-key-relationship-images')
+            .getPublicUrl(keyRelationship.image_path);
+          setImageUrl(data.publicUrl);
+        } catch (error) {
+          console.error('Error loading image URL:', error);
+          Alert.alert('Error', (error as Error).message);
+          setImageUrl(null);
+        }
       } else {
         setImageUrl(null);
       }
@@ -110,7 +117,8 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
   const uploadImage = async (uri: string) => {
     try {
       setUploading(true);
-      
+
+      const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
@@ -156,6 +164,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
   const removeImage = async () => {
     try {
+      const supabase = getSupabaseClient();
       if (imagePath) {
         // Delete from storage
         const { error } = await supabase.storage
@@ -164,7 +173,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
         if (error) console.error('Error deleting image:', error);
       }
-      
+
       setImagePath(null);
       setImageUrl(null);
     } catch (error) {
@@ -177,7 +186,8 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
     try {
       setSaving(true);
-      
+
+      const supabase = getSupabaseClient();
       const { error } = await supabase
         .from('0008-ap-key-relationships')
         .update({
@@ -195,7 +205,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
       onClose();
     } catch (error) {
       console.error('Error updating key relationship:', error);
-      Alert.alert('Error', 'Failed to update key relationship');
+      Alert.alert('Error', (error as Error).message || 'Failed to update key relationship');
     } finally {
       setSaving(false);
     }
@@ -220,6 +230,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
               }
 
               // Delete from database
+              const supabase = getSupabaseClient();
               const { error } = await supabase
                 .from('0008-ap-key-relationships')
                 .delete()
@@ -232,7 +243,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
               onClose();
             } catch (error) {
               console.error('Error deleting key relationship:', error);
-              Alert.alert('Error', 'Failed to delete key relationship');
+              Alert.alert('Error', (error as Error).message || 'Failed to delete key relationship');
             }
           }
         }

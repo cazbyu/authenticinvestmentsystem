@@ -8,7 +8,7 @@ import { AddItemModal } from '@/components/AddItemModal';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
 import { Animated } from 'react-native';
 
@@ -27,9 +27,10 @@ function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCance
 
   const fetchTaskNotes = async () => {
     if (!task?.id) return;
-    
+
     setLoadingNotes(true);
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('0008-ap-universal-notes-join')
         .select(`
@@ -43,11 +44,12 @@ function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCance
         .eq('parent_type', 'task');
 
       if (error) throw error;
-      
+
       const notes = data?.map(item => item.note).filter(Boolean) || [];
       setTaskNotes(notes);
     } catch (error) {
       console.error('Error fetching task notes:', error);
+      Alert.alert('Error', (error as Error).message);
     } finally {
       setLoadingNotes(false);
     }
@@ -234,40 +236,53 @@ export default function Roles() {
 
   const fetchActiveRoles = async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-    const { data, error } = await supabase
-      .from('0008-ap-roles')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true);
+      const { data, error } = await supabase
+        .from('0008-ap-roles')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching active roles:', error);
+        Alert.alert('Error', (error as Error).message);
+      } else {
+        setRoles(data || []);
+      }
+    } catch (error) {
       console.error('Error fetching active roles:', error);
-      console.log("Error", "Could not fetch roles. Please check your connection and database policies.");
-    } else {
-      setRoles(data || []);
+      Alert.alert('Error', (error as Error).message);
     }
     setLoading(false);
   };
 
   const fetchKeyRelationships = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data, error } = await supabase
-      .from('0008-ap-key-relationships')
-      .select('*')
-      .eq('user_id', user.id);
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .select('*')
+        .eq('user_id', user.id);
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching key relationships:', error);
+        Alert.alert('Error', (error as Error).message);
+      } else {
+        setKeyRelationships(data || []);
+      }
+    } catch (error) {
       console.error('Error fetching key relationships:', error);
-    } else {
-      setKeyRelationships(data || []);
+      Alert.alert('Error', (error as Error).message);
     }
   };
 
@@ -296,189 +311,215 @@ export default function Roles() {
   };
 
   const fetchRoleTasks = async (roleId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    let taskQuery = supabase
-      .from('0008-ap-tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .not('status', 'in', '(completed,cancelled)');
+      let taskQuery = supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .not('status', 'in', '(completed,cancelled)');
 
-    if (activeView === 'deposits') {
-      taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-    } else {
-      taskQuery = taskQuery.eq('deposit_idea', true);
+      if (activeView === 'deposits') {
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
+      } else {
+        taskQuery = taskQuery.eq('deposit_idea', true);
+      }
+
+      const { data: tasksData, error: tasksError } = await taskQuery;
+      if (tasksError) throw tasksError;
+
+      if (!tasksData || tasksData.length === 0) {
+        setRoleTasks([]);
+        return;
+      }
+
+      const taskIds = tasksData.map(t => t.id);
+
+      const [
+        { data: rolesData, error: rolesError },
+        { data: domainsData, error: domainsError },
+        { data: goalsData, error: goalsError },
+        { data: notesData, error: notesError },
+        { data: delegatesData, error: delegatesError }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
+      ]);
+
+      if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (goalsError) throw goalsError;
+      if (notesError) throw notesError;
+      if (delegatesError) throw delegatesError;
+
+      const transformedTasks = tasksData.map(task => ({
+        ...task,
+        roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+        domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+        goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+        has_notes: notesData?.some(n => n.parent_id === task.id),
+        has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+        has_attachments: false,
+      }));
+
+      // Filter tasks that belong to this specific role
+      const roleSpecificTasks = transformedTasks.filter(task =>
+        task.roles.some(role => role.id === roleId)
+      );
+
+      setRoleTasks(roleSpecificTasks);
+    } catch (error) {
+      console.error('Error fetching role tasks:', error);
+      Alert.alert('Error', (error as Error).message);
     }
-
-    const { data: tasksData, error: tasksError } = await taskQuery;
-    if (tasksError) {
-      console.error('Error fetching role tasks:', tasksError);
-      return;
-    }
-
-    if (!tasksData || tasksData.length === 0) {
-      setRoleTasks([]);
-      return;
-    }
-
-    const taskIds = tasksData.map(t => t.id);
-
-    const [
-      { data: rolesData, error: rolesError },
-      { data: domainsData, error: domainsError },
-      { data: goalsData, error: goalsError },
-      { data: notesData, error: notesError },
-      { data: delegatesData, error: delegatesError }
-    ] = await Promise.all([
-      supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
-    ]);
-
-    const transformedTasks = tasksData.map(task => ({
-      ...task,
-      roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-      domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-      goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
-      has_notes: notesData?.some(n => n.parent_id === task.id),
-      has_delegates: delegatesData?.some(d => d.parent_id === task.id),
-      has_attachments: false,
-    }));
-
-    // Filter tasks that belong to this specific role
-    const roleSpecificTasks = transformedTasks.filter(task => 
-      task.roles.some(role => role.id === roleId)
-    );
-
-    setRoleTasks(roleSpecificTasks);
   };
 
   const fetchRoleKeyRelationships = async (roleId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data, error } = await supabase
-      .from('0008-ap-key-relationships')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('role_id', roleId);
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('role_id', roleId);
 
-    if (error) {
-      console.error('Error fetching role key relationships:', error);
-    } else {
+      if (error) throw error;
       setRoleKeyRelationships(data || []);
+    } catch (error) {
+      console.error('Error fetching role key relationships:', error);
+      Alert.alert('Error', (error as Error).message);
     }
   };
 
   const handleAddKeyRelationship = async () => {
     if (!newKRName.trim() || !selectedRole) return;
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .insert({
+          name: newKRName.trim(),
+          role_id: selectedRole.id,
+          user_id: user.id
+        })
+        .select()
+        .single();
 
-    const { data, error } = await supabase
-      .from('0008-ap-key-relationships')
-      .insert({
-        name: newKRName.trim(),
-        role_id: selectedRole.id,
-        user_id: user.id
-      })
-      .select()
-      .single();
+      if (error) throw error;
 
-    if (error) {
-      console.error('Error adding key relationship:', error);
-      Alert.alert('Error', 'Failed to add key relationship');
-    } else {
       setNewKRName('');
       setAddKRModalVisible(false);
       await fetchRoleKeyRelationships(selectedRole.id);
-      await fetchKeyRelationships(); // Refresh main KR list
+      await fetchKeyRelationships();
+    } catch (error) {
+      console.error('Error adding key relationship:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to add key relationship');
     }
   };
 
   const fetchKRTasks = async (krId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    let taskQuery = supabase
-      .from('0008-ap-tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .not('status', 'in', '(completed,cancelled)');
+      let taskQuery = supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .not('status', 'in', '(completed,cancelled)');
 
-    if (activeView === 'deposits') {
-      taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-    } else {
-      taskQuery = taskQuery.eq('deposit_idea', true);
+      if (activeView === 'deposits') {
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
+      } else {
+        taskQuery = taskQuery.eq('deposit_idea', true);
+      }
+
+      const { data: tasksData, error: tasksError } = await taskQuery;
+      if (tasksError) throw tasksError;
+
+      if (!tasksData || tasksData.length === 0) {
+        setKrTasks([]);
+        return;
+      }
+
+      const taskIds = tasksData.map(t => t.id);
+
+      const [
+        { data: rolesData, error: rolesError },
+        { data: domainsData, error: domainsError },
+        { data: goalsData, error: goalsError },
+        { data: notesData, error: notesError },
+        { data: delegatesData, error: delegatesError },
+        { data: krData, error: krError }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
+        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds),
+      ]);
+
+      if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (goalsError) throw goalsError;
+      if (notesError) throw notesError;
+      if (delegatesError) throw delegatesError;
+      if (krError) throw krError;
+
+      const transformedTasks = tasksData.map(task => ({
+        ...task,
+        roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+        domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+        goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+        keyRelationships: krData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+        has_notes: notesData?.some(n => n.parent_id === task.id),
+        has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+        has_attachments: false,
+      }));
+
+      // Filter tasks that belong to this specific key relationship
+      const krSpecificTasks = transformedTasks.filter(task =>
+        task.keyRelationships?.some(kr => kr.id === krId)
+      );
+
+      setKrTasks(krSpecificTasks);
+    } catch (error) {
+      console.error('Error fetching KR tasks:', error);
+      Alert.alert('Error', (error as Error).message);
     }
-
-    const { data: tasksData, error: tasksError } = await taskQuery;
-    if (tasksError) {
-      console.error('Error fetching KR tasks:', tasksError);
-      return;
-    }
-
-    if (!tasksData || tasksData.length === 0) {
-      setKrTasks([]);
-      return;
-    }
-
-    const taskIds = tasksData.map(t => t.id);
-
-    const [
-      { data: rolesData, error: rolesError },
-      { data: domainsData, error: domainsError },
-      { data: goalsData, error: goalsError },
-      { data: notesData, error: notesError },
-      { data: delegatesData, error: delegatesError },
-      { data: krData, error: krError }
-    ] = await Promise.all([
-      supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
-      supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds),
-    ]);
-
-    const transformedTasks = tasksData.map(task => ({
-      ...task,
-      roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-      domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-      goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
-      keyRelationships: krData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
-      has_notes: notesData?.some(n => n.parent_id === task.id),
-      has_delegates: delegatesData?.some(d => d.parent_id === task.id),
-      has_attachments: false,
-    }));
-
-    // Filter tasks that belong to this specific key relationship
-    const krSpecificTasks = transformedTasks.filter(task => 
-      task.keyRelationships?.some(kr => kr.id === krId)
-    );
-
-    setKrTasks(krSpecificTasks);
   };
 
   const handleCompleteTask = async (taskId: string) => {
-    const { error } = await supabase.from('0008-ap-tasks').update({ 
-      status: 'completed', 
-      completed_at: new Date().toISOString() 
-    }).eq('id', taskId);
-    
-    if (error) {
-      console.log('Error', 'Failed to complete task.');
-    } else {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('0008-ap-tasks').update({
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      }).eq('id', taskId);
+
+      if (error) throw error;
       if (selectedRole) {
         await fetchRoleTasks(selectedRole.id);
       }
       if (selectedKR) {
         await fetchKRTasks(selectedKR.id);
       }
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to complete task.');
     }
   };
 
@@ -500,14 +541,14 @@ export default function Roles() {
   };
 
   const handleCancelTask = async (task: Task) => {
-    const { error } = await supabase.from('0008-ap-tasks').update({ 
-      status: 'cancelled' 
-    }).eq('id', task.id);
-    
-    if (error) {
-      console.log('Error', 'Failed to cancel task.');
-    } else {
-      console.log('Success', 'Task has been cancelled');
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('0008-ap-tasks').update({
+        status: 'cancelled'
+      }).eq('id', task.id);
+
+      if (error) throw error;
+      Alert.alert('Success', 'Task has been cancelled');
       setIsDetailModalVisible(false);
       if (selectedRole) {
         await fetchRoleTasks(selectedRole.id);
@@ -515,6 +556,8 @@ export default function Roles() {
       if (selectedKR) {
         await fetchKRTasks(selectedKR.id);
       }
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to cancel task.');
     }
   };
 
@@ -542,14 +585,19 @@ export default function Roles() {
   const renderKRCard = (kr: KeyRelationship) => {
     // Find the role this KR belongs to
     const parentRole = roles.find(role => role.id === kr.role_id);
-    
+
     // Get image URL if image_path exists
     let imageUrl = null;
     if (kr.image_path) {
-      const { data } = supabase.storage
-        .from('0008-key-relationship-images')
-        .getPublicUrl(kr.image_path);
-      imageUrl = data.publicUrl;
+      try {
+        const supabase = getSupabaseClient();
+        const { data } = supabase.storage
+          .from('0008-key-relationship-images')
+          .getPublicUrl(kr.image_path);
+        imageUrl = data.publicUrl;
+      } catch (error) {
+        console.error('Error loading image URL:', error);
+      }
     }
     
     return (
@@ -616,30 +664,44 @@ export default function Roles() {
                   styles.rolesGrid,
                   isTablet ? styles.rolesGridTablet : styles.rolesGridMobile
                 ]}>
-                  {keyRelationships.map(kr => (
-                    <TouchableOpacity
-                      key={kr.id}
-                      style={[
-                        styles.roleCard,
-                        isTablet ? styles.roleCardTablet : styles.roleCardMobile,
-                        hoveredCard === kr.id && styles.roleCardHovered
-                      ]}
-                      onPress={() => handleKRPress(kr)}
-                      onLongPress={() => handleEditKR(kr)}
-                      onPressIn={() => setHoveredCard(kr.id)}
-                      onPressOut={() => setHoveredCard(null)}
-                    >
-                      <View style={styles.cardContent}>
-                        {kr.image_path && (
-                          <Image source={{ uri: supabase.storage.from('0008-key-relationship-images').getPublicUrl(kr.image_path).data.publicUrl }} style={styles.krMainImage} />
-                        )}
-                        <Text style={styles.roleTitle}>{kr.name}</Text>
-                        <Text style={styles.roleCategory}>
-                          {roles.find(role => role.id === kr.role_id)?.label || 'Key Relationship'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  {keyRelationships.map(kr => {
+                    let imageUrl = null;
+                    if (kr.image_path) {
+                      try {
+                        const supabase = getSupabaseClient();
+                        imageUrl = supabase.storage
+                          .from('0008-key-relationship-images')
+                          .getPublicUrl(kr.image_path).data.publicUrl;
+                      } catch (error) {
+                        console.error('Error loading image URL:', error);
+                      }
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={kr.id}
+                        style={[
+                          styles.roleCard,
+                          isTablet ? styles.roleCardTablet : styles.roleCardMobile,
+                          hoveredCard === kr.id && styles.roleCardHovered
+                        ]}
+                        onPress={() => handleKRPress(kr)}
+                        onLongPress={() => handleEditKR(kr)}
+                        onPressIn={() => setHoveredCard(kr.id)}
+                        onPressOut={() => setHoveredCard(null)}
+                      >
+                        <View style={styles.cardContent}>
+                          {imageUrl && (
+                            <Image source={{ uri: imageUrl }} style={styles.krMainImage} />
+                          )}
+                          <Text style={styles.roleTitle}>{kr.name}</Text>
+                          <Text style={styles.roleCategory}>
+                            {roles.find(role => role.id === kr.role_id)?.label || 'Key Relationship'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </>
             )}
@@ -696,20 +758,32 @@ export default function Roles() {
                   ) : (
                     <>
                       <View style={styles.krGrid}>
-                        {roleKeyRelationships.map(kr => (
-                          <TouchableOpacity
-                            key={kr.id}
-                            style={styles.krCard}
-                            onPress={() => handleKRPress(kr)}
-                            onLongPress={() => handleEditKR(kr)}
-                            onLongPress={() => handleEditKR(kr)}
-                          >
-                            <Text style={styles.krCardTitle}>{kr.name}</Text>
-                            {kr.image_path && (
-                              <Image source={{ uri: supabase.storage.from('0008-key-relationship-images').getPublicUrl(kr.image_path).data.publicUrl }} style={styles.krCardImage} />
-                            )}
-                          </TouchableOpacity>
-                        ))}
+                        {roleKeyRelationships.map(kr => {
+                          let imageUrl = null;
+                          if (kr.image_path) {
+                            try {
+                              const supabase = getSupabaseClient();
+                              imageUrl = supabase.storage
+                                .from('0008-key-relationship-images')
+                                .getPublicUrl(kr.image_path).data.publicUrl;
+                            } catch (error) {
+                              console.error('Error loading image URL:', error);
+                            }
+                          }
+                          return (
+                            <TouchableOpacity
+                              key={kr.id}
+                              style={styles.krCard}
+                              onPress={() => handleKRPress(kr)}
+                              onLongPress={() => handleEditKR(kr)}
+                            >
+                              <Text style={styles.krCardTitle}>{kr.name}</Text>
+                              {imageUrl && (
+                                <Image source={{ uri: imageUrl }} style={styles.krCardImage} />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
                       </View>
                       <TouchableOpacity 
                         style={styles.addMoreKRButton}

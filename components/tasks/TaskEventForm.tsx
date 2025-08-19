@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Modal, FlatList } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { X } from 'lucide-react-native';
 
 // TYPE DEFINITIONS
@@ -131,18 +131,24 @@ const toDateString = (date: Date) => {
 
   useEffect(() => {
     const fetchOptions = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const supabase = getSupabaseClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-        const { data: roleData } = await supabase.from("0008-ap-roles").select("id,label").eq("user_id", user.id).eq("is_active", true);
-      const { data: domainData } = await supabase.from("0007-ap-domains").select("id,name");
-        const { data: krData } = await supabase.from("0008-ap-key-relationships").select("id,name,role_id").eq("user_id", user.id);
-        const { data: goalData } = await supabase.from("0008-ap-goals-12wk").select("id,title").eq("user_id", user.id).eq("status", "active");
+        const { data: roleData } = await supabase.from('0008-ap-roles').select('id,label').eq('user_id', user.id).eq('is_active', true);
+        const { data: domainData } = await supabase.from('0007-ap-domains').select('id,name');
+        const { data: krData } = await supabase.from('0008-ap-key-relationships').select('id,name,role_id').eq('user_id', user.id);
+        const { data: goalData } = await supabase.from('0008-ap-goals-12wk').select('id,title').eq('user_id', user.id).eq('status', 'active');
 
-      setRoles(roleData || []);
-      setDomains(domainData || []);
-      setKeyRelationships(krData || []);
-      setTwelveWeekGoals(goalData || []);
+        setRoles(roleData || []);
+        setDomains(domainData || []);
+        setKeyRelationships(krData || []);
+        setTwelveWeekGoals(goalData || []);
+      } catch (error) {
+        console.error('Error fetching options:', error);
+        Alert.alert('Error', (error as Error).message || 'Failed to load options');
+      }
     };
     fetchOptions();
   }, []);
@@ -219,6 +225,7 @@ const toDateString = (date: Date) => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
+        const supabase = getSupabaseClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not found");
 
@@ -299,7 +306,7 @@ const taskId = taskData.id;
 
     } catch (error) {
         console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} task:`, error);
-        Alert.alert('Error', `Failed to ${mode === 'edit' ? 'update' : 'create'} task`);
+        Alert.alert('Error', (error as Error).message || `Failed to ${mode === 'edit' ? 'update' : 'create'} task`);
     } finally {
         setLoading(false);
     }
