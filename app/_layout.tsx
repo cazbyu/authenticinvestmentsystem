@@ -1,5 +1,4 @@
 
-console.log("ENTRY: file loaded");
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
@@ -8,6 +7,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { SideMenu } from '@/components/SideMenu';
 import '@/lib/calendarLocale';
+
+console.log('ENTRY: file loaded');
 
 export default function RootLayout() {
   useFrameworkReady();
