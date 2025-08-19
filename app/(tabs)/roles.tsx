@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { CreditCard as Edit, UserX, Plus, X, Ban } from 'lucide-react-native';
@@ -208,6 +208,9 @@ export default function Roles() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [roleTasks, setRoleTasks] = useState<Task[]>([]);
   const [krTasks, setKrTasks] = useState<Task[]>([]);
+  const [roleKeyRelationships, setRoleKeyRelationships] = useState<KeyRelationship[]>([]);
+  const [addKRModalVisible, setAddKRModalVisible] = useState(false);
+  const [newKRName, setNewKRName] = useState('');
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -272,6 +275,7 @@ export default function Roles() {
   const handleRolePress = async (role: Role) => {
     setSelectedRole(role);
     await fetchRoleTasks(role.id);
+    await fetchRoleKeyRelationships(role.id);
     setRoleAccountVisible(true);
   };
 
@@ -340,6 +344,50 @@ export default function Roles() {
     );
 
     setRoleTasks(roleSpecificTasks);
+  };
+
+  const fetchRoleKeyRelationships = async (roleId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('0008-ap-key-relationships')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('role_id', roleId);
+
+    if (error) {
+      console.error('Error fetching role key relationships:', error);
+    } else {
+      setRoleKeyRelationships(data || []);
+    }
+  };
+
+  const handleAddKeyRelationship = async () => {
+    if (!newKRName.trim() || !selectedRole) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('0008-ap-key-relationships')
+      .insert({
+        name: newKRName.trim(),
+        role_id: selectedRole.id,
+        user_id: user.id
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding key relationship:', error);
+      Alert.alert('Error', 'Failed to add key relationship');
+    } else {
+      setNewKRName('');
+      setAddKRModalVisible(false);
+      await fetchRoleKeyRelationships(selectedRole.id);
+      await fetchKeyRelationships(); // Refresh main KR list
+    }
   };
 
   const fetchKRTasks = async (krId: string) => {
@@ -576,14 +624,52 @@ export default function Roles() {
               </View>
             ) : (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
-                {roleTasks.map(task => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onComplete={handleCompleteTask}
-                    onDoublePress={handleTaskDoublePress}
-                  />
-                ))}
+                {/* Active Tasks Section */}
+                <View style={styles.tasksSection}>
+                  {roleTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onComplete={handleCompleteTask}
+                      onDoublePress={handleTaskDoublePress}
+                    />
+                  ))}
+                </View>
+
+                {/* Key Relationships Section */}
+                <View style={styles.krSection}>
+                  <Text style={styles.krSectionTitle}>Key Relationships</Text>
+                  {roleKeyRelationships.length === 0 ? (
+                    <TouchableOpacity 
+                      style={styles.addKRButton}
+                      onPress={() => setAddKRModalVisible(true)}
+                    >
+                      <Plus size={20} color="#0078d4" />
+                      <Text style={styles.addKRButtonText}>Add Key Relationships</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <>
+                      <View style={styles.krGrid}>
+                        {roleKeyRelationships.map(kr => (
+                          <TouchableOpacity
+                            key={kr.id}
+                            style={styles.krCard}
+                            onPress={() => handleKRPress(kr)}
+                          >
+                            <Text style={styles.krCardTitle}>{kr.name}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.addMoreKRButton}
+                        onPress={() => setAddKRModalVisible(true)}
+                      >
+                        <Plus size={16} color="#0078d4" />
+                        <Text style={styles.addMoreKRButtonText}>Add More</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </ScrollView>
             )}
             
@@ -669,6 +755,55 @@ export default function Roles() {
             setEditingTask(null);
           }}
         />
+      </Modal>
+      
+      {/* Add Key Relationship Modal */}
+      <Modal visible={addKRModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.addKRModalContent}>
+            <View style={styles.addKRModalHeader}>
+              <Text style={styles.addKRModalTitle}>Add Key Relationship</Text>
+              <TouchableOpacity onPress={() => {
+                setAddKRModalVisible(false);
+                setNewKRName('');
+              }}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.addKRModalBody}>
+              <Text style={styles.addKRLabel}>
+                Add a key relationship for {selectedRole?.label}:
+              </Text>
+              <TextInput
+                style={styles.addKRInput}
+                placeholder="Enter relationship name (e.g., 'John Smith', 'My Manager')"
+                value={newKRName}
+                onChangeText={setNewKRName}
+                autoFocus
+              />
+            </View>
+            
+            <View style={styles.addKRModalActions}>
+              <TouchableOpacity 
+                style={styles.addKRCancelButton}
+                onPress={() => {
+                  setAddKRModalVisible(false);
+                  setNewKRName('');
+                }}
+              >
+                <Text style={styles.addKRCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.addKRSaveButton, !newKRName.trim() && styles.addKRSaveButtonDisabled]}
+                onPress={handleAddKeyRelationship}
+                disabled={!newKRName.trim()}
+              >
+                <Text style={styles.addKRSaveButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
       
       <AddItemModal
@@ -795,6 +930,164 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  
+  // Key Relationships Section Styles
+  tasksSection: {
+    marginBottom: 32,
+  },
+  krSection: {
+    marginBottom: 32,
+  },
+  krSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  addKRButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 2,
+    borderColor: '#0078d4',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 20,
+    gap: 8,
+  },
+  addKRButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0078d4',
+  },
+  krGrid: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  krCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  krCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
+  },
+  addMoreKRButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 8,
+    padding: 12,
+    gap: 6,
+  },
+  addMoreKRButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0078d4',
+  },
+  
+  // Add KR Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  addKRModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  addKRModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  addKRModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  addKRModalBody: {
+    padding: 20,
+  },
+  addKRLabel: {
+    fontSize: 16,
+    color: '#374151',
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  addKRInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+  },
+  addKRModalActions: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  addKRCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+  },
+  addKRCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  addKRSaveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#0078d4',
+    alignItems: 'center',
+  },
+  addKRSaveButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  addKRSaveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
 
