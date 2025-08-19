@@ -61,7 +61,7 @@ export default function Roles() {
   useEffect(() => {
     if (isFocused) {
       fetchActiveRoles();
-      fetchKeyRelationships();
+      fetchAllKeyRelationships();
     }
   }, [isFocused]);
 
@@ -94,7 +94,7 @@ export default function Roles() {
     setLoading(false);
   };
 
-  const fetchKeyRelationships = async () => {
+  const fetchAllKeyRelationships = async () => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -253,7 +253,7 @@ export default function Roles() {
       setNewKRName('');
       setAddKRModalVisible(false);
       await fetchRoleKeyRelationships(selectedRole.id);
-      await fetchKeyRelationships();
+      await fetchAllKeyRelationships();
     } catch (error) {
       console.error('Error adding key relationship:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to add key relationship');
@@ -495,7 +495,9 @@ export default function Roles() {
                   styles.rolesGrid,
                   isTablet ? styles.rolesGridTablet : styles.rolesGridMobile
                 ]}>
-                  {keyRelationships.map(kr => {
+                  {keyRelationships.filter(kr => 
+                    roles.some(role => role.id === kr.role_id)
+                  ).map(kr => {
                     let imageUrl = null;
                     if (kr.image_path) {
                       try {
@@ -772,7 +774,7 @@ export default function Roles() {
           setEditingKR(null);
         }}
         onUpdate={() => {
-          fetchKeyRelationships();
+          fetchAllKeyRelationships();
           if (selectedRole) {
             fetchRoleKeyRelationships(selectedRole.id);
           }
