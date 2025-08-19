@@ -7,7 +7,6 @@ import { Header } from '@/components/Header';
 import { AddItemModal } from '@/components/AddItemModal';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { EditKRModal } from '@/components/settings/EditKRModal';
-import { EditKRModal } from '@/components/settings/EditKRModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { supabase } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
