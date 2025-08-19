@@ -18,14 +18,3 @@ module.exports = function(api) {
     ],
   };
 };
-
-      },
-      extensions: ['.js', '.jsx', '.ts', '.tsx'],
-    },
-  ],
-  require.resolve('expo-router/babel'),
-  // This plugin MUST be listed last.
-  'react-native-reanimated/plugin'
-],
-  };
-};
