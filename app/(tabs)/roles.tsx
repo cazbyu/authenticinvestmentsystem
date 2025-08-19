@@ -189,19 +189,30 @@ interface Role {
   is_active: boolean;
 }
 
+interface KeyRelationship {
+  id: string;
+  name: string;
+  role_id: string;
+  user_id: string;
+}
+
 export default function Roles() {
   const [modalVisible, setModalVisible] = useState(false);
   const [roleAccountVisible, setRoleAccountVisible] = useState(false);
+  const [krAccountVisible, setKrAccountVisible] = useState(false);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [selectedKR, setSelectedKR] = useState<KeyRelationship | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [roleTasks, setRoleTasks] = useState<Task[]>([]);
+  const [krTasks, setKrTasks] = useState<Task[]>([]);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
   const [loading, setLoading] = useState(true);
   const isFocused = useIsFocused();
   const router = useRouter();
@@ -209,6 +220,7 @@ export default function Roles() {
   useEffect(() => {
     if (isFocused) {
       fetchActiveRoles();
+      fetchKeyRelationships();
     }
   }, [isFocused]);
 
@@ -235,6 +247,22 @@ export default function Roles() {
     setLoading(false);
   };
 
+  const fetchKeyRelationships = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('0008-ap-key-relationships')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error fetching key relationships:', error);
+    } else {
+      setKeyRelationships(data || []);
+    }
+  };
+
   const handleAddRole = (data: any) => {
     console.log('Adding new role:', data);
     setModalVisible(false);
@@ -245,6 +273,12 @@ export default function Roles() {
     setSelectedRole(role);
     await fetchRoleTasks(role.id);
     setRoleAccountVisible(true);
+  };
+
+  const handleKRPress = async (kr: KeyRelationship) => {
+    setSelectedKR(kr);
+    await fetchKRTasks(kr.id);
+    setKrAccountVisible(true);
   };
 
   const fetchRoleTasks = async (roleId: string) => {
@@ -308,6 +342,70 @@ export default function Roles() {
     setRoleTasks(roleSpecificTasks);
   };
 
+  const fetchKRTasks = async (krId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    let taskQuery = supabase
+      .from('0008-ap-tasks')
+      .select('*')
+      .eq('user_id', user.id)
+      .not('status', 'in', '(completed,cancelled)');
+
+    if (activeView === 'deposits') {
+      taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
+    } else {
+      taskQuery = taskQuery.eq('deposit_idea', true);
+    }
+
+    const { data: tasksData, error: tasksError } = await taskQuery;
+    if (tasksError) {
+      console.error('Error fetching KR tasks:', tasksError);
+      return;
+    }
+
+    if (!tasksData || tasksData.length === 0) {
+      setKrTasks([]);
+      return;
+    }
+
+    const taskIds = tasksData.map(t => t.id);
+
+    const [
+      { data: rolesData, error: rolesError },
+      { data: domainsData, error: domainsError },
+      { data: goalsData, error: goalsError },
+      { data: notesData, error: notesError },
+      { data: delegatesData, error: delegatesError },
+      { data: krData, error: krError }
+    ] = await Promise.all([
+      supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
+      supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
+      supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
+      supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
+      supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
+      supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds),
+    ]);
+
+    const transformedTasks = tasksData.map(task => ({
+      ...task,
+      roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+      domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+      goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+      keyRelationships: krData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+      has_notes: notesData?.some(n => n.parent_id === task.id),
+      has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+      has_attachments: false,
+    }));
+
+    // Filter tasks that belong to this specific key relationship
+    const krSpecificTasks = transformedTasks.filter(task => 
+      task.keyRelationships?.some(kr => kr.id === krId)
+    );
+
+    setKrTasks(krSpecificTasks);
+  };
+
   const handleCompleteTask = async (taskId: string) => {
     const { error } = await supabase.from('0008-ap-tasks').update({ 
       status: 'completed', 
@@ -319,6 +417,9 @@ export default function Roles() {
     } else {
       if (selectedRole) {
         await fetchRoleTasks(selectedRole.id);
+      }
+      if (selectedKR) {
+        await fetchKRTasks(selectedKR.id);
       }
     }
   };
@@ -353,6 +454,9 @@ export default function Roles() {
       if (selectedRole) {
         await fetchRoleTasks(selectedRole.id);
       }
+      if (selectedKR) {
+        await fetchKRTasks(selectedKR.id);
+      }
     }
   };
 
@@ -372,6 +476,30 @@ export default function Roles() {
         <View style={styles.cardContent}>
           <Text style={styles.roleTitle}>{role.label}</Text>
           <Text style={styles.roleCategory}>{role.category || 'Custom'}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderKRCard = (kr: KeyRelationship) => {
+    // Find the role this KR belongs to
+    const parentRole = roles.find(role => role.id === kr.role_id);
+    
+    return (
+      <TouchableOpacity
+        key={kr.id}
+        style={[
+          styles.roleCard,
+          isTablet ? styles.roleCardTablet : styles.roleCardMobile,
+          hoveredCard === kr.id && styles.roleCardHovered
+        ]}
+        onPress={() => handleKRPress(kr)}
+        onPressIn={() => setHoveredCard(kr.id)}
+        onPressOut={() => setHoveredCard(null)}
+      >
+        <View style={styles.cardContent}>
+          <Text style={styles.roleTitle}>{kr.name}</Text>
+          <Text style={styles.roleCategory}>{parentRole?.label || 'Key Relationship'}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -401,12 +529,26 @@ export default function Roles() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={true}
           >
+            {/* Roles Section */}
             <View style={[
               styles.rolesGrid,
               isTablet ? styles.rolesGridTablet : styles.rolesGridMobile
             ]}>
               {roles.map(renderRoleCard)}
             </View>
+            
+            {/* Key Relationships Section */}
+            {keyRelationships.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Key Relationships:</Text>
+                <View style={[
+                  styles.rolesGrid,
+                  isTablet ? styles.rolesGridTablet : styles.rolesGridMobile
+                ]}>
+                  {keyRelationships.map(renderKRCard)}
+                </View>
+              </>
+            )}
           </ScrollView>
         )}
       </View>
@@ -455,6 +597,50 @@ export default function Roles() {
         </SafeAreaView>
       </Modal>
       
+      {/* Key Relationship Account Modal */}
+      <Modal visible={krAccountVisible} animationType="slide" presentationStyle="fullScreen">
+        <SafeAreaView style={styles.container}>
+          <Header 
+            title={selectedKR?.name || 'Key Relationship'}
+            activeView={activeView}
+            onViewChange={(view) => {
+              setActiveView(view);
+              if (selectedKR) fetchKRTasks(selectedKR.id);
+            }}
+            onSortPress={handleSortPress}
+            onBackPress={() => setKrAccountVisible(false)}
+          />
+          
+          <View style={styles.content}>
+            {krTasks.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  No {activeView} currently associated with this Key Relationship
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
+                {krTasks.map(task => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onComplete={handleCompleteTask}
+                    onDoublePress={handleTaskDoublePress}
+                  />
+                ))}
+              </ScrollView>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.fab} 
+              onPress={() => setTaskFormVisible(true)}
+            >
+              <Plus size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+      
       {/* Task Detail Modal */}
       <Modal visible={isDetailModalVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskDetailModal 
@@ -476,6 +662,7 @@ export default function Roles() {
             setTaskFormVisible(false);
             setEditingTask(null);
             if (selectedRole) fetchRoleTasks(selectedRole.id);
+            if (selectedKR) fetchKRTasks(selectedKR.id);
           }}
           onClose={() => {
             setTaskFormVisible(false);
@@ -525,6 +712,14 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginTop: 32,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   rolesGrid: {
     gap: 16,
