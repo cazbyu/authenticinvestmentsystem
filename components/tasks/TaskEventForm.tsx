@@ -473,7 +473,26 @@ const taskId = taskData.id;
             </View>
 
             {filteredKeyRelationships.length > 0 && (
-                <><Text style={styles.sectionTitle}>Key Relationships</Text><View style={styles.selectionGrid}>{filteredKeyRelationships.map(kr => (<TouchableOpacity key={kr.id} style={[styles.chip, formData.selectedKeyRelationshipIds.includes(kr.id) && styles.chipSelected]} onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}><Text style={formData.selectedKeyRelationshipIds.includes(kr.id) ? styles.chipTextSelected : styles.chipText}>{kr.name}</Text></TouchableOpacity>))}</View></>
+              <>
+                <Text style={styles.sectionTitle}>Key Relationships</Text>
+                <View style={styles.checkboxGrid}>
+                  {filteredKeyRelationships.map(kr => {
+                    const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
+                    return (
+                      <TouchableOpacity
+                        key={kr.id}
+                        style={styles.checkItem}
+                        onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkLabel}>{kr.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
             )}
 
             <Text style={styles.sectionTitle}>Domains</Text>
