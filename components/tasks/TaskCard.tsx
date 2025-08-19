@@ -29,12 +29,13 @@ interface TaskCardProps {
   onComplete: (taskId: string) => void;
   onLongPress?: () => void;
   onDoublePress?: (task: Task) => void;
+  isDragging?: boolean;
 }
 
 // --- TaskCard Component ---
 // Renders a single task item in the list
 export const TaskCard = React.forwardRef<TouchableOpacity, TaskCardProps>(
-  ({ task, onComplete, onLongPress, onDoublePress }, ref) => {
+  ({ task, onComplete, onLongPress, onDoublePress, isDragging }, ref) => {
     const [lastTap, setLastTap] = useState(0);
     const celebrationAnim = new Animated.Value(0);
     const pointsAnim = new Animated.Value(0);
@@ -107,7 +108,7 @@ export const TaskCard = React.forwardRef<TouchableOpacity, TaskCardProps>(
   return (
     <TouchableOpacity
       ref={ref}
-      style={[styles.taskCard, { borderLeftColor: getBorderColor() }]}
+      style={[styles.taskCard, { borderLeftColor: getBorderColor() }, isDragging && styles.draggingItem]}
       onPress={handlePress}
       onLongPress={onLongPress}
       delayLongPress={200}
@@ -342,5 +343,9 @@ export const TaskCard = React.forwardRef<TouchableOpacity, TaskCardProps>(
         fontSize: 18,
         fontWeight: 'bold',
         color: '#16a34a',
+      },
+      draggingItem: {
+        opacity: 0.8,
+        transform: [{ scale: 1.02 }],
       },
   });

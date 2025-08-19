@@ -146,7 +146,7 @@ export default function Dashboard() {
     setEditingTask(null);
   };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
-  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <View style={[isActive && styles.draggingItem]}><TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} /></View>;
+  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
   const sortOptions = [{ value: 'due_date', label: 'Due Date' }, { value: 'priority', label: 'Priority' }, { value: 'title', label: 'Title' }];
 
   return (
@@ -214,7 +214,6 @@ const styles = StyleSheet.create({
     scrollContent: { flex: 1 },
     scrollContentContainer: { flexGrow: 1, paddingBottom: 100 },
     taskList: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 },
-    draggingItem: { opacity: 0.8, transform: [{ scale: 1.02 }] },
     tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
     roleTag: { backgroundColor: '#fce7f3' },
     domainTag: { backgroundColor: '#fed7aa' },
