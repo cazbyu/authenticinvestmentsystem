@@ -1,6 +1,6 @@
-
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -13,7 +13,7 @@ export default function RootLayout() {
   useFrameworkReady();
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <Drawer
         drawerContent={() => <SideMenu />}
         screenOptions={{
@@ -30,6 +30,6 @@ export default function RootLayout() {
         <Drawer.Screen name="+not-found" />
       </Drawer>
       <StatusBar style="auto" />
-    </>
+    </GestureHandlerRootView>
   );
 }
