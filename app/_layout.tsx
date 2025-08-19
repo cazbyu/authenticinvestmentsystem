@@ -1,30 +1,35 @@
-// app/_layout.tsx
+
+console.log("ENTRY: file loaded");
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import React from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useEffect } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
-// ⬇️ Temporarily comment these until smoke test passes
-// import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-// import { SideMenu } from '@/components/SideMenu';
-// import '@/lib/calendarLocale';
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { SideMenu } from '@/components/SideMenu';
+import '@/lib/calendarLocale';
 
 export default function RootLayout() {
-  console.log('LAYOUT: rendering'); // 👈 sentinel
+  useFrameworkReady();
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <>
       <Drawer
-        // drawerContent={() => <SideMenu />} // ⬅️ add back later
+        drawerContent={() => <SideMenu />}
         screenOptions={{
           headerShown: false,
-          drawerStyle: { width: 280 },
+          drawerStyle: {
+            width: 280,
+          },
         }}
       >
-        {/* Keep only one simple screen for now */}
-        <Drawer.Screen name="index" />
+        <Drawer.Screen name="(tabs)" />
+        <Drawer.Screen name="calendar" />
+        <Drawer.Screen name="settings" />
+        <Drawer.Screen name="coach" />
+        <Drawer.Screen name="+not-found" />
       </Drawer>
       <StatusBar style="auto" />
-    </GestureHandlerRootView>
+    </>
   );
 }
