@@ -216,8 +216,6 @@ export default function Roles() {
   const [newKRName, setNewKRName] = useState('');
   const [editKRModalVisible, setEditKRModalVisible] = useState(false);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
-  const [editKRModalVisible, setEditKRModalVisible] = useState(false);
-  const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
