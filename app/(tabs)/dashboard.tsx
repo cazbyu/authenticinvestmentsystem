@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Plus, Edit, UserX, Ban } from 'lucide-react-native';
+import { X, Plus, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { Header } from '@/components/Header';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
