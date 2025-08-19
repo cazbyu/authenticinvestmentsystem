@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal, TextInput, Alert } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal, TextInput, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { CreditCard as Edit, UserX, Plus, X, Ban } from 'lucide-react-native';
 import { Header } from '@/components/Header';
 import { AddItemModal } from '@/components/AddItemModal';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
+import { EditKRModal } from '@/components/settings/EditKRModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { supabase } from '@/lib/supabase';
@@ -195,6 +196,8 @@ interface KeyRelationship {
   name: string;
   role_id: string;
   user_id: string;
+  image_path?: string;
+  description?: string;
 }
 
 export default function Roles() {
@@ -212,6 +215,8 @@ export default function Roles() {
   const [roleKeyRelationships, setRoleKeyRelationships] = useState<KeyRelationship[]>([]);
   const [addKRModalVisible, setAddKRModalVisible] = useState(false);
   const [newKRName, setNewKRName] = useState('');
+  const [editKRModalVisible, setEditKRModalVisible] = useState(false);
+  const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
   const [editKRModalVisible, setEditKRModalVisible] = useState(false);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
@@ -286,6 +291,11 @@ export default function Roles() {
     setSelectedKR(kr);
     await fetchKRTasks(kr.id);
     setKrAccountVisible(true);
+  };
+
+  const handleEditKR = (kr: KeyRelationship) => {
+    setEditingKR(kr);
+    setEditKRModalVisible(true);
   };
 
   const handleEditKR = (kr: KeyRelationship) => {
@@ -541,6 +551,15 @@ export default function Roles() {
     // Find the role this KR belongs to
     const parentRole = roles.find(role => role.id === kr.role_id);
     
+    // Get image URL if image_path exists
+    let imageUrl = null;
+    if (kr.image_path) {
+      const { data } = supabase.storage
+        .from('0008-key-relationship-images')
+        .getPublicUrl(kr.image_path);
+      imageUrl = data.publicUrl;
+    }
+    
     return (
       <TouchableOpacity
         key={kr.id}
@@ -550,10 +569,14 @@ export default function Roles() {
           hoveredCard === kr.id && styles.roleCardHovered
         ]}
         onPress={() => handleKRPress(kr)}
+        onLongPress={() => handleEditKR(kr)}
         onPressIn={() => setHoveredCard(kr.id)}
         onPressOut={() => setHoveredCard(null)}
       >
         <View style={styles.cardContent}>
+          {imageUrl && (
+            <Image source={{ uri: imageUrl }} style={styles.krMainImage} />
+          )}
           <Text style={styles.roleTitle}>{kr.name}</Text>
           <Text style={styles.roleCategory}>{parentRole?.label || 'Key Relationship'}</Text>
         </View>
@@ -602,6 +625,29 @@ export default function Roles() {
                   isTablet ? styles.rolesGridTablet : styles.rolesGridMobile
                 ]}>
                   {keyRelationships.map(kr => (
+                    <TouchableOpacity
+                      key={kr.id}
+                      style={[
+                        styles.roleCard,
+                        isTablet ? styles.roleCardTablet : styles.roleCardMobile,
+                        hoveredCard === kr.id && styles.roleCardHovered
+                      ]}
+                      onPress={() => handleKRPress(kr)}
+                      onLongPress={() => handleEditKR(kr)}
+                      onPressIn={() => setHoveredCard(kr.id)}
+                      onPressOut={() => setHoveredCard(null)}
+                    >
+                      <View style={styles.cardContent}>
+                        {kr.image_path && (
+                          <Image source={{ uri: supabase.storage.from('0008-key-relationship-images').getPublicUrl(kr.image_path).data.publicUrl }} style={styles.krMainImage} />
+                        )}
+                        <Text style={styles.roleTitle}>{kr.name}</Text>
+                        <Text style={styles.roleCategory}>
+                          {roles.find(role => role.id === kr.role_id)?.label || 'Key Relationship'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
                     <TouchableOpacity
                       key={kr.id}
                       style={[
@@ -687,10 +733,11 @@ export default function Roles() {
                             style={styles.krCard}
                             onPress={() => handleKRPress(kr)}
                             onLongPress={() => handleEditKR(kr)}
+                            onLongPress={() => handleEditKR(kr)}
                           >
                             <Text style={styles.krCardTitle}>{kr.name}</Text>
-                            {kr.image_url && (
-                              <Image source={{ uri: kr.image_url }} style={styles.krCardImage} />
+                            {kr.image_path && (
+                              <Image source={{ uri: supabase.storage.from('0008-key-relationship-images').getPublicUrl(kr.image_path).data.publicUrl }} style={styles.krCardImage} />
                             )}
                           </TouchableOpacity>
                         ))}
@@ -840,6 +887,23 @@ export default function Roles() {
           </View>
         </View>
       </Modal>
+      
+      {/* Edit KR Modal */}
+      <EditKRModal
+        visible={editKRModalVisible}
+        onClose={() => {
+          setEditKRModalVisible(false);
+          setEditingKR(null);
+        }}
+        onUpdate={() => {
+          fetchKeyRelationships();
+          if (selectedRole) {
+            fetchRoleKeyRelationships(selectedRole.id);
+          }
+        }}
+        keyRelationship={editingKR}
+        roleName={editingKR ? roles.find(r => r.id === editingKR.role_id)?.label : undefined}
+      />
       
       {/* Edit KR Modal */}
       <EditKRModal
@@ -1046,6 +1110,12 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     alignSelf: 'center',
+  },
+  krMainImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 12,
   },
   krMainImage: {
     width: 60,

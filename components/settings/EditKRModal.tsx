@@ -23,7 +23,7 @@ interface EditKRModalProps {
     id: string;
     name: string;
     description?: string;
-    image_url?: string;
+    image_path?: string;
     role_id: string;
   } | null;
   roleName?: string;
@@ -32,6 +32,7 @@ interface EditKRModalProps {
 export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleName }: EditKRModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [imagePath, setImagePath] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,10 +41,21 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
     if (keyRelationship) {
       setName(keyRelationship.name || '');
       setDescription(keyRelationship.description || '');
-      setImageUrl(keyRelationship.image_url || null);
+      setImagePath(keyRelationship.image_path || null);
+      
+      // Get public URL if image path exists
+      if (keyRelationship.image_path) {
+        const { data } = supabase.storage
+          .from('0008-key-relationship-images')
+          .getPublicUrl(keyRelationship.image_path);
+        setImageUrl(data.publicUrl);
+      } else {
+        setImageUrl(null);
+      }
     } else {
       setName('');
       setDescription('');
+      setImagePath(null);
       setImageUrl(null);
     }
   }, [keyRelationship]);
@@ -110,9 +122,16 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
       const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user.id}/${keyRelationship?.id || 'temp'}_${Date.now()}.${fileExt}`;
 
+      // Remove old image if exists
+      if (imagePath) {
+        await supabase.storage
+          .from('0008-key-relationship-images')
+          .remove([imagePath]);
+      }
+
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
-        .from('key-relationship-images')
+        .from('0008-key-relationship-images')
         .upload(fileName, blob, {
           contentType: `image/${fileExt}`,
           upsert: true
@@ -122,9 +141,10 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('key-relationship-images')
+        .from('0008-key-relationship-images')
         .getPublicUrl(fileName);
 
+      setImagePath(fileName);
       setImageUrl(publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -136,19 +156,16 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
   const removeImage = async () => {
     try {
-      if (imageUrl && keyRelationship?.image_url) {
-        // Extract filename from URL
-        const urlParts = keyRelationship.image_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        
+      if (imagePath) {
         // Delete from storage
         const { error } = await supabase.storage
-          .from('key-relationship-images')
-          .remove([`${keyRelationship.id}/${fileName}`]);
+          .from('0008-key-relationship-images')
+          .remove([imagePath]);
 
         if (error) console.error('Error deleting image:', error);
       }
       
+      setImagePath(null);
       setImageUrl(null);
     } catch (error) {
       console.error('Error removing image:', error);
@@ -166,7 +183,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
         .update({
           name: name.trim(),
           description: description.trim() || null,
-          image_url: imageUrl,
+          image_path: imagePath,
           updated_at: new Date().toISOString()
         })
         .eq('id', keyRelationship.id);
@@ -198,7 +215,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
           onPress: async () => {
             try {
               // Remove image if exists
-              if (keyRelationship.image_url) {
+              if (imagePath) {
                 await removeImage();
               }
 
