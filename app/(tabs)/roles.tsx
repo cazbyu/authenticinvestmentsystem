@@ -815,21 +815,20 @@ export default function Roles() {
       
       {/* Task Form Modal */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
-        <TaskEventForm
-          mode={editingTask ? "edit" : "create"}
-          initialData={editingTask || (selectedRole ? { selectedRoleIds: [selectedRole.id] } : undefined)}
-          onSubmitSuccess={() => {
-            setTaskFormVisible(false);
-            setEditingTask(null);
-            if (selectedRole) fetchRoleTasks(selectedRole.id);
-            if (selectedKR) fetchKRTasks(selectedKR.id);
-          }}
-          onClose={() => {
-            setTaskFormVisible(false);
-            setEditingTask(null);
-          }}
-        />
-      </Modal>
+  <TaskEventForm
+    mode={editingTask ? "edit" : "create"}
+    initialData={editingTask || (selectedRole ? { selectedRoleIds: [selectedRole.id] } : undefined)}
+    onSubmitSuccess={() => {
+      setTaskFormVisible(false);
+      setEditingTask(null);
+      if (selectedRole) fetchRoleTasks(selectedRole.id);
+    }}
+    onClose={() => {
+      setTaskFormVisible(false);
+      setEditingTask(null);
+    }}
+  />
+</Modal>
       
       {/* Add Key Relationship Modal */}
       <Modal visible={addKRModalVisible} transparent animationType="fade">
