@@ -6,7 +6,7 @@ import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flat
 import { Header } from '@/components/Header';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
 // --- TaskDetailModal Component ---
 // Displays detailed information about a task in a modal
@@ -24,9 +24,10 @@ function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCance
 
   const fetchTaskNotes = async () => {
     if (!task?.id) return;
-    
+
     setLoadingNotes(true);
     try {
+      const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('0008-ap-universal-notes-join')
         .select(`
@@ -40,11 +41,12 @@ function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, onCance
         .eq('parent_type', 'task');
 
       if (error) throw error;
-      
+
       const notes = data?.map(item => item.note).filter(Boolean) || [];
       setTaskNotes(notes);
     } catch (error) {
       console.error('Error fetching task notes:', error);
+      Alert.alert('Error', (error as Error).message);
     } finally {
       setLoadingNotes(false);
     }
@@ -118,6 +120,7 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -187,7 +190,7 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error(`Error fetching ${activeView}:`, error);
-      Alert.alert('Error', `Failed to fetch ${activeView}.`);
+      Alert.alert('Error', (error as Error).message || `Failed to fetch ${activeView}.`);
     } finally {
       setLoading(false);
     }
@@ -198,18 +201,26 @@ export default function Dashboard() {
   }, [activeView, sortOption]);
 
   const handleCompleteTask = async (taskId: string) => {
-    const { error } = await supabase.from('0008-ap-tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', taskId);
-    if (error) Alert.alert('Error', 'Failed to complete task.');
-    else fetchData();
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('0008-ap-tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', taskId);
+      if (error) throw error;
+      fetchData();
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to complete task.');
+    }
   };
 
   const handleCancelTask = async (task: Task) => {
-    const { error } = await supabase.from('0008-ap-tasks').update({ status: 'cancelled' }).eq('id', task.id);
-    if (error) Alert.alert('Error', 'Failed to cancel task.');
-    else {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase.from('0008-ap-tasks').update({ status: 'cancelled' }).eq('id', task.id);
+      if (error) throw error;
       Alert.alert('Success', 'Task has been cancelled');
       setIsDetailModalVisible(false);
       fetchData();
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to cancel task.');
     }
   };
 
