@@ -611,15 +611,23 @@ export default function Roles() {
                   )}
                   
                   {/* Universal Add Button - always available */}
-                  <TouchableOpacity 
-                    style={roleKeyRelationships.length === 0 ? styles.addKRButton : styles.addMoreKRButton}
-                    onPress={() => setAddKRModalVisible(true)}
-                  >
-                    <Plus size={roleKeyRelationships.length === 0 ? 20 : 16} color="#0078d4" />
-                    <Text style={roleKeyRelationships.length === 0 ? styles.addKRButtonText : styles.addMoreKRButtonText}>
-                      {roleKeyRelationships.length === 0 ? 'Add Key Relationships' : 'Add More'}
-                    </Text>
-                  </TouchableOpacity>
+                  {roleKeyRelationships.length === 0 ? (
+                    <TouchableOpacity 
+                      style={styles.addKRButton}
+                      onPress={() => setAddKRModalVisible(true)}
+                    >
+                      <Plus size={20} color="#0078d4" />
+                      <Text style={styles.addKRButtonText}>Add Key Relationships</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.addMoreKRButton}
+                      onPress={() => setAddKRModalVisible(true)}
+                    >
+                      <Plus size={16} color="#0078d4" />
+                      <Text style={styles.addMoreKRButtonText}>Add More</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </ScrollView>
             )}
