@@ -61,9 +61,14 @@ export default function Roles() {
   useEffect(() => {
     if (isFocused) {
       fetchActiveRoles();
-      fetchAllKeyRelationships();
     }
   }, [isFocused]);
+
+  useEffect(() => {
+    if (roles.length > 0) {
+      fetchAllKeyRelationships();
+    }
+  }, [roles]);
 
   const fetchActiveRoles = async () => {
     setLoading(true);
@@ -495,9 +500,11 @@ export default function Roles() {
                   styles.rolesGrid,
                   isTablet ? styles.rolesGridTablet : styles.rolesGridMobile
                 ]}>
-                  {keyRelationships.filter(kr => 
-                    roles.some(role => role.id === kr.role_id)
-                  ).map(kr => {
+                  {keyRelationships.map(kr => {
+                    // Only show KRs that belong to currently active roles
+                    const parentRole = roles.find(role => role.id === kr.role_id);
+                    if (!parentRole) return null;
+                    
                     let imageUrl = null;
                     if (kr.image_path) {
                       try {
@@ -529,12 +536,12 @@ export default function Roles() {
                           )}
                           <Text style={styles.roleTitle}>{kr.name}</Text>
                           <Text style={styles.roleCategory}>
-                            {roles.find(role => role.id === kr.role_id)?.label || 'Key Relationship'}
+                            {parentRole.label}
                           </Text>
                         </View>
                       </TouchableOpacity>
                     );
-                  })}
+                  }).filter(Boolean)}
                 </View>
               </>
             )}
@@ -733,7 +740,7 @@ export default function Roles() {
             
             <View style={styles.addKRModalBody}>
               <Text style={styles.addKRLabel}>
-                Add a key relationship for {selectedRole?.label}:
+                {selectedRole ? `Add a key relationship for ${selectedRole.label}:` : 'Add a key relationship:'}
               </Text>
               <TextInput
                 style={styles.addKRInput}
