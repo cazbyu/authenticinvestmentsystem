@@ -33,10 +33,11 @@ interface TaskCardProps {
 
 // --- TaskCard Component ---
 // Renders a single task item in the list
-export function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskCardProps) {
-  const [lastTap, setLastTap] = useState(0);
-  const celebrationAnim = new Animated.Value(0);
-  const pointsAnim = new Animated.Value(0);
+export const TaskCard = React.forwardRef<TouchableOpacity, TaskCardProps>(
+  ({ task, onComplete, onLongPress, onDoublePress }, ref) => {
+    const [lastTap, setLastTap] = useState(0);
+    const celebrationAnim = new Animated.Value(0);
+    const pointsAnim = new Animated.Value(0);
 
   // Determines the border color based on task priority
   const getBorderColor = () => {
@@ -105,6 +106,7 @@ export function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskC
 
   return (
     <TouchableOpacity
+      ref={ref}
       style={[styles.taskCard, { borderLeftColor: getBorderColor() }]}
       onPress={handlePress}
       onLongPress={onLongPress}
@@ -191,9 +193,9 @@ export function TaskCard({ task, onComplete, onLongPress, onDoublePress }: TaskC
         <Animated.View style={[styles.pointsAnimation, { opacity: pointsAnim, transform: [{ translateY: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) }] }]} pointerEvents="none"><Text style={styles.pointsAnimationText}>+{points}</Text></Animated.View>
     </TouchableOpacity>
   );
-}
+  });
 
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
     taskCard: {
         backgroundColor: '#ffffff',
         borderRadius: 8,
@@ -341,4 +343,4 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#16a34a',
       },
-});
+  });
