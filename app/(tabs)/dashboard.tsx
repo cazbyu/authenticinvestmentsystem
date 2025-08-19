@@ -4,9 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Plus, Edit, UserX, Ban } from 'lucide-react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { Header } from '@/components/Header';
+import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { supabase } from '@/lib/supabase';
-import { Task, TaskCard } from '@/components/tasks/TaskCard';
 
 // --- TaskDetailModal Component ---
 // Displays detailed information about a task in a modal
