@@ -8,6 +8,7 @@ import { AddItemModal } from '@/components/AddItemModal';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
+import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
@@ -21,6 +22,8 @@ interface Role {
   label: string;
   category?: string;
   is_active: boolean;
+  image_path?: string;
+  color?: string;
 }
 
 interface KeyRelationship {
@@ -49,6 +52,8 @@ export default function Roles() {
   const [newKRName, setNewKRName] = useState('');
   const [editKRModalVisible, setEditKRModalVisible] = useState(false);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
+  const [editRoleModalVisible, setEditRoleModalVisible] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -144,6 +149,11 @@ export default function Roles() {
   const handleEditKR = (kr: KeyRelationship) => {
     setEditingKR(kr);
     setEditKRModalVisible(true);
+  };
+
+  const handleEditRole = (role: Role) => {
+    setEditingRole(role);
+    setEditRoleModalVisible(true);
   };
 
   const fetchRoleTasks = async (roleId: string) => {
@@ -398,6 +408,20 @@ export default function Roles() {
   };
 
   const renderRoleCard = (role: Role) => {
+    // Get image URL if image_path exists
+    let imageUrl = null;
+    if (role.image_path) {
+      try {
+        const supabase = getSupabaseClient();
+        const { data } = supabase.storage
+          .from('0008-role-images')
+          .getPublicUrl(role.image_path);
+        imageUrl = data.publicUrl;
+      } catch (error) {
+        console.error('Error loading role image URL:', error);
+      }
+    }
+
     return (
       <TouchableOpacity
         key={role.id}
@@ -407,10 +431,14 @@ export default function Roles() {
           hoveredCard === role.id && styles.roleCardHovered
         ]}
         onPress={() => handleRolePress(role)}
+        onLongPress={() => handleEditRole(role)}
         onPressIn={() => setHoveredCard(role.id)}
         onPressOut={() => setHoveredCard(null)}
       >
         <View style={styles.cardContent}>
+          {imageUrl && (
+            <Image source={{ uri: imageUrl }} style={styles.roleMainImage} />
+          )}
           <Text style={styles.roleTitle}>{role.label}</Text>
           <Text style={styles.roleCategory}>{role.category || 'Custom'}</Text>
         </View>
@@ -554,6 +582,7 @@ export default function Roles() {
         <SafeAreaView style={styles.container}>
           <Header 
             title={selectedRole?.label || 'Role'}
+            backgroundColor={selectedRole?.color}
             activeView={activeView}
             onViewChange={(view) => {
               setActiveView(view);
@@ -792,6 +821,19 @@ export default function Roles() {
         roleName={editingKR ? roles.find(r => r.id === editingKR.role_id)?.label : undefined}
       />
       
+      {/* Edit Role Modal */}
+      <EditRoleModal
+        visible={editRoleModalVisible}
+        onClose={() => {
+          setEditRoleModalVisible(false);
+          setEditingRole(null);
+        }}
+        onUpdate={() => {
+          fetchActiveRoles();
+        }}
+        role={editingRole}
+      />
+      
       <AddItemModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -960,6 +1002,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 8,
     padding: 16,
+    width: '48%',
+    aspectRatio: 1,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
@@ -991,6 +1035,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   krMainImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 12,
+  },
+  roleMainImage: {
     width: 60,
     height: 60,
     borderRadius: 30,

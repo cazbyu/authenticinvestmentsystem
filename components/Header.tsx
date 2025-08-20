@@ -14,9 +14,10 @@ interface HeaderProps {
   onSortPress?: () => void;
   authenticScore?: number;
   onBackPress?: () => void;
+  backgroundColor?: string;
 }
 
-export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress }: HeaderProps) {
+export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress, backgroundColor }: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
   const canGoBack = router.canGoBack();
@@ -34,7 +35,7 @@ export function Header({ title, activeView, onViewChange, onSortPress, authentic
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, backgroundColor && { backgroundColor }]}>
       {/* Top section with menu and score */}
       <View style={styles.topSection}>
         <TouchableOpacity style={styles.menuButton} onPress={handleLeftButtonPress}>
