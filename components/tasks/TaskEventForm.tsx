@@ -46,6 +46,9 @@ const CustomDayComponent = ({ date, state, marking, onPress }) => {
 // MAIN FORM COMPONENT
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
 
+  // Helper function to determine if we're in activation mode
+  const isActivationMode = initialData && initialData.sourceDepositIdeaId;
+
 const toDateString = (date: Date) => {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -88,7 +91,7 @@ const toDateString = (date: Date) => {
     is_important: initialData?.is_important || false,
     is_authentic_deposit: initialData?.is_authentic_deposit || false,
     is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
-    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea') || 'task',
+    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea') || (isActivationMode ? 'task' : 'task'),
     selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
     selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
@@ -229,84 +232,162 @@ const toDateString = (date: Date) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not found");
 
-        const payload: any = {
-            user_id: user.id,
-            title: formData.title,
-            is_urgent: formData.is_urgent,
-            is_important: formData.is_important,
-            is_authentic_deposit: formData.is_authentic_deposit,
-            is_twelve_week_goal: formData.is_twelve_week_goal,
-            goal_12wk_id: formData.selectedGoalId,
-            status: 'pending',
-            type: formData.schedulingType,
-            due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString().split('T')[0] : null,
-            deposit_idea: formData.schedulingType === 'depositIdea',
-            is_all_day: formData.isAnytime,
-            updated_at: new Date().toISOString(),
-        };
+        if (formData.schedulingType === 'depositIdea') {
+            // Handle Deposit Idea creation/update
+            const diPayload: any = {
+                user_id: user.id,
+                title: formData.title,
+                follow_up: formData.is_twelve_week_goal, // Map follow_up to 12-week goal flag
+                updated_at: new Date().toISOString(),
+            };
 
-        if (formData.schedulingType === 'event' && !formData.isAnytime) {
-            payload.start_time = combineDateAndTime(formData.dueDate, formData.startTime);
-            payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
-        }
+            let depositIdeaData;
+            let depositIdeaError;
 
-        let taskData;
-        let taskError;
+            if (mode === 'edit' && initialData?.id) {
+                const { data, error } = await supabase
+                    .from('0008-ap-deposit-ideas')
+                    .update(diPayload)
+                    .eq('id', initialData.id)
+                    .select()
+                    .single();
+                depositIdeaData = data;
+                depositIdeaError = error;
+            } else {
+                const { data, error } = await supabase
+                    .from('0008-ap-deposit-ideas')
+                    .insert(diPayload)
+                    .select()
+                    .single();
+                depositIdeaData = data;
+                depositIdeaError = error;
+            }
 
-        if (mode === 'edit' && initialData?.id) {
-            const { data, error } = await supabase
-                .from('0008-ap-tasks')
-                .update(payload)
-                .eq('id', initialData.id)
-                .select()
-                .single();
-            taskData = data;
-            taskError = error;
+            if (depositIdeaError) throw depositIdeaError;
+            if (!depositIdeaData) throw new Error("Failed to create deposit idea");
+
+            const depositIdeaId = depositIdeaData.id;
+
+            // Handle joins for deposit idea
+            if (mode === 'edit' && initialData?.id) {
+                await Promise.all([
+                    supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                    supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                    supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                ]);
+            }
+
+            const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', role_id, user_id: user.id }));
+            const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', domain_id, user_id: user.id }));
+            const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', key_relationship_id, user_id: user.id }));
+
+            // Only add a new note if there's content in the notes field
+            if (formData.notes && formData.notes.trim()) {
+                const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+                if (noteError) throw noteError;
+                await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: depositIdeaId, parent_type: 'depositIdea', note_id: noteData.id, user_id: user.id });
+            }
+
+            if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+            if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+
         } else {
-            const { data, error } = await supabase
-                .from('0008-ap-tasks')
-                .insert(payload)
-                .select()
-                .single();
-            taskData = data;
-            taskError = error;
+            // Handle Task/Event creation/update
+            const payload: any = {
+                user_id: user.id,
+                title: formData.title,
+                is_urgent: formData.is_urgent,
+                is_important: formData.is_important,
+                is_authentic_deposit: formData.is_authentic_deposit,
+                is_twelve_week_goal: formData.is_twelve_week_goal,
+                goal_12wk_id: formData.selectedGoalId,
+                status: 'pending',
+                type: formData.schedulingType,
+                due_date: formData.dueDate.toISOString().split('T')[0],
+                deposit_idea: false, // Always false for tasks/events
+                is_all_day: formData.isAnytime,
+                updated_at: new Date().toISOString(),
+            };
+
+            if (formData.schedulingType === 'event' && !formData.isAnytime) {
+                payload.start_time = combineDateAndTime(formData.dueDate, formData.startTime);
+                payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
+            }
+
+            let taskData;
+            let taskError;
+
+            if (mode === 'edit' && initialData?.id && !isActivationMode) {
+                const { data, error } = await supabase
+                    .from('0008-ap-tasks')
+                    .update(payload)
+                    .eq('id', initialData.id)
+                    .select()
+                    .single();
+                taskData = data;
+                taskError = error;
+            } else {
+                const { data, error } = await supabase
+                    .from('0008-ap-tasks')
+                    .insert(payload)
+                    .select()
+                    .single();
+                taskData = data;
+                taskError = error;
+            }
+
+            if (taskError) throw taskError;
+            if (!taskData) throw new Error("Failed to create task");
+
+            const taskId = taskData.id;
+
+            // Handle activation mode - link DI to new task
+            if (isActivationMode && initialData?.sourceDepositIdeaId) {
+                // Update the source deposit idea with activation info
+                const { error: diUpdateError } = await supabase
+                    .from('0008-ap-deposit-ideas')
+                    .update({
+                        activated_task_id: taskId,
+                        activated_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', initialData.sourceDepositIdeaId);
+
+                if (diUpdateError) throw diUpdateError;
+            }
+
+            // Handle joins for task/event
+            if (mode === 'edit' && initialData?.id && !isActivationMode) {
+                await Promise.all([
+                    supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                    supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                    supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                ]);
+            }
+
+            const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
+            const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
+            const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
+
+            // Only add a new note if there's content in the notes field
+            if (formData.notes && formData.notes.trim()) {
+                const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+                if (noteError) throw noteError;
+                await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+            }
+
+            if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+            if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
         }
-
-if (taskError) throw taskError;
-if (!taskData) throw new Error("Failed to create task");
-
-const taskId = taskData.id;
-
-        if (mode === 'edit' && initialData?.id) {
-            await Promise.all([
-                supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                // Don't delete existing notes - we want to keep them and add new ones
-            ]);
-        }
-
-        const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
-        const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
-        const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
-
-        // Only add a new note if there's content in the notes field
-        if (formData.notes && formData.notes.trim()) {
-            const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
-            if (noteError) throw noteError;
-            await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
-        }
-
-        if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
-        if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
-        if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
 
         onSubmitSuccess();
         onClose();
 
     } catch (error) {
-        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} task:`, error);
-        Alert.alert('Error', (error as Error).message || `Failed to ${mode === 'edit' ? 'update' : 'create'} task`);
+        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} ${formData.schedulingType}:`, error);
+        Alert.alert('Error', (error as Error).message || `Failed to ${mode === 'edit' ? 'update' : 'create'} ${formData.schedulingType}`);
     } finally {
         setLoading(false);
     }
@@ -317,19 +398,21 @@ const taskId = taskData.id;
   return (
     <View style={styles.formContainer}>
         <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{mode === 'create' ? 'New Action' : 'Edit Action'}</Text>
+            <Text style={styles.modalTitle}>
+              {isActivationMode ? 'Activate Deposit Idea' : (mode === 'create' ? 'New Action' : 'Edit Action')}
+            </Text>
             <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
         </View>
         <ScrollView style={styles.formContent}>
             <TextInput style={styles.input} placeholder="Action Title" value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
 
-            <View style={styles.schedulingToggle}>
+            {!isActivationMode && <View style={styles.schedulingToggle}>
               {['task', 'event', 'depositIdea'].map(type => (
                 <TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}>
                   <Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </View>}
 
             {formData.schedulingType !== 'depositIdea' && (
               <>

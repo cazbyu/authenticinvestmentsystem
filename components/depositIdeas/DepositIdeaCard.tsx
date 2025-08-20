@@ -54,6 +54,10 @@ export const DepositIdeaCard = React.forwardRef<View, DepositIdeaCardProps>(
       }
     };
 
+    const handleActivate = () => {
+      onActivate(depositIdea);
+    };
+
     return (
       <TouchableOpacity
         ref={ref}
@@ -157,7 +161,7 @@ export const DepositIdeaCard = React.forwardRef<View, DepositIdeaCardProps>(
             {!depositIdea.activated_at && (
               <TouchableOpacity 
                 style={[styles.actionButton, styles.activateButton]} 
-                onPress={() => onActivate(depositIdea)}
+                onPress={handleActivate}
               >
                 <Play size={14} color="#16a34a" />
               </TouchableOpacity>
