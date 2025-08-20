@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
-import { X, Edit, Play, Ban } from 'lucide-react-native';
+import { X, CreditCard as Edit, Play, Ban } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
 interface DepositIdea {
