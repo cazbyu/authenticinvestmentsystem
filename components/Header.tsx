@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { Menu, ArrowUpDown, ChevronLeft } from 'lucide-react-native';
+import { Menu, ArrowUpDown, ChevronLeft, Edit } from 'lucide-react-native';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -15,10 +15,11 @@ interface HeaderProps {
   authenticScore?: number;
   onBackPress?: () => void;
   backgroundColor?: string;
+  onEditPress?: () => void;
   backgroundColor?: string;
 }
 
-export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress, backgroundColor }: HeaderProps) {
+export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress, backgroundColor, onEditPress }: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
   const canGoBack = router.canGoBack();
@@ -46,6 +47,11 @@ export function Header({ title, activeView, onViewChange, onSortPress, authentic
         <View style={styles.titleSection}>
           <Text style={styles.title}>{title || 'Authentic'}</Text>
           {!title && <Text style={styles.subtitle}>Investments</Text>}
+          {onEditPress && (
+            <TouchableOpacity style={styles.editButton} onPress={onEditPress}>
+              <Edit size={16} color="#ffffff" />
+            </TouchableOpacity>
+          )}
         </View>
         
         <View style={styles.scoreContainer}>
@@ -119,6 +125,7 @@ const styles = StyleSheet.create({
   titleSection: {
     alignItems: 'center',
     flex: 1,
+    position: 'relative',
   },
   title: {
     color: '#ffffff',
@@ -131,6 +138,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     opacity: 0.9,
+  },
+  editButton: {
+    position: 'absolute',
+    right: -20,
+    top: '50%',
+    transform: [{ translateY: -8 }],
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    padding: 4,
   },
   scoreContainer: {
     alignItems: 'flex-end',

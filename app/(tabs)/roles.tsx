@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal, TextInput, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { CreditCard as Edit, UserX, Plus, X, Ban } from 'lucide-react-native';
+import { Edit, UserX, Plus, X, Ban } from 'lucide-react-native';
 import { Header } from '@/components/Header';
 import { AddItemModal } from '@/components/AddItemModal';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
@@ -431,12 +431,19 @@ export default function Roles() {
           styles.roleCard,
           isTablet ? styles.roleCardTablet : styles.roleCardMobile,
           hoveredCard === role.id && styles.roleCardHovered
+          { borderColor: role.color || 'rgba(0, 0, 0, 0.05)' }
         ]}
         onPress={() => handleRolePress(role)}
-        onLongPress={() => handleEditRole(role)}
         onPressIn={() => setHoveredCard(role.id)}
         onPressOut={() => setHoveredCard(null)}
       >
+        <TouchableOpacity 
+          style={styles.editIcon}
+          onPress={() => handleEditRole(role)}
+        >
+          <Edit size={16} color="#6b7280" />
+        </TouchableOpacity>
+        
         <View style={styles.cardContent}>
           {imageUrl && (
             <Image source={{ uri: imageUrl }} style={styles.roleMainImage} />
@@ -475,10 +482,16 @@ export default function Roles() {
           hoveredCard === kr.id && styles.roleCardHovered
         ]}
         onPress={() => handleKRPress(kr)}
-        onLongPress={() => handleEditKR(kr)}
         onPressIn={() => setHoveredCard(kr.id)}
         onPressOut={() => setHoveredCard(null)}
       >
+        <TouchableOpacity 
+          style={styles.editIcon}
+          onPress={() => handleEditKR(kr)}
+        >
+          <Edit size={16} color="#6b7280" />
+        </TouchableOpacity>
+        
         <View style={styles.cardContent}>
           {imageUrl && (
             <Image source={{ uri: imageUrl }} style={styles.krMainImage} />
@@ -556,10 +569,16 @@ export default function Roles() {
                           hoveredCard === kr.id && styles.roleCardHovered
                         ]}
                         onPress={() => handleKRPress(kr)}
-                        onLongPress={() => handleEditKR(kr)}
                         onPressIn={() => setHoveredCard(kr.id)}
                         onPressOut={() => setHoveredCard(null)}
                       >
+                        <TouchableOpacity 
+                          style={styles.editIcon}
+                          onPress={() => handleEditKR(kr)}
+                        >
+                          <Edit size={16} color="#6b7280" />
+                        </TouchableOpacity>
+                        
                         <View style={styles.cardContent}>
                           {imageUrl && (
                             <Image source={{ uri: imageUrl }} style={styles.krMainImage} />
@@ -592,6 +611,7 @@ export default function Roles() {
             }}
             onSortPress={handleSortPress}
             onBackPress={() => setRoleAccountVisible(false)}
+            onEditPress={() => selectedRole && handleEditRole(selectedRole)}
           />
           
           <View style={styles.content}>
@@ -641,8 +661,13 @@ export default function Roles() {
                           key={kr.id}
                           style={styles.krCard}
                           onPress={() => handleKRPress(kr)}
-                          onLongPress={() => handleEditKR(kr)}
                         >
+                          <TouchableOpacity 
+                            style={styles.krEditIcon}
+                            onPress={() => handleEditKR(kr)}
+                          >
+                            <Edit size={14} color="#6b7280" />
+                          </TouchableOpacity>
                           <Text style={styles.krCardTitle}>{kr.name}</Text>
                           {imageUrl && (
                             <Image source={{ uri: imageUrl }} style={styles.krCardImage} />
@@ -696,6 +721,7 @@ export default function Roles() {
             }}
             onSortPress={handleSortPress}
             onBackPress={() => setKrAccountVisible(false)}
+            onEditPress={() => selectedKR && handleEditKR(selectedKR)}
           />
           
           <View style={styles.content}>
@@ -911,8 +937,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderWidth: 2,
+    position: 'relative',
   },
   roleCardMobile: {
     width: '48%',
@@ -921,6 +947,20 @@ const styles = StyleSheet.create({
   roleCardTablet: {
     width: '48%',
     marginHorizontal: 0,
+  },
+  editIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    padding: 6,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   cardContent: {
     alignItems: 'center',
@@ -1013,6 +1053,21 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.05,
     shadowRadius: 3,
+    elevation: 2,
+    position: 'relative',
+  },
+  krEditIcon: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 10,
+    padding: 4,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     elevation: 2,
   },
   krCardTitle: {
