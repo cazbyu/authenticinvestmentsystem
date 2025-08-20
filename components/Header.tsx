@@ -11,8 +11,6 @@ interface HeaderProps {
   title?: string;
   activeView?: 'deposits' | 'ideas';
   onViewChange?: (view: 'deposits' | 'ideas') => void;
-  activeJournalView?: 'deposits' | 'ideas' | 'journal' | 'analytics';
-  onJournalViewChange?: (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => void;
   onSortPress?: () => void;
   authenticScore?: number;
   onBackPress?: () => void;
@@ -24,8 +22,6 @@ export function Header({
   title, 
   activeView, 
   onViewChange, 
-  activeJournalView, 
-  onJournalViewChange, 
   onSortPress, 
   authenticScore = 85, 
   onBackPress, 
@@ -73,21 +69,21 @@ export function Header({
       </View>
       
       {/* Bottom section with toggle and sort */}
-      {((activeView && onViewChange) || (activeJournalView && onJournalViewChange)) && (
+      {(activeView && onViewChange) && (
         <View style={styles.bottomSection}>
-          {activeJournalView && onJournalViewChange ? (
+          {(activeView === 'deposits' || activeView === 'ideas' || activeView === 'journal' || activeView === 'analytics') ? (
             <>
               <View style={styles.toggleContainer}>
                 <TouchableOpacity
                   style={[
                     styles.toggleButton,
-                    activeJournalView === 'deposits' && styles.activeToggle
+                    activeView === 'deposits' && styles.activeToggle
                   ]}
-                  onPress={() => onJournalViewChange('deposits')}
+                  onPress={() => onViewChange('deposits')}
                 >
                   <Text style={[
                     styles.toggleText,
-                    activeJournalView === 'deposits' && styles.activeToggleText
+                    activeView === 'deposits' && styles.activeToggleText
                   ]}>
                     Deposits
                   </Text>
@@ -96,13 +92,13 @@ export function Header({
                 <TouchableOpacity
                   style={[
                     styles.toggleButton,
-                    activeJournalView === 'ideas' && styles.activeToggle
+                    activeView === 'ideas' && styles.activeToggle
                   ]}
-                  onPress={() => onJournalViewChange('ideas')}
+                  onPress={() => onViewChange('ideas')}
                 >
                   <Text style={[
                     styles.toggleText,
-                    activeJournalView === 'ideas' && styles.activeToggleText
+                    activeView === 'ideas' && styles.activeToggleText
                   ]}>
                     Ideas
                   </Text>
@@ -113,13 +109,13 @@ export function Header({
                 <TouchableOpacity
                   style={[
                     styles.journalButton,
-                    activeJournalView === 'journal' && styles.activeJournalButton
+                    activeView === 'journal' && styles.activeJournalButton
                   ]}
-                  onPress={() => onJournalViewChange('journal')}
+                  onPress={() => onViewChange('journal')}
                 >
                   <Text style={[
                     styles.journalButtonText,
-                    activeJournalView === 'journal' && styles.activeJournalButtonText
+                    activeView === 'journal' && styles.activeJournalButtonText
                   ]}>
                     Role Journal
                   </Text>
@@ -128,13 +124,13 @@ export function Header({
                 <TouchableOpacity
                   style={[
                     styles.journalButton,
-                    activeJournalView === 'analytics' && styles.activeJournalButton
+                    activeView === 'analytics' && styles.activeJournalButton
                   ]}
-                  onPress={() => onJournalViewChange('analytics')}
+                  onPress={() => onViewChange('analytics')}
                 >
                   <Text style={[
                     styles.journalButtonText,
-                    activeJournalView === 'analytics' && styles.activeJournalButtonText
+                    activeView === 'analytics' && styles.activeJournalButtonText
                   ]}>
                     Analytics
                   </Text>
@@ -249,6 +245,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 32,
+    width: '100%',
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -256,12 +253,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 2,
     minWidth: 120,
+    flex: 0,
   },
   journalButtonsContainer: {
     flexDirection: 'row',
     gap: 8,
     minWidth: 180,
     justifyContent: 'flex-end',
+    flex: 0,
   },
   toggleButton: {
     paddingHorizontal: 16,

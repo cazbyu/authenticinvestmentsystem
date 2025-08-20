@@ -655,8 +655,8 @@ export default function Roles() {
           <Header 
             title={selectedRole?.label || 'Role'}
             backgroundColor={selectedRole?.color}
-            activeJournalView={activeJournalView}
-            onJournalViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
+            activeView={activeJournalView}
+            onViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
               setActiveJournalView(view);
               if ((view === 'deposits' || view === 'ideas') && selectedRole) {
                 fetchRoleTasks(selectedRole.id);
@@ -779,8 +779,8 @@ export default function Roles() {
         <SafeAreaView style={styles.container}>
           <Header 
             title={selectedKR?.name || 'Key Relationship'}
-            activeJournalView={activeJournalView}
-            onJournalViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
+            activeView={activeJournalView}
+            onViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
               setActiveJournalView(view);
               if ((view === 'deposits' || view === 'ideas') && selectedKR) {
                 fetchKRTasks(selectedKR.id);
