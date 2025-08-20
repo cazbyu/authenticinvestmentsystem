@@ -559,9 +559,9 @@ export default function Roles() {
           sourceDepositIdeaId: depositIdea.id,
           type: 'task',
           notes: latestNote
+          schedulingType: 'task', // Default to task, user can change to event
         };
         setEditingTask(activationData);
-          schedulingType: 'task', // Default to task, user can change to event
       } catch (error) {
         console.error('Error fetching note for activation:', error);
         // Continue with activation even if note fetch fails
