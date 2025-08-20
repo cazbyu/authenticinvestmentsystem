@@ -79,13 +79,13 @@ export default function Roles() {
 
   // Add effect to refetch tasks when activeJournalView changes
   useEffect(() => {
-    if (selectedRole && (activeJournalView === 'deposits' || activeJournalView === 'ideas')) {
+    if (selectedRole) {
       fetchRoleTasks(selectedRole.id);
     }
   }, [activeJournalView, selectedRole]);
 
   useEffect(() => {
-    if (selectedKR && (activeJournalView === 'deposits' || activeJournalView === 'ideas')) {
+    if (selectedKR) {
       fetchKRTasks(selectedKR.id);
     }
   }, [activeJournalView, selectedKR]);

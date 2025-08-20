@@ -263,17 +263,21 @@ const styles = StyleSheet.create({
     flex: 0,
   },
   toggleButton: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activeToggle: {
     backgroundColor: '#ffffff',
   },
   toggleText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    textAlign: 'center',
   },
   activeToggleText: {
     color: '#0078d4',
