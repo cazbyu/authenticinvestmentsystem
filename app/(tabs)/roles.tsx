@@ -93,13 +93,7 @@ export default function Roles() {
 
       if (error) throw error;
       setKeyRelationships(data || []);
-      setSelectedKR(null);
-      
-      if (data && data.length > 0) {
-        setSelectedKR(data[0]);
-      } else {
-        setSelectedKR(null);
-      }
+      setSelectedKR(null); // Don't auto-select first KR
     } catch (error) {
       console.error('Error fetching key relationships:', error);
       Alert.alert('Error', (error as Error).message);
@@ -534,6 +528,34 @@ export default function Roles() {
     setEditingKR(null);
   };
 
+  const handleAddKR = async (roleId: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .insert({
+          name: 'New Key Relationship',
+          role_id: roleId,
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Refresh KRs and open edit modal for the new one
+      await fetchKeyRelationships(roleId);
+      setEditingKR(data);
+      setEditKRVisible(true);
+    } catch (error) {
+      console.error('Error creating key relationship:', error);
+      Alert.alert('Error', (error as Error).message);
+    }
+  };
+
   const getImageUrl = (imagePath?: string, bucket: string = '0008-role-images') => {
     if (!imagePath) return null;
     try {
@@ -701,7 +723,16 @@ export default function Roles() {
 
           {keyRelationships.length > 0 && (
             <View style={styles.keyRelationshipsSection}>
-              <Text style={styles.sectionTitle}>Key Relationships</Text>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Key Relationships</Text>
+                <TouchableOpacity
+                  style={styles.addKRButton}
+                  onPress={() => handleAddKR(selectedRole.id)}
+                >
+                  <Plus size={16} color="#0078d4" />
+                  <Text style={styles.addKRButtonText}>Add KR</Text>
+                </TouchableOpacity>
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.keyRelationshipsList}>
                   {keyRelationships.map(kr => (
@@ -725,6 +756,23 @@ export default function Roles() {
                   ))}
                 </View>
               </ScrollView>
+            </View>
+          )}
+
+          {/* Show Add KR button even when no KRs exist */}
+          {keyRelationships.length === 0 && (
+            <View style={styles.keyRelationshipsSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Key Relationships</Text>
+                <TouchableOpacity
+                  style={styles.addKRButton}
+                  onPress={() => handleAddKR(selectedRole.id)}
+                >
+                  <Plus size={16} color="#0078d4" />
+                  <Text style={styles.addKRButtonText}>Add KR</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.emptyKRText}>No key relationships yet</Text>
             </View>
           )}
         </View>
@@ -1047,8 +1095,36 @@ roleCardHalf: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
     paddingHorizontal: 16,
+  },
+  addKRButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  addKRButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078d4',
+  },
+  emptyKRText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    fontStyle: 'italic',
   },
   keyRelationshipsList: {
     flexDirection: 'row',
