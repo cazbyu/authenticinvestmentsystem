@@ -181,7 +181,7 @@ export default function Wellness() {
   }, []);
 
   useEffect(() => {
-    if (selectedDomain) {
+    if (selectedDomain && (activeView === 'deposits' || activeView === 'ideas')) {
       fetchDomainTasks(selectedDomain.id, activeView);
     }
   }, [selectedDomain, activeView]);
