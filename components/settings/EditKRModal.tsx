@@ -122,12 +122,31 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
+      // Determine file extension and content type
+      let fileExt = 'jpg';
+      let contentType = 'image/jpeg';
+      
+      if (uri.startsWith('data:')) {
+        // Extract MIME type from data URI
+        const mimeMatch = uri.match(/data:([^;]+)/);
+        if (mimeMatch) {
+          contentType = mimeMatch[1];
+          fileExt = contentType.split('/')[1] || 'jpg';
+        }
+      } else {
+        // Extract from file URI
+        const uriExt = uri.split('.').pop()?.toLowerCase();
+        if (uriExt && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(uriExt)) {
+          fileExt = uriExt === 'jpeg' ? 'jpg' : uriExt;
+          contentType = `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
+        }
+      }
+
       // Convert URI to blob
       const response = await fetch(uri);
       const blob = await response.blob();
       
       // Create unique filename
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user.id}/${keyRelationship?.id || 'temp'}_${Date.now()}.${fileExt}`;
 
       // Remove old image if exists
@@ -141,7 +160,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
       const { data, error } = await supabase.storage
         .from('0008-key-relationship-images')
         .upload(fileName, blob, {
-          contentType: `image/${fileExt}`,
+          contentType,
           upsert: true
         });
 
