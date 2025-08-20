@@ -9,6 +9,10 @@ import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDet
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
+
+type DrawerNavigation = DrawerNavigationProp<any>;
 
 interface Domain {
   id: string;
@@ -377,10 +381,10 @@ export default function Wellness() {
     // Domains list view
     return (
       <View style={styles.content}>
-        <View style={styles.accountsHeader}>
-          <Text style={styles.accountsTitle}>Wellness Bank</Text>
-          <Text style={styles.accountsSubtitle}>Accounts</Text>
-        </View>
+        <Header 
+          title="Wellness Bank" 
+          authenticScore={85}
+        />
         
         <ScrollView style={styles.domainsList}>
           {domains.length === 0 ? (
@@ -556,24 +560,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-  },
-  accountsHeader: {
-    backgroundColor: '#0078d4',
-    paddingTop: 8,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  accountsTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  accountsSubtitle: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '400',
-    opacity: 0.9,
   },
 });

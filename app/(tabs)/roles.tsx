@@ -12,6 +12,10 @@ import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
+
+type DrawerNavigation = DrawerNavigationProp<any>;
 
 interface Role {
   id: string;
@@ -30,6 +34,7 @@ interface KeyRelationship {
 }
 
 export default function Roles() {
+  const navigation = useNavigation<DrawerNavigation>();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
@@ -782,10 +787,10 @@ export default function Roles() {
     // Roles list view
     return (
       <View style={styles.content}>
-        <View style={styles.accountsHeader}>
-          <Text style={styles.accountsTitle}>Role Bank</Text>
-          <Text style={styles.accountsSubtitle}>Accounts</Text>
-        </View>
+        <Header 
+          title="Role Bank" 
+          authenticScore={85}
+        />
         
         <ScrollView style={styles.rolesList}>
   {roles.length === 0 ? (
@@ -1222,24 +1227,5 @@ roleCardHalf: {
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-  },
-  accountsHeader: {
-    backgroundColor: '#0078d4',
-    paddingTop: 8,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  accountsTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  accountsSubtitle: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '400',
-    opacity: 0.9,
   },
 });
