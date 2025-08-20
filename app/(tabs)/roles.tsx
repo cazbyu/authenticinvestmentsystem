@@ -182,13 +182,11 @@ export default function Roles() {
         .eq('user_id', user.id)
         .not('status', 'in', '(completed,cancelled)');
 
+      // Apply filtering based on activeJournalView
       if (activeJournalView === 'deposits') {
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
+        taskQuery = taskQuery.eq('deposit_idea', false);
       } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
-      } else {
-        // For journal and analytics views, we still need to fetch tasks for potential display
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       }
 
       const { data: tasksData, error: tasksError } = await taskQuery;
@@ -304,13 +302,11 @@ export default function Roles() {
         .eq('user_id', user.id)
         .not('status', 'in', '(completed,cancelled)');
 
+      // Apply filtering based on activeJournalView
       if (activeJournalView === 'deposits') {
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
+        taskQuery = taskQuery.eq('deposit_idea', false);
       } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
-      } else {
-        // For journal and analytics views, we still need to fetch tasks for potential display
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       }
 
       const { data: tasksData, error: tasksError } = await taskQuery;
