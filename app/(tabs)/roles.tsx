@@ -9,7 +9,6 @@ import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import { EditRoleModal } from '@/components/settings/EditRoleModal';
-import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
