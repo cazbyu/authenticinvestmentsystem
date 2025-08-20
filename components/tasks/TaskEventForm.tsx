@@ -96,6 +96,7 @@ const toDateString = (date: Date) => {
     selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
     selectedGoalId: initialData?.goal_12wk_id || null as string | null,
+    selectedGoalIds: initialData?.goals?.map(g => g.id) || [] as string[],
   });
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -156,7 +157,7 @@ const toDateString = (date: Date) => {
     fetchOptions();
   }, []);
 
-  const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds', id: string) => {
+  const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds' | 'selectedGoalIds', id: string) => {
     setFormData(prev => {
       const currentSelection = prev[field] as string[];
       const newSelection = currentSelection.includes(id)
@@ -274,12 +275,14 @@ const toDateString = (date: Date) => {
                     supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
                     supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
                     supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                    supabase.from('0008-ap-universal-goals-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
                 ]);
             }
 
             const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', role_id, user_id: user.id }));
             const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', domain_id, user_id: user.id }));
             const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', key_relationship_id, user_id: user.id }));
+            const goalJoins = formData.selectedGoalIds.map(goal_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', goal_id, user_id: user.id }));
 
             // Only add a new note if there's content in the notes field
             if (formData.notes && formData.notes.trim()) {
@@ -291,6 +294,7 @@ const toDateString = (date: Date) => {
             if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
             if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
             if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+            if (goalJoins.length > 0) await supabase.from('0008-ap-universal-goals-join').insert(goalJoins);
 
         } else {
             // Handle Task/Event creation/update
@@ -363,12 +367,14 @@ const toDateString = (date: Date) => {
                     supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
                     supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
                     supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                    supabase.from('0008-ap-universal-goals-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
                 ]);
             }
 
             const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
             const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
             const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
+            const goalJoins = formData.selectedGoalIds.map(goal_id => ({ parent_id: taskId, parent_type: 'task', goal_id, user_id: user.id }));
 
             // Only add a new note if there's content in the notes field
             if (formData.notes && formData.notes.trim()) {
@@ -380,6 +386,7 @@ const toDateString = (date: Date) => {
             if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
             if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
             if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+            if (goalJoins.length > 0) await supabase.from('0008-ap-universal-goals-join').insert(goalJoins);
         }
 
         onSubmitSuccess();
@@ -533,6 +540,52 @@ const toDateString = (date: Date) => {
                     </View>
                   </>
                 )}
+
+                {formData.is_twelve_week_goal && (
+                  <>
+                    <Text style={styles.sectionTitle}>Goals</Text>
+                    <View style={styles.checkboxGrid}>
+                      {twelveWeekGoals.map(goal => {
+                        const isSelected = formData.selectedGoalId === goal.id;
+                        return (
+                          <TouchableOpacity
+                            key={goal.id}
+                            style={styles.checkItem}
+                            onPress={() => setFormData(prev => ({ ...prev, selectedGoalId: isSelected ? null : goal.id }))}
+                          >
+                            <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                              {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                            </View>
+                            <Text style={styles.checkLabel}>{goal.title}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </>
+            )}
+
+            {formData.schedulingType === 'depositIdea' && (
+              <>
+                <Text style={styles.sectionTitle}>12-Week Goals</Text>
+                <View style={styles.checkboxGrid}>
+                  {twelveWeekGoals.map(goal => {
+                    const isSelected = formData.selectedGoalIds?.includes(goal.id);
+                    return (
+                      <TouchableOpacity
+                        key={goal.id}
+                        style={styles.checkItem}
+                        onPress={() => handleMultiSelect('selectedGoalIds', goal.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkLabel}>{goal.title}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </>
             )}
 
@@ -736,7 +789,16 @@ const styles = StyleSheet.create({
       color: '#374151',
       marginLeft: 8,
       flexShrink: 1,
-    }
+    },
+    timeOptionPopup: {
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f3f4f6',
+    },
+    timeOptionTextPopup: {
+      fontSize: 14,
+      color: '#374151',
+    },
 
 });
 
