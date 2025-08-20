@@ -57,6 +57,7 @@ export default function Roles() {
   const [editRoleModalVisible, setEditRoleModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
+  const [activeJournalView, setActiveJournalView] = useState<'deposits' | 'journal' | 'analytics'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -500,6 +501,50 @@ export default function Roles() {
     // Sort functionality can be implemented later
   };
 
+  const renderJournalLedger = () => {
+    const placeholderRows = [
+      { date: '2025-01-15', description: 'Quality time with family', notes: 'Dinner together', deposit: '+15', withdrawal: '', balance: '85' },
+      { date: '2025-01-14', description: 'Missed workout session', notes: 'Too busy with work', deposit: '', withdrawal: '-8', balance: '70' },
+      { date: '2025-01-13', description: 'Completed project milestone', notes: 'Delivered on time', deposit: '+25', withdrawal: '', balance: '78' },
+      { date: '2025-01-12', description: 'Skipped family event', notes: 'Work conflict', deposit: '', withdrawal: '-12', balance: '53' },
+      { date: '2025-01-11', description: 'Helped with homework', notes: 'Math tutoring', deposit: '+10', withdrawal: '', balance: '65' },
+      { date: '2025-01-10', description: 'Argued with spouse', notes: 'Stress from work', deposit: '', withdrawal: '-15', balance: '55' },
+    ];
+
+    return (
+      <View style={styles.journalContainer}>
+        {/* Header Row */}
+        <View style={styles.journalHeader}>
+          <Text style={[styles.journalHeaderText, styles.dateColumn]}>Date</Text>
+          <Text style={[styles.journalHeaderText, styles.descriptionColumn]}>Description</Text>
+          <Text style={[styles.journalHeaderText, styles.notesColumn]}>Notes</Text>
+          <Text style={[styles.journalHeaderText, styles.amountColumn]}>Deposit</Text>
+          <Text style={[styles.journalHeaderText, styles.amountColumn]}>Withdrawal</Text>
+          <Text style={[styles.journalHeaderText, styles.balanceColumn]}>Balance</Text>
+        </View>
+        
+        {/* Data Rows */}
+        <ScrollView style={styles.journalScrollView}>
+          {placeholderRows.map((row, index) => (
+            <View 
+              key={index} 
+              style={[
+                styles.journalRow, 
+                index % 2 === 0 ? styles.journalRowEven : styles.journalRowOdd
+              ]}
+            >
+              <Text style={[styles.journalCellText, styles.dateColumn]}>{row.date}</Text>
+              <Text style={[styles.journalCellText, styles.descriptionColumn]} numberOfLines={2}>{row.description}</Text>
+              <Text style={[styles.journalCellText, styles.notesColumn]} numberOfLines={2}>{row.notes}</Text>
+              <Text style={[styles.journalCellText, styles.amountColumn, styles.depositText]}>{row.deposit}</Text>
+              <Text style={[styles.journalCellText, styles.amountColumn, styles.withdrawalText]}>{row.withdrawal}</Text>
+              <Text style={[styles.journalCellText, styles.balanceColumn, styles.balanceText]}>{row.balance}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
   return (
     <SafeAreaView style={styles.container}>
       <Header 
@@ -597,12 +642,14 @@ export default function Roles() {
           <Header 
             title={selectedRole?.label || 'Role'}
             backgroundColor={selectedRole?.color}
-            activeView={activeView}
-            onViewChange={(view) => {
-              setActiveView(view);
-              if (selectedRole) fetchRoleTasks(selectedRole.id);
+            activeJournalView={activeJournalView}
+            onJournalViewChange={(view) => {
+              setActiveJournalView(view);
+              if (view === 'deposits' && selectedRole) {
+                fetchRoleTasks(selectedRole.id);
+              }
             }}
-            onSortPress={handleSortPress}
+            onSortPress={activeJournalView === 'deposits' ? handleSortPress : undefined}
             onBackPress={() => setRoleAccountVisible(false)}
             onEditPress={() => {
               if (selectedRole) {
@@ -612,7 +659,7 @@ export default function Roles() {
           />
           
           <View style={styles.content}>
-            {roleTasks.length === 0 ? (
+            {activeJournalView === 'deposits' && roleTasks.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
                   No {activeView} currently associated with this Role
@@ -620,7 +667,7 @@ export default function Roles() {
               </View>
             ) : (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
-                {/* Active Tasks Section */}
+                {activeJournalView === 'deposits' && (
                 <View style={styles.tasksSection}>
                   {roleTasks.map(task => (
                     <TaskCard
@@ -631,6 +678,15 @@ export default function Roles() {
                     />
                   ))}
                 </View>
+                )}
+                
+                {activeJournalView === 'journal' && renderJournalLedger()}
+                
+                {activeJournalView === 'analytics' && (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>Analytics view coming soon!</Text>
+                  </View>
+                )}
               </ScrollView>
             )}
             
@@ -713,12 +769,14 @@ export default function Roles() {
         <SafeAreaView style={styles.container}>
           <Header 
             title={selectedKR?.name || 'Key Relationship'}
-            activeView={activeView}
-            onViewChange={(view) => {
-              setActiveView(view);
-              if (selectedKR) fetchKRTasks(selectedKR.id);
+            activeJournalView={activeJournalView}
+            onJournalViewChange={(view) => {
+              setActiveJournalView(view);
+              if (view === 'deposits' && selectedKR) {
+                fetchKRTasks(selectedKR.id);
+              }
             }}
-            onSortPress={handleSortPress}
+            onSortPress={activeJournalView === 'deposits' ? handleSortPress : undefined}
             onBackPress={() => setKrAccountVisible(false)}
             onEditPress={() => {
               if (selectedKR) {
@@ -728,7 +786,7 @@ export default function Roles() {
           />
           
           <View style={styles.content}>
-            {krTasks.length === 0 ? (
+            {activeJournalView === 'deposits' && krTasks.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
                   No {activeView} currently associated with this Key Relationship
@@ -736,14 +794,26 @@ export default function Roles() {
               </View>
             ) : (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
-                {krTasks.map(task => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onComplete={handleCompleteTask}
-                    onDoublePress={handleTaskDoublePress}
-                  />
-                ))}
+                {activeJournalView === 'deposits' && (
+                  <View style={styles.tasksSection}>
+                    {krTasks.map(task => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onComplete={handleCompleteTask}
+                        onDoublePress={handleTaskDoublePress}
+                      />
+                    ))}
+                  </View>
+                )}
+                
+                {activeJournalView === 'journal' && renderJournalLedger()}
+                
+                {activeJournalView === 'analytics' && (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>Analytics view coming soon!</Text>
+                  </View>
+                )}
               </ScrollView>
             )}
             
@@ -1204,5 +1274,76 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  
+  // Journal Ledger Styles
+  journalContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    margin: 16,
+    overflow: 'hidden',
+  },
+  journalHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 2,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  journalHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  journalScrollView: {
+    flex: 1,
+  },
+  journalRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  journalRowEven: {
+    backgroundColor: '#ffffff',
+  },
+  journalRowOdd: {
+    backgroundColor: '#f9fafb',
+  },
+  journalCellText: {
+    fontSize: 11,
+    color: '#374151',
+    textAlign: 'center',
+  },
+  dateColumn: {
+    width: '15%',
+  },
+  descriptionColumn: {
+    width: '25%',
+  },
+  notesColumn: {
+    width: '20%',
+  },
+  amountColumn: {
+    width: '15%',
+  },
+  balanceColumn: {
+    width: '10%',
+  },
+  depositText: {
+    color: '#16a34a',
+    fontWeight: '600',
+  },
+  withdrawalText: {
+    color: '#dc2626',
+    fontWeight: '600',
+  },
+  balanceText: {
+    color: '#0078d4',
+    fontWeight: '600',
   },
 });
