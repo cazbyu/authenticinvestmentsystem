@@ -9,6 +9,7 @@ import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import { EditRoleModal } from '@/components/settings/EditRoleModal';
+import { DepositIdeaCard } from '@/components/depositIdeas/DepositIdeaCard';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
@@ -49,6 +50,8 @@ export default function Roles() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [roleTasks, setRoleTasks] = useState<Task[]>([]);
   const [krTasks, setKrTasks] = useState<Task[]>([]);
+  const [roleDepositIdeas, setRoleDepositIdeas] = useState<any[]>([]);
+  const [krDepositIdeas, setKrDepositIdeas] = useState<any[]>([]);
   const [roleKeyRelationships, setRoleKeyRelationships] = useState<KeyRelationship[]>([]);
   const [addKRModalVisible, setAddKRModalVisible] = useState(false);
   const [newKRName, setNewKRName] = useState('');
@@ -170,74 +173,127 @@ export default function Roles() {
     setEditRoleModalVisible(true);
   };
 
-  const fetchRoleTasks = async (roleId: string) => {
+  const fetchRoleTasks = async (roleId: string, viewType: 'deposits' | 'ideas' | 'journal' | 'analytics' = 'deposits') => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let taskQuery = supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .not('status', 'in', '(completed,cancelled)');
+      if (viewType === 'deposits') {
+        // Fetch tasks/events
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('0008-ap-tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('status', 'in', '(completed,cancelled)')
+          .in('type', ['task', 'event'])
+          .eq('deposit_idea', false);
 
-      // Apply filtering based on activeJournalView
-      if (activeJournalView === 'deposits') {
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      } else if (activeJournalView === 'ideas') {
-        taskQuery = taskQuery.eq('deposit_idea', true);
-      } else {
-        // For journal and analytics views, default to deposits for background data
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      }
+        if (tasksError) throw tasksError;
 
-      const { data: tasksData, error: tasksError } = await taskQuery;
-      if (tasksError) throw tasksError;
+        if (!tasksData || tasksData.length === 0) {
+          setRoleTasks([]);
+          setRoleDepositIdeas([]);
+          return;
+        }
 
-      if (!tasksData || tasksData.length === 0) {
+        const taskIds = tasksData.map(t => t.id);
+
+        const [
+          { data: rolesData, error: rolesError },
+          { data: domainsData, error: domainsError },
+          { data: goalsData, error: goalsError },
+          { data: notesData, error: notesError },
+          { data: delegatesData, error: delegatesError }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+        ]);
+
+        if (rolesError) throw rolesError;
+        if (domainsError) throw domainsError;
+        if (goalsError) throw goalsError;
+        if (notesError) throw notesError;
+        if (delegatesError) throw delegatesError;
+
+        const transformedTasks = tasksData.map(task => ({
+          ...task,
+          roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+          goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === task.id),
+          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+          has_attachments: false,
+        }));
+
+        // Filter tasks that belong to this specific role
+        const roleSpecificTasks = transformedTasks.filter(task =>
+          task.roles.some(role => role.id === roleId)
+        );
+
+        setRoleTasks(roleSpecificTasks);
+        setRoleDepositIdeas([]);
+
+      } else if (viewType === 'ideas') {
+        // Fetch deposit ideas
+        const { data: depositIdeasData, error: depositIdeasError } = await supabase
+          .from('0008-ap-deposit-ideas')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('archived', false);
+
+        if (depositIdeasError) throw depositIdeasError;
+
+        if (!depositIdeasData || depositIdeasData.length === 0) {
+          setRoleDepositIdeas([]);
+          setRoleTasks([]);
+          return;
+        }
+
+        const depositIdeaIds = depositIdeasData.map(di => di.id);
+
+        const [
+          { data: rolesData, error: rolesError },
+          { data: domainsData, error: domainsError },
+          { data: krData, error: krError },
+          { data: notesData, error: notesError }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+        ]);
+
+        if (rolesError) throw rolesError;
+        if (domainsError) throw domainsError;
+        if (krError) throw krError;
+        if (notesError) throw notesError;
+
+        const transformedDepositIdeas = depositIdeasData.map(di => ({
+          ...di,
+          roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
+          domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
+          keyRelationships: krData?.filter(kr => kr.parent_id === di.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === di.id),
+          has_attachments: false,
+        }));
+
+        // Filter deposit ideas that belong to this specific role
+        const roleSpecificDepositIdeas = transformedDepositIdeas.filter(di =>
+          di.roles.some(role => role.id === roleId)
+        );
+
+        setRoleDepositIdeas(roleSpecificDepositIdeas);
         setRoleTasks([]);
-        return;
+
+      } else {
+        // For journal and analytics views, clear both lists
+        setRoleTasks([]);
+        setRoleDepositIdeas([]);
       }
-
-      const taskIds = tasksData.map(t => t.id);
-
-      const [
-        { data: rolesData, error: rolesError },
-        { data: domainsData, error: domainsError },
-        { data: goalsData, error: goalsError },
-        { data: notesData, error: notesError },
-        { data: delegatesData, error: delegatesError }
-      ] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
-      ]);
-
-      if (rolesError) throw rolesError;
-      if (domainsError) throw domainsError;
-      if (goalsError) throw goalsError;
-      if (notesError) throw notesError;
-      if (delegatesError) throw delegatesError;
-
-      const transformedTasks = tasksData.map(task => ({
-        ...task,
-        roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-        domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-        goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
-        has_notes: notesData?.some(n => n.parent_id === task.id),
-        has_delegates: delegatesData?.some(d => d.parent_id === task.id),
-        has_attachments: false,
-      }));
-
-      // Filter tasks that belong to this specific role
-      const roleSpecificTasks = transformedTasks.filter(task =>
-        task.roles.some(role => role.id === roleId)
-      );
-
-      setRoleTasks(roleSpecificTasks);
     } catch (error) {
       console.error('Error fetching role tasks:', error);
       Alert.alert('Error', (error as Error).message);
@@ -293,78 +349,131 @@ export default function Roles() {
     }
   };
 
-  const fetchKRTasks = async (krId: string) => {
+  const fetchKRTasks = async (krId: string, viewType: 'deposits' | 'ideas' | 'journal' | 'analytics' = 'deposits') => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let taskQuery = supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .not('status', 'in', '(completed,cancelled)');
+      if (viewType === 'deposits') {
+        // Fetch tasks/events
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('0008-ap-tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('status', 'in', '(completed,cancelled)')
+          .in('type', ['task', 'event'])
+          .eq('deposit_idea', false);
 
-      // Apply filtering based on activeJournalView
-      if (activeJournalView === 'deposits') {
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      } else if (activeJournalView === 'ideas') {
-        taskQuery = taskQuery.eq('deposit_idea', true);
-      } else {
-        // For journal and analytics views, default to deposits for background data
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      }
+        if (tasksError) throw tasksError;
 
-      const { data: tasksData, error: tasksError } = await taskQuery;
-      if (tasksError) throw tasksError;
+        if (!tasksData || tasksData.length === 0) {
+          setKrTasks([]);
+          setKrDepositIdeas([]);
+          return;
+        }
 
-      if (!tasksData || tasksData.length === 0) {
+        const taskIds = tasksData.map(t => t.id);
+
+        const [
+          { data: rolesData, error: rolesError },
+          { data: domainsData, error: domainsError },
+          { data: goalsData, error: goalsError },
+          { data: notesData, error: notesError },
+          { data: delegatesData, error: delegatesError },
+          { data: krData, error: krError }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+        ]);
+
+        if (rolesError) throw rolesError;
+        if (domainsError) throw domainsError;
+        if (goalsError) throw goalsError;
+        if (notesError) throw notesError;
+        if (delegatesError) throw delegatesError;
+        if (krError) throw krError;
+
+        const transformedTasks = tasksData.map(task => ({
+          ...task,
+          roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+          goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+          keyRelationships: krData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === task.id),
+          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+          has_attachments: false,
+        }));
+
+        // Filter tasks that belong to this specific key relationship
+        const krSpecificTasks = transformedTasks.filter(task =>
+          task.keyRelationships?.some(kr => kr.id === krId)
+        );
+
+        setKrTasks(krSpecificTasks);
+        setKrDepositIdeas([]);
+
+      } else if (viewType === 'ideas') {
+        // Fetch deposit ideas
+        const { data: depositIdeasData, error: depositIdeasError } = await supabase
+          .from('0008-ap-deposit-ideas')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('archived', false);
+
+        if (depositIdeasError) throw depositIdeasError;
+
+        if (!depositIdeasData || depositIdeasData.length === 0) {
+          setKrDepositIdeas([]);
+          setKrTasks([]);
+          return;
+        }
+
+        const depositIdeaIds = depositIdeasData.map(di => di.id);
+
+        const [
+          { data: rolesData, error: rolesError },
+          { data: domainsData, error: domainsError },
+          { data: krData, error: krError },
+          { data: notesData, error: notesError }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+        ]);
+
+        if (rolesError) throw rolesError;
+        if (domainsError) throw domainsError;
+        if (krError) throw krError;
+        if (notesError) throw notesError;
+
+        const transformedDepositIdeas = depositIdeasData.map(di => ({
+          ...di,
+          roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
+          domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
+          keyRelationships: krData?.filter(kr => kr.parent_id === di.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === di.id),
+          has_attachments: false,
+        }));
+
+        // Filter deposit ideas that belong to this specific key relationship
+        const krSpecificDepositIdeas = transformedDepositIdeas.filter(di =>
+          di.keyRelationships?.some(kr => kr.id === krId)
+        );
+
+        setKrDepositIdeas(krSpecificDepositIdeas);
         setKrTasks([]);
-        return;
+
+      } else {
+        // For journal and analytics views, clear both lists
+        setKrTasks([]);
+        setKrDepositIdeas([]);
       }
-
-      const taskIds = tasksData.map(t => t.id);
-
-      const [
-        { data: rolesData, error: rolesError },
-        { data: domainsData, error: domainsError },
-        { data: goalsData, error: goalsError },
-        { data: notesData, error: notesError },
-        { data: delegatesData, error: delegatesError },
-        { data: krData, error: krError }
-      ] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds),
-      ]);
-
-      if (rolesError) throw rolesError;
-      if (domainsError) throw domainsError;
-      if (goalsError) throw goalsError;
-      if (notesError) throw notesError;
-      if (delegatesError) throw delegatesError;
-      if (krError) throw krError;
-
-      const transformedTasks = tasksData.map(task => ({
-        ...task,
-        roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-        domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-        goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
-        keyRelationships: krData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
-        has_notes: notesData?.some(n => n.parent_id === task.id),
-        has_delegates: delegatesData?.some(d => d.parent_id === task.id),
-        has_attachments: false,
-      }));
-
-      // Filter tasks that belong to this specific key relationship
-      const krSpecificTasks = transformedTasks.filter(task =>
-        task.keyRelationships?.some(kr => kr.id === krId)
-      );
-
-      setKrTasks(krSpecificTasks);
     } catch (error) {
       console.error('Error fetching KR tasks:', error);
       Alert.alert('Error', (error as Error).message);
@@ -388,6 +497,51 @@ export default function Roles() {
       }
     } catch (error) {
       Alert.alert('Error', (error as Error).message || 'Failed to complete task.');
+    }
+  };
+
+  const handleActivateDepositIdea = (depositIdea: any) => {
+    // Prepare activation data
+    const activationData = {
+      ...depositIdea,
+      sourceDepositIdeaId: depositIdea.id,
+      type: 'task' // Default to task, user can change to event
+    };
+    setEditingTask(activationData);
+    setTaskFormVisible(true);
+  };
+
+  const handleUpdateDepositIdea = (depositIdea: any) => {
+    const editData = {
+      ...depositIdea,
+      type: 'depositIdea'
+    };
+    setEditingTask(editData);
+    setTaskFormVisible(true);
+  };
+
+  const handleCancelDepositIdea = async (depositIdea: any) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('0008-ap-deposit-ideas')
+        .update({
+          is_active: false,
+          archived: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', depositIdea.id);
+
+      if (error) throw error;
+      
+      if (selectedRole) {
+        await fetchRoleTasks(selectedRole.id, activeJournalView);
+      }
+      if (selectedKR) {
+        await fetchKRTasks(selectedKR.id, activeJournalView);
+      }
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to cancel deposit idea.');
     }
   };
 
@@ -678,13 +832,19 @@ export default function Roles() {
           />
           
           <View style={styles.content}>
-            {(activeJournalView === 'deposits' || activeJournalView === 'ideas') && roleTasks.length === 0 ? (
+            {activeJournalView === 'deposits' && roleTasks.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
-                  No {activeJournalView} currently associated with this Role
+                  No deposits currently associated with this Role
                 </Text>
               </View>
-            ) : (activeJournalView === 'deposits' || activeJournalView === 'ideas') ? (
+            ) : activeJournalView === 'ideas' && roleDepositIdeas.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  No ideas currently associated with this Role
+                </Text>
+              </View>
+            ) : activeJournalView === 'deposits' ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
                 <View style={styles.tasksSection}>
                   {roleTasks.map(task => (
@@ -693,6 +853,20 @@ export default function Roles() {
                       task={task}
                       onComplete={handleCompleteTask}
                       onDoublePress={handleTaskDoublePress}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            ) : activeJournalView === 'ideas' ? (
+              <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
+                <View style={styles.tasksSection}>
+                  {roleDepositIdeas.map(depositIdea => (
+                    <DepositIdeaCard
+                      key={depositIdea.id}
+                      depositIdea={depositIdea}
+                      onUpdate={handleUpdateDepositIdea}
+                      onActivate={handleActivateDepositIdea}
+                      onCancel={handleCancelDepositIdea}
                     />
                   ))}
                 </View>
@@ -720,7 +894,6 @@ export default function Roles() {
                           const { data } = supabase.storage
                             .from('0008-key-relationship-images')
                             .getPublicUrl(kr.image_path);
-                          imageUrl = data.publicUrl;
                           imageUrl = data.publicUrl;
                         } catch (error) {
                           console.error('Error loading image URL:', error);
@@ -801,13 +974,19 @@ export default function Roles() {
           />
           
           <View style={styles.content}>
-            {(activeJournalView === 'deposits' || activeJournalView === 'ideas') && krTasks.length === 0 ? (
+            {activeJournalView === 'deposits' && krTasks.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
-                  No {activeJournalView} currently associated with this Key Relationship
+                  No deposits currently associated with this Key Relationship
                 </Text>
               </View>
-            ) : (activeJournalView === 'deposits' || activeJournalView === 'ideas') ? (
+            ) : activeJournalView === 'ideas' && krDepositIdeas.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  No ideas currently associated with this Key Relationship
+                </Text>
+              </View>
+            ) : activeJournalView === 'deposits' ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
                 <View style={styles.tasksSection}>
                   {krTasks.map(task => (
@@ -816,6 +995,20 @@ export default function Roles() {
                       task={task}
                       onComplete={handleCompleteTask}
                       onDoublePress={handleTaskDoublePress}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            ) : activeJournalView === 'ideas' ? (
+              <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
+                <View style={styles.tasksSection}>
+                  {krDepositIdeas.map(depositIdea => (
+                    <DepositIdeaCard
+                      key={depositIdea.id}
+                      depositIdea={depositIdea}
+                      onUpdate={handleUpdateDepositIdea}
+                      onActivate={handleActivateDepositIdea}
+                      onCancel={handleCancelDepositIdea}
                     />
                   ))}
                 </View>
@@ -854,7 +1047,7 @@ export default function Roles() {
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
   <TaskEventForm
     mode={editingTask ? "edit" : "create"}
-    initialData={editingTask || (selectedRole ? { selectedRoleIds: [selectedRole.id] } : undefined)}
+    initialData={editingTask || (selectedRole ? { selectedRoleIds: [selectedRole.id] } : selectedKR ? { selectedKeyRelationshipIds: [selectedKR.id] } : undefined)}
     onSubmitSuccess={() => {
       setTaskFormVisible(false);
       setEditingTask(null);
@@ -1167,12 +1360,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     alignSelf: 'center',
-  },
-  krMainImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 12,
   },
   krMainImage: {
     width: 60,
