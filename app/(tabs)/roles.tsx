@@ -410,20 +410,6 @@ export default function Roles() {
   };
 
   const renderRoleCard = (role: Role) => {
-    // Get image URL if image_path exists
-    let imageUrl = null;
-    if (role.image_path) {
-      try {
-        const supabase = getSupabaseClient();
-        const { data } = supabase.storage
-          .from('0008-role-images')
-          .getPublicUrl(role.image_path);
-        imageUrl = data.publicUrl;
-      } catch (error) {
-        console.error('Error loading role image URL:', error);
-      }
-    }
-
     return (
       <TouchableOpacity
         key={role.id}
@@ -445,8 +431,15 @@ export default function Roles() {
         </TouchableOpacity>
         
         <View style={styles.cardContent}>
-          {imageUrl && (
-            <Image source={{ uri: imageUrl }} style={styles.roleMainImage} />
+          {role.image_path && (
+            <Image 
+              source={{ 
+                uri: getSupabaseClient().storage
+                  .from('0008-role-images')
+                  .getPublicUrl(role.image_path).data.publicUrl 
+              }} 
+              style={styles.roleMainImage} 
+            />
           )}
           <Text style={styles.roleTitle}>{role.label}</Text>
           <Text style={styles.roleCategory}>{role.category || 'Custom'}</Text>
@@ -649,9 +642,11 @@ export default function Roles() {
                       if (kr.image_path) {
                         try {
                           const supabase = getSupabaseClient();
-                          imageUrl = supabase.storage
+                          const { data } = supabase.storage
                             .from('0008-key-relationship-images')
-                            .getPublicUrl(kr.image_path).data.publicUrl;
+                            .getPublicUrl(kr.image_path);
+                          imageUrl = data.publicUrl;
+                          imageUrl = data.publicUrl;
                         } catch (error) {
                           console.error('Error loading image URL:', error);
                         }
