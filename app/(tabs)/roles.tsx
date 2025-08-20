@@ -56,8 +56,7 @@ export default function Roles() {
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
   const [editRoleModalVisible, setEditRoleModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
-  const [activeJournalView, setActiveJournalView] = useState<'deposits' | 'journal' | 'analytics'>('deposits');
+  const [activeJournalView, setActiveJournalView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -171,10 +170,13 @@ export default function Roles() {
         .eq('user_id', user.id)
         .not('status', 'in', '(completed,cancelled)');
 
-      if (activeView === 'deposits') {
+      if (activeJournalView === 'deposits') {
         taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      } else {
+      } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
+      } else {
+        // For journal and analytics views, we still need to fetch tasks for potential display
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       }
 
       const { data: tasksData, error: tasksError } = await taskQuery;
@@ -290,10 +292,13 @@ export default function Roles() {
         .eq('user_id', user.id)
         .not('status', 'in', '(completed,cancelled)');
 
-      if (activeView === 'deposits') {
+      if (activeJournalView === 'deposits') {
         taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      } else {
+      } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
+      } else {
+        // For journal and analytics views, we still need to fetch tasks for potential display
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       }
 
       const { data: tasksData, error: tasksError } = await taskQuery;
@@ -643,13 +648,13 @@ export default function Roles() {
             title={selectedRole?.label || 'Role'}
             backgroundColor={selectedRole?.color}
             activeJournalView={activeJournalView}
-            onJournalViewChange={(view) => {
+            onJournalViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
               setActiveJournalView(view);
-              if (view === 'deposits' && selectedRole) {
+              if ((view === 'deposits' || view === 'ideas') && selectedRole) {
                 fetchRoleTasks(selectedRole.id);
               }
             }}
-            onSortPress={activeJournalView === 'deposits' ? handleSortPress : undefined}
+            onSortPress={(activeJournalView === 'deposits' || activeJournalView === 'ideas') ? handleSortPress : undefined}
             onBackPress={() => setRoleAccountVisible(false)}
             onEditPress={() => {
               if (selectedRole) {
@@ -659,15 +664,14 @@ export default function Roles() {
           />
           
           <View style={styles.content}>
-            {activeJournalView === 'deposits' && roleTasks.length === 0 ? (
+            {(activeJournalView === 'deposits' || activeJournalView === 'ideas') && roleTasks.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
-                  No {activeView} currently associated with this Role
+                  No {activeJournalView} currently associated with this Role
                 </Text>
               </View>
-            ) : (
+            ) : (activeJournalView === 'deposits' || activeJournalView === 'ideas') ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
-                {activeJournalView === 'deposits' && (
                 <View style={styles.tasksSection}>
                   {roleTasks.map(task => (
                     <TaskCard
@@ -678,16 +682,14 @@ export default function Roles() {
                     />
                   ))}
                 </View>
-                )}
-                
-                {activeJournalView === 'journal' && renderJournalLedger()}
-                
-                {activeJournalView === 'analytics' && (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>Analytics view coming soon!</Text>
-                  </View>
-                )}
               </ScrollView>
+            ) : activeJournalView === 'journal' ? (
+              renderJournalLedger()
+            ) : activeJournalView === 'analytics' ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Analytics view coming soon!</Text>
+              </View>
+            ) : null}
             )}
             
             {/* Key Relationships Section - Always visible */}
@@ -770,13 +772,13 @@ export default function Roles() {
           <Header 
             title={selectedKR?.name || 'Key Relationship'}
             activeJournalView={activeJournalView}
-            onJournalViewChange={(view) => {
+            onJournalViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
               setActiveJournalView(view);
-              if (view === 'deposits' && selectedKR) {
+              if ((view === 'deposits' || view === 'ideas') && selectedKR) {
                 fetchKRTasks(selectedKR.id);
               }
             }}
-            onSortPress={activeJournalView === 'deposits' ? handleSortPress : undefined}
+            onSortPress={(activeJournalView === 'deposits' || activeJournalView === 'ideas') ? handleSortPress : undefined}
             onBackPress={() => setKrAccountVisible(false)}
             onEditPress={() => {
               if (selectedKR) {
@@ -786,35 +788,32 @@ export default function Roles() {
           />
           
           <View style={styles.content}>
-            {activeJournalView === 'deposits' && krTasks.length === 0 ? (
+            {(activeJournalView === 'deposits' || activeJournalView === 'ideas') && krTasks.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
-                  No {activeView} currently associated with this Key Relationship
+                  No {activeJournalView} currently associated with this Key Relationship
                 </Text>
               </View>
-            ) : (
+            ) : (activeJournalView === 'deposits' || activeJournalView === 'ideas') ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
-                {activeJournalView === 'deposits' && (
-                  <View style={styles.tasksSection}>
-                    {krTasks.map(task => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onComplete={handleCompleteTask}
-                        onDoublePress={handleTaskDoublePress}
-                      />
-                    ))}
-                  </View>
-                )}
-                
-                {activeJournalView === 'journal' && renderJournalLedger()}
-                
-                {activeJournalView === 'analytics' && (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>Analytics view coming soon!</Text>
-                  </View>
-                )}
+                <View style={styles.tasksSection}>
+                  {krTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onComplete={handleCompleteTask}
+                      onDoublePress={handleTaskDoublePress}
+                    />
+                  ))}
+                </View>
               </ScrollView>
+            ) : activeJournalView === 'journal' ? (
+              renderJournalLedger()
+            ) : activeJournalView === 'analytics' ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Analytics view coming soon!</Text>
+              </View>
+            ) : null}
             )}
             
             <TouchableOpacity 
@@ -848,6 +847,7 @@ export default function Roles() {
       setTaskFormVisible(false);
       setEditingTask(null);
       if (selectedRole) fetchRoleTasks(selectedRole.id);
+      if (selectedKR) fetchKRTasks(selectedKR.id);
     }}
     onClose={() => {
       setTaskFormVisible(false);

@@ -11,8 +11,8 @@ interface HeaderProps {
   title?: string;
   activeView?: 'deposits' | 'ideas';
   onViewChange?: (view: 'deposits' | 'ideas') => void;
-  activeJournalView?: 'deposits' | 'journal' | 'analytics';
-  onJournalViewChange?: (view: 'deposits' | 'journal' | 'analytics') => void;
+  activeJournalView?: 'deposits' | 'ideas' | 'journal' | 'analytics';
+  onJournalViewChange?: (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => void;
   onSortPress?: () => void;
   authenticScore?: number;
   onBackPress?: () => void;
@@ -20,7 +20,18 @@ interface HeaderProps {
   onEditPress?: () => void;
 }
 
-export function Header({ title, activeView, onViewChange, activeJournalView, onJournalViewChange, onSortPress, authenticScore = 85, onBackPress, backgroundColor, onEditPress }: HeaderProps) {
+export function Header({ 
+  title, 
+  activeView, 
+  onViewChange, 
+  activeJournalView, 
+  onJournalViewChange, 
+  onSortPress, 
+  authenticScore = 85, 
+  onBackPress, 
+  backgroundColor, 
+  onEditPress 
+}: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
   const canGoBack = router.canGoBack();
@@ -62,55 +73,74 @@ export function Header({ title, activeView, onViewChange, activeJournalView, onJ
       </View>
       
       {/* Bottom section with toggle and sort */}
-      {((activeView && onViewChange && onSortPress) || (activeJournalView && onJournalViewChange)) && (
+      {((activeView && onViewChange) || (activeJournalView && onJournalViewChange)) && (
         <View style={styles.bottomSection}>
           {activeJournalView && onJournalViewChange ? (
-            <View style={styles.journalToggleContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  activeJournalView === 'deposits' && styles.activeToggle
-                ]}
-                onPress={() => onJournalViewChange('deposits')}
-              >
-                <Text style={[
-                  styles.toggleText,
-                  activeJournalView === 'deposits' && styles.activeToggleText
-                ]}>
-                  Deposits
-                </Text>
-              </TouchableOpacity>
+            <>
+              <View style={styles.toggleContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    activeJournalView === 'deposits' && styles.activeToggle
+                  ]}
+                  onPress={() => onJournalViewChange('deposits')}
+                >
+                  <Text style={[
+                    styles.toggleText,
+                    activeJournalView === 'deposits' && styles.activeToggleText
+                  ]}>
+                    Deposits
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    activeJournalView === 'ideas' && styles.activeToggle
+                  ]}
+                  onPress={() => onJournalViewChange('ideas')}
+                >
+                  <Text style={[
+                    styles.toggleText,
+                    activeJournalView === 'ideas' && styles.activeToggleText
+                  ]}>
+                    Ideas
+                  </Text>
+                </TouchableOpacity>
+              </View>
               
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  activeJournalView === 'journal' && styles.activeToggle
-                ]}
-                onPress={() => onJournalViewChange('journal')}
-              >
-                <Text style={[
-                  styles.toggleText,
-                  activeJournalView === 'journal' && styles.activeToggleText
-                ]}>
-                  Role Journal
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  activeJournalView === 'analytics' && styles.activeToggle
-                ]}
-                onPress={() => onJournalViewChange('analytics')}
-              >
-                <Text style={[
-                  styles.toggleText,
-                  activeJournalView === 'analytics' && styles.activeToggleText
-                ]}>
-                  Analytics
-                </Text>
-              </TouchableOpacity>
-            </View>
+              <View style={styles.journalButtonsContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.journalButton,
+                    activeJournalView === 'journal' && styles.activeJournalButton
+                  ]}
+                  onPress={() => onJournalViewChange('journal')}
+                >
+                  <Text style={[
+                    styles.journalButtonText,
+                    activeJournalView === 'journal' && styles.activeJournalButtonText
+                  ]}>
+                    Role Journal
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.journalButton,
+                    activeJournalView === 'analytics' && styles.activeJournalButton
+                  ]}
+                  onPress={() => onJournalViewChange('analytics')}
+                >
+                  <Text style={[
+                    styles.journalButtonText,
+                    activeJournalView === 'analytics' && styles.activeJournalButtonText
+                  ]}>
+                    Analytics
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
           ) : (
             <View style={styles.toggleContainer}>
               <TouchableOpacity
@@ -222,40 +252,52 @@ const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16, // Smaller border radius
-    padding: 2,
-  },
-  journalToggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
     padding: 2,
-    flex: 1,
-    marginRight: 12,
+  },
+  journalButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
   },
   toggleButton: {
-    paddingHorizontal: 16, // Reduced horizontal padding
-    paddingVertical: 6,  // Reduced vertical padding
-    borderRadius: 14, // Smaller border radius
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 14,
   },
   activeToggle: {
     backgroundColor: '#ffffff',
   },
   toggleText: {
     color: '#ffffff',
-    fontSize: 12, // Smaller font size
+    fontSize: 12,
     fontWeight: '600',
   },
   activeToggleText: {
     color: '#0078d4',
   },
-  // New style for the sort button to match the toggle
+  journalButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  activeJournalButton: {
+    backgroundColor: '#ffffff',
+  },
+  journalButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeJournalButtonText: {
+    color: '#0078d4',
+  },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 16,
-    paddingVertical: 8, // Adjusted to vertically align text
+    paddingVertical: 8,
     borderRadius: 16,
   },
 });
