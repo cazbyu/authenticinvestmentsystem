@@ -38,7 +38,7 @@ export default function Wellness() {
     try {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from('0007-ap-domains')
+        .from('0008-ap-domains')
         .select('*')
         .order('name');
 
@@ -85,7 +85,7 @@ export default function Wellness() {
           { data: delegatesData, error: delegatesError }
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
@@ -141,7 +141,7 @@ export default function Wellness() {
           { data: notesData, error: notesError }
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
-          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea')
         ]);
@@ -303,14 +303,14 @@ export default function Wellness() {
 
   const getDomainColor = (domainName: string) => {
     const colors = {
-      'Physical': '#16a34a',
-      'Mental': '#0891b2', 
-      'Spiritual': '#7c3aed',
-      'Emotional': '#dc2626',
-      'Creative': '#ea580c',
-      'Social': '#0078d4',
+      'Community': '#7c3aed',
       'Financial': '#059669',
-      'Environmental': '#84cc16'
+      'Physical': '#16a34a',
+      'Social': '#0078d4',
+      'Emotional': '#dc2626',
+      'Intellectual': '#0891b2',
+      'Recreational': '#ea580c',
+      'Spiritual': '#7c3aed',
     };
     return colors[domainName] || '#6b7280';
   };
