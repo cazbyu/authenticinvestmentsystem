@@ -7,6 +7,7 @@ config.resolver.assetExts.push('db', 'mp3', 'ttf', 'obj', 'png', 'jpg');
 
 // Add support for TypeScript path mapping
 config.resolver.alias = {
+  ...config.resolver.alias,
   '@': __dirname,
 };
 
