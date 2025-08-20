@@ -704,7 +704,6 @@ export default function Roles() {
                 <Text style={styles.emptyText}>Analytics view coming soon!</Text>
               </View>
             ) : null}
-            )}
             
             {/* Key Relationships Section - Always visible */}
             <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
@@ -828,7 +827,6 @@ export default function Roles() {
                 <Text style={styles.emptyText}>Analytics view coming soon!</Text>
               </View>
             ) : null}
-            )}
             
             <TouchableOpacity 
               style={styles.fab} 
