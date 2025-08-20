@@ -149,14 +149,14 @@ export default function Roles() {
 
   const handleRolePress = async (role: Role) => {
     setSelectedRole(role);
-    await fetchRoleTasks(role.id);
+    await fetchRoleTasks(role.id, 'deposits'); // Default to deposits when opening
     await fetchRoleKeyRelationships(role.id);
     setRoleAccountVisible(true);
   };
 
   const handleKRPress = async (kr: KeyRelationship) => {
     setSelectedKR(kr);
-    await fetchKRTasks(kr.id);
+    await fetchKRTasks(kr.id, 'deposits'); // Default to deposits when opening
     setKrAccountVisible(true);
   };
 
@@ -170,7 +170,7 @@ export default function Roles() {
     setEditRoleModalVisible(true);
   };
 
-  const fetchRoleTasks = async (roleId: string, viewType: 'deposits' | 'ideas' | 'journal' | 'analytics' = activeJournalView) => {
+  const fetchRoleTasks = async (roleId: string) => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -183,9 +183,9 @@ export default function Roles() {
         .not('status', 'in', '(completed,cancelled)');
 
       // Apply filtering based on activeJournalView
-      if (viewType === 'deposits') {
+      if (activeJournalView === 'deposits') {
         taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      } else if (viewType === 'ideas') {
+      } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
       } else {
         // For journal and analytics views, default to deposits for background data
