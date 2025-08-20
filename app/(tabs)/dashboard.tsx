@@ -185,6 +185,7 @@ export default function Dashboard() {
 
   const handleDepositIdeaDoublePress = (depositIdea: any) => { 
     setSelectedDepositIdea(depositIdea);
+    setIsDepositIdeaDetailVisible(true);
   };
   const handleUpdateDepositIdea = async (depositIdea: any) => {
     // Fetch the latest note for prefilling
