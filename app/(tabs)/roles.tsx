@@ -187,6 +187,9 @@ export default function Roles() {
         taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
+      } else {
+        // For journal and analytics views, default to deposits for background data
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       }
 
       const { data: tasksData, error: tasksError } = await taskQuery;
@@ -307,6 +310,9 @@ export default function Roles() {
         taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
+      } else {
+        // For journal and analytics views, default to deposits for background data
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       }
 
       const { data: tasksData, error: tasksError } = await taskQuery;
