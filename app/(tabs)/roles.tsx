@@ -1004,7 +1004,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     width: '48%',
-    aspectRatio: 1,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     shadowColor: '#000',
