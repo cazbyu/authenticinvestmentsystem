@@ -20,11 +20,9 @@ interface HeaderProps {
   onEditPress?: () => void;
 }
 
-export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress, backgroundColor, onEditPress }: HeaderProps) {
+export function Header({ title, activeView, onViewChange, activeJournalView, onJournalViewChange, onSortPress, authenticScore = 85, onBackPress, backgroundColor, onEditPress }: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
-  activeJournalView,
-  onJournalViewChange,
   const canGoBack = router.canGoBack();
 
   const handleLeftButtonPress = () => {
