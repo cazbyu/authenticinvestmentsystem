@@ -95,6 +95,7 @@ export default function Roles() {
 
       if (error) throw error;
       setKeyRelationships(data || []);
+      setSelectedKR(null);
       
       if (data && data.length > 0) {
         setSelectedKR(data[0]);
