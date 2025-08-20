@@ -1018,7 +1018,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
   },
-  roleCardLeft: {
+rolesGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  gap: 12,
+  paddingHorizontal: 16,    // nice gutters
+},
+roleCardHalf: {
+  width: '48%',
+},
+    roleCardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
