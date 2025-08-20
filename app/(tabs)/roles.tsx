@@ -183,7 +183,8 @@ export default function Roles() {
           `)
           .eq('role_id', roleId)
           .eq('parent_type', 'depositIdea')
-          .eq('depositIdea.archived', false);
+          .eq('depositIdea.archived', false)
+          .is('depositIdea.activated_task_id', null);
 
         if (depositIdeasError) throw depositIdeasError;
 
@@ -310,7 +311,8 @@ export default function Roles() {
           `)
           .eq('key_relationship_id', krId)
           .eq('parent_type', 'depositIdea')
-          .eq('depositIdea.archived', false);
+          .eq('depositIdea.archived', false)
+          .is('depositIdea.activated_task_id', null);
 
         if (depositIdeasError) throw depositIdeasError;
 

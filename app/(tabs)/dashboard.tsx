@@ -99,7 +99,8 @@ export default function Dashboard() {
           .from('0008-ap-deposit-ideas')
           .select('*')
           .eq('user_id', user.id)
-          .eq('archived', false);
+          .eq('archived', false)
+          .is('activated_task_id', null);
 
         if (depositIdeasError) throw depositIdeasError;
         if (!depositIdeasData || depositIdeasData.length === 0) {
