@@ -41,7 +41,6 @@ export default function Dashboard() {
           .eq('user_id', user.id)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event'])
-          .eq('deposit_idea', false);
 
         if (tasksError) throw tasksError;
         if (!tasksData || tasksData.length === 0) {
