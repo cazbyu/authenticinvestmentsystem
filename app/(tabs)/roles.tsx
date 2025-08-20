@@ -430,7 +430,7 @@ export default function Roles() {
         style={[
           styles.roleCard,
           isTablet ? styles.roleCardTablet : styles.roleCardMobile,
-          hoveredCard === role.id && styles.roleCardHovered
+          hoveredCard === role.id && styles.roleCardHovered,
           { borderColor: role.color || 'rgba(0, 0, 0, 0.05)' }
         ]}
         onPress={() => handleRolePress(role)}
