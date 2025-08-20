@@ -89,7 +89,7 @@ const toDateString = (date: Date) => {
     is_important: initialData?.is_important || false,
     is_authentic_deposit: initialData?.is_authentic_deposit || false,
     is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
-    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea') || (isActivationMode ? 'task' : 'task'),
+    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea') || 'task',
     selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
     selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
