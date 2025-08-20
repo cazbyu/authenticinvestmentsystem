@@ -80,15 +80,15 @@ export default function Roles() {
   // Add effect to refetch tasks when activeJournalView changes
   useEffect(() => {
     if (selectedRole) {
-      fetchRoleTasks(selectedRole.id);
+      fetchRoleTasks(selectedRole.id, activeJournalView);
     }
-  }, [activeJournalView, selectedRole]);
+  }, [activeJournalView, selectedRole?.id]);
 
   useEffect(() => {
     if (selectedKR) {
-      fetchKRTasks(selectedKR.id);
+      fetchKRTasks(selectedKR.id, activeJournalView);
     }
-  }, [activeJournalView, selectedKR]);
+  }, [activeJournalView, selectedKR?.id]);
   const fetchActiveRoles = async () => {
     setLoading(true);
     try {
