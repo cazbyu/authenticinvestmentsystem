@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, ScrollView, TouchableOpacity, Dimensions, Modal, TextInput, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Edit, UserX, Plus, X, Ban } from 'lucide-react-native';
+import { CreditCard as Edit, UserX, Plus, X, Ban } from 'lucide-react-native';
 import { Header } from '@/components/Header';
 import { AddItemModal } from '@/components/AddItemModal';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
