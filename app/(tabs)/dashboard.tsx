@@ -10,6 +10,8 @@ import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 
+import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
+
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
   const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
@@ -178,25 +180,61 @@ export default function Dashboard() {
   };
 
   const handleTaskDoublePress = (task: Task) => { setSelectedTask(task); setIsDetailModalVisible(true); };
+  const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
+  const [isDepositIdeaDetailVisible, setIsDepositIdeaDetailVisible] = useState(false);
+
   const handleDepositIdeaDoublePress = (depositIdea: any) => { 
-    // Convert deposit idea to task format for detail modal
-    const taskLikeObject = {
-      ...depositIdea,
-      type: 'depositIdea',
-      status: depositIdea.is_active ? 'active' : 'archived'
-    };
-    setSelectedTask(taskLikeObject); 
-    setIsDetailModalVisible(true); 
+    setSelectedDepositIdea(depositIdea);
+    setIsDepositIdeaDetailVisible(true);
   };
+
   const handleActivateDepositIdea = (depositIdea: any) => {
-    // Prepare activation data
-    const activationData = {
-      ...depositIdea,
-      sourceDepositIdeaId: depositIdea.id,
-      type: 'task' // Default to task, user can change to event
+    // Fetch the latest note for prefilling
+    const fetchLatestNote = async () => {
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('0008-ap-universal-notes-join')
+          .select(`
+            note:0008-ap-notes(
+              id,
+              content,
+              created_at
+            )
+          `)
+          .eq('parent_id', depositIdea.id)
+          .eq('parent_type', 'depositIdea')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) throw error;
+
+        const latestNote = data?.[0]?.note?.content || '';
+        
+        // Prepare activation data with prefilled note
+        const activationData = {
+          ...depositIdea,
+          sourceDepositIdeaId: depositIdea.id,
+          type: 'task', // Default to task, user can change to event
+          notes: latestNote
+        };
+        setEditingTask(activationData);
+        setIsFormModalVisible(true);
+      } catch (error) {
+        console.error('Error fetching note for activation:', error);
+        // Continue with activation even if note fetch fails
+        const activationData = {
+          ...depositIdea,
+          sourceDepositIdeaId: depositIdea.id,
+          type: 'task',
+          notes: ''
+        };
+        setEditingTask(activationData);
+        setIsFormModalVisible(true);
+      }
     };
-    setEditingTask(activationData);
-    setIsFormModalVisible(true);
+
+    fetchLatestNote();
   };
   const handleUpdateDepositIdea = (depositIdea: any) => {
     const editData = {
@@ -292,6 +330,14 @@ export default function Dashboard() {
         />
       </Modal>
       <TaskDetailModal visible={isDetailModalVisible} task={selectedTask} onClose={() => setIsDetailModalVisible(false)} onUpdate={handleUpdateTask} onDelegate={handleDelegateTask} onCancel={handleCancelTask} />
+      <DepositIdeaDetailModal 
+        visible={isDepositIdeaDetailVisible} 
+        depositIdea={selectedDepositIdea} 
+        onClose={() => setIsDepositIdeaDetailVisible(false)} 
+        onUpdate={handleUpdateDepositIdea}
+        onActivate={handleActivateDepositIdea}
+        onCancel={handleCancelDepositIdea}
+      />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
