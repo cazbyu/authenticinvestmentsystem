@@ -116,29 +116,24 @@ export default function Roles() {
       if (!user) return;
 
       if (view === 'deposits') {
-        // Fetch tasks/events for this role
+        // Fetch all tasks/events for this user first
         const { data: tasksData, error: tasksError } = await supabase
-          .from('0008-ap-universal-roles-join')
-          .select(`
-            parent_id,
-            task:0008-ap-tasks!inner(*)
-          `)
-          .eq('role_id', roleId)
-          .eq('parent_type', 'task')
-          .not('task.status', 'in', '(completed,cancelled)')
-          .in('task.type', ['task', 'event']);
+          .from('0008-ap-tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('status', 'in', '(completed,cancelled)')
+          .in('type', ['task', 'event']);
 
         if (tasksError) throw tasksError;
 
-        const tasksList = tasksData?.map(item => item.task).filter(Boolean) || [];
-        if (tasksList.length === 0) {
+        if (!tasksData || tasksData.length === 0) {
           setTasks([]);
           setDepositIdeas([]);
           setLoading(false);
           return;
         }
 
-        const taskIds = tasksList.map(t => t.id);
+        const taskIds = tasksData.map(t => t.id);
 
         const [
           { data: rolesData, error: rolesError },
@@ -160,7 +155,11 @@ export default function Roles() {
         if (notesError) throw notesError;
         if (delegatesError) throw delegatesError;
 
-        const transformedTasks = tasksList.map(task => ({
+        // Filter tasks that have the selected role
+        const roleTaskIds = rolesData?.filter(r => r.role?.id === roleId).map(r => r.parent_id) || [];
+        const filteredTasks = tasksData.filter(task => roleTaskIds.includes(task.id));
+
+        const transformedTasks = filteredTasks.map(task => ({
           ...task,
           roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
@@ -174,29 +173,24 @@ export default function Roles() {
         setDepositIdeas([]);
 
       } else {
-        // Fetch deposit ideas for this role
+        // Fetch all deposit ideas for this user first
         const { data: depositIdeasData, error: depositIdeasError } = await supabase
-          .from('0008-ap-universal-roles-join')
-          .select(`
-            parent_id,
-            depositIdea:0008-ap-deposit-ideas!inner(*)
-          `)
-          .eq('role_id', roleId)
-          .eq('parent_type', 'depositIdea')
-          .eq('depositIdea.archived', false)
-          .is('depositIdea.activated_task_id', null);
+          .from('0008-ap-deposit-ideas')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('archived', false)
+          .is('activated_task_id', null);
 
         if (depositIdeasError) throw depositIdeasError;
 
-        const depositIdeasList = depositIdeasData?.map(item => item.depositIdea).filter(Boolean) || [];
-        if (depositIdeasList.length === 0) {
+        if (!depositIdeasData || depositIdeasData.length === 0) {
           setDepositIdeas([]);
           setTasks([]);
           setLoading(false);
           return;
         }
 
-        const depositIdeaIds = depositIdeasList.map(di => di.id);
+        const depositIdeaIds = depositIdeasData.map(di => di.id);
 
         const [
           { data: rolesData, error: rolesError },
@@ -215,7 +209,11 @@ export default function Roles() {
         if (krError) throw krError;
         if (notesError) throw notesError;
 
-        const transformedDepositIdeas = depositIdeasList.map(di => ({
+        // Filter deposit ideas that have the selected role
+        const roleDepositIdeaIds = rolesData?.filter(r => r.role?.id === roleId).map(r => r.parent_id) || [];
+        const filteredDepositIdeas = depositIdeasData.filter(di => roleDepositIdeaIds.includes(di.id));
+
+        const transformedDepositIdeas = filteredDepositIdeas.map(di => ({
           ...di,
           roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
@@ -244,29 +242,24 @@ export default function Roles() {
       if (!user) return;
 
       if (view === 'deposits') {
-        // Fetch tasks/events for this key relationship
+        // Fetch all tasks/events for this user first
         const { data: tasksData, error: tasksError } = await supabase
-          .from('0008-ap-universal-key-relationships-join')
-          .select(`
-            parent_id,
-            task:0008-ap-tasks!inner(*)
-          `)
-          .eq('key_relationship_id', krId)
-          .eq('parent_type', 'task')
-          .not('task.status', 'in', '(completed,cancelled)')
-          .in('task.type', ['task', 'event']);
+          .from('0008-ap-tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('status', 'in', '(completed,cancelled)')
+          .in('type', ['task', 'event']);
 
         if (tasksError) throw tasksError;
 
-        const tasksList = tasksData?.map(item => item.task).filter(Boolean) || [];
-        if (tasksList.length === 0) {
+        if (!tasksData || tasksData.length === 0) {
           setTasks([]);
           setDepositIdeas([]);
           setLoading(false);
           return;
         }
 
-        const taskIds = tasksList.map(t => t.id);
+        const taskIds = tasksData.map(t => t.id);
 
         const [
           { data: rolesData, error: rolesError },
@@ -288,7 +281,11 @@ export default function Roles() {
         if (notesError) throw notesError;
         if (delegatesError) throw delegatesError;
 
-        const transformedTasks = tasksList.map(task => ({
+        // Filter tasks that have the selected key relationship
+        const krTaskIds = delegatesData?.filter(kr => kr.key_relationship?.id === krId).map(kr => kr.parent_id) || [];
+        const filteredTasks = tasksData.filter(task => krTaskIds.includes(task.id));
+
+        const transformedTasks = filteredTasks.map(task => ({
           ...task,
           roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
@@ -302,29 +299,24 @@ export default function Roles() {
         setDepositIdeas([]);
 
       } else {
-        // Fetch deposit ideas for this key relationship
+        // Fetch all deposit ideas for this user first
         const { data: depositIdeasData, error: depositIdeasError } = await supabase
-          .from('0008-ap-universal-key-relationships-join')
-          .select(`
-            parent_id,
-            depositIdea:0008-ap-deposit-ideas!inner(*)
-          `)
-          .eq('key_relationship_id', krId)
-          .eq('parent_type', 'depositIdea')
-          .eq('depositIdea.archived', false)
-          .is('depositIdea.activated_task_id', null);
+          .from('0008-ap-deposit-ideas')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('archived', false)
+          .is('activated_task_id', null);
 
         if (depositIdeasError) throw depositIdeasError;
 
-        const depositIdeasList = depositIdeasData?.map(item => item.depositIdea).filter(Boolean) || [];
-        if (depositIdeasList.length === 0) {
+        if (!depositIdeasData || depositIdeasData.length === 0) {
           setDepositIdeas([]);
           setTasks([]);
           setLoading(false);
           return;
         }
 
-        const depositIdeaIds = depositIdeasList.map(di => di.id);
+        const depositIdeaIds = depositIdeasData.map(di => di.id);
 
         const [
           { data: rolesData, error: rolesError },
@@ -343,7 +335,11 @@ export default function Roles() {
         if (krError) throw krError;
         if (notesError) throw notesError;
 
-        const transformedDepositIdeas = depositIdeasList.map(di => ({
+        // Filter deposit ideas that have the selected key relationship
+        const krDepositIdeaIds = krData?.filter(kr => kr.key_relationship?.id === krId).map(kr => kr.parent_id) || [];
+        const filteredDepositIdeas = depositIdeasData.filter(di => krDepositIdeaIds.includes(di.id));
+
+        const transformedDepositIdeas = filteredDepositIdeas.map(di => ({
           ...di,
           roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
