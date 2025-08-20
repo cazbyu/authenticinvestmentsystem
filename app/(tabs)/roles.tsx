@@ -77,6 +77,18 @@ export default function Roles() {
     }
   }, [roles]);
 
+  // Add effect to refetch tasks when activeJournalView changes
+  useEffect(() => {
+    if (selectedRole && (activeJournalView === 'deposits' || activeJournalView === 'ideas')) {
+      fetchRoleTasks(selectedRole.id);
+    }
+  }, [activeJournalView, selectedRole]);
+
+  useEffect(() => {
+    if (selectedKR && (activeJournalView === 'deposits' || activeJournalView === 'ideas')) {
+      fetchKRTasks(selectedKR.id);
+    }
+  }, [activeJournalView, selectedKR]);
   const fetchActiveRoles = async () => {
     setLoading(true);
     try {

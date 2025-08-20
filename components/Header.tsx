@@ -248,16 +248,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 32,
   },
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
     padding: 2,
+    minWidth: 120,
   },
   journalButtonsContainer: {
     flexDirection: 'row',
     gap: 8,
+    minWidth: 180,
+    justifyContent: 'flex-end',
   },
   toggleButton: {
     paddingHorizontal: 16,
