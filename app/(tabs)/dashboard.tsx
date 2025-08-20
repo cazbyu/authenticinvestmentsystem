@@ -187,47 +187,13 @@ export default function Dashboard() {
     setIsDepositIdeaDetailVisible(true);
   };
   const handleUpdateDepositIdea = async (depositIdea: any) => {
-    // Fetch the latest note for prefilling
-    try {
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from('0008-ap-universal-notes-join')
-        .select(`
-          note:0008-ap-notes(
-            id,
-            content,
-            created_at
-          )
-        `)
-        .eq('parent_id', depositIdea.id)
-        .eq('parent_type', 'depositIdea')
-        .order('created_at', { ascending: false, foreignTable: '0008-ap-notes' })
-        .limit(1);
-
-      if (error) throw error;
-
-      const latestNote = data?.[0]?.note?.content || '';
-      
-      const editData = {
-        ...depositIdea,
-        type: 'depositIdea',
-        notes: latestNote
-      };
-      setEditingTask(editData);
-      setIsDepositIdeaDetailVisible(false);
-      setIsFormModalVisible(true);
-    } catch (error) {
-      console.error('Error fetching note for update:', error);
-      // Continue with update even if note fetch fails
-      const editData = {
-        ...depositIdea,
-        type: 'depositIdea',
-        notes: ''
-      };
-      setEditingTask(editData);
-      setIsDepositIdeaDetailVisible(false);
-      setIsFormModalVisible(true);
-    }
+    const editData = {
+      ...depositIdea,
+      type: 'depositIdea'
+    };
+    setEditingTask(editData);
+    setIsDepositIdeaDetailVisible(false);
+    setIsFormModalVisible(true);
   };
   const handleCancelDepositIdea = async (depositIdea: any) => {
     try {

@@ -79,7 +79,10 @@ const toDateString = (date: Date) => {
 
   const [formData, setFormData] = useState({
     title: initialData?.title || '',
-    notes: initialData?.notes || '',
+    notes: 
+      (initialData?.type === 'depositIdea' || initialData?.sourceDepositIdeaId)
+        ? ''
+        : (initialData?.notes || ''),
     dueDate: initialData?.due_date ? new Date(initialData.due_date) : new Date(),
     time: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
     startTime: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
