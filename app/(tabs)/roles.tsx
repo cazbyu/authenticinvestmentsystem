@@ -846,7 +846,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   rolesGridMobile: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   rolesGridTablet: {
     flexDirection: 'row',
@@ -869,8 +871,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 0, 0, 0.05)',
   },
   roleCardMobile: {
-    width: '100%',
+    width: '48%',
     marginHorizontal: 0,
+    aspectRatio: 1,
   },
   roleCardTablet: {
     width: '48%',
