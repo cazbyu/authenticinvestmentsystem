@@ -170,7 +170,7 @@ export default function Roles() {
     setEditRoleModalVisible(true);
   };
 
-  const fetchRoleTasks = async (roleId: string) => {
+  const fetchRoleTasks = async (roleId: string, viewType: 'deposits' | 'ideas' | 'journal' | 'analytics' = activeJournalView) => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -183,9 +183,9 @@ export default function Roles() {
         .not('status', 'in', '(completed,cancelled)');
 
       // Apply filtering based on activeJournalView
-      if (activeJournalView === 'deposits') {
+      if (viewType === 'deposits') {
         taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
-      } else if (activeJournalView === 'ideas') {
+      } else if (viewType === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
       } else {
         // For journal and analytics views, default to deposits for background data
