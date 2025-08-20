@@ -215,7 +215,7 @@ export default function Dashboard() {
         const activationData = {
           ...depositIdea,
           sourceDepositIdeaId: depositIdea.id,
-          type: 'task', // Default to task, user can change to event
+          schedulingType: 'task', // Default to task, user can change to event
           notes: latestNote
         };
         setEditingTask(activationData);
@@ -226,7 +226,7 @@ export default function Dashboard() {
         const activationData = {
           ...depositIdea,
           sourceDepositIdeaId: depositIdea.id,
-          type: 'task',
+          schedulingType: 'task',
           notes: ''
         };
         setEditingTask(activationData);

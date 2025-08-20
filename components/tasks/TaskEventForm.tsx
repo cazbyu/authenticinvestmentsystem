@@ -319,6 +319,10 @@ const toDateString = (date: Date) => {
                 payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
             }
 
+            // If this is activation mode, mark the task as coming from a deposit idea
+            if (isActivationMode && initialData?.sourceDepositIdeaId) {
+                payload.deposit_idea = true;
+            }
             let taskData;
             let taskError;
 
