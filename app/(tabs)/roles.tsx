@@ -774,7 +774,7 @@ export default function Roles() {
       <View style={styles.content}>
         <Header title="Role Bank" />
         
-        <ScrollView style={styles.rolesList}>
+        *<ScrollView style={styles.rolesList}>
           {roles.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No active roles found</Text>
@@ -789,7 +789,9 @@ export default function Roles() {
             roles.map(role => (
               <TouchableOpacity
                 key={role.id}
-                style={[styles.roleCard, { borderLeftColor: role.color || '#0078d4' }]}
+                style={[styles.roleCard,
+                styles.roleCardHalf,       
+                { borderLeftColor: role.color || '#0078d4' }]}
                 onPress={() => handleRolePress(role)}
               >
                 <View style={styles.roleCardContent}>
@@ -823,7 +825,7 @@ export default function Roles() {
               </TouchableOpacity>
             ))
           )}
-        </ScrollView>
+        </ScrollView>*
       </View>
     );
   };
