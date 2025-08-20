@@ -9,6 +9,7 @@ import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import { EditRoleModal } from '@/components/settings/EditRoleModal';
+import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
@@ -22,6 +23,8 @@ interface Role {
   label: string;
   category?: string;
   is_active: boolean;
+  image_path?: string;
+  color?: string;
   image_path?: string;
   color?: string;
 }
@@ -915,7 +918,6 @@ const styles = StyleSheet.create({
   roleCardMobile: {
     width: '48%',
     marginHorizontal: 0,
-    aspectRatio: 1,
   },
   roleCardTablet: {
     width: '48%',
