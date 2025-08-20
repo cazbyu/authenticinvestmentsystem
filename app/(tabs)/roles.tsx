@@ -604,7 +604,11 @@ export default function Roles() {
             }}
             onSortPress={handleSortPress}
             onBackPress={() => setRoleAccountVisible(false)}
-            onEditPress={() => selectedRole && handleEditRole(selectedRole)}
+            onEditPress={() => {
+              if (selectedRole) {
+                handleEditRole(selectedRole);
+              }
+            }}
           />
           
           <View style={styles.content}>
@@ -716,7 +720,11 @@ export default function Roles() {
             }}
             onSortPress={handleSortPress}
             onBackPress={() => setKrAccountVisible(false)}
-            onEditPress={() => selectedKR && handleEditKR(selectedKR)}
+            onEditPress={() => {
+              if (selectedKR) {
+                handleEditKR(selectedKR);
+              }
+            }}
           />
           
           <View style={styles.content}>

@@ -16,7 +16,6 @@ interface HeaderProps {
   onBackPress?: () => void;
   backgroundColor?: string;
   onEditPress?: () => void;
-  backgroundColor?: string;
 }
 
 export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress, backgroundColor, onEditPress }: HeaderProps) {
