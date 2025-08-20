@@ -71,9 +71,7 @@ export default function Roles() {
       if (error) throw error;
       setRoles(data || []);
       
-      if (data && data.length > 0 && !selectedRole) {
-        setSelectedRole(data[0]);
-      }
+      // Don't auto-select first role - show accounts page by default
     } catch (error) {
       console.error('Error fetching roles:', error);
       Alert.alert('Error', (error as Error).message);
@@ -736,7 +734,10 @@ export default function Roles() {
     // Roles list view
     return (
       <View style={styles.content}>
-        <Header title="Role Bank" />
+        <View style={styles.accountsHeader}>
+          <Text style={styles.accountsTitle}>Role Bank</Text>
+          <Text style={styles.accountsSubtitle}>Accounts</Text>
+        </View>
         
         <ScrollView style={styles.rolesList}>
   {roles.length === 0 ? (
@@ -1145,5 +1146,24 @@ roleCardHalf: {
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  accountsHeader: {
+    backgroundColor: '#0078d4',
+    paddingTop: 8,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  accountsTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  accountsSubtitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '400',
+    opacity: 0.9,
   },
 });
