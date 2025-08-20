@@ -184,7 +184,7 @@ export default function Roles() {
 
       // Apply filtering based on activeJournalView
       if (activeJournalView === 'deposits') {
-        taskQuery = taskQuery.eq('deposit_idea', false);
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
       }
@@ -304,7 +304,7 @@ export default function Roles() {
 
       // Apply filtering based on activeJournalView
       if (activeJournalView === 'deposits') {
-        taskQuery = taskQuery.eq('deposit_idea', false);
+        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
       } else if (activeJournalView === 'ideas') {
         taskQuery = taskQuery.eq('deposit_idea', true);
       }
