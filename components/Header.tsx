@@ -258,8 +258,9 @@ const styles = StyleSheet.create({
   journalButtonsContainer: {
     flexDirection: 'row',
     gap: 8,
-    minWidth: 180,
-    justifyContent: 'flex-end',
+    minWidth: 200,
+    justifyContent: 'space-between',
+    alignItems: 'center',
     flex: 0,
   },
   toggleButton: {
@@ -283,10 +284,12 @@ const styles = StyleSheet.create({
     color: '#0078d4',
   },
   journalButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 90,
+    alignItems: 'center',
   },
   activeJournalButton: {
     backgroundColor: '#ffffff',
