@@ -149,14 +149,14 @@ export default function Roles() {
 
   const handleRolePress = async (role: Role) => {
     setSelectedRole(role);
-    await fetchRoleTasks(role.id, 'deposits'); // Default to deposits when opening
+    await fetchRoleTasks(role.id);
     await fetchRoleKeyRelationships(role.id);
     setRoleAccountVisible(true);
   };
 
   const handleKRPress = async (kr: KeyRelationship) => {
     setSelectedKR(kr);
-    await fetchKRTasks(kr.id, 'deposits'); // Default to deposits when opening
+    await fetchKRTasks(kr.id);
     setKrAccountVisible(true);
   };
 
@@ -381,10 +381,10 @@ export default function Roles() {
 
       if (error) throw error;
       if (selectedRole) {
-        await fetchRoleTasks(selectedRole.id);
+        await fetchRoleTasks(selectedRole.id, activeJournalView);
       }
       if (selectedKR) {
-        await fetchKRTasks(selectedKR.id);
+        await fetchKRTasks(selectedKR.id, activeJournalView);
       }
     } catch (error) {
       Alert.alert('Error', (error as Error).message || 'Failed to complete task.');
@@ -419,10 +419,10 @@ export default function Roles() {
       Alert.alert('Success', 'Task has been cancelled');
       setIsDetailModalVisible(false);
       if (selectedRole) {
-        await fetchRoleTasks(selectedRole.id);
+        await fetchRoleTasks(selectedRole.id, activeJournalView);
       }
       if (selectedKR) {
-        await fetchKRTasks(selectedKR.id);
+        await fetchKRTasks(selectedKR.id, activeJournalView);
       }
     } catch (error) {
       Alert.alert('Error', (error as Error).message || 'Failed to cancel task.');
@@ -860,8 +860,8 @@ export default function Roles() {
     onSubmitSuccess={() => {
       setTaskFormVisible(false);
       setEditingTask(null);
-      if (selectedRole) fetchRoleTasks(selectedRole.id);
-      if (selectedKR) fetchKRTasks(selectedKR.id);
+      if (selectedRole) fetchRoleTasks(selectedRole.id, activeJournalView);
+      if (selectedKR) fetchKRTasks(selectedKR.id, activeJournalView);
     }}
     onClose={() => {
       setTaskFormVisible(false);
