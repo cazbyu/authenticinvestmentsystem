@@ -65,7 +65,7 @@ export default function Dashboard() {
           supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task')
         ]);
 
         if (rolesError) throw rolesError;
@@ -121,7 +121,7 @@ export default function Dashboard() {
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
-          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea')
         ]);
 
         if (rolesError) throw rolesError;
@@ -227,13 +227,10 @@ export default function Dashboard() {
           ...depositIdea,
           sourceDepositIdeaId: depositIdea.id,
           type: 'task',
-          ...depositIdea,
-          notes: ''
-          type: 'task',
-          schedulingType: 'task',
+          notes: '',
+          schedulingType: 'task'
+        };
         setEditingTask(activationData);
-        setIsDepositIdeaDetailVisible(false);
-        setIsFormModalVisible(true);
         setIsDepositIdeaDetailVisible(false);
         setIsFormModalVisible(true);
       }
@@ -243,8 +240,7 @@ export default function Dashboard() {
   };
   const handleUpdateDepositIdea = (depositIdea: any) => {
     const editData = {
-      ...depositIdea,
-      ...depositIdea,
+      ...depositIdea
     };
     setEditingTask(editData);
     setIsDepositIdeaDetailVisible(false);
@@ -382,5 +378,5 @@ const styles = StyleSheet.create({
     sortOption: { padding: 12, borderRadius: 8, marginVertical: 2 },
     activeSortOption: { backgroundColor: '#eff6ff' },
     sortOptionText: { fontSize: 14, color: '#374151' },
-    activeSortOptionText: { color: '#0078d4', fontWeight: '600' },
+    activeSortOptionText: { color: '#0078d4', fontWeight: '600' }
 });
