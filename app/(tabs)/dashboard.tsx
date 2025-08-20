@@ -225,7 +225,7 @@ export default function Dashboard() {
         // Continue with activation even if note fetch fails
         const activationData = {
           ...depositIdea,
-          sourceDepositIdeaId: depositIdea.id,
+          notes: '',
           type: 'task',
           notes: '',
           schedulingType: 'task'
