@@ -10,6 +10,7 @@ import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import { DepositIdeaCard } from '@/components/depositIdeas/DepositIdeaCard';
+import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useIsFocused } from '@react-navigation/native';
@@ -65,6 +66,8 @@ export default function Roles() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
+  const [isDepositIdeaDetailVisible, setIsDepositIdeaDetailVisible] = useState(false);
   const isFocused = useIsFocused();
   const router = useRouter();
 
@@ -92,6 +95,25 @@ export default function Roles() {
       fetchKRTasks(selectedKR.id, activeJournalView);
     }
   }, [activeJournalView, selectedKR?.id]);
+
+  const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
+    setActiveJournalView(view);
+    
+    // Immediately fetch data with the new view to prevent jitter
+    if (selectedRole) {
+      fetchRoleTasks(selectedRole.id, view);
+    }
+  };
+
+  const handleKRViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
+    setActiveJournalView(view);
+    
+    // Immediately fetch data with the new view to prevent jitter
+    if (selectedKR) {
+      fetchKRTasks(selectedKR.id, view);
+    }
+  };
+
   const fetchActiveRoles = async () => {
     setLoading(true);
     try {
@@ -258,17 +280,20 @@ export default function Roles() {
         const [
           { data: rolesData, error: rolesError },
           { data: domainsData, error: domainsError },
+          { data: goalsData, error: goalsError },
           { data: krData, error: krError },
           { data: notesData, error: notesError }
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
         ]);
 
         if (rolesError) throw rolesError;
         if (domainsError) throw domainsError;
+        if (goalsError) throw goalsError;
         if (krError) throw krError;
         if (notesError) throw notesError;
 
@@ -276,6 +301,7 @@ export default function Roles() {
           ...di,
           roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
+          goals: goalsData?.filter(g => g.parent_id === di.id).map(g => g.goal).filter(Boolean) || [],
           keyRelationships: krData?.filter(kr => kr.parent_id === di.id).map(kr => kr.key_relationship).filter(Boolean) || [],
           has_notes: notesData?.some(n => n.parent_id === di.id),
           has_attachments: false,
@@ -438,17 +464,20 @@ export default function Roles() {
         const [
           { data: rolesData, error: rolesError },
           { data: domainsData, error: domainsError },
+          { data: goalsData, error: goalsError },
           { data: krData, error: krError },
           { data: notesData, error: notesError }
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
         ]);
 
         if (rolesError) throw rolesError;
         if (domainsError) throw domainsError;
+        if (goalsError) throw goalsError;
         if (krError) throw krError;
         if (notesError) throw notesError;
 
@@ -456,6 +485,7 @@ export default function Roles() {
           ...di,
           roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
+          goals: goalsData?.filter(g => g.parent_id === di.id).map(g => g.goal).filter(Boolean) || [],
           keyRelationships: krData?.filter(kr => kr.parent_id === di.id).map(kr => kr.key_relationship).filter(Boolean) || [],
           has_notes: notesData?.some(n => n.parent_id === di.id),
           has_attachments: false,
@@ -501,14 +531,52 @@ export default function Roles() {
   };
 
   const handleActivateDepositIdea = (depositIdea: any) => {
-    // Prepare activation data
-    const activationData = {
-      ...depositIdea,
-      sourceDepositIdeaId: depositIdea.id,
-      type: 'task' // Default to task, user can change to event
+    // Fetch the latest note for prefilling
+    const fetchLatestNote = async () => {
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('0008-ap-universal-notes-join')
+          .select(`
+            note:0008-ap-notes(
+              id,
+              content,
+              created_at
+            )
+          `)
+          .eq('parent_id', depositIdea.id)
+          .eq('parent_type', 'depositIdea')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) throw error;
+
+        const latestNote = data?.[0]?.note?.content || '';
+        
+        // Prepare activation data with prefilled note
+        const activationData = {
+          ...depositIdea,
+          sourceDepositIdeaId: depositIdea.id,
+          type: 'task',
+          notes: latestNote
+        };
+        setEditingTask(activationData);
+        setTaskFormVisible(true);
+      } catch (error) {
+        console.error('Error fetching note for activation:', error);
+        // Continue with activation even if note fetch fails
+        const activationData = {
+          ...depositIdea,
+          sourceDepositIdeaId: depositIdea.id,
+          type: 'task',
+          notes: ''
+        };
+        setEditingTask(activationData);
+        setTaskFormVisible(true);
+      }
     };
-    setEditingTask(activationData);
-    setTaskFormVisible(true);
+
+    fetchLatestNote();
   };
 
   const handleUpdateDepositIdea = (depositIdea: any) => {
@@ -548,6 +616,11 @@ export default function Roles() {
   const handleTaskDoublePress = (task: Task) => {
     setSelectedTask(task);
     setIsDetailModalVisible(true);
+  };
+
+  const handleDepositIdeaDoublePress = (depositIdea: any) => {
+    setSelectedDepositIdea(depositIdea);
+    setIsDepositIdeaDetailVisible(true);
   };
 
   const handleUpdateTask = (task: Task) => {
@@ -673,6 +746,49 @@ export default function Roles() {
   const handleSortPress = () => {
     // Sort functionality can be implemented later
   };
+
+  // Add sorting for deposit ideas
+  const sortDepositIdeas = (ideas: any[], sortBy: string) => {
+    const sorted = [...ideas];
+    switch (sortBy) {
+      case 'title':
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case 'created_at':
+        return sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      case 'activated_at':
+        return sorted.sort((a, b) => {
+          if (!a.activated_at && !b.activated_at) return 0;
+          if (!a.activated_at) return 1;
+          if (!b.activated_at) return -1;
+          return new Date(b.activated_at).getTime() - new Date(a.activated_at).getTime();
+        });
+      default:
+        return sorted;
+    }
+  };
+
+  // Apply sorting to tasks
+  const sortTasks = (tasks: Task[], sortBy: string) => {
+    const sorted = [...tasks];
+    switch (sortBy) {
+      case 'due_date':
+        return sorted.sort((a, b) => {
+          if (!a.due_date && !b.due_date) return 0;
+          if (!a.due_date) return 1;
+          if (!b.due_date) return -1;
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        });
+      case 'title':
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case 'created_at':
+        return sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      default:
+        return sorted;
+    }
+  };
+
+  const sortedTasks = sortTasks(roleTasks, sortOption);
+  const sortedDepositIdeas = sortDepositIdeas(roleDepositIdeas, sortOption);
 
   const renderJournalLedger = () => {
     const placeholderRows = [
@@ -816,12 +932,7 @@ export default function Roles() {
             title={selectedRole?.label || 'Role'}
             backgroundColor={selectedRole?.color}
             activeView={activeJournalView}
-            onViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
-              setActiveJournalView(view);
-              if ((view === 'deposits' || view === 'ideas') && selectedRole) {
-                fetchRoleTasks(selectedRole.id);
-              }
-            }}
+            onViewChange={handleViewChange}
             onSortPress={(activeJournalView === 'deposits' || activeJournalView === 'ideas') ? handleSortPress : undefined}
             onBackPress={() => setRoleAccountVisible(false)}
             onEditPress={() => {
@@ -847,7 +958,7 @@ export default function Roles() {
             ) : activeJournalView === 'deposits' ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
                 <View style={styles.tasksSection}>
-                  {roleTasks.map(task => (
+                  {sortedTasks.map(task => (
                     <TaskCard
                       key={task.id}
                       task={task}
@@ -860,13 +971,14 @@ export default function Roles() {
             ) : activeJournalView === 'ideas' ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
                 <View style={styles.tasksSection}>
-                  {roleDepositIdeas.map(depositIdea => (
+                  {sortedDepositIdeas.map(depositIdea => (
                     <DepositIdeaCard
                       key={depositIdea.id}
                       depositIdea={depositIdea}
                       onUpdate={handleUpdateDepositIdea}
                       onActivate={handleActivateDepositIdea}
                       onCancel={handleCancelDepositIdea}
+                      onDoublePress={handleDepositIdeaDoublePress}
                     />
                   ))}
                 </View>
@@ -958,12 +1070,7 @@ export default function Roles() {
           <Header 
             title={selectedKR?.name || 'Key Relationship'}
             activeView={activeJournalView}
-            onViewChange={(view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
-              setActiveJournalView(view);
-              if ((view === 'deposits' || view === 'ideas') && selectedKR) {
-                fetchKRTasks(selectedKR.id);
-              }
-            }}
+            onViewChange={handleKRViewChange}
             onSortPress={(activeJournalView === 'deposits' || activeJournalView === 'ideas') ? handleSortPress : undefined}
             onBackPress={() => setKrAccountVisible(false)}
             onEditPress={() => {
@@ -989,7 +1096,7 @@ export default function Roles() {
             ) : activeJournalView === 'deposits' ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
                 <View style={styles.tasksSection}>
-                  {krTasks.map(task => (
+                  {sortTasks(krTasks, sortOption).map(task => (
                     <TaskCard
                       key={task.id}
                       task={task}
@@ -1002,13 +1109,14 @@ export default function Roles() {
             ) : activeJournalView === 'ideas' ? (
               <ScrollView style={styles.tasksList} contentContainerStyle={styles.tasksListContent}>
                 <View style={styles.tasksSection}>
-                  {krDepositIdeas.map(depositIdea => (
+                  {sortDepositIdeas(krDepositIdeas, sortOption).map(depositIdea => (
                     <DepositIdeaCard
                       key={depositIdea.id}
                       depositIdea={depositIdea}
                       onUpdate={handleUpdateDepositIdea}
                       onActivate={handleActivateDepositIdea}
                       onCancel={handleCancelDepositIdea}
+                      onDoublePress={handleDepositIdeaDoublePress}
                     />
                   ))}
                 </View>
@@ -1042,6 +1150,15 @@ export default function Roles() {
           onCancel={handleCancelTask}
         />
       </Modal>
+      
+      <DepositIdeaDetailModal 
+        visible={isDepositIdeaDetailVisible} 
+        depositIdea={selectedDepositIdea} 
+        onClose={() => setIsDepositIdeaDetailVisible(false)} 
+        onUpdate={handleUpdateDepositIdea}
+        onActivate={handleActivateDepositIdea}
+        onCancel={handleCancelDepositIdea}
+      />
       
       {/* Task Form Modal */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
