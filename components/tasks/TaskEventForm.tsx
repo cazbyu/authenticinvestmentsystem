@@ -46,8 +46,6 @@ const CustomDayComponent = ({ date, state, marking, onPress }) => {
 // MAIN FORM COMPONENT
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
 
-  // Helper function to determine if we're in activation mode
-  const isActivationMode = initialData && initialData.sourceDepositIdeaId;
 
 const toDateString = (date: Date) => {
     const year = date.getFullYear();
@@ -233,6 +231,7 @@ const toDateString = (date: Date) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not found");
 
+        const isEditingDepositIdea = initialData?.type === 'depositIdea';
         if (formData.schedulingType === 'depositIdea') {
             // Handle Deposit Idea creation/update
             const diPayload: any = {
@@ -309,7 +308,7 @@ const toDateString = (date: Date) => {
                 status: 'pending',
                 type: formData.schedulingType,
                 due_date: formData.dueDate.toISOString().split('T')[0],
-                deposit_idea: false, // Always false for tasks/events
+                deposit_idea: isEditingDepositIdea, // True if converting from DI
                 is_all_day: formData.isAnytime,
                 updated_at: new Date().toISOString(),
             };
@@ -319,14 +318,10 @@ const toDateString = (date: Date) => {
                 payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
             }
 
-            // If this is activation mode, mark the task as coming from a deposit idea
-            if (isActivationMode && initialData?.sourceDepositIdeaId) {
-                payload.deposit_idea = true;
-            }
             let taskData;
             let taskError;
 
-            if (mode === 'edit' && initialData?.id && !isActivationMode) {
+            if (mode === 'edit' && initialData?.id && !isEditingDepositIdea) {
                 const { data, error } = await supabase
                     .from('0008-ap-tasks')
                     .update(payload)
@@ -350,23 +345,24 @@ const toDateString = (date: Date) => {
 
             const taskId = taskData.id;
 
-            // Handle activation mode - link DI to new task
-            if (isActivationMode && initialData?.sourceDepositIdeaId) {
+            // Handle DI conversion - link DI to new task
+            if (isEditingDepositIdea && initialData?.id) {
                 // Update the source deposit idea with activation info
                 const { error: diUpdateError } = await supabase
                     .from('0008-ap-deposit-ideas')
                     .update({
                         activated_task_id: taskId,
                         activated_at: new Date().toISOString(),
+                        is_active: true,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', initialData.sourceDepositIdeaId);
+                    .eq('id', initialData.id);
 
                 if (diUpdateError) throw diUpdateError;
             }
 
             // Handle joins for task/event
-            if (mode === 'edit' && initialData?.id && !isActivationMode) {
+            if (mode === 'edit' && initialData?.id && !isEditingDepositIdea) {
                 await Promise.all([
                     supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
                     supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
@@ -410,20 +406,20 @@ const toDateString = (date: Date) => {
     <View style={styles.formContainer}>
         <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              {isActivationMode ? 'Activate Deposit Idea' : (mode === 'create' ? 'New Action' : 'Edit Action')}
+              {mode === 'create' ? 'New Action' : 'Edit Action'}
             </Text>
             <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
         </View>
         <ScrollView style={styles.formContent}>
             <TextInput style={styles.input} placeholder="Action Title" value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
 
-            {!isActivationMode && <View style={styles.schedulingToggle}>
+            <View style={styles.schedulingToggle}>
               {['task', 'event', 'depositIdea'].map(type => (
                 <TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}>
                   <Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
                 </TouchableOpacity>
               ))}
-            </View>}
+            </View>
 
             {formData.schedulingType !== 'depositIdea' && (
               <>

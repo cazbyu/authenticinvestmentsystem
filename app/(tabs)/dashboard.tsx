@@ -185,66 +185,49 @@ export default function Dashboard() {
 
   const handleDepositIdeaDoublePress = (depositIdea: any) => { 
     setSelectedDepositIdea(depositIdea);
-    setIsDepositIdeaDetailVisible(true);
   };
-
-  const handleActivateDepositIdea = (depositIdea: any) => {
+  const handleUpdateDepositIdea = async (depositIdea: any) => {
     // Fetch the latest note for prefilling
-    const fetchLatestNote = async () => {
-      try {
-        const supabase = getSupabaseClient();
-        const { data, error } = await supabase
-          .from('0008-ap-universal-notes-join')
-          .select(`
-            note:0008-ap-notes(
-              id,
-              content,
-              created_at
-            )
-          `)
-          .eq('parent_id', depositIdea.id)
-          .eq('parent_type', 'depositIdea')
-          .order('created_at', { ascending: false, foreignTable: '0008-ap-notes' })
-          .limit(1);
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('0008-ap-universal-notes-join')
+        .select(`
+          note:0008-ap-notes(
+            id,
+            content,
+            created_at
+          )
+        `)
+        .eq('parent_id', depositIdea.id)
+        .eq('parent_type', 'depositIdea')
+        .order('created_at', { ascending: false, foreignTable: '0008-ap-notes' })
+        .limit(1);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const latestNote = data?.[0]?.note?.content || '';
-        
-        // Prepare activation data with prefilled note
-        const activationData = {
-          ...depositIdea,
-          sourceDepositIdeaId: depositIdea.id,
-          schedulingType: 'task', // Default to task, user can change to event
-          notes: latestNote
-        };
-        setEditingTask(activationData);
-        setIsFormModalVisible(true);
-      } catch (error) {
-        console.error('Error fetching note for activation:', error);
-        // Continue with activation even if note fetch fails
-        const activationData = {
-          ...depositIdea,
-          notes: '',
-          type: 'task',
-          notes: '',
-          schedulingType: 'task'
-        };
-        setEditingTask(activationData);
-        setIsDepositIdeaDetailVisible(false);
-        setIsFormModalVisible(true);
-      }
-    };
-
-    fetchLatestNote();
-  };
-  const handleUpdateDepositIdea = (depositIdea: any) => {
-    const editData = {
-      ...depositIdea
-    };
-    setEditingTask(editData);
-    setIsDepositIdeaDetailVisible(false);
-    setIsFormModalVisible(true);
+      const latestNote = data?.[0]?.note?.content || '';
+      
+      const editData = {
+        ...depositIdea,
+        type: 'depositIdea',
+        notes: latestNote
+      };
+      setEditingTask(editData);
+      setIsDepositIdeaDetailVisible(false);
+      setIsFormModalVisible(true);
+    } catch (error) {
+      console.error('Error fetching note for update:', error);
+      // Continue with update even if note fetch fails
+      const editData = {
+        ...depositIdea,
+        type: 'depositIdea',
+        notes: ''
+      };
+      setEditingTask(editData);
+      setIsDepositIdeaDetailVisible(false);
+      setIsFormModalVisible(true);
+    }
   };
   const handleCancelDepositIdea = async (depositIdea: any) => {
     try {
@@ -313,7 +296,6 @@ export default function Dashboard() {
                     key={depositIdea.id} 
                     depositIdea={depositIdea} 
                     onUpdate={handleUpdateDepositIdea}
-                    onActivate={handleActivateDepositIdea}
                     onCancel={handleCancelDepositIdea}
                     onDoublePress={handleDepositIdeaDoublePress} 
                   />
@@ -337,7 +319,6 @@ export default function Dashboard() {
         depositIdea={selectedDepositIdea} 
         onClose={() => setIsDepositIdeaDetailVisible(false)} 
         onUpdate={handleUpdateDepositIdea}
-        onActivate={handleActivateDepositIdea}
         onCancel={handleCancelDepositIdea}
       />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>

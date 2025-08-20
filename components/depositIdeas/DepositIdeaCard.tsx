@@ -25,14 +25,13 @@ interface DepositIdeaCardProps {
   onUpdate: (depositIdea: DepositIdea) => void;
   onActivate: (depositIdea: DepositIdea) => void;
   onCancel: (depositIdea: DepositIdea) => void;
-  onDoublePress?: (depositIdea: DepositIdea) => void;
   isDragging?: boolean;
 }
 
 // --- DepositIdeaCard Component ---
 // Renders a single deposit idea item in the list
 export const DepositIdeaCard = React.forwardRef<View, DepositIdeaCardProps>(
-  ({ depositIdea, onUpdate, onActivate, onCancel, onDoublePress, isDragging }, ref) => {
+  ({ depositIdea, onUpdate, onCancel, onDoublePress, isDragging }, ref) => {
     const [lastTap, setLastTap] = useState(0);
 
     // Formats the created date string
@@ -52,10 +51,6 @@ export const DepositIdeaCard = React.forwardRef<View, DepositIdeaCardProps>(
       } else {
         setLastTap(now);
       }
-    };
-
-    const handleActivate = () => {
-      onActivate(depositIdea);
     };
 
     return (
@@ -157,15 +152,6 @@ export const DepositIdeaCard = React.forwardRef<View, DepositIdeaCardProps>(
             >
               <Edit size={14} color="#0078d4" />
             </TouchableOpacity>
-            
-            {!depositIdea.activated_at && (
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.activateButton]} 
-                onPress={handleActivate}
-              >
-                <Play size={14} color="#16a34a" />
-              </TouchableOpacity>
-            )}
             
             <TouchableOpacity 
               style={[styles.actionButton, styles.cancelButton]} 

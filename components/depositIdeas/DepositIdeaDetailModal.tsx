@@ -24,7 +24,6 @@ interface DepositIdeaDetailModalProps {
   depositIdea: DepositIdea | null;
   onClose: () => void;
   onUpdate: (depositIdea: DepositIdea) => void;
-  onActivate: (depositIdea: DepositIdea) => void;
   onCancel: (depositIdea: DepositIdea) => void;
 }
 
@@ -33,7 +32,6 @@ export function DepositIdeaDetailModal({
   depositIdea, 
   onClose, 
   onUpdate, 
-  onActivate, 
   onCancel 
 }: DepositIdeaDetailModalProps) {
   const [notes, setNotes] = useState([]);
@@ -203,18 +201,8 @@ export function DepositIdeaDetailModal({
             onPress={() => onUpdate(depositIdea)}
           >
             <Edit size={16} color="#ffffff" />
-            <Text style={styles.buttonText}>Update</Text>
+            <Text style={styles.buttonText}>Update/Activate</Text>
           </TouchableOpacity>
-          
-          {!depositIdea.activated_at && (
-            <TouchableOpacity 
-              style={[styles.button, styles.activateButton]} 
-              onPress={() => onActivate(depositIdea)}
-            >
-              <Play size={16} color="#ffffff" />
-              <Text style={styles.buttonText}>Activate</Text>
-            </TouchableOpacity>
-          )}
           
           <TouchableOpacity 
             style={[styles.button, styles.cancelButton]} 
