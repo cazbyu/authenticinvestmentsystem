@@ -558,8 +558,8 @@ export default function Roles() {
           ...depositIdea,
           sourceDepositIdeaId: depositIdea.id,
           type: 'task',
-          notes: latestNote
-          schedulingType: 'task', // Default to task, user can change to event
+          notes: latestNote,
+          schedulingType: 'task' // Default to task, user can change to event
         };
         setEditingTask(activationData);
       } catch (error) {
