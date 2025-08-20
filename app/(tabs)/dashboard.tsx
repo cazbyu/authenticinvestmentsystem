@@ -204,7 +204,7 @@ export default function Dashboard() {
           `)
           .eq('parent_id', depositIdea.id)
           .eq('parent_type', 'depositIdea')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false, foreignTable: '0008-ap-notes' })
           .limit(1);
 
         if (error) throw error;
@@ -226,10 +226,15 @@ export default function Dashboard() {
         const activationData = {
           ...depositIdea,
           sourceDepositIdeaId: depositIdea.id,
-          schedulingType: 'task',
+          type: 'task',
+          ...depositIdea,
           notes: ''
-        };
+          type: 'task',
+          schedulingType: 'task',
         setEditingTask(activationData);
+        setIsDepositIdeaDetailVisible(false);
+        setIsFormModalVisible(true);
+        setIsDepositIdeaDetailVisible(false);
         setIsFormModalVisible(true);
       }
     };
@@ -239,9 +244,10 @@ export default function Dashboard() {
   const handleUpdateDepositIdea = (depositIdea: any) => {
     const editData = {
       ...depositIdea,
-      type: 'depositIdea'
+      ...depositIdea,
     };
     setEditingTask(editData);
+    setIsDepositIdeaDetailVisible(false);
     setIsFormModalVisible(true);
   };
   const handleCancelDepositIdea = async (depositIdea: any) => {

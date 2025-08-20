@@ -546,7 +546,7 @@ export default function Roles() {
           `)
           .eq('parent_id', depositIdea.id)
           .eq('parent_type', 'depositIdea')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false, foreignTable: '0008-ap-notes' })
           .limit(1);
 
         if (error) throw error;
@@ -562,6 +562,8 @@ export default function Roles() {
           schedulingType: 'task' // Default to task, user can change to event
         };
         setEditingTask(activationData);
+        setIsDepositIdeaDetailVisible(false);
+        setTaskFormVisible(true);
       } catch (error) {
         console.error('Error fetching note for activation:', error);
         // Continue with activation even if note fetch fails
@@ -572,6 +574,7 @@ export default function Roles() {
           notes: ''
         };
         setEditingTask(activationData);
+        setIsDepositIdeaDetailVisible(false);
         setTaskFormVisible(true);
       }
     };
@@ -585,6 +588,7 @@ export default function Roles() {
       type: 'depositIdea'
     };
     setEditingTask(editData);
+    setIsDepositIdeaDetailVisible(false);
     setTaskFormVisible(true);
   };
 
