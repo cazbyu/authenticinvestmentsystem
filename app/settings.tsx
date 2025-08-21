@@ -35,6 +35,7 @@ export default function SettingsScreen() {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -308,6 +309,31 @@ export default function SettingsScreen() {
     }
   };
 
+  const debouncedUpdateProfile = (updates: Partial<typeof profile>) => {
+    // Clear existing timeout
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+
+    // Set new timeout for auto-save
+    const timeout = setTimeout(() => {
+      updateProfile(updates);
+    }, 1000); // Save after 1 second of no changes
+
+    setSaveTimeout(timeout);
+  };
+
+  const handleProfileChange = (field: keyof typeof profile, value: string) => {
+    const updatedProfile = { ...profile, [field]: value };
+    setProfile(updatedProfile);
+    debouncedUpdateProfile({ [field]: value });
+  };
+
+  const handleColorChange = (field: 'primary_color' | 'accent_color', color: string) => {
+    setProfile(prev => ({ ...prev, [field]: color }));
+    updateProfile({ [field]: color }); // Immediate save for color changes
+  };
+
   const connectToGoogle = async () => {
     setIsConnectingGoogle(true);
     await promptAsync();
@@ -375,10 +401,9 @@ export default function SettingsScreen() {
             <TextInput
               style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
               value={profile.first_name}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, first_name: text }))}
+              onChangeText={(text) => handleProfileChange('first_name', text)}
               placeholder="Enter first name"
               placeholderTextColor={colors.textSecondary}
-              onBlur={() => updateProfile({ first_name: profile.first_name })}
             />
           </View>
 
@@ -387,10 +412,9 @@ export default function SettingsScreen() {
             <TextInput
               style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
               value={profile.last_name}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, last_name: text }))}
+              onChangeText={(text) => handleProfileChange('last_name', text)}
               placeholder="Enter last name"
               placeholderTextColor={colors.textSecondary}
-              onBlur={() => updateProfile({ last_name: profile.last_name })}
             />
           </View>
 
@@ -409,8 +433,7 @@ export default function SettingsScreen() {
                     profile.primary_color === color && styles.selectedColorOption
                   ]}
                   onPress={() => {
-                    setProfile(prev => ({ ...prev, primary_color: color }));
-                    updateProfile({ primary_color: color });
+                    handleColorChange('primary_color', color);
                   }}
                 >
                   {profile.primary_color === color && (
@@ -436,8 +459,7 @@ export default function SettingsScreen() {
                     profile.accent_color === color && styles.selectedColorOption
                   ]}
                   onPress={() => {
-                    setProfile(prev => ({ ...prev, accent_color: color }));
-                    updateProfile({ accent_color: color });
+                    handleColorChange('accent_color', color);
                   }}
                 >
                   {profile.accent_color === color && (
@@ -710,6 +732,15 @@ const styles = StyleSheet.create({
   disconnectButton: {
     backgroundColor: '#dc2626',
   },
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+      }
+    };
+  }, [saveTimeout]);
+
   disconnectButtonText: {
     color: '#ffffff',
     fontSize: 14,
