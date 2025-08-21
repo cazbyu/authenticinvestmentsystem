@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Animated, Platform, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DepositIdeaCard } from '@/components/depositIdeas/DepositIdeaCard';
 import { X, Plus, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
@@ -262,6 +262,7 @@ export default function Dashboard() {
   };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
+  const renderRegularItem = ({ item }: { item: Task }) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={() => {}} onDoublePress={handleTaskDoublePress} isDragging={false} />;
   const sortOptions = [{ value: 'due_date', label: 'Due Date' }, { value: 'priority', label: 'Priority' }, { value: 'title', label: 'Title' }];
 
   return (
@@ -277,16 +278,27 @@ export default function Dashboard() {
           : (activeView === 'deposits' && tasks.length === 0) || (activeView === 'ideas' && depositIdeas.length === 0) ? 
             <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
           : activeView === 'deposits' ? 
-            <DraggableFlatList 
-              data={tasks} 
-              renderItem={renderDraggableItem} 
-              keyExtractor={(item) => item.id} 
-              onDragEnd={handleDragEnd} 
-              contentContainerStyle={styles.taskList} 
-              showsVerticalScrollIndicator={true}
-              scrollEnabled={true}
-              style={styles.draggableList}
-            />
+            Platform.OS === 'web' ? (
+              <FlatList
+                data={tasks}
+                renderItem={renderRegularItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.taskList}
+                showsVerticalScrollIndicator={true}
+                style={styles.draggableList}
+              />
+            ) : (
+              <DraggableFlatList 
+                data={tasks} 
+                renderItem={renderDraggableItem} 
+                keyExtractor={(item) => item.id} 
+                onDragEnd={handleDragEnd} 
+                contentContainerStyle={styles.taskList} 
+                showsVerticalScrollIndicator={true}
+                scrollEnabled={true}
+                style={styles.draggableList}
+              />
+            )
           : <ScrollView 
               style={styles.scrollContent} 
               showsVerticalScrollIndicator={true}
