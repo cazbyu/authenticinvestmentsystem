@@ -513,6 +513,16 @@ export default function Roles() {
     }
   };
 
+const handleWithdrawalFormClose = () => {
+  setIsWithdrawalFormVisible(false);
+  setEditingWithdrawal(null);
+};
+const handleWithdrawalFormSuccess = () => {
+  setIsWithdrawalFormVisible(false);
+  setEditingWithdrawal(null);
+  // optional: refresh the journal if active
+};
+  
   const handleFormClose = () => {
     setTaskFormVisible(false);
     setEditingTask(null);
