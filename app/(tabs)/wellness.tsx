@@ -7,7 +7,6 @@ import { DepositIdeaCard } from '@/components/depositIdeas/DepositIdeaCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
-import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
@@ -39,10 +38,6 @@ export default function Wellness() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
-  const [editingWithdrawal, setEditingWithdrawal] = useState<any>(null);
-
-  const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
 
   const fetchDomains = async () => {
     try {
@@ -313,28 +308,17 @@ export default function Wellness() {
 
   const handleJournalEntryPress = (entry: any) => {
     if (entry.source_type === 'task') {
-      // Open task detail modal
       setSelectedTask(entry.source_data);
       setTaskDetailVisible(true);
     } else if (entry.source_type === 'withdrawal') {
-      // Open withdrawal form for editing
-      setEditingWithdrawal(entry.source_data);
-      setIsWithdrawalFormVisible(true);
+      // Open TaskEventForm in withdrawal mode for editing
+      const editData = {
+        ...entry.source_data,
+        type: 'withdrawal'
+      };
+      setEditingTask(editData);
+      setTaskFormVisible(true);
     }
-  };
-
-  const handleWithdrawalFormSuccess = () => {
-    setIsWithdrawalFormVisible(false);
-    setEditingWithdrawal(null);
-  };
-
-  const handleWithdrawalFormClose = () => {
-    setIsWithdrawalFormVisible(false);
-    setEditingWithdrawal(null);
-  };
-
-  const handleAddWithdrawal = () => {
-    setWithdrawalFormVisible(true);
   };
 
   const getDomainColor = (domainName: string) => {
@@ -369,7 +353,6 @@ export default function Wellness() {
               <JournalView
                 scope={{ type: 'domain', id: selectedDomain.id, name: selectedDomain.name }}
                 onEntryPress={handleJournalEntryPress}
-                onAddWithdrawal={handleAddWithdrawal}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>
@@ -499,27 +482,6 @@ export default function Wellness() {
         onClose={() => setDepositIdeaDetailVisible(false)}
         onUpdate={handleUpdateDepositIdea}
         onCancel={handleCancelDepositIdea}
-      />
-
-      <WithdrawalForm
-        visible={isWithdrawalFormVisible}
-        onClose={handleWithdrawalFormClose}
-        onSubmitSuccess={handleWithdrawalFormSuccess}
-        initialData={editingWithdrawal}
-        scope={selectedDomain ? { type: 'domain', id: selectedDomain.id } : { type: 'user' }}
-      />
-      
-      <WithdrawalForm
-        visible={withdrawalFormVisible}
-        onClose={() => setWithdrawalFormVisible(false)}
-        onSubmitSuccess={() => {
-          setWithdrawalFormVisible(false);
-          if (selectedDomain) {
-            fetchDomainTasks(selectedDomain.id, activeView);
-          }
-        }}
-        initialData={undefined}
-        scope={selectedDomain ? { type: 'domain', id: selectedDomain.id } : { type: 'user' }}
       />
     </SafeAreaView>
   );

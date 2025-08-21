@@ -11,7 +11,6 @@ import { ManageRolesModal } from '@/components/settings/ManageRolesModal';
 import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import { JournalView } from '@/components/journal/JournalView';
-import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -62,25 +61,21 @@ export default function Roles() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
-  const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
-  const [editingWithdrawal, setEditingWithdrawal] = useState<any>(null);
 
-  const handleAddWithdrawal = () => {
-    setIsWithdrawalFormVisible(true);
+  const handleJournalEntryPress = (entry: any) => {
+    if (entry.source_type === 'task') {
+      setSelectedTask(entry.source_data);
+      setTaskDetailVisible(true);
+    } else if (entry.source_type === 'withdrawal') {
+      // Open TaskEventForm in withdrawal mode for editing
+      const editData = {
+        ...entry.source_data,
+        type: 'withdrawal'
+      };
+      setEditingTask(editData);
+      setTaskFormVisible(true);
+    }
   };
-
-  const handleWithdrawalFormClose = () => {
-  setIsWithdrawalFormVisible(false);
-  setEditingWithdrawal(null);
-};
-
-const handleWithdrawalFormSuccess = () => {
-  setIsWithdrawalFormVisible(false);
-  setEditingWithdrawal(null);
-  // Optional: refresh lists if you want withdrawals to
-  // influence any on-screen balances immediately.
-  // e.g., selectedRole ? fetchRoleTasks(selectedRole.id) : null;
-};
 
   const fetchRoles = async () => {
     try {
@@ -659,7 +654,6 @@ const handleWithdrawalFormSuccess = () => {
               <JournalView
                 scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
                 onEntryPress={handleJournalEntryPress}
-                onAddWithdrawal={handleAddWithdrawal}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>
@@ -724,7 +718,6 @@ const handleWithdrawalFormSuccess = () => {
               <JournalView
                 scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
                 onEntryPress={handleJournalEntryPress}
-                onAddWithdrawal={handleAddWithdrawal}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>
@@ -966,20 +959,6 @@ const handleWithdrawalFormSuccess = () => {
         onClose={() => setDepositIdeaDetailVisible(false)}
         onUpdate={handleUpdateDepositIdea}
         onCancel={handleCancelDepositIdea}
-      />
-
-      <WithdrawalForm
-        visible={isWithdrawalFormVisible}
-        onClose={handleWithdrawalFormClose}
-        onSubmitSuccess={handleWithdrawalFormSuccess}
-        initialData={editingWithdrawal}
-        scope={
-          selectedKR 
-            ? { type: 'key_relationship', id: selectedKR.id } 
-            : selectedRole 
-            ? { type: 'role', id: selectedRole.id } 
-            : { type: 'user' }
-        }
       />
     </SafeAreaView>
   );

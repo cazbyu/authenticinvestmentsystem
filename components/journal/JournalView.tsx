@@ -458,6 +458,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  filterRowContent: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
   filterGroup: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
