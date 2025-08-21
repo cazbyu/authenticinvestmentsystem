@@ -552,37 +552,40 @@ const toDateString = (date: Date) => {
 
             {formData.schedulingType === 'withdrawal' && (
               <>
-                <View style={styles.field}>
-                  <Text style={styles.label}>Amount *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.amount}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, amount: text }))}
-                    placeholder="0.0"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>Date</Text>
-                  <TouchableOpacity
-                    ref={dateInputRef}
-                    style={styles.dateButton}
-                    onPress={() => {
-                      dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
-                        setWithdrawalDatePickerPosition({ x: px, y: py, width, height });
-                        setShowWithdrawalCalendar(!showWithdrawalCalendar);
-                      });
-                    }}
-                  >
-                    <TextInput 
-                      style={styles.dateTextInput} 
-                      value={withdrawalDateInputValue} 
-                      onChangeText={handleWithdrawalDateInputChange}
-                      editable={false}
+                <Text style={styles.compactSectionTitle}>Withdrawal Details</Text>
+                <View style={styles.compactDateTimeRow}>
+                  <View style={styles.amountContainer}>
+                    <Text style={styles.compactInputLabel}>Amount *</Text>
+                    <TextInput
+                      style={styles.amountInput}
+                      value={formData.amount}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, amount: text }))}
+                      placeholder="0.0"
+                      placeholderTextColor="#9ca3af"
+                      keyboardType="decimal-pad"
                     />
-                  </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.withdrawalDateContainer}>
+                    <TouchableOpacity
+                      ref={dateInputRef}
+                      style={styles.compactDateButton}
+                      onPress={() => {
+                        dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
+                          setWithdrawalDatePickerPosition({ x: px, y: py, width, height });
+                          setShowWithdrawalCalendar(!showWithdrawalCalendar);
+                        });
+                      }}
+                    >
+                      <Text style={styles.compactInputLabel}>Date</Text>
+                      <TextInput 
+                        style={styles.dateTextInput} 
+                        value={withdrawalDateInputValue} 
+                        onChangeText={handleWithdrawalDateInputChange}
+                        editable={false}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </>
             )}
@@ -984,6 +987,22 @@ const styles = StyleSheet.create({
       fontSize: 14,
       color: '#374151',
     },
+   amountContainer: {
+     flex: 1,
+     marginRight: 8,
+   },
+   amountInput: {
+     borderWidth: 1,
+     borderColor: '#d1d5db',
+     borderRadius: 6,
+     padding: 8,
+     fontSize: 14,
+     backgroundColor: '#f0f9ff',
+   },
+   withdrawalDateContainer: {
+     flex: 1,
+     marginLeft: 8,
+   },
 
 });
 
