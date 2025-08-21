@@ -449,6 +449,7 @@ export default function SettingsScreen() {
               ))}
             </View>
           </View>
+          </View>
         </View>
 
         {/* Account Section */}
