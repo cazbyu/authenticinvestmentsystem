@@ -76,7 +76,7 @@ export default function SettingsScreen() {
       const { data, error } = await supabase
         .from('0008-ap-users')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -90,6 +90,8 @@ export default function SettingsScreen() {
             .from('0008-ap-profile-images')
             .getPublicUrl(data.profile_image);
           setProfileImageUrl(imageData.publicUrl);
+        } else {
+          setProfileImageUrl(null);
         }
       }
     } catch (error) {
@@ -298,23 +300,29 @@ export default function SettingsScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('No user found');
 
-    // IMPORTANT: use id (NOT user_id) and include email (NOT NULL in your table)
     const { error } = await supabase
       .from('0008-ap-users')
       .upsert(
         {
-          id: user.id,                 // <-- replaces user_id
-          email: user.email ?? '',     // <-- satisfies NOT NULL constraint
+          user_id: user.id,
           ...profile,                  // keep existing local state
           ...updates,                  // apply incoming changes
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'id' }           // <-- crucial because id is the PK
+        { onConflict: 'user_id' }
       );
 
     if (error) throw error;
 
     setProfile(prev => ({ ...prev, ...updates }));
+    
+    // Update profile image URL if profile_image was updated
+    if (updates.profile_image) {
+      const { data: imageData } = supabase.storage
+        .from('0008-ap-profile-images')
+        .getPublicUrl(updates.profile_image);
+      setProfileImageUrl(imageData.publicUrl);
+    }
   } catch (error) {
     console.error('Error updating profile:', error);
     Alert.alert('Error', 'Failed to update profile');
