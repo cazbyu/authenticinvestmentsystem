@@ -9,10 +9,8 @@ import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
-
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
-import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
@@ -27,11 +25,6 @@ export default function Dashboard() {
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
-  const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
-  const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
-  const [editingWithdrawal, setEditingWithdrawal] = useState(null);
-
-  const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -239,28 +232,17 @@ export default function Dashboard() {
 
   const handleJournalEntryPress = (entry: any) => {
     if (entry.source_type === 'task') {
-      // Open task detail modal
       setSelectedTask(entry.source_data);
       setIsDetailModalVisible(true);
     } else if (entry.source_type === 'withdrawal') {
-      // Open withdrawal form for editing
-      setEditingWithdrawal(entry.source_data);
-      setIsWithdrawalFormVisible(true);
+      // Open TaskEventForm in withdrawal mode for editing
+      const editData = {
+        ...entry.source_data,
+        type: 'withdrawal'
+      };
+      setEditingTask(editData);
+      setIsFormModalVisible(true);
     }
-  };
-
-  const handleWithdrawalFormSuccess = () => {
-    setIsWithdrawalFormVisible(false);
-    setEditingWithdrawal(null);
-    // Refresh journal data if we're in journal view
-    if (activeView === 'journal') {
-      // The JournalView component will handle its own refresh
-    }
-  };
-
-  const handleWithdrawalFormClose = () => {
-    setIsWithdrawalFormVisible(false);
-    setEditingWithdrawal(null);
   };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
@@ -279,13 +261,7 @@ export default function Dashboard() {
         ) : loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
           : (activeView === 'deposits' && tasks.length === 0) || (activeView === 'ideas' && depositIdeas.length === 0) ? 
             <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
-          : activeView === 'journal' ? (
-            <JournalView
-              scope={{ type: 'user' }}
-              onEntryPress={handleJournalEntryPress}
-              onAddWithdrawal={() => setWithdrawalFormVisible(true)}
-            />
-          ) : activeView === 'deposits' ? 
+          : activeView === 'deposits' ? 
             Platform.OS === 'web' ? (
               <FlatList
                 data={tasks}
@@ -343,23 +319,6 @@ export default function Dashboard() {
         onClose={() => setIsDepositIdeaDetailVisible(false)} 
         onUpdate={handleUpdateDepositIdea}
         onCancel={handleCancelDepositIdea}
-      />
-      <WithdrawalForm
-        visible={isWithdrawalFormVisible}
-        onClose={handleWithdrawalFormClose}
-        onSubmitSuccess={handleWithdrawalFormSuccess}
-        initialData={editingWithdrawal}
-        scope={{ type: 'user' }}
-      />
-      
-      <WithdrawalForm
-        visible={withdrawalFormVisible}
-        onClose={() => setWithdrawalFormVisible(false)}
-        onSubmitSuccess={() => {
-          setWithdrawalFormVisible(false);
-          fetchData();
-        }}
-        scope={{ type: 'user' }}
       />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>
         <View style={styles.modalOverlay}>
