@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
   const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
+  const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
+  const [editingWithdrawal, setEditingWithdrawal] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -43,7 +45,7 @@ export default function Dashboard() {
           .select('*')
           .eq('user_id', user.id)
           .not('status', 'in', '(completed,cancelled)')
-          .in('type', ['task', 'event'])
+          .in('type', ['task', 'event']);
 
         if (tasksError) throw tasksError;
         if (!tasksData || tasksData.length === 0) {
@@ -303,7 +305,7 @@ export default function Dashboard() {
                 )}
               </View>
             </ScrollView>
-        )}
+        }
       </View>
       <TouchableOpacity style={styles.fab} onPress={() => setIsFormModalVisible(true)}><Plus size={24} color="#ffffff" /></TouchableOpacity>
       <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet">
