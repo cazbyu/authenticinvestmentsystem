@@ -76,7 +76,7 @@ export default function SettingsScreen() {
       const { data, error } = await supabase
         .from('0008-ap-users')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -283,31 +283,37 @@ export default function SettingsScreen() {
   };
 
   const updateProfile = async (updates: Partial<typeof profile>) => {
-    try {
-      setSaving(true);
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+  try {
+    setSaving(true);
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('No user found');
 
-      const { error } = await supabase
-        .from('0008-ap-users')
-        .upsert({
-          user_id: user.id,
-          ...profile,
-          ...updates,
-          updated_at: new Date().toISOString()
-        });
+    // IMPORTANT: use id (NOT user_id) and include email (NOT NULL in your table)
+    const { error } = await supabase
+      .from('0008-ap-users')
+      .upsert(
+        {
+          id: user.id,                 // <-- replaces user_id
+          email: user.email ?? '',     // <-- satisfies NOT NULL constraint
+          ...profile,                  // keep existing local state
+          ...updates,                  // apply incoming changes
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }           // <-- crucial because id is the PK
+      );
 
-      if (error) throw error;
+    if (error) throw error;
 
-      setProfile(prev => ({ ...prev, ...updates }));
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile');
-    } finally {
-      setSaving(false);
-    }
-  };
+    setProfile(prev => ({ ...prev, ...updates }));
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    Alert.alert('Error', 'Failed to update profile');
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const debouncedUpdateProfile = (updates: Partial<typeof profile>) => {
     // Clear existing timeout
