@@ -169,6 +169,15 @@ export default function SettingsScreen() {
     calculateAuthenticScore();
   }, []);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeout) {
+        clearTimeout(saveTimeout);
+      }
+    };
+  }, [saveTimeout]);
+
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -738,15 +747,6 @@ const styles = StyleSheet.create({
   disconnectButton: {
     backgroundColor: '#dc2626',
   },
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
-      }
-    };
-  }, [saveTimeout]);
-
   disconnectButtonText: {
     color: '#ffffff',
     fontSize: 14,
