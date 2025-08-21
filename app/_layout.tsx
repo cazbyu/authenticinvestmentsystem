@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import 'react-native-gesture-handler/lib/web';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Drawer } from 'expo-router/drawer';
