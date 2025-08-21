@@ -82,29 +82,40 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
         const { data: tasksData, error: tasksError } = await tasksQuery;
         if (tasksError) throw tasksError;
 
-        if (tasksData && tasksData.length > 0) {
+        // Process tasks data even if empty to ensure proper flow
+        if (tasksData) {
           const taskIds = tasksData.map(t => t.id);
 
-          // Get all related data for tasks
-          const [
-            { data: rolesData, error: rolesError },
-            { data: domainsData, error: domainsError },
-            { data: goalsData, error: goalsError },
-            { data: notesData, error: notesError },
-            { data: krData, error: krError }
-          ] = await Promise.all([
-            supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-            supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
-            supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
-            supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
-            supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
-          ]);
+          // Only fetch related data if we have tasks
+          let rolesData = [], domainsData = [], goalsData = [], notesData = [], krData = [];
+          
+          if (taskIds.length > 0) {
+            const [
+              { data: rolesResult, error: rolesError },
+              { data: domainsResult, error: domainsError },
+              { data: goalsResult, error: goalsError },
+              { data: notesResult, error: notesError },
+              { data: krResult, error: krError }
+            ] = await Promise.all([
+              supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+              supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+              supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+              supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+              supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
+            ]);
 
-          if (rolesError) throw rolesError;
-          if (domainsError) throw domainsError;
-          if (goalsError) throw goalsError;
-          if (notesError) throw notesError;
-          if (krError) throw krError;
+            if (rolesError) throw rolesError;
+            if (domainsError) throw domainsError;
+            if (goalsError) throw goalsError;
+            if (notesError) throw notesError;
+            if (krError) throw krError;
+
+            rolesData = rolesResult || [];
+            domainsData = domainsResult || [];
+            goalsData = goalsResult || [];
+            notesData = notesResult || [];
+            krData = krResult || [];
+          }
 
           // Apply scope filtering
           let scopeFilteredTaskIds = taskIds;
@@ -167,26 +178,36 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
         const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
         if (withdrawalsError) throw withdrawalsError;
 
-        if (withdrawalsData && withdrawalsData.length > 0) {
+        // Process withdrawals data even if empty to ensure proper flow
+        if (withdrawalsData) {
           const withdrawalIds = withdrawalsData.map(w => w.id);
 
-          // Get all related data for withdrawals
-          const [
-            { data: rolesData, error: rolesError },
-            { data: domainsData, error: domainsError },
-            { data: krData, error: krError },
-            { data: notesData, error: notesError }
-          ] = await Promise.all([
-            supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
-            supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
-            supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
-            supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal')
-          ]);
+          // Only fetch related data if we have withdrawals
+          let rolesData = [], domainsData = [], krData = [], notesData = [];
+          
+          if (withdrawalIds.length > 0) {
+            const [
+              { data: rolesResult, error: rolesError },
+              { data: domainsResult, error: domainsError },
+              { data: krResult, error: krError },
+              { data: notesResult, error: notesError }
+            ] = await Promise.all([
+              supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
+              supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
+              supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
+              supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal')
+            ]);
 
-          if (rolesError) throw rolesError;
-          if (domainsError) throw domainsError;
-          if (krError) throw krError;
-          if (notesError) throw notesError;
+            if (rolesError) throw rolesError;
+            if (domainsError) throw domainsError;
+            if (krError) throw krError;
+            if (notesError) throw notesError;
+
+            rolesData = rolesResult || [];
+            domainsData = domainsResult || [];
+            krData = krResult || [];
+            notesData = notesResult || [];
+          }
 
           // Apply scope filtering
           let scopeFilteredWithdrawalIds = withdrawalIds;
@@ -554,7 +575,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   oddRow: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f1f5f9',
   },
   cellDate: {
     width: 70,
