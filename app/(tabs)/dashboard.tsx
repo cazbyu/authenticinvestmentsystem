@@ -31,6 +31,8 @@ export default function Dashboard() {
   const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
   const [editingWithdrawal, setEditingWithdrawal] = useState(null);
 
+  const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -277,7 +279,13 @@ export default function Dashboard() {
         ) : loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
           : (activeView === 'deposits' && tasks.length === 0) || (activeView === 'ideas' && depositIdeas.length === 0) ? 
             <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
-          : activeView === 'deposits' ? 
+          : activeView === 'journal' ? (
+            <JournalView
+              scope={{ type: 'user' }}
+              onEntryPress={handleJournalEntryPress}
+              onAddWithdrawal={() => setWithdrawalFormVisible(true)}
+            />
+          ) : activeView === 'deposits' ? 
             Platform.OS === 'web' ? (
               <FlatList
                 data={tasks}
@@ -341,6 +349,16 @@ export default function Dashboard() {
         onClose={handleWithdrawalFormClose}
         onSubmitSuccess={handleWithdrawalFormSuccess}
         initialData={editingWithdrawal}
+        scope={{ type: 'user' }}
+      />
+      
+      <WithdrawalForm
+        visible={withdrawalFormVisible}
+        onClose={() => setWithdrawalFormVisible(false)}
+        onSubmitSuccess={() => {
+          setWithdrawalFormVisible(false);
+          fetchData();
+        }}
         scope={{ type: 'user' }}
       />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>

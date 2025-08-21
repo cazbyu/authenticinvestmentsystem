@@ -71,7 +71,7 @@ export function Header({
       {/* Bottom section with toggle and sort */}
       {(activeView && onViewChange) && (
         <View style={styles.bottomSection}>
-                    {/* Always show both toggle groups */}
+          {/* Always show both toggle groups */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {/* Deposits / Ideas */}
             <View style={styles.toggleContainer}>
@@ -97,16 +97,16 @@ export function Header({
             {/* Journal / Analytics */}
             <View style={styles.journalButtonsContainer}>
               <TouchableOpacity
-                style={[styles.journalButton, activeView === 'journal' && styles.activeJournalButton]}
+                style={[styles.journalButton, activeView === 'journal' && styles.activeJournalButton, { minWidth: 70 }]}
                 onPress={() => onViewChange && onViewChange('journal')}
               >
                 <Text style={[styles.journalButtonText, activeView === 'journal' && styles.activeJournalButtonText]}>
-                  Role Journal
+                  Journal
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.journalButton, activeView === 'analytics' && styles.activeJournalButton]}
+                style={[styles.journalButton, activeView === 'analytics' && styles.activeJournalButton, { minWidth: 70 }]}
                 onPress={() => onViewChange && onViewChange('analytics')}
               >
                 <Text style={[styles.journalButtonText, activeView === 'analytics' && styles.activeJournalButtonText]}>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    minWidth: 90,
+    minWidth: 70,
     alignItems: 'center',
   },
   activeJournalButton: {

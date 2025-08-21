@@ -65,6 +65,10 @@ export default function Roles() {
   const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
   const [editingWithdrawal, setEditingWithdrawal] = useState<any>(null);
 
+  const handleAddWithdrawal = () => {
+    setIsWithdrawalFormVisible(true);
+  };
+
   const handleWithdrawalFormClose = () => {
   setIsWithdrawalFormVisible(false);
   setEditingWithdrawal(null);
@@ -655,6 +659,7 @@ const handleWithdrawalFormSuccess = () => {
               <JournalView
                 scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
                 onEntryPress={handleJournalEntryPress}
+                onAddWithdrawal={handleAddWithdrawal}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>
@@ -719,6 +724,7 @@ const handleWithdrawalFormSuccess = () => {
               <JournalView
                 scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
                 onEntryPress={handleJournalEntryPress}
+                onAddWithdrawal={handleAddWithdrawal}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>
@@ -967,7 +973,13 @@ const handleWithdrawalFormSuccess = () => {
         onClose={handleWithdrawalFormClose}
         onSubmitSuccess={handleWithdrawalFormSuccess}
         initialData={editingWithdrawal}
-        scope={selectedRole ? { type: 'role', id: selectedRole.id } : selectedKR ? { type: 'key_relationship', id: selectedKR.id } : { type: 'user' }}
+        scope={
+          selectedKR 
+            ? { type: 'key_relationship', id: selectedKR.id } 
+            : selectedRole 
+            ? { type: 'role', id: selectedRole.id } 
+            : { type: 'user' }
+        }
       />
     </SafeAreaView>
   );

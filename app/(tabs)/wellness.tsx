@@ -42,6 +42,8 @@ export default function Wellness() {
   const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
   const [editingWithdrawal, setEditingWithdrawal] = useState<any>(null);
 
+  const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
+
   const fetchDomains = async () => {
     try {
       const supabase = getSupabaseClient();
@@ -331,6 +333,10 @@ export default function Wellness() {
     setEditingWithdrawal(null);
   };
 
+  const handleAddWithdrawal = () => {
+    setWithdrawalFormVisible(true);
+  };
+
   const getDomainColor = (domainName: string) => {
     const colors = {
       'Community': '#7c3aed',
@@ -363,6 +369,7 @@ export default function Wellness() {
               <JournalView
                 scope={{ type: 'domain', id: selectedDomain.id, name: selectedDomain.name }}
                 onEntryPress={handleJournalEntryPress}
+                onAddWithdrawal={handleAddWithdrawal}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>
@@ -499,6 +506,19 @@ export default function Wellness() {
         onClose={handleWithdrawalFormClose}
         onSubmitSuccess={handleWithdrawalFormSuccess}
         initialData={editingWithdrawal}
+        scope={selectedDomain ? { type: 'domain', id: selectedDomain.id } : { type: 'user' }}
+      />
+      
+      <WithdrawalForm
+        visible={withdrawalFormVisible}
+        onClose={() => setWithdrawalFormVisible(false)}
+        onSubmitSuccess={() => {
+          setWithdrawalFormVisible(false);
+          if (selectedDomain) {
+            fetchDomainTasks(selectedDomain.id, activeView);
+          }
+        }}
+        initialData={undefined}
         scope={selectedDomain ? { type: 'domain', id: selectedDomain.id } : { type: 'user' }}
       />
     </SafeAreaView>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { FileText, Calendar, ListFilter as Filter } from 'lucide-react-native';
+import { FileText, Plus } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
 interface JournalEntry {
@@ -23,13 +23,15 @@ interface JournalViewProps {
     name?: string;
   };
   onEntryPress: (entry: JournalEntry) => void;
+  onAddWithdrawal?: () => void;
 }
 
-export function JournalView({ scope, onEntryPress }: JournalViewProps) {
+export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalViewProps) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'all'>('month');
+  const [totalBalance, setTotalBalance] = useState(0);
 
   const calculateTaskPoints = (task: any) => {
     let points = 0;
@@ -245,6 +247,7 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
         entry.balance = runningBalance;
       }
 
+      setTotalBalance(runningBalance);
       setEntries(journalEntries);
     } catch (error) {
       console.error('Error fetching journal entries:', error);
@@ -276,50 +279,83 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
     return balance >= 0 ? '#16a34a' : '#dc2626';
   };
 
+  const getHeaderTitle = () => {
+    switch (scope.type) {
+      case 'user':
+        return 'Total Authentic Score';
+      case 'role':
+        return `Authentic Score – ${scope.name}`;
+      case 'key_relationship':
+        return `Authentic Score – ${scope.name}`;
+      case 'domain':
+        return `Authentic Score – ${scope.name}`;
+      default:
+        return 'Authentic Score';
+    }
+  };
+
   return (
     <View style={styles.container}>
+      {/* Header with Score */}
+      <View style={styles.scoreHeader}>
+        <Text style={styles.scoreTitle}>{getHeaderTitle()}</Text>
+        <Text style={[styles.scoreValue, { color: getBalanceColor(totalBalance) }]}>
+          {formatBalance(totalBalance)}
+        </Text>
+      </View>
+
       {/* Filter Controls */}
       <View style={styles.filterContainer}>
         <View style={styles.filterRow}>
-          <View style={styles.filterGroup}>
-            {(['all', 'deposits', 'withdrawals'] as const).map((filterOption) => (
-              <TouchableOpacity
-                key={filterOption}
-                style={[
-                  styles.filterButton,
-                  filter === filterOption && styles.activeFilterButton
-                ]}
-                onPress={() => setFilter(filterOption)}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  filter === filterOption && styles.activeFilterButtonText
-                ]}>
-                  {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.filterRowContent}>
+            <View style={styles.filterGroup}>
+              {(['all', 'deposits', 'withdrawals'] as const).map((filterOption) => (
+                <TouchableOpacity
+                  key={filterOption}
+                  style={[
+                    styles.filterButton,
+                    filter === filterOption && styles.activeFilterButton
+                  ]}
+                  onPress={() => setFilter(filterOption)}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    filter === filterOption && styles.activeFilterButtonText
+                  ]}>
+                    {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <View style={styles.filterGroup}>
+              {(['week', 'month', 'all'] as const).map((rangeOption) => (
+                <TouchableOpacity
+                  key={rangeOption}
+                  style={[
+                    styles.filterButton,
+                    dateRange === rangeOption && styles.activeFilterButton
+                  ]}
+                  onPress={() => setDateRange(rangeOption)}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    dateRange === rangeOption && styles.activeFilterButtonText
+                  ]}>
+                    {rangeOption.charAt(0).toUpperCase() + rangeOption.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-          
-          <View style={styles.filterGroup}>
-            {(['week', 'month', 'all'] as const).map((rangeOption) => (
-              <TouchableOpacity
-                key={rangeOption}
-                style={[
-                  styles.filterButton,
-                  dateRange === rangeOption && styles.activeFilterButton
-                ]}
-                onPress={() => setDateRange(rangeOption)}
-              >
-                <Text style={[
-                  styles.filterButtonText,
-                  dateRange === rangeOption && styles.activeFilterButtonText
-                ]}>
-                  {rangeOption.charAt(0).toUpperCase() + rangeOption.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        
+          {/* Add Withdrawal Button */}
+          {onAddWithdrawal && (
+            <TouchableOpacity style={styles.addWithdrawalButton} onPress={onAddWithdrawal}>
+              <Plus size={16} color="#dc2626" />
+              <Text style={styles.addWithdrawalText}>Add Withdrawal</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -387,6 +423,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  scoreHeader: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  scoreTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  scoreValue: {
+    fontSize: 32,
+    fontWeight: '700',
+  },
   filterContainer: {
     backgroundColor: '#f8fafc',
     paddingHorizontal: 16,
@@ -395,15 +449,37 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
   },
   filterRow: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  filterRowContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 16,
   },
   filterGroup: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
     borderRadius: 8,
     padding: 2,
+  },
+  addWithdrawalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#dc2626',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignSelf: 'center',
+    gap: 6,
+  },
+  addWithdrawalText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#dc2626',
   },
   filterButton: {
     paddingHorizontal: 12,
