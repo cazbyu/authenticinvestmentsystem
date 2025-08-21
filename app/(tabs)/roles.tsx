@@ -12,6 +12,7 @@ import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
 import { JournalView } from '@/components/journal/JournalView';
 import { getSupabaseClient } from '@/lib/supabase';
+import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
@@ -45,7 +46,7 @@ export default function Roles() {
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [krView, setKRView] = useState<'deposits' | 'ideas'>('deposits');
-  const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal'>('deposits');
+  const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   
   // Modal states
   const [manageRolesVisible, setManageRolesVisible] = useState(false);
@@ -406,9 +407,9 @@ export default function Roles() {
     }
   };
 
-  const handleKRJournalViewChange = (view: 'deposits' | 'ideas' | 'journal') => {
+  const handleKRJournalViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setKRJournalView(view);
-    if (view !== 'journal' && selectedKR) {
+    if (view !== 'journal' && view !== 'analytics' && selectedKR) {
       setKRView(view as 'deposits' | 'ideas');
       fetchKRTasks(selectedKR.id, view as 'deposits' | 'ideas');
     }
@@ -635,7 +636,7 @@ export default function Roles() {
             </View>
             
             <View style={styles.toggleContainer}>
-              {(['deposits', 'ideas', 'journal'] as const).map((view) => (
+              {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
                 <TouchableOpacity
                   key={view}
                   style={[styles.toggleButton, krJournalView === view && styles.activeToggle]}
@@ -654,6 +655,10 @@ export default function Roles() {
               <JournalView
                 scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
                 onEntryPress={handleJournalEntryPress}
+              />
+            ) : krJournalView === 'analytics' ? (
+              <AnalyticsView
+                scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>
@@ -718,6 +723,10 @@ export default function Roles() {
               <JournalView
                 scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
                 onEntryPress={handleJournalEntryPress}
+              />
+            ) : activeView === 'analytics' ? (
+              <AnalyticsView
+                scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>

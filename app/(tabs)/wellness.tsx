@@ -8,6 +8,7 @@ import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
+import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -353,6 +354,10 @@ export default function Wellness() {
               <JournalView
                 scope={{ type: 'domain', id: selectedDomain.id, name: selectedDomain.name }}
                 onEntryPress={handleJournalEntryPress}
+              />
+            ) : activeView === 'analytics' ? (
+              <AnalyticsView
+                scope={{ type: 'domain', id: selectedDomain.id, name: selectedDomain.name }}
               />
             ) : loading ? (
               <View style={styles.loadingContainer}>

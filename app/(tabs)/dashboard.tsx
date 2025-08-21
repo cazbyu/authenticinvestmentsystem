@@ -11,10 +11,11 @@ import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
+import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
-  const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal'>('deposits');
+  const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
@@ -326,6 +327,10 @@ export default function Dashboard() {
           <JournalView
             scope={{ type: 'user' }}
             onEntryPress={handleJournalEntryPress}
+          />
+        ) : activeView === 'analytics' ? (
+          <AnalyticsView
+            scope={{ type: 'user' }}
           />
         ) : loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
           : (activeView === 'deposits' && tasks.length === 0) || (activeView === 'ideas' && depositIdeas.length === 0) ? 

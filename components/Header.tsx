@@ -94,7 +94,7 @@ export function Header({
               </TouchableOpacity>
             </View>
 
-            {/* Journal / Analytics */}
+            {/* Journal / Analytics - Updated to include Analytics */}
             <View style={styles.journalButtonsContainer}>
               <TouchableOpacity
                 style={[styles.journalButton, activeView === 'journal' && styles.activeJournalButton, { minWidth: 70 }]}
