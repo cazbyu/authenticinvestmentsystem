@@ -66,14 +66,26 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
   // Formats the due date string
   const formatDueDate = (date?: string) => {
     if (!date) return "";
-    const d = new Date(date);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  };
-
-  // Handles single and double tap gestures
-  const handlePress = () => {
-    const now = Date.now();
-    const DOUBLE_PRESS_DELAY = 400;
+    try {
+      // Handle both YYYY-MM-DD format and full datetime strings
+      let d;
+      if (date.includes('T') || date.includes(' ')) {
+        // Full datetime string - use as is but be careful with timezone
+        d = new Date(date);
+      } else {
+        // Date-only string (YYYY-MM-DD) - parse as local date
+        const [year, month, day] = date.split('-').map(Number);
+        d = new Date(year, month - 1, day);
+      }
+      
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      
+      return `${months[d.getMonth()]} ${d.getDate()}`;
+    } catch (error) {
+      console.error('Error formatting date:', date, error);
+      return "";
+    }
     if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
       setLastTap(0); // Reset to prevent triple-tap issues
       onDoublePress?.(task);
