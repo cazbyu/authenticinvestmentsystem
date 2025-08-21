@@ -48,6 +48,7 @@ const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubm
 
 
 const toDateString = (date: Date) => {
+    // Use local date components to avoid timezone conversion
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
@@ -169,7 +170,8 @@ const toDateString = (date: Date) => {
   };
 
   const onCalendarDayPress = (day: any) => {
-    const selectedDate = new Date(day.timestamp);
+    // Create date using local time components to avoid timezone issues
+    const selectedDate = new Date(day.year, day.month - 1, day.day);
     setFormData(prev => ({ ...prev, dueDate: selectedDate }));
     setDateInputValue(formatDateForInput(selectedDate));
     setShowMiniCalendar(false);
@@ -183,17 +185,19 @@ const toDateString = (date: Date) => {
   };
 
   const formatDateForInput = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    // Use local date components to avoid timezone conversion
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
   };
 
   const handleDateInputChange = (text: string) => {
     setDateInputValue(text);
     const parsedDate = new Date(text);
+    // Only update if the parsed date is valid and use local time
     if (!isNaN(parsedDate.getTime())) {
+      // Create a new date using local time components to avoid timezone issues
+      const localDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
       setFormData(prev => ({ ...prev, dueDate: parsedDate }));
     }
   };
@@ -310,7 +314,7 @@ const toDateString = (date: Date) => {
                 goal_12wk_id: formData.selectedGoalId,
                 status: 'pending',
                 type: formData.schedulingType,
-                due_date: formData.dueDate.toISOString().split('T')[0],
+                due_date: toDateString(formData.dueDate),
                 deposit_idea: isEditingDepositIdea, // True if converting from DI
                 is_all_day: formData.isAnytime,
                 updated_at: new Date().toISOString(),
