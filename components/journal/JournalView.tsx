@@ -296,14 +296,6 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
 
   return (
     <View style={styles.container}>
-      {/* Header with Score */}
-      <View style={styles.scoreHeader}>
-        <Text style={styles.scoreTitle}>{getHeaderTitle()}</Text>
-        <Text style={[styles.scoreValue, { color: getBalanceColor(totalBalance) }]}>
-          {formatBalance(totalBalance)}
-        </Text>
-      </View>
-
       {/* Filter Controls */}
       <View style={styles.filterContainer}>
         <View style={styles.filterRow}>
@@ -422,24 +414,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
-  },
-  scoreHeader: {
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    alignItems: 'center',
-  },
-  scoreTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  scoreValue: {
-    fontSize: 32,
-    fontWeight: '700',
   },
   filterContainer: {
     backgroundColor: '#f8fafc',
