@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Calendar, MessageCircle, Settings, LogOut } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const menuItems = [
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
@@ -13,6 +14,7 @@ const menuItems = [
 
 export function SideMenu() {
   const router = useRouter();
+  const { colors } = useTheme();
 
   const handleMenuPress = (route: string) => {
     router.push(route as any);
@@ -37,33 +39,33 @@ export function SideMenu() {
   // -------------------------
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <Text style={styles.headerTitle}>Authentic</Text>
         <Text style={styles.headerSubtitle}>Investments</Text>
       </View>
       
-      <ScrollView style={styles.menuContainer}>
+      <ScrollView style={[styles.menuContainer, { backgroundColor: colors.background }]}>
         {menuItems.map((item) => {
           const IconComponent = item.icon;
           return (
             <TouchableOpacity
               key={item.id}
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: colors.border }]}
               onPress={() => handleMenuPress(item.route)}
             >
-              <IconComponent size={24} color="#0078d4" />
-              <Text style={styles.menuItemText}>{item.title}</Text>
+              <IconComponent size={24} color={colors.primary} />
+              <Text style={[styles.menuItemText, { color: colors.text }]}>{item.title}</Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
       
-      <View style={styles.footer}>
+      <View style={[styles.footer, { borderTopColor: colors.border }]}>
         {/* --- UPDATE THIS BUTTON --- */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-          <LogOut size={20} color="#dc2626" />
-          <Text style={styles.logoutText}>Sign Out</Text>
+          <LogOut size={20} color={colors.error} />
+          <Text style={[styles.logoutText, { color: colors.error }]}>Sign Out</Text>
         </TouchableOpacity>
         {/* -------------------------- */}
       </View>
@@ -74,10 +76,8 @@ export function SideMenu() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   header: {
-    backgroundColor: '#0078d4',
     padding: 20,
     alignItems: 'center',
   },
@@ -102,18 +102,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   menuItemText: {
     marginLeft: 16,
     fontSize: 16,
     fontWeight: '500',
-    color: '#1f2937',
   },
   footer: {
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
   },
   logoutButton: {
     flexDirection: 'row',
@@ -124,6 +121,5 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     fontWeight: '500',
-    color: '#dc2626',
   },
 });

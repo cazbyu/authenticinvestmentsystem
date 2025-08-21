@@ -5,6 +5,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Header } from '@/components/Header';
 import { ManageRolesModal } from '@/components/settings/ManageRolesModal'; // <-- Import the new component
+import { useTheme } from '@/contexts/ThemeContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -14,6 +15,7 @@ const redirectUri = AuthSession.makeRedirectUri({
 });
 
 export default function SettingsScreen() {
+  const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -56,37 +58,52 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header title="Settings" />
       
-      <ScrollView style={styles.content}>
+      <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
         {/* Account Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
           
           {/* --- ADD THIS BUTTON --- */}
           <TouchableOpacity 
             style={styles.settingButton}
             onPress={() => setIsRolesModalVisible(true)}
           >
-            <Text style={styles.settingButtonText}>Manage Roles</Text>
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Manage Roles</Text>
           </TouchableOpacity>
           {/* ----------------------- */}
           
           <TouchableOpacity style={styles.settingButton}>
-            <Text style={styles.settingButtonText}>Export Data</Text>
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Export Data</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Appearance Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+          
+          <View style={styles.settingRow}>
+            <Text style={[styles.settingLabel, { color: colors.text }]}>Dark Mode</Text>
+            <Switch
+              value={isDarkMode}
+              onValueChange={toggleDarkMode}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={isDarkMode ? colors.surface : colors.surface}
+            />
+          </View>
+        </View>
+
         {/* Google Calendar Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Google Calendar Integration</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Google Calendar Integration</Text>
           {/* ... existing Google Calendar code ... */}
         </View>
 
         {/* Notifications Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
           {/* ... existing Notifications code ... */}
         </View>
       </ScrollView>
@@ -105,14 +122,12 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   content: {
     flex: 1,
     padding: 16,
   },
   section: {
-    backgroundColor: '#ffffff',
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
@@ -120,17 +135,25 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 16,
   },
   settingButton: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: 'transparent',
   },
   settingButtonText: {
     fontSize: 16,
-    color: '#0078d4',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   // ... other styles from your settings screen
 });
