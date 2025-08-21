@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, TextInput, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as ImagePicker from 'expo-image-picker';
 import { Header } from '@/components/Header';
 import { ManageRolesModal } from '@/components/settings/ManageRolesModal'; // <-- Import the new component
 import { useTheme } from '@/contexts/ThemeContext';
 import { getSupabaseClient } from '@/lib/supabase';
+import { Camera, Upload, User, Palette } from 'lucide-react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,6 +25,17 @@ export default function SettingsScreen() {
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isRolesModalVisible, setIsRolesModalVisible] = useState(false); // <-- Add state for the modal
   const [authenticScore, setAuthenticScore] = useState(0);
+  const [profile, setProfile] = useState({
+    first_name: '',
+    last_name: '',
+    bio: '',
+    image_path: '',
+    primary_color: '#0078d4',
+    accent_color: '#16a34a'
+  });
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -47,6 +60,42 @@ export default function SettingsScreen() {
       Alert.alert('Error', 'Failed to connect to Google Calendar');
     }
   }, [response]);
+
+  const colorOptions = [
+    '#0078d4', '#16a34a', '#dc2626', '#7c3aed', '#ea580c',
+    '#0891b2', '#be185d', '#059669', '#7c2d12', '#4338ca',
+    '#9333ea', '#c2410c', '#0f766e', '#b91c1c', '#6366f1'
+  ];
+
+  const fetchProfile = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setProfile(data);
+        
+        // Get profile image URL if exists
+        if (data.image_path) {
+          const { data: imageData } = supabase.storage
+            .from('0008-ap-profile-images')
+            .getPublicUrl(data.image_path);
+          setProfileImageUrl(imageData.publicUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -116,8 +165,149 @@ export default function SettingsScreen() {
   };
 
   useEffect(() => {
+    fetchProfile();
     calculateAuthenticScore();
   }, []);
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant camera roll permissions to upload images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant camera permissions to take photos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo');
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    try {
+      setUploading(true);
+
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      // Determine file extension and content type
+      let fileExt = 'jpg';
+      let contentType = 'image/jpeg';
+      
+      if (uri.startsWith('data:')) {
+        const mimeMatch = uri.match(/data:([^;]+)/);
+        if (mimeMatch) {
+          contentType = mimeMatch[1];
+          fileExt = contentType.split('/')[1] || 'jpg';
+        }
+      } else {
+        const uriExt = uri.split('.').pop()?.toLowerCase();
+        if (uriExt && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(uriExt)) {
+          fileExt = uriExt === 'jpeg' ? 'jpg' : uriExt;
+          contentType = `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
+        }
+      }
+
+      // Convert URI to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // Create unique filename
+      const fileName = `${user.id}/profile_${Date.now()}.${fileExt}`;
+
+      // Remove old image if exists
+      if (profile.image_path) {
+        await supabase.storage
+          .from('0008-ap-profile-images')
+          .remove([profile.image_path]);
+      }
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('0008-ap-profile-images')
+        .upload(fileName, blob, {
+          contentType,
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('0008-ap-profile-images')
+        .getPublicUrl(fileName);
+
+      // Update profile with new image path
+      await updateProfile({ image_path: fileName });
+      setProfileImageUrl(publicUrl);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Failed to upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const updateProfile = async (updates: Partial<typeof profile>) => {
+    try {
+      setSaving(true);
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const { error } = await supabase
+        .from('0008-ap-profiles')
+        .upsert({
+          user_id: user.id,
+          ...profile,
+          ...updates,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      setProfile(prev => ({ ...prev, ...updates }));
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const connectToGoogle = async () => {
     setIsConnectingGoogle(true);
@@ -135,18 +325,160 @@ export default function SettingsScreen() {
       <Header title="Settings" authenticScore={authenticScore} />
       
       <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
+        {/* Profile Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Profile</Text>
+          
+          {/* Profile Photo */}
+          <View style={styles.profilePhotoSection}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Profile Photo</Text>
+            <View style={styles.profilePhotoContainer}>
+              {profileImageUrl ? (
+                <Image source={{ uri: profileImageUrl }} style={styles.profileImage} />
+              ) : (
+                <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.border }]}>
+                  <User size={32} color={colors.textSecondary} />
+                </View>
+              )}
+              
+              <View style={styles.profilePhotoButtons}>
+                <TouchableOpacity 
+                  style={[styles.photoButton, { borderColor: colors.primary }]}
+                  onPress={takePhoto}
+                  disabled={uploading}
+                >
+                  <Camera size={16} color={colors.primary} />
+                  <Text style={[styles.photoButtonText, { color: colors.primary }]}>Take Photo</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.photoButton, { borderColor: colors.primary }]}
+                  onPress={pickImage}
+                  disabled={uploading}
+                >
+                  <Upload size={16} color={colors.primary} />
+                  <Text style={[styles.photoButtonText, { color: colors.primary }]}>Choose Photo</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {uploading && (
+                <View style={styles.uploadingContainer}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.uploadingText, { color: colors.textSecondary }]}>Uploading...</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Profile Information */}
+          <View style={styles.profileField}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>First Name</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={profile.first_name}
+              onChangeText={(text) => setProfile(prev => ({ ...prev, first_name: text }))}
+              placeholder="Enter first name"
+              placeholderTextColor={colors.textSecondary}
+              onBlur={() => updateProfile({ first_name: profile.first_name })}
+            />
+          </View>
+
+          <View style={styles.profileField}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Last Name</Text>
+            <TextInput
+              style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={profile.last_name}
+              onChangeText={(text) => setProfile(prev => ({ ...prev, last_name: text }))}
+              placeholder="Enter last name"
+              placeholderTextColor={colors.textSecondary}
+              onBlur={() => updateProfile({ last_name: profile.last_name })}
+            />
+          </View>
+
+          <View style={styles.profileField}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Bio</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={profile.bio}
+              onChangeText={(text) => setProfile(prev => ({ ...prev, bio: text }))}
+              placeholder="Tell us about yourself..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={3}
+              onBlur={() => updateProfile({ bio: profile.bio })}
+            />
+          </View>
+        </View>
+
+        {/* Personalization Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Personalization</Text>
+          
+          {/* Primary Color */}
+          <View style={styles.colorField}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Primary Color</Text>
+            <View style={styles.colorGrid}>
+              {colorOptions.map((color) => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.colorOption,
+                    { backgroundColor: color },
+                    profile.primary_color === color && styles.selectedColorOption
+                  ]}
+                  onPress={() => {
+                    setProfile(prev => ({ ...prev, primary_color: color }));
+                    updateProfile({ primary_color: color });
+                  }}
+                >
+                  {profile.primary_color === color && (
+                    <View style={styles.colorCheckmark}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Accent Color */}
+          <View style={styles.colorField}>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>Accent Color</Text>
+            <View style={styles.colorGrid}>
+              {colorOptions.map((color) => (
+                <TouchableOpacity
+                  key={color}
+                  style={[
+                    styles.colorOption,
+                    { backgroundColor: color },
+                    profile.accent_color === color && styles.selectedColorOption
+                  ]}
+                  onPress={() => {
+                    setProfile(prev => ({ ...prev, accent_color: color }));
+                    updateProfile({ accent_color: color });
+                  }}
+                >
+                  {profile.accent_color === color && (
+                    <View style={styles.colorCheckmark}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+
         {/* Account Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
           
-          {/* --- ADD THIS BUTTON --- */}
           <TouchableOpacity 
             style={styles.settingButton}
             onPress={() => setIsRolesModalVisible(true)}
           >
             <Text style={[styles.settingButtonText, { color: colors.primary }]}>Manage Roles</Text>
           </TouchableOpacity>
-          {/* ----------------------- */}
           
           <TouchableOpacity style={styles.settingButton}>
             <Text style={[styles.settingButtonText, { color: colors.primary }]}>Export Data</Text>
@@ -171,27 +503,71 @@ export default function SettingsScreen() {
         {/* Google Calendar Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Google Calendar Integration</Text>
-          {/* ... existing Google Calendar code ... */}
+          
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Google Calendar</Text>
+              <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                {googleAccessToken ? 'Connected' : 'Not connected'}
+              </Text>
+            </View>
+            {googleAccessToken ? (
+              <TouchableOpacity
+                style={[styles.connectButton, styles.disconnectButton]}
+                onPress={disconnectGoogle}
+              >
+                <Text style={styles.disconnectButtonText}>Disconnect</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.connectButton, { backgroundColor: colors.primary }]}
+                onPress={connectToGoogle}
+                disabled={isConnectingGoogle}
+              >
+                <Text style={styles.connectButtonText}>
+                  {isConnectingGoogle ? 'Connecting...' : 'Connect'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {googleAccessToken && (
+            <View style={styles.settingRow}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Sync Events</Text>
+              <Switch
+                value={syncEnabled}
+                onValueChange={setSyncEnabled}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={syncEnabled ? colors.surface : colors.surface}
+              />
+            </View>
+          )}
         </View>
 
         {/* Notifications Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
-          {/* ... existing Notifications code ... */}
+          
+          <View style={styles.settingRow}>
+            <Text style={[styles.settingLabel, { color: colors.text }]}>Push Notifications</Text>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={notificationsEnabled ? colors.surface : colors.surface}
+            />
+          </View>
         </View>
       </ScrollView>
 
-      {/* --- ADD THE MODAL COMPONENT --- */}
       <ManageRolesModal
         visible={isRolesModalVisible}
         onClose={() => setIsRolesModalVisible(false)}
       />
-      {/* ----------------------------- */}
     </SafeAreaView>
   );
 }
 
-// ... (your existing styles for settings.tsx)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -228,5 +604,132 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  // ... other styles from your settings screen
+  profilePhotoSection: {
+    marginBottom: 24,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  profilePhotoContainer: {
+    alignItems: 'center',
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 16,
+  },
+  profileImagePlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  profilePhotoButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  photoButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  uploadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 8,
+  },
+  uploadingText: {
+    fontSize: 14,
+  },
+  profileField: {
+    marginBottom: 16,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  colorField: {
+    marginBottom: 24,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedColorOption: {
+    borderColor: '#1f2937',
+    borderWidth: 3,
+  },
+  colorCheckmark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmarkText: {
+    color: '#1f2937',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  settingInfo: {
+    flex: 1,
+  },
+  settingDescription: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  connectButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  connectButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  disconnectButton: {
+    backgroundColor: '#dc2626',
+  },
+  disconnectButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
