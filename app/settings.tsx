@@ -28,8 +28,7 @@ export default function SettingsScreen() {
   const [profile, setProfile] = useState({
     first_name: '',
     last_name: '',
-    bio: '',
-    image_path: '',
+    profile_image: '',
     primary_color: '#0078d4',
     accent_color: '#16a34a'
   });
@@ -74,7 +73,7 @@ export default function SettingsScreen() {
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('0008-ap-profiles')
+        .from('0008-ap-users')
         .select('*')
         .eq('user_id', user.id)
         .single();
@@ -85,10 +84,10 @@ export default function SettingsScreen() {
         setProfile(data);
         
         // Get profile image URL if exists
-        if (data.image_path) {
+        if (data.profile_image) {
           const { data: imageData } = supabase.storage
             .from('0008-ap-profile-images')
-            .getPublicUrl(data.image_path);
+            .getPublicUrl(data.profile_image);
           setProfileImageUrl(imageData.publicUrl);
         }
       }
@@ -250,10 +249,10 @@ export default function SettingsScreen() {
       const fileName = `${user.id}/profile_${Date.now()}.${fileExt}`;
 
       // Remove old image if exists
-      if (profile.image_path) {
+      if (profile.profile_image) {
         await supabase.storage
           .from('0008-ap-profile-images')
-          .remove([profile.image_path]);
+          .remove([profile.profile_image]);
       }
 
       // Upload to Supabase Storage
@@ -272,7 +271,7 @@ export default function SettingsScreen() {
         .getPublicUrl(fileName);
 
       // Update profile with new image path
-      await updateProfile({ image_path: fileName });
+      await updateProfile({ profile_image: fileName });
       setProfileImageUrl(publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -290,7 +289,7 @@ export default function SettingsScreen() {
       if (!user) throw new Error('No user found');
 
       const { error } = await supabase
-        .from('0008-ap-profiles')
+        .from('0008-ap-users')
         .upsert({
           user_id: user.id,
           ...profile,
@@ -396,26 +395,9 @@ export default function SettingsScreen() {
           </View>
 
           <View style={styles.profileField}>
-            <Text style={[styles.fieldLabel, { color: colors.text }]}>Bio</Text>
-            <TextInput
-              style={[styles.textInput, styles.textArea, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-              value={profile.bio}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, bio: text }))}
-              placeholder="Tell us about yourself..."
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              numberOfLines={3}
-              onBlur={() => updateProfile({ bio: profile.bio })}
-            />
-          </View>
-        </View>
-
-        {/* Personalization Section */}
-        <View style={[styles.section, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Personalization</Text>
-          
           {/* Primary Color */}
-          <View style={styles.colorField}>
+          <View style={[styles.colorField, { marginTop: 24 }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Personalization</Text>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Primary Color</Text>
             <View style={styles.colorGrid}>
               {colorOptions.map((color) => (
