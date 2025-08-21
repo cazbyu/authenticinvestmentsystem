@@ -85,7 +85,7 @@ const toDateString = (date: Date) => {
         ? ''
         : (initialData?.notes || ''),
     amount: initialData?.amount?.toString() || '',
-    withdrawalDate: initialData?.withdrawal_date ? new Date(initialData.withdrawal_date) : new Date(),
+    withdrawalDate: initialData?.withdrawn_at ? new Date(initialData.withdrawn_at) : new Date(),
     dueDate: initialData?.due_date ? new Date(initialData.due_date) : new Date(),
     time: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
     startTime: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
@@ -279,7 +279,7 @@ const toDateString = (date: Date) => {
                 user_id: user.id,
                 title: formData.title.trim(),
                 amount: parseFloat(formData.amount),
-                withdrawal_date: toDateString(formData.withdrawalDate),
+                withdrawn_at: toDateString(formData.withdrawalDate),
                 updated_at: new Date().toISOString(),
             };
 

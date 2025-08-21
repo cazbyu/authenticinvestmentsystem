@@ -161,7 +161,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
           .eq('user_id', user.id);
 
         if (dateFilter) {
-          withdrawalsQuery = withdrawalsQuery.gte('withdrawal_date', dateFilter);
+          withdrawalsQuery = withdrawalsQuery.gte('withdrawn_at', dateFilter);
         }
 
         const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
@@ -220,7 +220,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
 
             journalEntries.push({
               id: withdrawal.id,
-              date: withdrawal.withdrawal_date,
+              date: withdrawal.withdrawn_at,
               description: withdrawal.title,
               type: 'withdrawal',
               amount: parseFloat(withdrawal.amount.toString()),
