@@ -235,16 +235,28 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
       }
 
       // Sort by date and calculate running balance
-      journalEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      journalEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       let runningBalance = 0;
-      for (const entry of journalEntries) {
+      // Calculate balance in chronological order (oldest first) but display newest first
+      const chronologicalEntries = [...journalEntries].reverse();
+      for (const entry of chronologicalEntries) {
         if (entry.type === 'deposit') {
           runningBalance += entry.amount;
         } else {
           runningBalance -= entry.amount;
         }
-        entry.balance = runningBalance;
+      }
+      
+      // Now assign balances in reverse chronological order (newest first)
+      let currentBalance = runningBalance;
+      for (const entry of journalEntries) {
+        entry.balance = currentBalance;
+        if (entry.type === 'deposit') {
+          currentBalance -= entry.amount;
+        } else {
+          currentBalance += entry.amount;
+        }
       }
 
       setTotalBalance(runningBalance);
