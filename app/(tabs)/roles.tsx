@@ -903,7 +903,7 @@ export default function Roles() {
       <View style={styles.content}>
         <Header 
           title="Role Bank" 
-          authenticScore={85}
+          authenticScore={authenticScore}
         />
         
         <ScrollView style={styles.rolesList}>
