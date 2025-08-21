@@ -62,6 +62,7 @@ export default function Roles() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
+  const [authenticScore, setAuthenticScore] = useState(0);
 
   const handleJournalEntryPress = (entry: any) => {
     if (entry.source_type === 'task') {
@@ -75,6 +76,73 @@ export default function Roles() {
       };
       setEditingTask(editData);
       setTaskFormVisible(true);
+    }
+  };
+
+  const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
+    let points = 0;
+    if (roles && roles.length > 0) points += roles.length;
+    if (domains && domains.length > 0) points += domains.length;
+    if (task.is_authentic_deposit) points += 2;
+    if (task.is_urgent && task.is_important) points += 1.5;
+    else if (!task.is_urgent && task.is_important) points += 3;
+    else if (task.is_urgent && !task.is_important) points += 1;
+    else points += 0.5;
+    if (task.is_twelve_week_goal) points += 2;
+    return Math.round(points * 10) / 10;
+  };
+
+  const calculateAuthenticScore = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Calculate deposits from completed tasks
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .not('completed_at', 'is', null);
+
+      if (tasksError) throw tasksError;
+
+      let totalDeposits = 0;
+      if (tasksData && tasksData.length > 0) {
+        const taskIds = tasksData.map(t => t.id);
+        const [
+          { data: rolesData },
+          { data: domainsData }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
+        ]);
+
+        for (const task of tasksData) {
+          const taskWithData = {
+            ...task,
+            roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+            domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+          };
+          totalDeposits += calculateTaskPoints(task, taskWithData.roles, taskWithData.domains);
+        }
+      }
+
+      // Calculate withdrawals
+      const { data: withdrawalsData, error: withdrawalsError } = await supabase
+        .from('0008-ap-withdrawals')
+        .select('amount')
+        .eq('user_id', user.id);
+
+      if (withdrawalsError) throw withdrawalsError;
+
+      const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
+      
+      const balance = totalDeposits - totalWithdrawals;
+      setAuthenticScore(Math.round(balance * 10) / 10);
+    } catch (error) {
+      console.error('Error calculating authentic score:', error);
     }
   };
 
@@ -95,6 +163,7 @@ export default function Roles() {
       setRoles(data || []);
       
       // Don't auto-select first role - show accounts page by default
+      await calculateAuthenticScore();
     } catch (error) {
       console.error('Error fetching roles:', error);
       Alert.alert('Error', (error as Error).message);
@@ -713,9 +782,10 @@ export default function Roles() {
             title={selectedRole.label}
             activeView={activeView}
             onViewChange={handleViewChange}
+            authenticScore={authenticScore}
             backgroundColor={selectedRole.color}
             onEditPress={() => handleEditRole(selectedRole)}
-            onBackPress={() => setSelectedRole(null)}
+            authenticScore={authenticScore}
           />
 
           <ScrollView style={styles.taskList}>

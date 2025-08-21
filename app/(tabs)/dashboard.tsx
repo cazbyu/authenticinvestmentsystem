@@ -90,6 +90,17 @@ export default function Dashboard() {
         if (sortOption === 'due_date') sortedTasks.sort((a, b) => (new Date(a.due_date).getTime() || 0) - (new Date(b.due_date).getTime() || 0));
         else if (sortOption === 'priority') sortedTasks.sort((a, b) => ((b.is_urgent ? 2 : 0) + (b.is_important ? 1 : 0)) - ((a.is_urgent ? 2 : 0) + (a.is_important ? 1 : 0)));
         else if (sortOption === 'title') sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
+        else if (sortOption === 'authentic_points') {
+          sortedTasks.sort((a, b) => {
+            const pointsA = calculateTaskPoints(a, a.roles, a.domains);
+            const pointsB = calculateTaskPoints(b, b.roles, b.domains);
+            return pointsB - pointsA; // Highest points first
+          });
+        }
+        else if (sortOption === 'roles') sortedTasks.sort((a, b) => (b.roles?.length || 0) - (a.roles?.length || 0));
+        else if (sortOption === 'domains') sortedTasks.sort((a, b) => (b.domains?.length || 0) - (a.domains?.length || 0));
+        else if (sortOption === 'goals') sortedTasks.sort((a, b) => (b.goals?.length || 0) - (a.goals?.length || 0));
+        else if (sortOption === 'delegated') sortedTasks.sort((a, b) => (b.has_delegates ? 1 : 0) - (a.has_delegates ? 1 : 0));
 
         setTasks(sortedTasks);
         setDepositIdeas([]);
@@ -317,7 +328,16 @@ export default function Dashboard() {
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
   const renderRegularItem = ({ item }: { item: Task }) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={() => {}} onDoublePress={handleTaskDoublePress} isDragging={false} />;
-  const sortOptions = [{ value: 'due_date', label: 'Due Date' }, { value: 'priority', label: 'Priority' }, { value: 'title', label: 'Title' }];
+  const sortOptions = [
+    { value: 'due_date', label: 'Due Date' }, 
+    { value: 'priority', label: 'Priority' }, 
+    { value: 'title', label: 'Title' },
+    { value: 'authentic_points', label: 'Authentic Points' },
+    { value: 'roles', label: 'Roles' },
+    { value: 'domains', label: 'Domains' },
+    { value: 'goals', label: 'Goals' },
+    { value: 'delegated', label: 'Delegated' }
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
