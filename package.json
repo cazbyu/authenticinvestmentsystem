@@ -40,7 +40,7 @@
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-gesture-handler": "2.16.0",
     "react-native-reanimated": "~3.10.0",
-    "react-native-safe-area-context": "5.8.0",
+    "react-native-safe-area-context": "^6.0.0",
     "react-native-screens": "4.16.0",
     "react-native-svg": "16.0.0",
     "react-native-url-polyfill": "^2.0.0",
