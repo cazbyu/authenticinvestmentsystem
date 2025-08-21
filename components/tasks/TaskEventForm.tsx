@@ -506,6 +506,29 @@ const toDateString = (date: Date) => {
 
   const filteredKeyRelationships = keyRelationships.filter(kr => formData.selectedRoleIds.includes(kr.role_id));
 
+  // Dynamic placeholder text based on scheduling type
+  const getTitlePlaceholder = () => {
+    switch (formData.schedulingType) {
+      case 'withdrawal':
+        return 'Reason for your Withdrawal';
+      case 'depositIdea':
+        return 'What is your Deposit Idea?';
+      default:
+        return 'Action Title';
+    }
+  };
+
+  const getNotesPlaceholder = () => {
+    switch (formData.schedulingType) {
+      case 'withdrawal':
+        return 'Details that may help you improve';
+      case 'depositIdea':
+        return 'What is needed to make this idea a success?';
+      default:
+        return 'Notes...';
+    }
+  };
+
   return (
     <View style={styles.formContainer}>
         <View style={styles.modalHeader}>
@@ -515,7 +538,7 @@ const toDateString = (date: Date) => {
             <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
         </View>
         <ScrollView style={styles.formContent}>
-            <TextInput style={styles.input} placeholder="Action Title" value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
+            <TextInput style={styles.input} placeholder={getTitlePlaceholder()} value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
 
             <View style={styles.schedulingToggle}>
               {['task', 'event', 'depositIdea', 'withdrawal'].map(type => (
@@ -793,7 +816,7 @@ const toDateString = (date: Date) => {
               })}
             </View>
 
-            <TextInput style={[styles.input, { height: 100 }]} placeholder="Notes..." value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
+            <TextInput style={[styles.input, { height: 100 }]} placeholder={getNotesPlaceholder()} value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
         </ScrollView>
 
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}><Text style={styles.submitButtonText}>{loading ? 'Saving...' : mode === 'edit' ? 'Update Action' : 'Save Action'}</Text></TouchableOpacity>
