@@ -65,6 +65,19 @@ export default function Roles() {
   const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
   const [editingWithdrawal, setEditingWithdrawal] = useState<any>(null);
 
+  const handleWithdrawalFormClose = () => {
+  setIsWithdrawalFormVisible(false);
+  setEditingWithdrawal(null);
+};
+
+const handleWithdrawalFormSuccess = () => {
+  setIsWithdrawalFormVisible(false);
+  setEditingWithdrawal(null);
+  // Optional: refresh lists if you want withdrawals to
+  // influence any on-screen balances immediately.
+  // e.g., selectedRole ? fetchRoleTasks(selectedRole.id) : null;
+};
+
   const fetchRoles = async () => {
     try {
       const supabase = getSupabaseClient();
@@ -513,16 +526,6 @@ export default function Roles() {
     }
   };
 
-const handleWithdrawalFormClose = () => {
-  setIsWithdrawalFormVisible(false);
-  setEditingWithdrawal(null);
-};
-const handleWithdrawalFormSuccess = () => {
-  setIsWithdrawalFormVisible(false);
-  setEditingWithdrawal(null);
-  // optional: refresh the journal if active
-};
-  
   const handleFormClose = () => {
     setTaskFormVisible(false);
     setEditingTask(null);
