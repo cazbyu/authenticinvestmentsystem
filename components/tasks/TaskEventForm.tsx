@@ -84,6 +84,8 @@ const toDateString = (date: Date) => {
       (initialData?.type === 'depositIdea' || initialData?.sourceDepositIdeaId)
         ? ''
         : (initialData?.notes || ''),
+    amount: initialData?.amount?.toString() || '',
+    withdrawalDate: initialData?.withdrawal_date ? new Date(initialData.withdrawal_date) : new Date(),
     dueDate: initialData?.due_date ? new Date(initialData.due_date) : new Date(),
     time: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
     startTime: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
@@ -93,7 +95,7 @@ const toDateString = (date: Date) => {
     is_important: initialData?.is_important || false,
     is_authentic_deposit: initialData?.is_authentic_deposit || false,
     is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
-    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea') || 'task',
+    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea' | 'withdrawal') || 'task',
     selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
     selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
@@ -109,16 +111,23 @@ const toDateString = (date: Date) => {
   const [loading, setLoading] = useState(false);
 
   const [showMiniCalendar, setShowMiniCalendar] = useState(false);
+  const [showWithdrawalCalendar, setShowWithdrawalCalendar] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [dateInputValue, setDateInputValue] = useState('');
+  const [withdrawalDateInputValue, setWithdrawalDateInputValue] = useState('');
   const [activeTimeField, setActiveTimeField] = useState<'time' | 'startTime' | 'endTime' | null>(null);
 
   const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [withdrawalDatePickerPosition, setWithdrawalDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   useEffect(() => {
     setDateInputValue(formatDateForInput(formData.dueDate));
   }, [formData.dueDate]);
+
+  useEffect(() => {
+    setWithdrawalDateInputValue(formatDateForInput(formData.withdrawalDate));
+  }, [formData.withdrawalDate]);
 
   const generateTimeOptions = () => {
     const times = [];
@@ -177,6 +186,14 @@ const toDateString = (date: Date) => {
     setShowMiniCalendar(false);
   };
 
+  const onWithdrawalCalendarDayPress = (day: any) => {
+    // Create date using local time components to avoid timezone issues
+    const selectedDate = new Date(day.year, day.month - 1, day.day);
+    setFormData(prev => ({ ...prev, withdrawalDate: selectedDate }));
+    setWithdrawalDateInputValue(formatDateForInput(selectedDate));
+    setShowWithdrawalCalendar(false);
+  };
+
   const onTimeSelect = (time: string) => {
     if (activeTimeField) {
       setFormData(prev => ({ ...prev, [activeTimeField]: time }));
@@ -199,6 +216,17 @@ const toDateString = (date: Date) => {
       // Create a new date using local time components to avoid timezone issues
       const localDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
       setFormData(prev => ({ ...prev, dueDate: parsedDate }));
+    }
+  };
+
+  const handleWithdrawalDateInputChange = (text: string) => {
+    setWithdrawalDateInputValue(text);
+    const parsedDate = new Date(text);
+    // Only update if the parsed date is valid and use local time
+    if (!isNaN(parsedDate.getTime())) {
+      // Create a new date using local time components to avoid timezone issues
+      const localDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+      setFormData(prev => ({ ...prev, withdrawalDate: parsedDate }));
     }
   };
 
@@ -239,7 +267,76 @@ const toDateString = (date: Date) => {
         if (!user) throw new Error("User not found");
 
         const isEditingDepositIdea = initialData?.type === 'depositIdea';
-        if (formData.schedulingType === 'depositIdea') {
+        
+        if (formData.schedulingType === 'withdrawal') {
+            // Handle Withdrawal creation/update
+            if (!formData.title.trim() || !formData.amount || parseFloat(formData.amount) <= 0) {
+                Alert.alert('Error', 'Please fill in title and a valid amount');
+                return;
+            }
+
+            const withdrawalPayload = {
+                user_id: user.id,
+                title: formData.title.trim(),
+                amount: parseFloat(formData.amount),
+                withdrawal_date: toDateString(formData.withdrawalDate),
+                updated_at: new Date().toISOString(),
+            };
+
+            let withdrawalData;
+            let withdrawalError;
+
+            if (mode === 'edit' && initialData?.id && initialData?.type === 'withdrawal') {
+                const { data, error } = await supabase
+                    .from('0008-ap-withdrawals')
+                    .update(withdrawalPayload)
+                    .eq('id', initialData.id)
+                    .select()
+                    .single();
+                withdrawalData = data;
+                withdrawalError = error;
+            } else {
+                const { data, error } = await supabase
+                    .from('0008-ap-withdrawals')
+                    .insert(withdrawalPayload)
+                    .select()
+                    .single();
+                withdrawalData = data;
+                withdrawalError = error;
+            }
+
+            if (withdrawalError) throw withdrawalError;
+            if (!withdrawalData) throw new Error("Failed to save withdrawal");
+
+            const withdrawalId = withdrawalData.id;
+
+            // Handle joins for withdrawal
+            if (mode === 'edit' && initialData?.id && initialData?.type === 'withdrawal') {
+                await Promise.all([
+                    supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', withdrawalId).eq('parent_type', 'withdrawal'),
+                    supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', withdrawalId).eq('parent_type', 'withdrawal'),
+                    supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', withdrawalId).eq('parent_type', 'withdrawal'),
+                ]);
+            }
+
+            const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: withdrawalId, parent_type: 'withdrawal', role_id, user_id: user.id }));
+            const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: withdrawalId, parent_type: 'withdrawal', domain_id, user_id: user.id }));
+            const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: withdrawalId, parent_type: 'withdrawal', key_relationship_id, user_id: user.id }));
+
+            // Only add a new note if there's content in the notes field
+            if (formData.notes && formData.notes.trim()) {
+                const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+                if (noteError) throw noteError;
+                await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: withdrawalId, parent_type: 'withdrawal', note_id: noteData.id, user_id: user.id });
+            }
+
+            if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+            if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+
+            Alert.alert('Success', `Withdrawal ${mode === 'edit' ? 'updated' : 'created'} successfully`);
+
+        } else if (formData.schedulingType === 'depositIdea') {
             // Handle Deposit Idea creation/update
             const diPayload: any = {
                 user_id: user.id,
@@ -421,14 +518,53 @@ const toDateString = (date: Date) => {
             <TextInput style={styles.input} placeholder="Action Title" value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
 
             <View style={styles.schedulingToggle}>
-              {['task', 'event', 'depositIdea'].map(type => (
+              {['task', 'event', 'depositIdea', 'withdrawal'].map(type => (
                 <TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}>
-                  <Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
+                  <Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>
+                    {type === 'depositIdea' ? 'Deposit Idea' : type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {formData.schedulingType !== 'depositIdea' && (
+            {formData.schedulingType === 'withdrawal' && (
+              <>
+                <View style={styles.field}>
+                  <Text style={styles.label}>Amount *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.amount}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, amount: text }))}
+                    placeholder="0.0"
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={styles.label}>Date</Text>
+                  <TouchableOpacity
+                    ref={dateInputRef}
+                    style={styles.dateButton}
+                    onPress={() => {
+                      dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
+                        setWithdrawalDatePickerPosition({ x: px, y: py, width, height });
+                        setShowWithdrawalCalendar(!showWithdrawalCalendar);
+                      });
+                    }}
+                  >
+                    <TextInput 
+                      style={styles.dateTextInput} 
+                      value={withdrawalDateInputValue} 
+                      onChangeText={handleWithdrawalDateInputChange}
+                      editable={false}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {formData.schedulingType !== 'depositIdea' && formData.schedulingType !== 'withdrawal' && (
               <>
                 <View style={styles.compactSwitchRow}>
                   <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Urgent</Text><Switch value={formData.is_urgent} onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))} /></View>
@@ -678,6 +814,22 @@ const toDateString = (date: Date) => {
           </TouchableOpacity>
         </Modal>
 
+        {/* Pop-up Withdrawal Calendar Modal */}
+        <Modal transparent visible={showWithdrawalCalendar} onRequestClose={() => setShowWithdrawalCalendar(false)}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowWithdrawalCalendar(false)}>
+            <View style={[styles.calendarPopup, { top: withdrawalDatePickerPosition.y + withdrawalDatePickerPosition.height, left: withdrawalDatePickerPosition.x }]}>
+              <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
+                <Calendar
+                  onDayPress={onWithdrawalCalendarDayPress}
+                  markedDates={{ [toDateString(formData.withdrawalDate)]: { selected: true } }}
+                  dayComponent={CustomDayComponent}
+                  hideExtraDays={true}
+                />
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
         {/* Pop-up Time Picker Modal */}
         <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
@@ -713,6 +865,9 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 18, fontWeight: '600' },
     formContent: { padding: 16 },
     input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16 },
+    field: { marginBottom: 16 },
+    label: { fontSize: 16, fontWeight: '500', color: '#1f2937', marginBottom: 8 },
+    dateButton: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12 },
     compactSwitchRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
     compactSwitchContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     compactSwitchLabel: { fontSize: 14, fontWeight: '500' },
