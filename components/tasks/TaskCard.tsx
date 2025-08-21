@@ -86,6 +86,12 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
       console.error('Error formatting date:', date, error);
       return "";
     }
+  };
+
+  const DOUBLE_PRESS_DELAY = 300;
+
+  const handlePress = () => {
+    const now = Date.now();
     if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
       setLastTap(0); // Reset to prevent triple-tap issues
       onDoublePress?.(task);
