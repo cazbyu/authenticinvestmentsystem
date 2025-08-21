@@ -71,105 +71,51 @@ export function Header({
       {/* Bottom section with toggle and sort */}
       {(activeView && onViewChange) && (
         <View style={styles.bottomSection}>
-          {(activeView === 'journal' || activeView === 'analytics') ? (
-            <>
-              <View style={styles.toggleContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    activeView === 'deposits' && styles.activeToggle
-                  ]}
-                  onPress={() => onViewChange('deposits')}
-                >
-                  <Text style={[
-                    styles.toggleText,
-                    activeView === 'deposits' && styles.activeToggleText
-                  ]}>
-                    Deposits
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    activeView === 'ideas' && styles.activeToggle
-                  ]}
-                  onPress={() => onViewChange('ideas')}
-                >
-                  <Text style={[
-                    styles.toggleText,
-                    activeView === 'ideas' && styles.activeToggleText
-                  ]}>
-                    Ideas
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.journalButtonsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.journalButton,
-                    activeView === 'journal' && styles.activeJournalButton
-                  ]}
-                  onPress={() => onViewChange('journal')}
-                >
-                  <Text style={[
-                    styles.journalButtonText,
-                    activeView === 'journal' && styles.activeJournalButtonText
-                  ]}>
-                    Role Journal
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.journalButton,
-                    activeView === 'analytics' && styles.activeJournalButton
-                  ]}
-                  onPress={() => onViewChange('analytics')}
-                >
-                  <Text style={[
-                    styles.journalButtonText,
-                    activeView === 'analytics' && styles.activeJournalButtonText
-                  ]}>
-                    Analytics
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
+                    {/* Always show both toggle groups */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* Deposits / Ideas */}
             <View style={styles.toggleContainer}>
               <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  activeView === 'deposits' && styles.activeToggle
-                ]}
+                style={[styles.toggleButton, activeView === 'deposits' && styles.activeToggle]}
                 onPress={() => onViewChange && onViewChange('deposits')}
               >
-                <Text style={[
-                  styles.toggleText,
-                  activeView === 'deposits' && styles.activeToggleText
-                ]}>
+                <Text style={[styles.toggleText, activeView === 'deposits' && styles.activeToggleText]}>
                   Deposits
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  activeView === 'ideas' && styles.activeToggle
-                ]}
+                style={[styles.toggleButton, activeView === 'ideas' && styles.activeToggle]}
                 onPress={() => onViewChange && onViewChange('ideas')}
               >
-                <Text style={[
-                  styles.toggleText,
-                  activeView === 'ideas' && styles.activeToggleText
-                ]}>
+                <Text style={[styles.toggleText, activeView === 'ideas' && styles.activeToggleText]}>
                   Ideas
                 </Text>
               </TouchableOpacity>
             </View>
-          )}
+
+            {/* Journal / Analytics */}
+            <View style={styles.journalButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.journalButton, activeView === 'journal' && styles.activeJournalButton]}
+                onPress={() => onViewChange && onViewChange('journal')}
+              >
+                <Text style={[styles.journalButtonText, activeView === 'journal' && styles.activeJournalButtonText]}>
+                  Role Journal
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.journalButton, activeView === 'analytics' && styles.activeJournalButton]}
+                onPress={() => onViewChange && onViewChange('analytics')}
+              >
+                <Text style={[styles.journalButtonText, activeView === 'analytics' && styles.activeJournalButtonText]}>
+                  Analytics
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           
           {/* Updated Sort Button to look like a toggle */}
           {onSortPress && (
