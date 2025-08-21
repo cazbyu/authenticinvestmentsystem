@@ -337,6 +337,11 @@ export default function Dashboard() {
     { value: 'domains', label: 'Domains' },
     { value: 'goals', label: 'Goals' },
     { value: 'delegated', label: 'Delegated' }
+    { value: 'authentic_points', label: 'Authentic Points' },
+    { value: 'roles', label: 'Roles' },
+    { value: 'domains', label: 'Domains' },
+    { value: 'goals', label: 'Goals' },
+    { value: 'delegated', label: 'Delegated' }
   ];
 
   return (
