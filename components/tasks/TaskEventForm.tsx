@@ -46,6 +46,7 @@ const CustomDayComponent = ({ date, state, marking, onPress }) => {
 // MAIN FORM COMPONENT
 const TaskEventForm: React.FC<TaskEventFormProps> = ({ mode, initialData, onSubmitSuccess, onClose }) => {
 
+
 const toDateString = (date: Date) => {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -78,7 +79,10 @@ const toDateString = (date: Date) => {
 
   const [formData, setFormData] = useState({
     title: initialData?.title || '',
-    notes: initialData?.notes || '',
+    notes: 
+      (initialData?.type === 'depositIdea' || initialData?.sourceDepositIdeaId)
+        ? ''
+        : (initialData?.notes || ''),
     dueDate: initialData?.due_date ? new Date(initialData.due_date) : new Date(),
     time: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
     startTime: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
@@ -93,6 +97,7 @@ const toDateString = (date: Date) => {
     selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
     selectedGoalId: initialData?.goal_12wk_id || null as string | null,
+    selectedGoalIds: initialData?.goals?.map(g => g.id) || [] as string[],
   });
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -153,7 +158,7 @@ const toDateString = (date: Date) => {
     fetchOptions();
   }, []);
 
-  const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds', id: string) => {
+  const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds' | 'selectedGoalIds', id: string) => {
     setFormData(prev => {
       const currentSelection = prev[field] as string[];
       const newSelection = currentSelection.includes(id)
@@ -229,84 +234,170 @@ const toDateString = (date: Date) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not found");
 
-        const payload: any = {
-            user_id: user.id,
-            title: formData.title,
-            is_urgent: formData.is_urgent,
-            is_important: formData.is_important,
-            is_authentic_deposit: formData.is_authentic_deposit,
-            is_twelve_week_goal: formData.is_twelve_week_goal,
-            goal_12wk_id: formData.selectedGoalId,
-            status: 'pending',
-            type: formData.schedulingType,
-            due_date: formData.schedulingType !== 'depositIdea' ? formData.dueDate.toISOString().split('T')[0] : null,
-            deposit_idea: formData.schedulingType === 'depositIdea',
-            is_all_day: formData.isAnytime,
-            updated_at: new Date().toISOString(),
-        };
+        const isEditingDepositIdea = initialData?.type === 'depositIdea';
+        if (formData.schedulingType === 'depositIdea') {
+            // Handle Deposit Idea creation/update
+            const diPayload: any = {
+                user_id: user.id,
+                title: formData.title,
+                follow_up: formData.is_twelve_week_goal, // Map follow_up to 12-week goal flag
+                updated_at: new Date().toISOString(),
+            };
 
-        if (formData.schedulingType === 'event' && !formData.isAnytime) {
-            payload.start_time = combineDateAndTime(formData.dueDate, formData.startTime);
-            payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
-        }
+            let depositIdeaData;
+            let depositIdeaError;
 
-        let taskData;
-        let taskError;
+            if (mode === 'edit' && initialData?.id) {
+                const { data, error } = await supabase
+                    .from('0008-ap-deposit-ideas')
+                    .update(diPayload)
+                    .eq('id', initialData.id)
+                    .select()
+                    .single();
+                depositIdeaData = data;
+                depositIdeaError = error;
+            } else {
+                const { data, error } = await supabase
+                    .from('0008-ap-deposit-ideas')
+                    .insert(diPayload)
+                    .select()
+                    .single();
+                depositIdeaData = data;
+                depositIdeaError = error;
+            }
 
-        if (mode === 'edit' && initialData?.id) {
-            const { data, error } = await supabase
-                .from('0008-ap-tasks')
-                .update(payload)
-                .eq('id', initialData.id)
-                .select()
-                .single();
-            taskData = data;
-            taskError = error;
+            if (depositIdeaError) throw depositIdeaError;
+            if (!depositIdeaData) throw new Error("Failed to create deposit idea");
+
+            const depositIdeaId = depositIdeaData.id;
+
+            // Handle joins for deposit idea
+            if (mode === 'edit' && initialData?.id) {
+                await Promise.all([
+                    supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                    supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                    supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                    supabase.from('0008-ap-universal-goals-join').delete().eq('parent_id', depositIdeaId).eq('parent_type', 'depositIdea'),
+                ]);
+            }
+
+            const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', role_id, user_id: user.id }));
+            const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', domain_id, user_id: user.id }));
+            const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', key_relationship_id, user_id: user.id }));
+            const goalJoins = formData.selectedGoalIds.map(goal_id => ({ parent_id: depositIdeaId, parent_type: 'depositIdea', goal_id, user_id: user.id }));
+
+            // Only add a new note if there's content in the notes field
+            if (formData.notes && formData.notes.trim()) {
+                const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+                if (noteError) throw noteError;
+                await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: depositIdeaId, parent_type: 'depositIdea', note_id: noteData.id, user_id: user.id });
+            }
+
+            if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+            if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+            if (goalJoins.length > 0) await supabase.from('0008-ap-universal-goals-join').insert(goalJoins);
+
         } else {
-            const { data, error } = await supabase
-                .from('0008-ap-tasks')
-                .insert(payload)
-                .select()
-                .single();
-            taskData = data;
-            taskError = error;
+            // Handle Task/Event creation/update
+            const payload: any = {
+                user_id: user.id,
+                title: formData.title,
+                is_urgent: formData.is_urgent,
+                is_important: formData.is_important,
+                is_authentic_deposit: formData.is_authentic_deposit,
+                is_twelve_week_goal: formData.is_twelve_week_goal,
+                goal_12wk_id: formData.selectedGoalId,
+                status: 'pending',
+                type: formData.schedulingType,
+                due_date: formData.dueDate.toISOString().split('T')[0],
+                deposit_idea: isEditingDepositIdea, // True if converting from DI
+                is_all_day: formData.isAnytime,
+                updated_at: new Date().toISOString(),
+            };
+
+            if (formData.schedulingType === 'event' && !formData.isAnytime) {
+                payload.start_time = combineDateAndTime(formData.dueDate, formData.startTime);
+                payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
+            }
+
+            let taskData;
+            let taskError;
+
+            if (mode === 'edit' && initialData?.id && !isEditingDepositIdea) {
+                const { data, error } = await supabase
+                    .from('0008-ap-tasks')
+                    .update(payload)
+                    .eq('id', initialData.id)
+                    .select()
+                    .single();
+                taskData = data;
+                taskError = error;
+            } else {
+                const { data, error } = await supabase
+                    .from('0008-ap-tasks')
+                    .insert(payload)
+                    .select()
+                    .single();
+                taskData = data;
+                taskError = error;
+            }
+
+            if (taskError) throw taskError;
+            if (!taskData) throw new Error("Failed to create task");
+
+            const taskId = taskData.id;
+
+            // Handle DI conversion - link DI to new task
+            if (isEditingDepositIdea && initialData?.id) {
+                // Update the source deposit idea with activation info
+                const { error: diUpdateError } = await supabase
+                    .from('0008-ap-deposit-ideas')
+                    .update({
+                        activated_task_id: taskId,
+                        activated_at: new Date().toISOString(),
+                        is_active: true,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', initialData.id);
+
+                if (diUpdateError) throw diUpdateError;
+            }
+
+            // Handle joins for task/event
+            if (mode === 'edit' && initialData?.id && !isEditingDepositIdea) {
+                await Promise.all([
+                    supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                    supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                    supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                    supabase.from('0008-ap-universal-goals-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+                ]);
+            }
+
+            const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
+            const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
+            const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
+            const goalJoins = formData.selectedGoalIds.map(goal_id => ({ parent_id: taskId, parent_type: 'task', goal_id, user_id: user.id }));
+
+            // Only add a new note if there's content in the notes field
+            if (formData.notes && formData.notes.trim()) {
+                const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
+                if (noteError) throw noteError;
+                await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
+            }
+
+            if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+            if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+            if (goalJoins.length > 0) await supabase.from('0008-ap-universal-goals-join').insert(goalJoins);
         }
-
-if (taskError) throw taskError;
-if (!taskData) throw new Error("Failed to create task");
-
-const taskId = taskData.id;
-
-        if (mode === 'edit' && initialData?.id) {
-            await Promise.all([
-                supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', taskId).eq('parent_type', 'task'),
-                // Don't delete existing notes - we want to keep them and add new ones
-            ]);
-        }
-
-        const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
-        const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
-        const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
-
-        // Only add a new note if there's content in the notes field
-        if (formData.notes && formData.notes.trim()) {
-            const { data: noteData, error: noteError } = await supabase.from('0008-ap-notes').insert({ user_id: user.id, content: formData.notes }).select().single();
-            if (noteError) throw noteError;
-            await supabase.from('0008-ap-universal-notes-join').insert({ parent_id: taskId, parent_type: 'task', note_id: noteData.id, user_id: user.id });
-        }
-
-        if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
-        if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
-        if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
 
         onSubmitSuccess();
         onClose();
 
     } catch (error) {
-        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} task:`, error);
-        Alert.alert('Error', (error as Error).message || `Failed to ${mode === 'edit' ? 'update' : 'create'} task`);
+        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} ${formData.schedulingType}:`, error);
+        Alert.alert('Error', (error as Error).message || `Failed to ${mode === 'edit' ? 'update' : 'create'} ${formData.schedulingType}`);
     } finally {
         setLoading(false);
     }
@@ -317,7 +408,9 @@ const taskId = taskData.id;
   return (
     <View style={styles.formContainer}>
         <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{mode === 'create' ? 'New Action' : 'Edit Action'}</Text>
+            <Text style={styles.modalTitle}>
+              {mode === 'create' ? 'New Action' : 'Edit Action'}
+            </Text>
             <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
         </View>
         <ScrollView style={styles.formContent}>
@@ -450,6 +543,52 @@ const taskId = taskData.id;
                     </View>
                   </>
                 )}
+
+                {formData.is_twelve_week_goal && (
+                  <>
+                    <Text style={styles.sectionTitle}>Goals</Text>
+                    <View style={styles.checkboxGrid}>
+                      {twelveWeekGoals.map(goal => {
+                        const isSelected = formData.selectedGoalId === goal.id;
+                        return (
+                          <TouchableOpacity
+                            key={goal.id}
+                            style={styles.checkItem}
+                            onPress={() => setFormData(prev => ({ ...prev, selectedGoalId: isSelected ? null : goal.id }))}
+                          >
+                            <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                              {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                            </View>
+                            <Text style={styles.checkLabel}>{goal.title}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </>
+            )}
+
+            {formData.schedulingType === 'depositIdea' && (
+              <>
+                <Text style={styles.sectionTitle}>12-Week Goals</Text>
+                <View style={styles.checkboxGrid}>
+                  {twelveWeekGoals.map(goal => {
+                    const isSelected = formData.selectedGoalIds?.includes(goal.id);
+                    return (
+                      <TouchableOpacity
+                        key={goal.id}
+                        style={styles.checkItem}
+                        onPress={() => handleMultiSelect('selectedGoalIds', goal.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkLabel}>{goal.title}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </>
             )}
 
@@ -653,7 +792,16 @@ const styles = StyleSheet.create({
       color: '#374151',
       marginLeft: 8,
       flexShrink: 1,
-    }
+    },
+    timeOptionPopup: {
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f3f4f6',
+    },
+    timeOptionTextPopup: {
+      fontSize: 14,
+      color: '#374151',
+    },
 
 });
 

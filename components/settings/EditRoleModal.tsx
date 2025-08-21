@@ -11,61 +11,65 @@ import {
   Image,
   ActivityIndicator
 } from 'react-native';
-import { X, Camera, Upload, Trash2 } from 'lucide-react-native';
+import { X, Camera, Upload, Trash2, Palette } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 
-interface EditKRModalProps {
+interface EditRoleModalProps {
   visible: boolean;
   onClose: () => void;
   onUpdate: () => void;
-  keyRelationship: {
+  role: {
     id: string;
-    name: string;
-    description?: string;
+    label: string;
+    category?: string;
     image_path?: string;
-    role_id: string;
+    color?: string;
   } | null;
-  roleName?: string;
 }
 
-export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleName }: EditKRModalProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+const colorOptions = [
+  '#0078d4', '#16a34a', '#dc2626', '#7c3aed', '#ea580c',
+  '#0891b2', '#be185d', '#059669', '#7c2d12', '#4338ca',
+  '#9333ea', '#c2410c', '#0f766e', '#b91c1c', '#6366f1'
+];
+
+export function EditRoleModal({ visible, onClose, onUpdate, role }: EditRoleModalProps) {
+  const [label, setLabel] = useState('');
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState('#0078d4');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (keyRelationship) {
-      setName(keyRelationship.name || '');
-      setDescription(keyRelationship.description || '');
-      setImagePath(keyRelationship.image_path || null);
+    if (role) {
+      setLabel(role.label || '');
+      setImagePath(role.image_path || null);
+      setSelectedColor(role.color || '#0078d4');
 
       // Get public URL if image path exists
-      if (keyRelationship.image_path) {
+      if (role.image_path) {
         try {
           const supabase = getSupabaseClient();
           const { data } = supabase.storage
-            .from('0008-key-relationship-images')
-            .getPublicUrl(keyRelationship.image_path);
+            .from('0008-role-images')
+            .getPublicUrl(role.image_path);
           setImageUrl(data.publicUrl);
         } catch (error) {
           console.error('Error loading image URL:', error);
-          Alert.alert('Error', (error as Error).message);
           setImageUrl(null);
         }
       } else {
         setImageUrl(null);
       }
     } else {
-      setName('');
-      setDescription('');
+      setLabel('');
       setImagePath(null);
       setImageUrl(null);
+      setSelectedColor('#0078d4');
     }
-  }, [keyRelationship]);
+  }, [role]);
 
   const pickImage = async () => {
     try {
@@ -147,18 +151,18 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
       const blob = await response.blob();
       
       // Create unique filename
-      const fileName = `${user.id}/${keyRelationship?.id || 'temp'}_${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/${role?.id || 'temp'}_${Date.now()}.${fileExt}`;
 
       // Remove old image if exists
       if (imagePath) {
         await supabase.storage
-          .from('0008-key-relationship-images')
+          .from('0008-role-images')
           .remove([imagePath]);
       }
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
-        .from('0008-key-relationship-images')
+        .from('0008-role-images')
         .upload(fileName, blob, {
           contentType,
           upsert: true
@@ -168,7 +172,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('0008-key-relationship-images')
+        .from('0008-role-images')
         .getPublicUrl(fileName);
 
       setImagePath(fileName);
@@ -187,7 +191,7 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
       if (imagePath) {
         // Delete from storage
         const { error } = await supabase.storage
-          .from('0008-key-relationship-images')
+          .from('0008-role-images')
           .remove([imagePath]);
 
         if (error) console.error('Error deleting image:', error);
@@ -201,82 +205,42 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
   };
 
   const handleSave = async () => {
-    if (!keyRelationship || !name.trim()) return;
+    if (!role || !label.trim()) return;
 
     try {
       setSaving(true);
 
       const supabase = getSupabaseClient();
       const { error } = await supabase
-        .from('0008-ap-key-relationships')
+        .from('0008-ap-roles')
         .update({
-          name: name.trim(),
-          description: description.trim() || null,
+          label: label.trim(),
           image_path: imagePath,
+          color: selectedColor,
           updated_at: new Date().toISOString()
         })
-        .eq('id', keyRelationship.id);
+        .eq('id', role.id);
 
       if (error) throw error;
 
-      Alert.alert('Success', 'Key relationship updated successfully');
+      Alert.alert('Success', 'Role updated successfully');
       onUpdate();
       onClose();
     } catch (error) {
-      console.error('Error updating key relationship:', error);
-      Alert.alert('Error', (error as Error).message || 'Failed to update key relationship');
+      console.error('Error updating role:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to update role');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!keyRelationship) return;
-
-    Alert.alert(
-      'Delete Key Relationship',
-      `Are you sure you want to delete "${keyRelationship.name}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Remove image if exists
-              if (imagePath) {
-                await removeImage();
-              }
-
-              // Delete from database
-              const supabase = getSupabaseClient();
-              const { error } = await supabase
-                .from('0008-ap-key-relationships')
-                .delete()
-                .eq('id', keyRelationship.id);
-
-              if (error) throw error;
-
-              Alert.alert('Success', 'Key relationship deleted successfully');
-              onUpdate();
-              onClose();
-            } catch (error) {
-              console.error('Error deleting key relationship:', error);
-              Alert.alert('Error', (error as Error).message || 'Failed to delete key relationship');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  if (!keyRelationship) return null;
+  if (!role) return null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Edit Key Relationship</Text>
+          <Text style={styles.headerTitle}>Edit Role</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#1f2937" />
           </TouchableOpacity>
@@ -284,15 +248,9 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
         <ScrollView style={styles.content}>
           <View style={styles.form}>
-            {/* Role Context */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Role</Text>
-              <Text style={styles.roleContext}>{roleName || 'Unknown Role'}</Text>
-            </View>
-
             {/* Image Section */}
             <View style={styles.field}>
-              <Text style={styles.label}>Photo</Text>
+              <Text style={styles.label}>Profile Picture</Text>
               <View style={styles.imageSection}>
                 {imageUrl ? (
                   <View style={styles.imageContainer}>
@@ -342,45 +300,47 @@ export function EditKRModal({ visible, onClose, onUpdate, keyRelationship, roleN
 
             {/* Name Field */}
             <View style={styles.field}>
-              <Text style={styles.label}>Name *</Text>
+              <Text style={styles.label}>Role Name *</Text>
               <TextInput
                 style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter relationship name"
+                value={label}
+                onChangeText={setLabel}
+                placeholder="Enter role name"
                 placeholderTextColor="#9ca3af"
               />
             </View>
 
-            {/* Description Field */}
+            {/* Color Selection */}
             <View style={styles.field}>
-              <Text style={styles.label}>Description</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Add notes about this relationship..."
-                placeholderTextColor="#9ca3af"
-                multiline
-                numberOfLines={3}
-              />
+              <Text style={styles.label}>Header Color</Text>
+              <View style={styles.colorGrid}>
+                {colorOptions.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorOption,
+                      { backgroundColor: color },
+                      selectedColor === color && styles.selectedColorOption
+                    ]}
+                    onPress={() => setSelectedColor(color)}
+                  >
+                    {selectedColor === color && (
+                      <View style={styles.colorCheckmark}>
+                        <Text style={styles.checkmarkText}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </View>
         </ScrollView>
 
         <View style={styles.actions}>
           <TouchableOpacity 
-            style={styles.deleteButton}
-            onPress={handleDelete}
-          >
-            <Trash2 size={16} color="#ffffff" />
-            <Text style={styles.deleteButtonText}>Delete</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.saveButton, (!name.trim() || saving) && styles.saveButtonDisabled]}
+            style={[styles.saveButton, (!label.trim() || saving) && styles.saveButtonDisabled]}
             onPress={handleSave}
-            disabled={!name.trim() || saving}
+            disabled={!label.trim() || saving}
           >
             {saving ? (
               <ActivityIndicator size="small" color="#ffffff" />
@@ -431,11 +391,6 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 8,
   },
-  roleContext: {
-    fontSize: 16,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
   input: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
@@ -445,10 +400,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#1f2937',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
   },
   imageSection: {
     alignItems: 'center',
@@ -523,30 +474,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
   },
-  actions: {
+  colorGrid: {
     flexDirection: 'row',
-    padding: 16,
+    flexWrap: 'wrap',
     gap: 12,
+  },
+  colorOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedColorOption: {
+    borderColor: '#1f2937',
+    borderWidth: 3,
+  },
+  colorCheckmark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkmarkText: {
+    color: '#1f2937',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  actions: {
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     backgroundColor: '#ffffff',
   },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  deleteButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   saveButton: {
-    flex: 1,
     backgroundColor: '#0078d4',
     paddingVertical: 12,
     borderRadius: 8,

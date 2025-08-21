@@ -3,20 +3,31 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { Menu, ArrowUpDown, ChevronLeft } from 'lucide-react-native';
+import { Menu, ArrowUpDown, ChevronLeft, CreditCard as Edit } from 'lucide-react-native';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
 interface HeaderProps {
   title?: string;
-  activeView?: 'deposits' | 'ideas';
-  onViewChange?: (view: 'deposits' | 'ideas') => void;
+  activeView?: 'deposits' | 'ideas' | 'journal' | 'analytics';
+  onViewChange?: (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => void;
   onSortPress?: () => void;
   authenticScore?: number;
   onBackPress?: () => void;
+  backgroundColor?: string;
+  onEditPress?: () => void;
 }
 
-export function Header({ title, activeView, onViewChange, onSortPress, authenticScore = 85, onBackPress }: HeaderProps) {
+export function Header({ 
+  title, 
+  activeView, 
+  onViewChange, 
+  onSortPress, 
+  authenticScore = 85, 
+  onBackPress, 
+  backgroundColor, 
+  onEditPress 
+}: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
   const canGoBack = router.canGoBack();
@@ -34,7 +45,7 @@ export function Header({ title, activeView, onViewChange, onSortPress, authentic
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, backgroundColor && { backgroundColor }]}>
       {/* Top section with menu and score */}
       <View style={styles.topSection}>
         <TouchableOpacity style={styles.menuButton} onPress={handleLeftButtonPress}>
@@ -44,6 +55,11 @@ export function Header({ title, activeView, onViewChange, onSortPress, authentic
         <View style={styles.titleSection}>
           <Text style={styles.title}>{title || 'Authentic'}</Text>
           {!title && <Text style={styles.subtitle}>Investments</Text>}
+          {onEditPress && (
+            <TouchableOpacity style={styles.editButton} onPress={onEditPress}>
+              <Edit size={16} color="#ffffff" />
+            </TouchableOpacity>
+          )}
         </View>
         
         <View style={styles.scoreContainer}>
@@ -53,45 +69,61 @@ export function Header({ title, activeView, onViewChange, onSortPress, authentic
       </View>
       
       {/* Bottom section with toggle and sort */}
-      {activeView && onViewChange && onSortPress && (
+      {(activeView && onViewChange) && (
         <View style={styles.bottomSection}>
-          <View style={styles.toggleContainer}>
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                activeView === 'deposits' && styles.activeToggle
-              ]}
-              onPress={() => onViewChange('deposits')}
-            >
-              <Text style={[
-                styles.toggleText,
-                activeView === 'deposits' && styles.activeToggleText
-              ]}>
-                Deposits
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                activeView === 'ideas' && styles.activeToggle
-              ]}
-              onPress={() => onViewChange('ideas')}
-            >
-              <Text style={[
-                styles.toggleText,
-                activeView === 'ideas' && styles.activeToggleText
-              ]}>
-                Ideas
-              </Text>
-            </TouchableOpacity>
+                    {/* Always show both toggle groups */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* Deposits / Ideas */}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[styles.toggleButton, activeView === 'deposits' && styles.activeToggle]}
+                onPress={() => onViewChange && onViewChange('deposits')}
+              >
+                <Text style={[styles.toggleText, activeView === 'deposits' && styles.activeToggleText]}>
+                  Deposits
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.toggleButton, activeView === 'ideas' && styles.activeToggle]}
+                onPress={() => onViewChange && onViewChange('ideas')}
+              >
+                <Text style={[styles.toggleText, activeView === 'ideas' && styles.activeToggleText]}>
+                  Ideas
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Journal / Analytics */}
+            <View style={styles.journalButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.journalButton, activeView === 'journal' && styles.activeJournalButton]}
+                onPress={() => onViewChange && onViewChange('journal')}
+              >
+                <Text style={[styles.journalButtonText, activeView === 'journal' && styles.activeJournalButtonText]}>
+                  Role Journal
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.journalButton, activeView === 'analytics' && styles.activeJournalButton]}
+                onPress={() => onViewChange && onViewChange('analytics')}
+              >
+                <Text style={[styles.journalButtonText, activeView === 'analytics' && styles.activeJournalButtonText]}>
+                  Analytics
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
+
           
           {/* Updated Sort Button to look like a toggle */}
-          <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
-            <Text style={styles.toggleText}>Sort</Text>
-            <ArrowUpDown size={16} color="#ffffff" style={{ marginLeft: 6 }}/>
-          </TouchableOpacity>
+          {onSortPress && (
+            <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
+              <Text style={styles.toggleText}>Sort</Text>
+              <ArrowUpDown size={16} color="#ffffff" style={{ marginLeft: 6 }}/>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -117,6 +149,7 @@ const styles = StyleSheet.create({
   titleSection: {
     alignItems: 'center',
     flex: 1,
+    position: 'relative',
   },
   title: {
     color: '#ffffff',
@@ -129,6 +162,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     opacity: 0.9,
+  },
+  editButton: {
+    position: 'absolute',
+    right: -20,
+    top: '50%',
+    transform: [{ translateY: -8 }],
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    padding: 4,
   },
   scoreContainer: {
     alignItems: 'flex-end',
@@ -148,36 +190,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 32,
+    width: '100%',
   },
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16, // Smaller border radius
+    borderRadius: 16,
     padding: 2,
+    minWidth: 120,
+    flex: 0,
+  },
+  journalButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    minWidth: 200,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flex: 0,
   },
   toggleButton: {
-    paddingHorizontal: 16, // Reduced horizontal padding
-    paddingVertical: 6,  // Reduced vertical padding
-    borderRadius: 14, // Smaller border radius
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activeToggle: {
     backgroundColor: '#ffffff',
   },
   toggleText: {
     color: '#ffffff',
-    fontSize: 12, // Smaller font size
+    fontSize: 11,
     fontWeight: '600',
+    textAlign: 'center',
   },
   activeToggleText: {
     color: '#0078d4',
   },
-  // New style for the sort button to match the toggle
+  journalButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    minWidth: 90,
+    alignItems: 'center',
+  },
+  activeJournalButton: {
+    backgroundColor: '#ffffff',
+  },
+  journalButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activeJournalButtonText: {
+    color: '#0078d4',
+  },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 16,
-    paddingVertical: 8, // Adjusted to vertically align text
+    paddingVertical: 8,
     borderRadius: 16,
   },
 });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Animated, Platform, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DepositIdeaCard } from '@/components/depositIdeas/DepositIdeaCard';
 import { X, Plus, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import { Header } from '@/components/Header';
@@ -9,9 +10,13 @@ import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 
+import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
+import { JournalView } from '@/components/journal/JournalView';
+import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
+
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
-  const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
+  const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
@@ -19,8 +24,12 @@ export default function Dashboard() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
+  const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
+  const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
+  const [editingWithdrawal, setEditingWithdrawal] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -29,69 +38,115 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let taskQuery = supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .not('status', 'in', '(completed,cancelled)');
-
       if (activeView === 'deposits') {
-        taskQuery = taskQuery.in('type', ['task', 'event']).eq('deposit_idea', false);
+        // Fetch tasks/events
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('0008-ap-tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('status', 'in', '(completed,cancelled)')
+          .in('type', ['task', 'event']);
+
+        if (tasksError) throw tasksError;
+        if (!tasksData || tasksData.length === 0) {
+          setTasks([]);
+          setDepositIdeas([]);
+          setLoading(false);
+          return;
+        }
+
+        const taskIds = tasksData.map(t => t.id);
+
+        const [
+          { data: rolesData, error: rolesError },
+          { data: domainsData, error: domainsError },
+          { data: goalsData, error: goalsError },
+          { data: notesData, error: notesError },
+          { data: delegatesData, error: delegatesError }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task')
+        ]);
+
+        if (rolesError) throw rolesError;
+        if (domainsError) throw domainsError;
+        if (goalsError) throw goalsError;
+        if (notesError) throw notesError;
+        if (delegatesError) throw delegatesError;
+
+        const transformedTasks = tasksData.map(task => {
+          return {
+            ...task,
+            roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+            domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+            goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+            has_notes: notesData?.some(n => n.parent_id === task.id),
+            has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+            has_attachments: false,
+          };
+        });
+
+        let sortedTasks = [...transformedTasks];
+        if (sortOption === 'due_date') sortedTasks.sort((a, b) => (new Date(a.due_date).getTime() || 0) - (new Date(b.due_date).getTime() || 0));
+        else if (sortOption === 'priority') sortedTasks.sort((a, b) => ((b.is_urgent ? 2 : 0) + (b.is_important ? 1 : 0)) - ((a.is_urgent ? 2 : 0) + (a.is_important ? 1 : 0)));
+        else if (sortOption === 'title') sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
+
+        setTasks(sortedTasks);
+        setDepositIdeas([]);
+
       } else {
-        taskQuery = taskQuery.eq('deposit_idea', true);
-      }
+        // Fetch deposit ideas
+        const { data: depositIdeasData, error: depositIdeasError } = await supabase
+          .from('0008-ap-deposit-ideas')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('archived', false)
+          .is('activated_task_id', null);
 
-      const { data: tasksData, error: tasksError } = await taskQuery;
-      if (tasksError) throw tasksError;
-      if (!tasksData || tasksData.length === 0) {
-        setTasks([]);
-        setLoading(false);
-        return;
-      }
+        if (depositIdeasError) throw depositIdeasError;
+        if (!depositIdeasData || depositIdeasData.length === 0) {
+          setDepositIdeas([]);
+          setTasks([]);
+          setLoading(false);
+          return;
+        }
 
-      const taskIds = tasksData.map(t => t.id);
+        const depositIdeaIds = depositIdeasData.map(di => di.id);
 
-      const [
-        { data: rolesData, error: rolesError },
-        { data: domainsData, error: domainsError },
-        { data: goalsData, error: goalsError },
-        { data: notesData, error: notesError },
-        { data: delegatesData, error: delegatesError }
-      ] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0007-ap-domains(id, name)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-key-relationships-join')
-    .select('parent_id, key_relationship:0008-ap-key-relationships(id, name)')
-    .in('parent_id', taskIds),
-        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds),
-      ]);
+        const [
+          { data: rolesData, error: rolesError },
+          { data: domainsData, error: domainsError },
+          { data: krData, error: krError },
+          { data: notesData, error: notesError }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea'),
+          supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', depositIdeaIds).eq('parent_type', 'depositIdea')
+        ]);
 
-      if (rolesError) throw rolesError;
-      if (domainsError) throw domainsError;
-      if (goalsError) throw goalsError;
-      if (notesError) throw notesError;
-      if (delegatesError) throw delegatesError;
+        if (rolesError) throw rolesError;
+        if (domainsError) throw domainsError;
+        if (krError) throw krError;
+        if (notesError) throw notesError;
 
-      const transformedTasks = tasksData.map(task => {
-        return {
-          ...task,
-          roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-          goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
-          has_notes: notesData?.some(n => n.parent_id === task.id),
-          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+        const transformedDepositIdeas = depositIdeasData.map(di => ({
+          ...di,
+          roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
+          domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
+          keyRelationships: krData?.filter(kr => kr.parent_id === di.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === di.id),
           has_attachments: false,
-        };
-      });
+        }));
 
-      let sortedTasks = [...transformedTasks];
-      if (sortOption === 'due_date') sortedTasks.sort((a, b) => (new Date(a.due_date).getTime() || 0) - (new Date(b.due_date).getTime() || 0));
-      else if (sortOption === 'priority') sortedTasks.sort((a, b) => ((b.is_urgent ? 2 : 0) + (b.is_important ? 1 : 0)) - ((a.is_urgent ? 2 : 0) + (a.is_important ? 1 : 0)));
-      else if (sortOption === 'title') sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
+        setDepositIdeas(transformedDepositIdeas);
+        setTasks([]);
+      }
 
-      setTasks(sortedTasks);
 
     } catch (error) {
       console.error(`Error fetching ${activeView}:`, error);
@@ -130,6 +185,40 @@ export default function Dashboard() {
   };
 
   const handleTaskDoublePress = (task: Task) => { setSelectedTask(task); setIsDetailModalVisible(true); };
+  const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
+  const [isDepositIdeaDetailVisible, setIsDepositIdeaDetailVisible] = useState(false);
+
+  const handleDepositIdeaDoublePress = (depositIdea: any) => { 
+    setSelectedDepositIdea(depositIdea);
+    setIsDepositIdeaDetailVisible(true);
+  };
+  const handleUpdateDepositIdea = async (depositIdea: any) => {
+    const editData = {
+      ...depositIdea,
+      type: 'depositIdea'
+    };
+    setEditingTask(editData);
+    setIsDepositIdeaDetailVisible(false);
+    setIsFormModalVisible(true);
+  };
+  const handleCancelDepositIdea = async (depositIdea: any) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('0008-ap-deposit-ideas')
+        .update({
+          is_active: false,
+          archived: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', depositIdea.id);
+
+      if (error) throw error;
+      fetchData();
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to cancel deposit idea.');
+    }
+  };
   const handleUpdateTask = (task: Task) => {
     setEditingTask(task);
     setIsDetailModalVisible(false);
@@ -145,27 +234,71 @@ export default function Dashboard() {
     setIsFormModalVisible(false);
     setEditingTask(null);
   };
+
+  const handleJournalEntryPress = (entry: any) => {
+    if (entry.source_type === 'task') {
+      // Open task detail modal
+      setSelectedTask(entry.source_data);
+      setIsDetailModalVisible(true);
+    } else if (entry.source_type === 'withdrawal') {
+      // Open withdrawal form for editing
+      setEditingWithdrawal(entry.source_data);
+      setIsWithdrawalFormVisible(true);
+    }
+  };
+
+  const handleWithdrawalFormSuccess = () => {
+    setIsWithdrawalFormVisible(false);
+    setEditingWithdrawal(null);
+    // Refresh journal data if we're in journal view
+    if (activeView === 'journal') {
+      // The JournalView component will handle its own refresh
+    }
+  };
+
+  const handleWithdrawalFormClose = () => {
+    setIsWithdrawalFormVisible(false);
+    setEditingWithdrawal(null);
+  };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
+  const renderRegularItem = ({ item }: { item: Task }) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={() => {}} onDoublePress={handleTaskDoublePress} isDragging={false} />;
   const sortOptions = [{ value: 'due_date', label: 'Due Date' }, { value: 'priority', label: 'Priority' }, { value: 'title', label: 'Title' }];
 
   return (
     <SafeAreaView style={styles.container}>
       <Header activeView={activeView} onViewChange={setActiveView} onSortPress={() => setIsSortModalVisible(true)} authenticScore={authenticScore} />
       <View style={styles.content}>
-        {loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
-          : tasks.length === 0 ? <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
+        {activeView === 'journal' ? (
+          <JournalView
+            scope={{ type: 'user' }}
+            onEntryPress={handleJournalEntryPress}
+          />
+        ) : loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
+          : (activeView === 'deposits' && tasks.length === 0) || (activeView === 'ideas' && depositIdeas.length === 0) ? 
+            <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
           : activeView === 'deposits' ? 
-            <DraggableFlatList 
-              data={tasks} 
-              renderItem={renderDraggableItem} 
-              keyExtractor={(item) => item.id} 
-              onDragEnd={handleDragEnd} 
-              contentContainerStyle={styles.taskList} 
-              showsVerticalScrollIndicator={true}
-              scrollEnabled={true}
-              style={styles.draggableList}
-            />
+            Platform.OS === 'web' ? (
+              <FlatList
+                data={tasks}
+                renderItem={renderRegularItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.taskList}
+                showsVerticalScrollIndicator={true}
+                style={styles.draggableList}
+              />
+            ) : (
+              <DraggableFlatList 
+                data={tasks} 
+                renderItem={renderDraggableItem} 
+                keyExtractor={(item) => item.id} 
+                onDragEnd={handleDragEnd} 
+                contentContainerStyle={styles.taskList} 
+                showsVerticalScrollIndicator={true}
+                scrollEnabled={true}
+                style={styles.draggableList}
+              />
+            )
           : <ScrollView 
               style={styles.scrollContent} 
               showsVerticalScrollIndicator={true}
@@ -173,12 +306,13 @@ export default function Dashboard() {
               contentContainerStyle={styles.scrollContentContainer}
             >
               <View style={styles.taskList}>
-                {tasks.map(task => 
-                  <TaskCard 
-                    key={task.id} 
-                    task={task} 
-                    onComplete={handleCompleteTask} 
-                    onDoublePress={handleTaskDoublePress} 
+                {depositIdeas.map(depositIdea => 
+                  <DepositIdeaCard 
+                    key={depositIdea.id} 
+                    depositIdea={depositIdea} 
+                    onUpdate={handleUpdateDepositIdea}
+                    onCancel={handleCancelDepositIdea}
+                    onDoublePress={handleDepositIdeaDoublePress} 
                   />
                 )}
               </View>
@@ -195,6 +329,20 @@ export default function Dashboard() {
         />
       </Modal>
       <TaskDetailModal visible={isDetailModalVisible} task={selectedTask} onClose={() => setIsDetailModalVisible(false)} onUpdate={handleUpdateTask} onDelegate={handleDelegateTask} onCancel={handleCancelTask} />
+      <DepositIdeaDetailModal 
+        visible={isDepositIdeaDetailVisible} 
+        depositIdea={selectedDepositIdea} 
+        onClose={() => setIsDepositIdeaDetailVisible(false)} 
+        onUpdate={handleUpdateDepositIdea}
+        onCancel={handleCancelDepositIdea}
+      />
+      <WithdrawalForm
+        visible={isWithdrawalFormVisible}
+        onClose={handleWithdrawalFormClose}
+        onSubmitSuccess={handleWithdrawalFormSuccess}
+        initialData={editingWithdrawal}
+        scope={{ type: 'user' }}
+      />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -233,5 +381,5 @@ const styles = StyleSheet.create({
     sortOption: { padding: 12, borderRadius: 8, marginVertical: 2 },
     activeSortOption: { backgroundColor: '#eff6ff' },
     sortOptionText: { fontSize: 14, color: '#374151' },
-    activeSortOptionText: { color: '#0078d4', fontWeight: '600' },
+    activeSortOptionText: { color: '#0078d4', fontWeight: '600' }
 });
