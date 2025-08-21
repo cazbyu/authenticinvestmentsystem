@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { FileText, Calendar, Filter } from 'lucide-react-native';
+import { FileText, Calendar, ListFilter as Filter } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
 interface JournalEntry {
