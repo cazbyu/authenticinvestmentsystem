@@ -9,8 +9,8 @@ type DrawerNavigation = DrawerNavigationProp<any>;
 
 interface HeaderProps {
   title?: string;
-  activeView?: 'deposits' | 'ideas';
-  onViewChange?: (view: 'deposits' | 'ideas') => void;
+  activeView?: 'deposits' | 'ideas' | 'journal' | 'analytics';
+  onViewChange?: (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => void;
   onSortPress?: () => void;
   authenticScore?: number;
   onBackPress?: () => void;
@@ -71,7 +71,82 @@ export function Header({
       {/* Bottom section with toggle and sort */}
       {(activeView && onViewChange) && (
         <View style={styles.bottomSection}>
-          {(activeView === 'deposits' || activeView === 'ideas' || activeView === 'journal' || activeView === 'analytics') ? (
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                activeView === 'deposits' && styles.activeToggle
+              ]}
+              onPress={() => onViewChange('deposits')}
+            >
+              <Text style={[
+                styles.toggleText,
+                activeView === 'deposits' && styles.activeToggleText
+              ]}>
+                Deposits
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                activeView === 'ideas' && styles.activeToggle
+              ]}
+              onPress={() => onViewChange('ideas')}
+            >
+              <Text style={[
+                styles.toggleText,
+                activeView === 'ideas' && styles.activeToggleText
+              ]}>
+                Ideas
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.journalButtonsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.journalButton,
+                activeView === 'journal' && styles.activeJournalButton
+              ]}
+              onPress={() => onViewChange('journal')}
+            >
+              <Text style={[
+                styles.journalButtonText,
+                activeView === 'journal' && styles.activeJournalButtonText
+              ]}>
+                Journal
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.journalButton,
+                activeView === 'analytics' && styles.activeJournalButton
+              ]}
+              onPress={() => onViewChange('analytics')}
+            >
+              <Text style={[
+                styles.journalButtonText,
+                activeView === 'analytics' && styles.activeJournalButtonText
+              ]}>
+                Analytics
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Sort Button */}
+          {onSortPress && activeView !== 'journal' && (
+            <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
+              <Text style={styles.toggleText}>Sort</Text>
+              <ArrowUpDown size={16} color="#ffffff" style={{ marginLeft: 6 }}/>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
             <>
               <View style={styles.toggleContainer}>
                 <TouchableOpacity

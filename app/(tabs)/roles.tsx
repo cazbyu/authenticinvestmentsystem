@@ -10,6 +10,8 @@ import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { ManageRolesModal } from '@/components/settings/ManageRolesModal';
 import { EditRoleModal } from '@/components/settings/EditRoleModal';
 import { EditKRModal } from '@/components/settings/EditKRModal';
+import { JournalView } from '@/components/journal/JournalView';
+import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -44,6 +46,7 @@ export default function Roles() {
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [krView, setKRView] = useState<'deposits' | 'ideas'>('deposits');
+  const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal'>('deposits');
   
   // Modal states
   const [manageRolesVisible, setManageRolesVisible] = useState(false);
@@ -59,6 +62,8 @@ export default function Roles() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
+  const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
+  const [editingWithdrawal, setEditingWithdrawal] = useState<any>(null);
 
   const fetchRoles = async () => {
     try {
@@ -383,8 +388,17 @@ export default function Roles() {
 
   const handleKRViewChange = (view: 'deposits' | 'ideas') => {
     setKRView(view);
+    setKRJournalView(view);
     if (selectedKR) {
       fetchKRTasks(selectedKR.id, view);
+    }
+  };
+
+  const handleKRJournalViewChange = (view: 'deposits' | 'ideas' | 'journal') => {
+    setKRJournalView(view);
+    if (view !== 'journal' && selectedKR) {
+      setKRView(view as 'deposits' | 'ideas');
+      fetchKRTasks(selectedKR.id, view as 'deposits' | 'ideas');
     }
   };
 
@@ -609,31 +623,31 @@ export default function Roles() {
             </View>
             
             <View style={styles.toggleContainer}>
-              <TouchableOpacity
-                style={[styles.toggleButton, krView === 'deposits' && styles.activeToggle]}
-                onPress={() => handleKRViewChange('deposits')}
-              >
-                <Text style={[styles.toggleText, krView === 'deposits' && styles.activeToggleText]}>
-                  Deposits
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleButton, krView === 'ideas' && styles.activeToggle]}
-                onPress={() => handleKRViewChange('ideas')}
-              >
-                <Text style={[styles.toggleText, krView === 'ideas' && styles.activeToggleText]}>
-                  Ideas
-                </Text>
-              </TouchableOpacity>
+              {(['deposits', 'ideas', 'journal'] as const).map((view) => (
+                <TouchableOpacity
+                  key={view}
+                  style={[styles.toggleButton, krJournalView === view && styles.activeToggle]}
+                  onPress={() => handleKRJournalViewChange(view)}
+                >
+                  <Text style={[styles.toggleText, krJournalView === view && styles.activeToggleText]}>
+                    {view.charAt(0).toUpperCase() + view.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
           <ScrollView style={styles.taskList}>
-            {loading ? (
+            {krJournalView === 'journal' ? (
+              <JournalView
+                scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
+                onEntryPress={handleJournalEntryPress}
+              />
+            ) : loading ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
-            ) : krView === 'deposits' ? (
+            ) : krJournalView === 'deposits' ? (
               tasks.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>No deposits found for this key relationship</Text>
@@ -648,7 +662,7 @@ export default function Roles() {
                   />
                 ))
               )
-            ) : (
+            ) : krJournalView === 'ideas' ? (
               depositIdeas.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>No ideas found for this key relationship</Text>
@@ -664,6 +678,10 @@ export default function Roles() {
                   />
                 ))
               )
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Feature coming soon!</Text>
+              </View>
             )}
           </ScrollView>
         </View>
@@ -684,7 +702,12 @@ export default function Roles() {
           />
 
           <ScrollView style={styles.taskList}>
-            {loading ? (
+            {activeView === 'journal' ? (
+              <JournalView
+                scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
+                onEntryPress={handleJournalEntryPress}
+              />
+            ) : loading ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
@@ -924,6 +947,14 @@ export default function Roles() {
         onClose={() => setDepositIdeaDetailVisible(false)}
         onUpdate={handleUpdateDepositIdea}
         onCancel={handleCancelDepositIdea}
+      />
+
+      <WithdrawalForm
+        visible={isWithdrawalFormVisible}
+        onClose={handleWithdrawalFormClose}
+        onSubmitSuccess={handleWithdrawalFormSuccess}
+        initialData={editingWithdrawal}
+        scope={selectedRole ? { type: 'role', id: selectedRole.id } : selectedKR ? { type: 'key_relationship', id: selectedKR.id } : { type: 'user' }}
       />
     </SafeAreaView>
   );

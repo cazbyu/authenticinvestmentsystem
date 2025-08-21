@@ -13,6 +13,7 @@ interface JournalEntry {
   has_notes: boolean;
   source_id: string; // task_id or withdrawal_id
   source_type: 'task' | 'withdrawal';
+  source_data?: any; // Full task or withdrawal data for editing
 }
 
 interface JournalViewProps {
@@ -29,6 +30,19 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'all'>('month');
+
+  const calculateTaskPoints = (task: any) => {
+    let points = 0;
+    if (task.roles && task.roles.length > 0) points += task.roles.length;
+    if (task.domains && task.domains.length > 0) points += task.domains.length;
+    if (task.is_authentic_deposit) points += 2;
+    if (task.is_urgent && task.is_important) points += 1.5;
+    else if (!task.is_urgent && task.is_important) points += 3;
+    else if (task.is_urgent && !task.is_important) points += 1;
+    else points += 0.5;
+    if (task.is_twelve_week_goal) points += 2;
+    return Math.round(points * 10) / 10;
+  };
 
   const fetchJournalEntries = async () => {
     setLoading(true);
@@ -69,54 +83,58 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
         if (tasksData && tasksData.length > 0) {
           const taskIds = tasksData.map(t => t.id);
 
-          // Get scope-filtered task IDs based on the current scope
+          // Get all related data for tasks
+          const [
+            { data: rolesData, error: rolesError },
+            { data: domainsData, error: domainsError },
+            { data: goalsData, error: goalsError },
+            { data: notesData, error: notesError },
+            { data: krData, error: krError }
+          ] = await Promise.all([
+            supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+            supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+            supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+            supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+            supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
+          ]);
+
+          if (rolesError) throw rolesError;
+          if (domainsError) throw domainsError;
+          if (goalsError) throw goalsError;
+          if (notesError) throw notesError;
+          if (krError) throw krError;
+
+          // Apply scope filtering
           let scopeFilteredTaskIds = taskIds;
           if (scope.type !== 'user' && scope.id) {
-            let joinTable = '';
-            let joinField = '';
-            
             switch (scope.type) {
               case 'role':
-                joinTable = '0008-ap-universal-roles-join';
-                joinField = 'role_id';
+                scopeFilteredTaskIds = rolesData?.filter(r => r.role?.id === scope.id).map(r => r.parent_id) || [];
                 break;
               case 'key_relationship':
-                joinTable = '0008-ap-universal-key-relationships-join';
-                joinField = 'key_relationship_id';
+                scopeFilteredTaskIds = krData?.filter(kr => kr.key_relationship?.id === scope.id).map(kr => kr.parent_id) || [];
                 break;
               case 'domain':
-                joinTable = '0008-ap-universal-domains-join';
-                joinField = 'domain_id';
+                scopeFilteredTaskIds = domainsData?.filter(d => d.domain?.id === scope.id).map(d => d.parent_id) || [];
                 break;
-            }
-
-            if (joinTable) {
-              const { data: scopeData, error: scopeError } = await supabase
-                .from(joinTable)
-                .select('parent_id')
-                .in('parent_id', taskIds)
-                .eq('parent_type', 'task')
-                .eq(joinField, scope.id);
-
-              if (scopeError) throw scopeError;
-              scopeFilteredTaskIds = scopeData?.map(s => s.parent_id) || [];
             }
           }
 
-          // Get notes for tasks
-          const { data: notesData } = await supabase
-            .from('0008-ap-universal-notes-join')
-            .select('parent_id')
-            .in('parent_id', scopeFilteredTaskIds)
-            .eq('parent_type', 'task');
-
           const tasksWithNotes = new Set(notesData?.map(n => n.parent_id) || []);
 
-          // Filter tasks to scope and create deposit entries
+          // Create deposit entries for scope-filtered tasks
           const scopedTasks = tasksData.filter(task => scopeFilteredTaskIds.includes(task.id));
           
           for (const task of scopedTasks) {
-            const points = calculateTaskPoints(task);
+            // Attach related data to task
+            const taskWithData = {
+              ...task,
+              roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+              domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+              goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+            };
+
+            const points = calculateTaskPoints(taskWithData);
             journalEntries.push({
               id: task.id,
               date: task.completed_at?.split('T')[0] || task.due_date,
@@ -127,6 +145,7 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
               has_notes: tasksWithNotes.has(task.id),
               source_id: task.id,
               source_type: 'task',
+              source_data: taskWithData,
             });
           }
         }
@@ -149,53 +168,54 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
         if (withdrawalsData && withdrawalsData.length > 0) {
           const withdrawalIds = withdrawalsData.map(w => w.id);
 
-          // Get scope-filtered withdrawal IDs
+          // Get all related data for withdrawals
+          const [
+            { data: rolesData, error: rolesError },
+            { data: domainsData, error: domainsError },
+            { data: krData, error: krError },
+            { data: notesData, error: notesError }
+          ] = await Promise.all([
+            supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
+            supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
+            supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
+            supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal')
+          ]);
+
+          if (rolesError) throw rolesError;
+          if (domainsError) throw domainsError;
+          if (krError) throw krError;
+          if (notesError) throw notesError;
+
+          // Apply scope filtering
           let scopeFilteredWithdrawalIds = withdrawalIds;
           if (scope.type !== 'user' && scope.id) {
-            let joinTable = '';
-            let joinField = '';
-            
             switch (scope.type) {
               case 'role':
-                joinTable = '0008-ap-universal-roles-join';
-                joinField = 'role_id';
+                scopeFilteredWithdrawalIds = rolesData?.filter(r => r.role?.id === scope.id).map(r => r.parent_id) || [];
                 break;
               case 'key_relationship':
-                joinTable = '0008-ap-universal-key-relationships-join';
-                joinField = 'key_relationship_id';
+                scopeFilteredWithdrawalIds = krData?.filter(kr => kr.key_relationship?.id === scope.id).map(kr => kr.parent_id) || [];
                 break;
               case 'domain':
-                joinTable = '0008-ap-universal-domains-join';
-                joinField = 'domain_id';
+                scopeFilteredWithdrawalIds = domainsData?.filter(d => d.domain?.id === scope.id).map(d => d.parent_id) || [];
                 break;
-            }
-
-            if (joinTable) {
-              const { data: scopeData, error: scopeError } = await supabase
-                .from(joinTable)
-                .select('parent_id')
-                .in('parent_id', withdrawalIds)
-                .eq('parent_type', 'withdrawal')
-                .eq(joinField, scope.id);
-
-              if (scopeError) throw scopeError;
-              scopeFilteredWithdrawalIds = scopeData?.map(s => s.parent_id) || [];
             }
           }
 
-          // Get notes for withdrawals
-          const { data: notesData } = await supabase
-            .from('0008-ap-universal-notes-join')
-            .select('parent_id')
-            .in('parent_id', scopeFilteredWithdrawalIds)
-            .eq('parent_type', 'withdrawal');
-
           const withdrawalsWithNotes = new Set(notesData?.map(n => n.parent_id) || []);
 
-          // Filter withdrawals to scope and create withdrawal entries
+          // Create withdrawal entries for scope-filtered withdrawals
           const scopedWithdrawals = withdrawalsData.filter(withdrawal => scopeFilteredWithdrawalIds.includes(withdrawal.id));
           
           for (const withdrawal of scopedWithdrawals) {
+            // Attach related data to withdrawal
+            const withdrawalWithData = {
+              ...withdrawal,
+              roles: rolesData?.filter(r => r.parent_id === withdrawal.id).map(r => r.role).filter(Boolean) || [],
+              domains: domainsData?.filter(d => d.parent_id === withdrawal.id).map(d => d.domain).filter(Boolean) || [],
+              keyRelationships: krData?.filter(kr => kr.parent_id === withdrawal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+            };
+
             journalEntries.push({
               id: withdrawal.id,
               date: withdrawal.withdrawal_date,
@@ -206,6 +226,7 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
               has_notes: withdrawalsWithNotes.has(withdrawal.id),
               source_id: withdrawal.id,
               source_type: 'withdrawal',
+              source_data: withdrawalWithData,
             });
           }
         }
@@ -231,19 +252,6 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const calculateTaskPoints = (task: any) => {
-    let points = 0;
-    if (task.roles && task.roles.length > 0) points += task.roles.length;
-    if (task.domains && task.domains.length > 0) points += task.domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
   };
 
   useEffect(() => {
@@ -338,7 +346,7 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
         ) : (
           entries.map((entry, index) => (
             <TouchableOpacity
-              key={entry.id}
+              key={`${entry.source_type}-${entry.id}`}
               style={[
                 styles.journalRow,
                 index % 2 === 0 ? styles.evenRow : styles.oddRow

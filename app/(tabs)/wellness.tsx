@@ -6,6 +6,8 @@ import { TaskCard, Task } from '@/components/tasks/TaskCard';
 import { DepositIdeaCard } from '@/components/depositIdeas/DepositIdeaCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
+import { JournalView } from '@/components/journal/JournalView';
+import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
@@ -37,6 +39,8 @@ export default function Wellness() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isWithdrawalFormVisible, setIsWithdrawalFormVisible] = useState(false);
+  const [editingWithdrawal, setEditingWithdrawal] = useState<any>(null);
 
   const fetchDomains = async () => {
     try {
@@ -305,6 +309,28 @@ export default function Wellness() {
     setSelectedDomain(domain);
   };
 
+  const handleJournalEntryPress = (entry: any) => {
+    if (entry.source_type === 'task') {
+      // Open task detail modal
+      setSelectedTask(entry.source_data);
+      setTaskDetailVisible(true);
+    } else if (entry.source_type === 'withdrawal') {
+      // Open withdrawal form for editing
+      setEditingWithdrawal(entry.source_data);
+      setIsWithdrawalFormVisible(true);
+    }
+  };
+
+  const handleWithdrawalFormSuccess = () => {
+    setIsWithdrawalFormVisible(false);
+    setEditingWithdrawal(null);
+  };
+
+  const handleWithdrawalFormClose = () => {
+    setIsWithdrawalFormVisible(false);
+    setEditingWithdrawal(null);
+  };
+
   const getDomainColor = (domainName: string) => {
     const colors = {
       'Community': '#7c3aed',
@@ -333,7 +359,12 @@ export default function Wellness() {
           />
 
           <ScrollView style={styles.taskList}>
-            {loading ? (
+            {activeView === 'journal' ? (
+              <JournalView
+                scope={{ type: 'domain', id: selectedDomain.id, name: selectedDomain.name }}
+                onEntryPress={handleJournalEntryPress}
+              />
+            ) : loading ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
@@ -461,6 +492,14 @@ export default function Wellness() {
         onClose={() => setDepositIdeaDetailVisible(false)}
         onUpdate={handleUpdateDepositIdea}
         onCancel={handleCancelDepositIdea}
+      />
+
+      <WithdrawalForm
+        visible={isWithdrawalFormVisible}
+        onClose={handleWithdrawalFormClose}
+        onSubmitSuccess={handleWithdrawalFormSuccess}
+        initialData={editingWithdrawal}
+        scope={selectedDomain ? { type: 'domain', id: selectedDomain.id } : { type: 'user' }}
       />
     </SafeAreaView>
   );

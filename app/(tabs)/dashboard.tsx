@@ -11,10 +11,12 @@ import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
+import { JournalView } from '@/components/journal/JournalView';
+import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
-  const [activeView, setActiveView] = useState<'deposits' | 'ideas'>('deposits');
+  const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
@@ -25,6 +27,7 @@ export default function Dashboard() {
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(85);
+  const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -229,6 +232,32 @@ export default function Dashboard() {
     setIsFormModalVisible(false);
     setEditingTask(null);
   };
+
+  const handleJournalEntryPress = (entry: any) => {
+    if (entry.source_type === 'task') {
+      // Open task detail modal
+      setSelectedTask(entry.source_data);
+      setIsDetailModalVisible(true);
+    } else if (entry.source_type === 'withdrawal') {
+      // Open withdrawal form for editing
+      setEditingWithdrawal(entry.source_data);
+      setIsWithdrawalFormVisible(true);
+    }
+  };
+
+  const handleWithdrawalFormSuccess = () => {
+    setIsWithdrawalFormVisible(false);
+    setEditingWithdrawal(null);
+    // Refresh journal data if we're in journal view
+    if (activeView === 'journal') {
+      // The JournalView component will handle its own refresh
+    }
+  };
+
+  const handleWithdrawalFormClose = () => {
+    setIsWithdrawalFormVisible(false);
+    setEditingWithdrawal(null);
+  };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
   const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
   const sortOptions = [{ value: 'due_date', label: 'Due Date' }, { value: 'priority', label: 'Priority' }, { value: 'title', label: 'Title' }];
@@ -237,7 +266,12 @@ export default function Dashboard() {
     <SafeAreaView style={styles.container}>
       <Header activeView={activeView} onViewChange={setActiveView} onSortPress={() => setIsSortModalVisible(true)} authenticScore={authenticScore} />
       <View style={styles.content}>
-        {loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
+        {activeView === 'journal' ? (
+          <JournalView
+            scope={{ type: 'user' }}
+            onEntryPress={handleJournalEntryPress}
+          />
+        ) : loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
           : (activeView === 'deposits' && tasks.length === 0) || (activeView === 'ideas' && depositIdeas.length === 0) ? 
             <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
           : activeView === 'deposits' ? 
@@ -269,7 +303,7 @@ export default function Dashboard() {
                 )}
               </View>
             </ScrollView>
-        }
+        )}
       </View>
       <TouchableOpacity style={styles.fab} onPress={() => setIsFormModalVisible(true)}><Plus size={24} color="#ffffff" /></TouchableOpacity>
       <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet">
@@ -287,6 +321,13 @@ export default function Dashboard() {
         onClose={() => setIsDepositIdeaDetailVisible(false)} 
         onUpdate={handleUpdateDepositIdea}
         onCancel={handleCancelDepositIdea}
+      />
+      <WithdrawalForm
+        visible={isWithdrawalFormVisible}
+        onClose={handleWithdrawalFormClose}
+        onSubmitSuccess={handleWithdrawalFormSuccess}
+        initialData={editingWithdrawal}
+        scope={{ type: 'user' }}
       />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>
         <View style={styles.modalOverlay}>
