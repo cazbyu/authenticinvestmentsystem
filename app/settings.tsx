@@ -382,7 +382,9 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Profile Photo</Text>
             <View style={styles.profilePhotoContainer}>
               {profileImageUrl ? (
-                <Image source={{ uri: profileImageUrl }} style={styles.profileImage} />
+  <Image key={profileImageUrl} source={{ uri: profileImageUrl }} style={styles.profileImage} />
+) : ( /* placeholder */ )}
+
               ) : (
                 <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.border }]}>
                   <User size={32} color={colors.textSecondary} />
