@@ -5,10 +5,10 @@ import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as ImagePicker from 'expo-image-picker';
 import { Header } from '@/components/Header';
-import { ManageRolesModal } from '@/components/settings/ManageRolesModal'; // <-- Import the new component
+import { ManageRolesModal } from '@/components/settings/ManageRolesModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Camera, Upload, User, Palette } from 'lucide-react-native';
+import { Camera, Upload, User } from 'lucide-react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,7 +23,7 @@ export default function SettingsScreen() {
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [syncEnabled, setSyncEnabled] = useState(false);
-  const [isRolesModalVisible, setIsRolesModalVisible] = useState(false); // <-- Add state for the modal
+  const [isRolesModalVisible, setIsRolesModalVisible] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   const [profile, setProfile] = useState({
     first_name: '',
@@ -79,18 +79,17 @@ export default function SettingsScreen() {
         .eq('id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && (error as any).code !== 'PGRST116') throw error;
 
       if (data) {
         setProfile(data);
-        
-        // Get profile image URL if exists
-        if (data.profile_image) {
-          const { data: signed } = await supabase.storage
-  .from('0008-ap-profile-images')
-  .createSignedUrl(data.profile_image, 60 * 60); // 1 hour
-setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
 
+        if (data.profile_image) {
+          const { data: signed } = await supabase
+            .storage
+            .from('0008-ap-profile-images')
+            .createSignedUrl(data.profile_image, 60 * 60);
+          setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
         } else {
           setProfileImageUrl(null);
         }
@@ -119,7 +118,6 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Calculate deposits from completed tasks
       const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
         .select('*')
@@ -150,7 +148,6 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
         }
       }
 
-      // Calculate withdrawals
       const { data: withdrawalsData, error: withdrawalsError } = await supabase
         .from('0008-ap-withdrawals')
         .select('amount')
@@ -159,7 +156,6 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
       if (withdrawalsError) throw withdrawalsError;
 
       const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
-      
       const balance = totalDeposits - totalWithdrawals;
       setAuthenticScore(Math.round(balance * 10) / 10);
     } catch (error) {
@@ -172,13 +168,8 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
     calculateAuthenticScore();
   }, []);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
-    return () => {
-      if (saveTimeout) {
-        clearTimeout(saveTimeout);
-      }
-    };
+    return () => { if (saveTimeout) clearTimeout(saveTimeout); };
   }, [saveTimeout]);
 
   const pickImage = async () => {
@@ -231,15 +222,13 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
   const uploadImage = async (uri: string) => {
     try {
       setUploading(true);
-
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      // Determine file extension and content type
       let fileExt = 'jpg';
       let contentType = 'image/jpeg';
-      
+
       if (uri.startsWith('data:')) {
         const mimeMatch = uri.match(/data:([^;]+)/);
         if (mimeMatch) {
@@ -254,37 +243,26 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
         }
       }
 
-      // Convert URI to blob
       const response = await fetch(uri);
       const blob = await response.blob();
-      
-      // Create unique filename
+
       const fileName = `${user.id}/profile_${Date.now()}.${fileExt}`;
 
-      // Remove old image if exists
       if (profile.profile_image) {
-        await supabase.storage
-          .from('0008-ap-profile-images')
-          .remove([profile.profile_image]);
+        await supabase.storage.from('0008-ap-profile-images').remove([profile.profile_image]);
       }
 
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('0008-ap-profile-images')
-        .upload(fileName, blob, {
-          contentType,
-          upsert: true
-        });
+        .upload(fileName, blob, { contentType, upsert: true });
+      if (uploadError) throw uploadError;
 
-      if (error) throw error;
-
-      // Get public URL
       const { data: signed } = await supabase.storage
-  .from('0008-ap-profile-images')
-  .createSignedUrl(fileName, 60 * 60); // 1 hour
-await updateProfile({ profile_image: fileName });
-setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+        .from('0008-ap-profile-images')
+        .createSignedUrl(fileName, 60 * 60);
 
+      await updateProfile({ profile_image: fileName });
+      setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
     } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image');
@@ -294,67 +272,57 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
   };
 
   const updateProfile = async (updates: Partial<typeof profile>) => {
-  try {
-    setSaving(true);
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('No user found');
+    try {
+      setSaving(true);
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
 
-    const { error } = await supabase
-      .from('0008-ap-users')
-      .upsert(
-        {
-          id: user.id,
-          ...profile,                  // keep existing local state
-          ...updates,                  // apply incoming changes
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'id' }
-      );
+      const payload = {
+        id: user.id,
+        email: user.email ?? '', // ensure NOT NULL on first upsert
+        ...profile,
+        ...updates,
+        updated_at: new Date().toISOString(),
+      } as any;
 
-    if (error) throw error;
+      const { error } = await supabase
+        .from('0008-ap-users')
+        .upsert(payload, { onConflict: 'id' });
 
-    setProfile(prev => ({ ...prev, ...updates }));
-    
-    // Update profile image URL if profile_image was updated
-    if (updates.profile_image) {
-      const { data: imageData } = supabase.storage
-        .from('0008-ap-profile-images')
-        .getPublicUrl(updates.profile_image);
-      setProfileImageUrl(imageData.publicUrl);
+      if (error) throw error;
+
+      setProfile(prev => ({ ...prev, ...updates }));
+
+      if (updates.profile_image) {
+        const { data: signed } = await supabase.storage
+          .from('0008-ap-profile-images')
+          .createSignedUrl(updates.profile_image, 60 * 60);
+        setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setSaving(false);
     }
-  } catch (error) {
-    console.error('Error updating profile:', error);
-    Alert.alert('Error', 'Failed to update profile');
-  } finally {
-    setSaving(false);
-  }
-};
-
+  };
 
   const debouncedUpdateProfile = (updates: Partial<typeof profile>) => {
-    // Clear existing timeout
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
-    }
-
-    // Set new timeout for auto-save
-    const timeout = setTimeout(() => {
-      updateProfile(updates);
-    }, 1000); // Save after 1 second of no changes
-
+    if (saveTimeout) clearTimeout(saveTimeout);
+    const timeout = setTimeout(() => { updateProfile(updates); }, 1000);
     setSaveTimeout(timeout);
   };
 
   const handleProfileChange = (field: keyof typeof profile, value: string) => {
     const updatedProfile = { ...profile, [field]: value };
     setProfile(updatedProfile);
-    debouncedUpdateProfile({ [field]: value });
+    debouncedUpdateProfile({ [field]: value } as any);
   };
 
   const handleColorChange = (field: 'primary_color' | 'accent_color', color: string) => {
     setProfile(prev => ({ ...prev, [field]: color }));
-    updateProfile({ [field]: color }); // Immediate save for color changes
+    updateProfile({ [field]: color } as any);
   };
 
   const connectToGoogle = async () => {
@@ -371,57 +339,32 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header title="Settings" authenticScore={authenticScore} />
-      
+
       <ScrollView style={[styles.content, { backgroundColor: colors.background }]}>
         {/* Profile Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Profile</Text>
-          
+
           {/* Profile Photo */}
           <View style={styles.profilePhotoSection}>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Profile Photo</Text>
+
             <View style={styles.profilePhotoContainer}>
               {profileImageUrl ? (
-  <Image
-    key={profileImageUrl}
-    source={{ uri: profileImageUrl }}
-    style={styles.profileImage}
-  />
-) : (
-  <View style={[styles.profileImage, { backgroundColor: '#ccc' }]} />
-)}
-
-              <View style={styles.avatarBox}>
-  {profileImageUrl ? (
-    <Image
-      key={profileImageUrl}
-      source={{ uri: profileImageUrl }}
-      style={styles.profileImage}
-      resizeMode="cover"
-    />
-  ) : (
-    <View style={[styles.profileImage, styles.profileImagePlaceholder]} />
-  )}
-</View>
-const styles = StyleSheet.create({
-  avatarBox: { alignItems: 'center', justifyContent: 'center' },
-  profileImage: { width: 96, height: 96, borderRadius: 48 },
-  profileImagePlaceholder: { backgroundColor: '#ccc' },
-});
-<View style={[styles.profileImage, styles.profileImagePlaceholder]}>
-  <Text>No photo</Text>
-</View>
-{__DEV__ && <Text selectable>{String(profileImageUrl || '')}</Text>}
-
-
+                <Image
+                  key={profileImageUrl}
+                  source={{ uri: profileImageUrl }}
+                  style={styles.profileImage}
+                  resizeMode="cover"
+                />
               ) : (
-                <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.border }]}>
+                <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <User size={32} color={colors.textSecondary} />
                 </View>
               )}
-              
+
               <View style={styles.profilePhotoButtons}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.photoButton, { borderColor: colors.primary }]}
                   onPress={takePhoto}
                   disabled={uploading}
@@ -429,8 +372,8 @@ const styles = StyleSheet.create({
                   <Camera size={16} color={colors.primary} />
                   <Text style={[styles.photoButtonText, { color: colors.primary }]}>Take Photo</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={[styles.photoButton, { borderColor: colors.primary }]}
                   onPress={pickImage}
                   disabled={uploading}
@@ -439,7 +382,7 @@ const styles = StyleSheet.create({
                   <Text style={[styles.photoButtonText, { color: colors.primary }]}>Choose Photo</Text>
                 </TouchableOpacity>
               </View>
-              
+
               {uploading && (
                 <View style={styles.uploadingContainer}>
                   <ActivityIndicator size="small" color={colors.primary} />
@@ -472,8 +415,7 @@ const styles = StyleSheet.create({
             />
           </View>
 
-          <View style={styles.profileField}>
-          {/* Primary Color */}
+          {/* Personalization */}
           <View style={[styles.colorField, { marginTop: 24 }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Personalization</Text>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Primary Color</Text>
@@ -486,9 +428,7 @@ const styles = StyleSheet.create({
                     { backgroundColor: color },
                     profile.primary_color === color && styles.selectedColorOption
                   ]}
-                  onPress={() => {
-                    handleColorChange('primary_color', color);
-                  }}
+                  onPress={() => handleColorChange('primary_color', color)}
                 >
                   {profile.primary_color === color && (
                     <View style={styles.colorCheckmark}>
@@ -500,7 +440,6 @@ const styles = StyleSheet.create({
             </View>
           </View>
 
-          {/* Accent Color */}
           <View style={styles.colorField}>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Accent Color</Text>
             <View style={styles.colorGrid}>
@@ -512,9 +451,7 @@ const styles = StyleSheet.create({
                     { backgroundColor: color },
                     profile.accent_color === color && styles.selectedColorOption
                   ]}
-                  onPress={() => {
-                    handleColorChange('accent_color', color);
-                  }}
+                  onPress={() => handleColorChange('accent_color', color)}
                 >
                   {profile.accent_color === color && (
                     <View style={styles.colorCheckmark}>
@@ -525,20 +462,19 @@ const styles = StyleSheet.create({
               ))}
             </View>
           </View>
-          </View>
         </View>
 
         {/* Account Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
-          
+
           <TouchableOpacity 
             style={styles.settingButton}
             onPress={() => setIsRolesModalVisible(true)}
           >
             <Text style={[styles.settingButtonText, { color: colors.primary }]}>Manage Roles</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.settingButton}>
             <Text style={[styles.settingButtonText, { color: colors.primary }]}>Export Data</Text>
           </TouchableOpacity>
@@ -547,7 +483,7 @@ const styles = StyleSheet.create({
         {/* Appearance Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
-          
+
           <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, { color: colors.text }]}>Dark Mode</Text>
             <Switch
@@ -562,7 +498,7 @@ const styles = StyleSheet.create({
         {/* Google Calendar Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Google Calendar Integration</Text>
-          
+
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={[styles.settingLabel, { color: colors.text }]}>Google Calendar</Text>
@@ -606,7 +542,7 @@ const styles = StyleSheet.create({
         {/* Notifications Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
-          
+
           <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, { color: colors.text }]}>Push Notifications</Text>
             <Switch
@@ -628,58 +564,18 @@ const styles = StyleSheet.create({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  section: {
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  settingButton: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'transparent',
-  },
-  settingButtonText: {
-    fontSize: 16,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  profilePhotoSection: {
-    marginBottom: 24,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  profilePhotoContainer: {
-    alignItems: 'center',
-  },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-  },
+  container: { flex: 1 },
+  content: { flex: 1, padding: 16 },
+  section: { borderRadius: 8, padding: 16, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
+  settingButton: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'transparent' },
+  settingButtonText: { fontSize: 16 },
+  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
+  settingLabel: { fontSize: 16, fontWeight: '500' },
+  profilePhotoSection: { marginBottom: 24 },
+  fieldLabel: { fontSize: 16, fontWeight: '500', marginBottom: 8 },
+  profilePhotoContainer: { alignItems: 'center' },
+  profileImage: { width: 100, height: 100, borderRadius: 50, marginBottom: 16 },
   profileImagePlaceholder: {
     width: 100,
     height: 100,
@@ -691,104 +587,24 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     borderStyle: 'dashed',
   },
-  profilePhotoButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  photoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  photoButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  uploadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  uploadingText: {
-    fontSize: 14,
-  },
-  profileField: {
-    marginBottom: 16,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  colorField: {
-    marginBottom: 24,
-  },
-  colorGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  colorOption: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedColorOption: {
-    borderColor: '#1f2937',
-    borderWidth: 3,
-  },
-  colorCheckmark: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkmarkText: {
-    color: '#1f2937',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  settingInfo: {
-    flex: 1,
-  },
-  settingDescription: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  connectButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  connectButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  disconnectButton: {
-    backgroundColor: '#dc2626',
-  },
-  disconnectButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  profilePhotoButtons: { flexDirection: 'row', gap: 12 },
+  photoButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent', borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
+  photoButtonText: { fontSize: 14, fontWeight: '500' },
+  uploadingContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 8 },
+  uploadingText: { fontSize: 14 },
+  profileField: { marginBottom: 16 },
+  textInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, fontSize: 16 },
+  textArea: { height: 80, textAlignVertical: 'top' },
+  colorField: { marginBottom: 24 },
+  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  colorOption: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'transparent' },
+  selectedColorOption: { borderColor: '#1f2937', borderWidth: 3 },
+  colorCheckmark: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  checkmarkText: { color: '#1f2937', fontSize: 12, fontWeight: 'bold' },
+  settingInfo: { flex: 1 },
+  settingDescription: { fontSize: 14, marginTop: 2 },
+  connectButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6 },
+  connectButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  disconnectButton: { backgroundColor: '#dc2626' },
+  disconnectButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
 });
