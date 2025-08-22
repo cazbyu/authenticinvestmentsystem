@@ -350,17 +350,17 @@ export default function SettingsScreen() {
             <Text style={[styles.fieldLabel, { color: colors.text }]}>Profile Photo</Text>
 
             <View style={styles.profilePhotoContainer}>
-              {profileImageUrl ? (
+              {profileImageUrl ? 
                 <Image
                   key={profileImageUrl}
                   source={{ uri: profileImageUrl }}
                   style={styles.profileImage}
                 />
-              ) : (
+               : 
                 <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <User size={32} color={colors.textSecondary} />
                 </View>
-              )}
+              }
 
               <View style={styles.profilePhotoButtons}>
                 <TouchableOpacity
