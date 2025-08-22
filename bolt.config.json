@@ -1,6 +1,6 @@
 {
   "build": {
-    "command": "npm run clean:web && npm run build:web",
+    "command": "npm run build:publish",
     "outputDir": "build"
   },
   "start": {
