@@ -279,13 +279,12 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
       if (error) throw error;
 
       // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('0008-ap-profile-images')
-        .getPublicUrl(fileName);
+      const { data: signed } = await supabase.storage
+  .from('0008-ap-profile-images')
+  .createSignedUrl(fileName, 60 * 60); // 1 hour
+await updateProfile({ profile_image: fileName });
+setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
 
-      // Update profile with new image path
-      await updateProfile({ profile_image: fileName });
-      setProfileImageUrl(publicUrl);
     } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image');
