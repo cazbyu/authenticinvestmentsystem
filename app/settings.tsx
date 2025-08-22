@@ -86,10 +86,11 @@ export default function SettingsScreen() {
         
         // Get profile image URL if exists
         if (data.profile_image) {
-          const { data: imageData } = supabase.storage
-            .from('0008-ap-profile-images')
-            .getPublicUrl(data.profile_image);
-          setProfileImageUrl(imageData.publicUrl);
+          const { data: signed } = await supabase.storage
+  .from('0008-ap-profile-images')
+  .createSignedUrl(data.profile_image, 60 * 60); // 1 hour
+setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+
         } else {
           setProfileImageUrl(null);
         }
