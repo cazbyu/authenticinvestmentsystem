@@ -785,7 +785,7 @@ export default function Roles() {
             authenticScore={authenticScore}
             backgroundColor={selectedRole.color}
             onEditPress={() => handleEditRole(selectedRole)}
-            authenticScore={authenticScore}
+            onBackPress={() => setSelectedRole(null)}
           />
 
           <ScrollView style={styles.taskList}>
