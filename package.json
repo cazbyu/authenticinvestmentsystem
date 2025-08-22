@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-"dev": "cross-env EXPO_NO_TELEMETRY=1 npx expo start",
+    "dev": "cross-env EXPO_NO_TELEMETRY=1 npx expo start",
     "start": "expo start",
     "build:web": "cross-env EXPO_NO_TELEMETRY=1 npx expo export -p web --output-dir build",
     "lint": "expo lint"
@@ -58,6 +58,7 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~9.2.0",
     "metro": "^0.82.0",
+    "shx": "^0.4.0",
     "typescript": "~5.8.3"
   }
 }
