@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "cross-env EXPO_NO_TELEMETRY=1 npx expo start",
     "start": "expo start",
-    "build:web": "cross-env EXPO_NO_TELEMETRY=1 npx expo export -p web --output-dir build",
-    "build:publish": "npm run clean:web && npm run build:web",
+    "build:web": "npm run clean:web && cross-env EXPO_NO_TELEMETRY=1 npx expo export -p web --output-dir build",
     "clean:web": "shx rm -rf build",
     "lint": "expo lint"
   },
