@@ -355,8 +355,6 @@ export default function SettingsScreen() {
                   key={profileImageUrl}
                   source={{ uri: profileImageUrl }}
                   style={styles.profileImage}
-                  resizeMode="cover"
-                />
               ) : (
                 <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <User size={32} color={colors.textSecondary} />
@@ -562,11 +560,6 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flex: 1, padding: 16 },
-  section: { borderRadius: 8, padding: 16, marginBottom: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
   settingButton: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'transparent' },
   settingButtonText: { fontSize: 16 },
