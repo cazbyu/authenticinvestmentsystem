@@ -309,7 +309,7 @@ export default function SettingsScreen() {
           ...updates,                  // apply incoming changes
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'user_id' }
+        { onConflict: 'id' }
       );
 
     if (error) throw error;
