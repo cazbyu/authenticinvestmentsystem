@@ -76,7 +76,7 @@ export default function SettingsScreen() {
       const { data, error } = await supabase
         .from('0008-ap-users')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -304,7 +304,7 @@ export default function SettingsScreen() {
       .from('0008-ap-users')
       .upsert(
         {
-          user_id: user.id,
+          id: user.id,
           ...profile,                  // keep existing local state
           ...updates,                  // apply incoming changes
           updated_at: new Date().toISOString(),
