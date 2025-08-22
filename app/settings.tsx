@@ -391,6 +391,29 @@ setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : 
   <View style={[styles.profileImage, { backgroundColor: '#ccc' }]} />
 )}
 
+              <View style={styles.avatarBox}>
+  {profileImageUrl ? (
+    <Image
+      key={profileImageUrl}
+      source={{ uri: profileImageUrl }}
+      style={styles.profileImage}
+      resizeMode="cover"
+    />
+  ) : (
+    <View style={[styles.profileImage, styles.profileImagePlaceholder]} />
+  )}
+</View>
+const styles = StyleSheet.create({
+  avatarBox: { alignItems: 'center', justifyContent: 'center' },
+  profileImage: { width: 96, height: 96, borderRadius: 48 },
+  profileImagePlaceholder: { backgroundColor: '#ccc' },
+});
+<View style={[styles.profileImage, styles.profileImagePlaceholder]}>
+  <Text>No photo</Text>
+</View>
+{__DEV__ && <Text selectable>{String(profileImageUrl || '')}</Text>}
+
+
               ) : (
                 <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.border }]}>
                   <User size={32} color={colors.textSecondary} />
