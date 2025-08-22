@@ -1,20 +1,7 @@
-module.exports = function(api) {
+module.exports = function (api) {
   api.cache(true);
   return {
-    presets: ['babel-preset-expo'],
-    plugins: [
-      [
-        'module-resolver',
-        {
-          alias: {
-            '@': '.',
-          },
-          extensions: ['.js', '.jsx', '.ts', '.tsx'],
-        },
-      ],
-      require.resolve('expo-router/babel'),
-      // This plugin MUST be listed last.
-      'react-native-reanimated/plugin'
-    ],
+    presets: ['babel-preset-expo'],   // ✅ new preset
+    plugins: [],                      // 👈 remove "expo-router/babel"
   };
 };
