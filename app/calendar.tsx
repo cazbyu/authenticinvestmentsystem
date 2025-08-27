@@ -561,12 +561,12 @@ export default function CalendarScreen() {
           
           {/* Time grid with hour slots */}
           <ScrollView
-            ref={scrollViewRef}
+            ref={hoursScrollRef}
             style={styles.hoursScrollView}
             showsVerticalScrollIndicator={true}
             onLayout={(event) => {
               const { height } = event.nativeEvent.layout;
-              setHoursScrollViewHeight(height);
+              setHoursViewportH(height);
             }}
           >
             <View 
