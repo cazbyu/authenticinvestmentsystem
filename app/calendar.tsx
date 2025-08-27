@@ -23,7 +23,7 @@ interface CalendarEvent {
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -546,6 +546,11 @@ export default function CalendarScreen() {
                   {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                 </Text>
                 <View style={styles.hourLine} />
+                
+                {/* 15-minute increment lines */}
+                <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
+                <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
+                <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
               </View>
             ))}
             
@@ -1006,6 +1011,21 @@ const styles = StyleSheet.create({
     top: 0,
     height: 1,
     backgroundColor: '#f3f4f6',
+  },
+  quarterHourLine: {
+    position: 'absolute',
+    left: 70,
+    right: 0,
+    height: 1,
+    backgroundColor: '#f9fafb',
+  },
+  halfHourLine: {
+    position: 'absolute',
+    left: 70,
+    right: 0,
+    height: 1,
+    backgroundColor: '#f3f4f6',
+    opacity: 0.7,
   },
   
   // Weekly View Styles
