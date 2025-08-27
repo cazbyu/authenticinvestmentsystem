@@ -6,6 +6,7 @@ import { Header } from '@/components/Header';
 import { TaskCard, Task } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
+import { CalendarEventDisplay } from '@/components/calendar/CalendarEventDisplay';
 import { getSupabaseClient } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react-native';
 
@@ -353,6 +354,33 @@ export default function CalendarScreen() {
   const renderDailyView = () => {
     const dayEvents = getEventsForDate(selectedDate);
     const dayTasks = tasks.filter(task => task.due_date === selectedDate);
+    
+    // Helper function to convert time string to minutes from midnight
+    const getTimeInMinutes = (timeString: string) => {
+      const date = new Date(timeString);
+      return date.getHours() * 60 + date.getMinutes();
+    };
+    
+    // Constants for time grid layout
+    const MINUTE_HEIGHT = 1.5; // pixels per minute
+    const HOUR_HEIGHT = 60 * MINUTE_HEIGHT; // 90 pixels per hour
+    
+    // Get events with specific times for absolute positioning
+    const timedEvents = tasks.filter(task => {
+      const isInDateRange = task.start_date && task.end_date 
+        ? selectedDate >= task.start_date && selectedDate <= task.end_date
+        : task.due_date === selectedDate || task.start_date === selectedDate;
+      return isInDateRange && task.start_time && task.end_time;
+    });
+    
+    // Get all-day events and tasks without specific times
+    const allDayItems = tasks.filter(task => {
+      const isInDateRange = task.start_date && task.end_date 
+        ? selectedDate >= task.start_date && selectedDate <= task.end_date
+        : task.due_date === selectedDate || task.start_date === selectedDate;
+      return isInDateRange && (!task.start_time || !task.end_time || task.is_all_day);
+    });
+
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
@@ -370,38 +398,59 @@ export default function CalendarScreen() {
         </View>
 
         <ScrollView style={styles.dailyContent}>
-          {hours.map(hour => {
-            const hourEvents = dayEvents.filter(event => {
-              if (event.isAllDay) return hour === 0; // Show all-day events at top
-              if (!event.time) return hour === 0; // Show tasks without time at top
-              const eventHour = new Date(`2000-01-01 ${event.time}`).getHours();
-              return eventHour === hour;
-            });
-
-            const hourTasks = dayTasks.filter(task => {
-              if (task.is_all_day) return hour === 0;
-              if (!task.start_time) return hour === 0;
-              const taskHour = new Date(task.start_time).getHours();
-              return taskHour === hour;
-            });
-            return (
-              <View key={hour} style={styles.hourSlot}>
-                <Text style={styles.hourLabel}>
-                  {hour === 0 ? '12 AM' : hour <= 12 ? `${hour} AM` : `${hour - 12} PM`}
-                </Text>
-                <View style={styles.hourEvents}>
-                  {hourTasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onComplete={handleCompleteTask}
-                      onDoublePress={handleTaskDoublePress}
-                    />
-                  ))}
-                </View>
+          {/* All-day events and tasks without specific times */}
+          {allDayItems.length > 0 && (
+            <View style={styles.allDaySection}>
+              <Text style={styles.allDayLabel}>All Day</Text>
+              <View style={styles.allDayEvents}>
+                {allDayItems.map(task => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onComplete={handleCompleteTask}
+                    onDoublePress={handleTaskDoublePress}
+                  />
+                ))}
               </View>
-            );
-          })}
+            </View>
+          )}
+          
+          {/* Time grid with hour slots */}
+          <View style={[styles.timeGrid, { height: 24 * HOUR_HEIGHT }]}>
+            {/* Hour markers */}
+            {hours.map(hour => (
+              <View key={hour} style={[styles.hourSlot, { height: HOUR_HEIGHT }]}>
+                <Text style={styles.hourLabel}>
+                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                </Text>
+                <View style={styles.hourLine} />
+              </View>
+            ))}
+            
+            {/* Timed events with absolute positioning */}
+            {timedEvents.map(task => {
+              const startMinutes = getTimeInMinutes(task.start_time!);
+              const endMinutes = getTimeInMinutes(task.end_time!);
+              const top = startMinutes * MINUTE_HEIGHT;
+              const height = Math.max((endMinutes - startMinutes) * MINUTE_HEIGHT, 30); // Minimum 30px height
+              
+              return (
+                <CalendarEventDisplay
+                  key={task.id}
+                  task={task}
+                  onDoublePress={handleTaskDoublePress}
+                  style={{
+                    position: 'absolute',
+                    top,
+                    height,
+                    left: 70, // Account for hour label width
+                    right: 8,
+                    zIndex: 1,
+                  }}
+                />
+              );
+            })}
+          </View>
         </ScrollView>
       </View>
     );
@@ -764,12 +813,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 8,
+    position: 'relative',
+  },
+  allDaySection: {
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    padding: 12,
+  },
+  allDayLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  allDayEvents: {
+    gap: 8,
+  },
+  timeGrid: {
+    position: 'relative',
+    paddingLeft: 8,
   },
   hourSlot: {
-    flexDirection: 'row',
-    minHeight: 60,
+    position: 'relative',
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   hourLabel: {
     width: 60,
@@ -778,11 +848,17 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     paddingRight: 8,
     paddingTop: 4,
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
-  hourEvents: {
-    flex: 1,
-    paddingLeft: 8,
-    paddingVertical: 4,
+  hourLine: {
+    position: 'absolute',
+    left: 70,
+    right: 0,
+    top: 0,
+    height: 1,
+    backgroundColor: '#f3f4f6',
   },
   
   // Weekly View Styles
