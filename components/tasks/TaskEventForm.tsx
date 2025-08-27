@@ -732,7 +732,6 @@ if (formData.schedulingType === 'event') {
                           onPress={() => {
                             dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
                               setDatePickerPosition({ x: px, y: py, width, height });
-                              setActiveCalendarField('start');       // <-- add this
                               setShowMiniCalendar(!showMiniCalendar);
                             });
                           }}
@@ -999,11 +998,7 @@ if (formData.schedulingType === 'event') {
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Calendar
                   onDayPress={onCalendarDayPress}
-                  markedDates={{ [toDateString(
-                    activeCalendarField === 'end'
-                      ? ((formData as any).eventEndDate || formData.dueDate)
-                      : formData.dueDate
-                  )]: { selected: true } }}
+                  markedDates={{ [toDateString(formData.dueDate)]: { selected: true } }}
                   dayComponent={CustomDayComponent}
                   hideExtraDays={true}
                 />
