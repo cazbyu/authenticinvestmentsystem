@@ -10,6 +10,13 @@ import { CalendarEventDisplay } from '@/components/calendar/CalendarEventDisplay
 import { getSupabaseClient } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react-native';
 
+const ymdLocal = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 interface CalendarEvent {
   id: string;
   title: string;
@@ -67,7 +74,7 @@ export default function CalendarScreen() {
   // Auto-scroll to current time when viewing today in daily mode
   useEffect(() => {
     if (viewMode === 'daily' && 
-        selectedDate === new Date().toISOString().split('T')[0] && 
+        selectedDate === ymdLocal() && 
         scrollViewRef.current &&
         hoursScrollViewHeight > 0 &&
         !hasScrolledToTime.current) {
@@ -94,7 +101,7 @@ export default function CalendarScreen() {
     }
     
     // Reset scroll flag when changing views or dates
-    if (viewMode !== 'daily' || selectedDate !== new Date().toISOString().split('T')[0]) {
+    if (viewMode !== 'daily' || selectedDate !== ymdLocal()) {
       hasScrolledToTime.current = false;
     }
   }, [viewMode, selectedDate, currentTimePosition, hoursScrollViewHeight]);
@@ -611,7 +618,7 @@ export default function CalendarScreen() {
               })}
               
               {/* Current time indicator - only show for today */}
-              {selectedDate === new Date().toISOString().split('T')[0] && (
+              {selectedDate === ymdLocal() && (
                 <View 
                   style={[
                     styles.currentTimeLine,
@@ -660,7 +667,7 @@ export default function CalendarScreen() {
           {weekDates.map((date, index) => {
             const dateString = date.toISOString().split('T')[0];
             const dayEvents = getEventsForDate(dateString);
-            const isToday = dateString === new Date().toISOString().split('T')[0];
+            const isToday = dateString === ymdLocal();
             const dayTasksAndEvents = tasks.filter(task => {
               if (task.start_date && task.end_date) {
                 return dateString >= task.start_date && dateString <= task.end_date;
