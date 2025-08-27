@@ -327,11 +327,14 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         color: '#0078d4',
       },
       completeButton: {
-        padding: 4,
-        borderRadius: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         borderWidth: 2,
         borderColor: '#0078d4',
         backgroundColor: '#ffffff',
+        justifyContent: 'center',
+        alignItems: 'center',
       },
       celebrationOverlay: {
         position: 'absolute',

@@ -461,12 +461,6 @@ export default function CalendarScreen() {
                 ]}>
                   {date.getDate()}
                 </Text>
-                  {dayTasksAndEvents.filter(task => {
-                    if (task.is_all_day) return hour === 0;
-                    if (!task.start_time) return hour === 0;
-                    const taskHour = new Date(task.start_time).getHours();
-                    return taskHour === hour;
-                  }).map(task => (
                 <View style={styles.weekDayEvents}>
                   {dayEvents.slice(0, 3).map(event => (
                     <View 
