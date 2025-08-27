@@ -118,13 +118,14 @@ export default function CalendarScreen() {
   };
 
   const prepareMarkedDates = () => {
-    const marked = {};
+    const marked: any = {};
 
     // Add selected date
     marked[selectedDate] = {
       selected: true,
       selectedColor: '#0078d4',
       selectedTextColor: '#ffffff',
+      dots: [],
     };
 
     // Add tasks and events
@@ -133,6 +134,11 @@ export default function CalendarScreen() {
       if (task.due_date && typeof task.due_date === 'string') {
         const taskDate = task.due_date.split('T')[0];
         if (taskDate && taskDate.length === 10) { // YYYY-MM-DD format
+        // Initialize marked date object if it doesn't exist
+        if (!marked[taskDate]) {
+          marked[taskDate] = {};
+        }
+        
         if (marked[taskDate]) {
           // If date already marked, add dots
           if (!marked[taskDate].dots) {
@@ -209,6 +215,7 @@ export default function CalendarScreen() {
           style={[
             styles.viewButton,
             currentView === view && styles.activeViewButton
+          ]}
           ]}
           onPress={() => setCurrentView(view)}
         >
