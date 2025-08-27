@@ -30,8 +30,8 @@ export default function CalendarScreen() {
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   const [currentTimePosition, setCurrentTimePosition] = useState(0);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const hasScrolledToTime = useRef(false);
+  const scrollViewRef = React.useRef<ScrollView>(null);
+const hasScrolledToTime = React.useRef(false);
   
   // Modal states
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
