@@ -11,9 +11,18 @@ import {
   Image,
   ActivityIndicator
 } from 'react-native';
-import { X, Camera, Upload, Trash2, Palette } from 'lucide-react-native';
+import { X, Camera, Upload, Trash2, Palette, Plus, Edit } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
+import { EditKRModal } from './EditKRModal';
+
+interface KeyRelationship {
+  id: string;
+  name: string;
+  description?: string;
+  image_path?: string;
+  role_id: string;
+}
 
 interface EditRoleModalProps {
   visible: boolean;
@@ -41,6 +50,9 @@ export function EditRoleModal({ visible, onClose, onUpdate, role }: EditRoleModa
   const [selectedColor, setSelectedColor] = useState('#0078d4');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
+  const [isEditKRModalVisible, setIsEditKRModalVisible] = useState(false);
+  const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
 
   useEffect(() => {
     if (role) {
@@ -63,11 +75,15 @@ export function EditRoleModal({ visible, onClose, onUpdate, role }: EditRoleModa
       } else {
         setImageUrl(null);
       }
+
+      // Fetch key relationships for this role
+      fetchKeyRelationships(role.id);
     } else {
       setLabel('');
       setImagePath(null);
       setImageUrl(null);
       setSelectedColor('#0078d4');
+      setKeyRelationships([]);
     }
   }, [role]);
 
@@ -204,6 +220,112 @@ export function EditRoleModal({ visible, onClose, onUpdate, role }: EditRoleModa
     }
   };
 
+  const fetchKeyRelationships = async (roleId: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('role_id', roleId)
+        .order('name');
+
+      if (error) throw error;
+      setKeyRelationships(data || []);
+    } catch (error) {
+      console.error('Error fetching key relationships:', error);
+      Alert.alert('Error', (error as Error).message);
+    }
+  };
+
+  const handleAddKR = async () => {
+    if (!role) return;
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .insert({
+          name: 'New Key Relationship',
+          role_id: role.id,
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Refresh KRs and open edit modal for the new one
+      await fetchKeyRelationships(role.id);
+      setEditingKR(data);
+      setIsEditKRModalVisible(true);
+    } catch (error) {
+      console.error('Error creating key relationship:', error);
+      Alert.alert('Error', (error as Error).message);
+    }
+  };
+
+  const handleEditKR = (kr: KeyRelationship) => {
+    setEditingKR(kr);
+    setIsEditKRModalVisible(true);
+  };
+
+  const handleKRUpdate = () => {
+    if (role) {
+      fetchKeyRelationships(role.id);
+    }
+    setIsEditKRModalVisible(false);
+    setEditingKR(null);
+  };
+
+  const handleDeleteKR = async (kr: KeyRelationship) => {
+    Alert.alert(
+      'Delete Key Relationship',
+      `Are you sure you want to delete "${kr.name}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const supabase = getSupabaseClient();
+              
+              // Remove image if exists
+              if (kr.image_path) {
+                await supabase.storage
+                  .from('0008-key-relationship-images')
+                  .remove([kr.image_path]);
+              }
+
+              // Delete from database
+              const { error } = await supabase
+                .from('0008-ap-key-relationships')
+                .delete()
+                .eq('id', kr.id);
+
+              if (error) throw error;
+
+              Alert.alert('Success', 'Key relationship deleted successfully');
+              if (role) {
+                fetchKeyRelationships(role.id);
+              }
+            } catch (error) {
+              console.error('Error deleting key relationship:', error);
+              Alert.alert('Error', (error as Error).message);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleSave = async () => {
     if (!role || !label.trim()) return;
 
@@ -334,6 +456,53 @@ export function EditRoleModal({ visible, onClose, onUpdate, role }: EditRoleModa
               </View>
             </View>
           </View>
+
+          {/* Key Relationships Section */}
+          <View style={styles.field}>
+            <View style={styles.krSectionHeader}>
+              <Text style={styles.label}>Key Relationships</Text>
+              <TouchableOpacity 
+                style={styles.addKRButton}
+                onPress={handleAddKR}
+              >
+                <Plus size={16} color="#0078d4" />
+                <Text style={styles.addKRButtonText}>Add KR</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {keyRelationships.length === 0 ? (
+              <Text style={styles.noKRText}>No key relationships yet</Text>
+            ) : (
+              <View style={styles.krList}>
+                {keyRelationships.map(kr => (
+                  <View key={kr.id} style={styles.krItem}>
+                    <View style={styles.krInfo}>
+                      <Text style={styles.krName}>{kr.name}</Text>
+                      {kr.description && (
+                        <Text style={styles.krDescription} numberOfLines={1}>
+                          {kr.description}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.krActions}>
+                      <TouchableOpacity 
+                        style={styles.krActionButton}
+                        onPress={() => handleEditKR(kr)}
+                      >
+                        <Edit size={14} color="#0078d4" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.krActionButton, styles.deleteKRButton]}
+                        onPress={() => handleDeleteKR(kr)}
+                      >
+                        <Trash2 size={14} color="#dc2626" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
         </ScrollView>
 
         <View style={styles.actions}>
@@ -349,6 +518,15 @@ export function EditRoleModal({ visible, onClose, onUpdate, role }: EditRoleModa
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Edit KR Modal */}
+        <EditKRModal
+          visible={isEditKRModalVisible}
+          onClose={() => setIsEditKRModalVisible(false)}
+          onUpdate={handleKRUpdate}
+          keyRelationship={editingKR}
+          roleName={role?.label}
+        />
       </View>
     </Modal>
   );
@@ -504,6 +682,79 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  krSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addKRButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  addKRButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078d4',
+  },
+  noKRText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  krList: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  krItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  krInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  krName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  krDescription: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  krActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  krActionButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  deleteKRButton: {
+    borderColor: '#dc2626',
+    backgroundColor: '#fef2f2',
   },
   actions: {
     padding: 16,
