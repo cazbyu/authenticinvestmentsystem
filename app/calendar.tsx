@@ -488,6 +488,124 @@ export default function CalendarScreen() {
     setSelectedDate(ymdLocal(newDate));
   };
 
+  // Mini daily view used inside Weekly/Monthly: tasks/all-day on top, time grid below.
+  const DailySlice: React.FC<{ date: string; height?: number }> = ({ date, height = 0.5 }) => {
+    // Local ref/height for this embedded grid so it scrolls independently
+    const sliceScrollRef = useRef<ScrollView>(null);
+    const [sliceViewportH, setSliceViewportH] = useState(0);
+
+    // Constants consistent with main daily grid
+    const HOUR_HEIGHT = 60 * MINUTE_HEIGHT;
+    const COLUMN_GUTTER = 4;
+
+    // All-day / untimed for the given date
+    const allDayItems = tasks.filter(task => {
+      const inRange = task.start_date && task.end_date
+        ? date >= task.start_date && date <= task.end_date
+        : task.due_date === date || task.start_date === date;
+      return inRange && (!task.start_time || !task.end_time || task.is_all_day);
+    });
+
+    // Timed events for absolute positioning
+    const timedEvents = tasks.filter(task => {
+      const inRange = task.start_date && task.end_date
+        ? date >= task.start_date && date <= task.end_date
+        : task.due_date === date || task.start_date === date;
+      return inRange && task.start_time && task.end_time;
+    });
+
+    const eventsWithLayout = calculateEventLayout(timedEvents);
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+
+    return (
+      <View style={{ flex: 1, minHeight: 240, height: `${height * 100}%` }}>
+        {/* All-day header */}
+        {allDayItems.length > 0 && (
+          <View style={styles.allDaySection}>
+            <Text style={styles.allDayLabel}>All Day</Text>
+            <View style={styles.allDayEvents}>
+              {allDayItems.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onComplete={handleCompleteTask}
+                  onDoublePress={handleTaskDoublePress}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Time grid */}
+        <ScrollView
+          ref={sliceScrollRef}
+          onLayout={(e) => setSliceViewportH(e.nativeEvent.layout.height)}
+          style={styles.hoursScrollView}
+          showsVerticalScrollIndicator
+        >
+          <View
+            style={[styles.timeGrid, { height: 24 * HOUR_HEIGHT }]}
+            onLayout={(event) => {
+              const { width } = event.nativeEvent.layout;
+              setTimeGridWidth(width - 70); // re-use same label width logic
+            }}
+          >
+            {/* Hour markers */}
+            {hours.map(hour => (
+              <View key={hour} style={[styles.hourSlot, { height: HOUR_HEIGHT }]}>
+                <Text style={styles.hourLabel}>
+                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                </Text>
+                <View style={styles.hourLine} />
+                <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
+                <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
+                <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
+              </View>
+            ))}
+
+            {/* Timed events with overlap layout */}
+            {eventsWithLayout.map(event => {
+              const top = event.startMinutes * MINUTE_HEIGHT;
+              const heightPx = Math.max((event.endMinutes - event.startMinutes) * MINUTE_HEIGHT, 30);
+              const availableWidth = timeGridWidth > 0 ? timeGridWidth - 16 : 200;
+              const colWidth = (availableWidth - (event.maxColumns - 1) * COLUMN_GUTTER) / event.maxColumns;
+              const leftOffset = event.column * (colWidth + COLUMN_GUTTER);
+
+              return (
+                <CalendarEventDisplay
+                  key={event.id}
+                  task={event}
+                  onDoublePress={handleTaskDoublePress}
+                  style={{
+                    position: 'absolute',
+                    top,
+                    height: heightPx,
+                    left: 70 + leftOffset,
+                    width: colWidth,
+                    zIndex: 1,
+                  }}
+                />
+              );
+            })}
+
+            {/* Optional: show now-line only if this slice is "today" */}
+            {date === ymdLocal() && (
+              <View style={[styles.currentTimeLine, { top: currentTimePosition }]}>
+                <View style={styles.currentTimeDot} />
+                <View style={styles.currentTimeLineBar} />
+                <View style={styles.currentTimeLabel}>
+                  <Text style={styles.currentTimeLabelText}>
+                    {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
+
   const renderDailyView = () => {
     const dayEvents = getEventsForDate(selectedDate);
     const dayTasks = tasks.filter(task => task.due_date === selectedDate);
@@ -717,34 +835,8 @@ export default function CalendarScreen() {
           <Text style={styles.selectedDayTitle}>
             {formatDateForDisplay(selectedDate)}
           </Text>
-          <ScrollView 
-            style={styles.selectedDayEventsScroll}
-            contentContainerStyle={styles.selectedDayEvents}
-          >
-            {tasks.filter(task => {
-              // For events with start_date and end_date, check if selectedDate falls within range
-              if (task.start_date && task.end_date) {
-                return selectedDate >= task.start_date && selectedDate <= task.end_date;
-              }
-              // For single-day events or tasks, match exact date
-              return task.due_date === selectedDate || task.start_date === selectedDate;
-            }).map(task => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onComplete={handleCompleteTask}
-                onDoublePress={handleTaskDoublePress}
-              />
-            ))}
-            {tasks.filter(task => {
-              if (task.start_date && task.end_date) {
-                return selectedDate >= task.start_date && selectedDate <= task.end_date;
-              }
-              return task.due_date === selectedDate || task.start_date === selectedDate;
-            }).length === 0 && (
-              <Text style={styles.noEventsText}>No events for this day</Text>
-            )}
-          </ScrollView>
+          {/* Bottom half: embedded daily slice for the selected day */}
+          <DailySlice date={selectedDate} height={0.5} />
         </View>
       </View>
     );
@@ -784,35 +876,8 @@ export default function CalendarScreen() {
           <Text style={styles.selectedDateLabel}>
             {formatDateForDisplay(selectedDate)}
           </Text>
-          
-          <ScrollView 
-            style={styles.dayEventsListScroll}
-            contentContainerStyle={styles.dayEventsList}
-          >
-            {tasks.filter(task => {
-              // For events with start_date and end_date, check if selectedDate falls within range
-              if (task.start_date && task.end_date) {
-                return selectedDate >= task.start_date && selectedDate <= task.end_date;
-              }
-              // For single-day events or tasks, match exact date
-              return task.due_date === selectedDate || task.start_date === selectedDate;
-            }).map(task => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onComplete={handleCompleteTask}
-                onDoublePress={handleTaskDoublePress}
-              />
-            ))}
-            {tasks.filter(task => {
-              if (task.start_date && task.end_date) {
-                return selectedDate >= task.start_date && selectedDate <= task.end_date;
-              }
-              return task.due_date === selectedDate || task.start_date === selectedDate;
-            }).length === 0 && (
-              <Text style={styles.noEventsText}>No events for this day</Text>
-            )}
-          </ScrollView>
+          {/* Bottom half: embedded daily slice for the selected date */}
+          <DailySlice date={selectedDate} height={0.5} />
         </View>
       </View>
     );
@@ -963,6 +1028,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     marginTop: 16,
+    minHeight: 320,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -1149,6 +1215,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     flex: 1,
+    minHeight: 320,
   },
   selectedDayTitle: {
     fontSize: 16,
@@ -1231,6 +1298,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  hoursScrollView: {
+    flex: 1,
   },
   currentTimeLine: {
     position: 'absolute',
