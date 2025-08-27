@@ -68,7 +68,7 @@ export default function CalendarScreen() {
         !hasScrolledToTime.current) {
       
       // Scroll to current time with some offset (2 hours above)
-      const scrollOffset = Math.max(0, currentTimePosition - (2 * 60 * 1.5)); // 2 hours * 60 minutes * 1.5 pixels
+      const scrollOffset = Math.max(0, currentTimePosition - 200); // Center current time with 200px offset from top
       
       setTimeout(() => {
         scrollViewRef.current?.scrollTo({ 
@@ -76,7 +76,7 @@ export default function CalendarScreen() {
           animated: true 
         });
         hasScrolledToTime.current = true;
-      }, 500); // Small delay to ensure layout is complete
+      }, 100); // Reduced delay for faster initial positioning
     }
     
     // Reset scroll flag when changing views or dates
@@ -1017,15 +1017,16 @@ const styles = StyleSheet.create({
     left: 70,
     right: 0,
     height: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#e5e7eb',
+    opacity: 0.8,
   },
   halfHourLine: {
     position: 'absolute',
     left: 70,
     right: 0,
     height: 1,
-    backgroundColor: '#f3f4f6',
-    opacity: 0.7,
+    backgroundColor: '#d1d5db',
+    opacity: 0.9,
   },
   
   // Weekly View Styles
