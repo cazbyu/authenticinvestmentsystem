@@ -129,6 +129,15 @@ const toDateString = (date: Date) => {
     setWithdrawalDateInputValue(formatDateForInput(formData.withdrawalDate));
   }, [formData.withdrawalDate]);
 
+  // Debug log to check initial data
+  useEffect(() => {
+    if (initialData) {
+      console.log('Initial data received:', {
+        keyRelationships: initialData.keyRelationships,
+        selectedKeyRelationshipIds: formData.selectedKeyRelationshipIds
+      });
+    }
+  }, [initialData]);
   const generateTimeOptions = () => {
     const times = [];
     for (let hour = 0; hour < 24; hour++) {
@@ -152,7 +161,7 @@ const toDateString = (date: Date) => {
         if (!user) return;
 
         const { data: roleData } = await supabase.from('0008-ap-roles').select('id,label').eq('user_id', user.id).eq('is_active', true);
-        const { data: domainData } = await supabase.from('0007-ap-domains').select('id,name');
+        const { data: domainData } = await supabase.from('0008-ap-domains').select('id,name');
         const { data: krData } = await supabase.from('0008-ap-key-relationships').select('id,name,role_id').eq('user_id', user.id);
         const { data: goalData } = await supabase.from('0008-ap-goals-12wk').select('id,title').eq('user_id', user.id).eq('status', 'active');
 
@@ -160,6 +169,10 @@ const toDateString = (date: Date) => {
         setDomains(domainData || []);
         setKeyRelationships(krData || []);
         setTwelveWeekGoals(goalData || []);
+        
+        // Debug log to check fetched data
+        console.log('Fetched key relationships:', krData);
+        console.log('Current selected KR IDs:', formData.selectedKeyRelationshipIds);
       } catch (error) {
         console.error('Error fetching options:', error);
         Alert.alert('Error', (error as Error).message || 'Failed to load options');
@@ -494,7 +507,6 @@ const toDateString = (date: Date) => {
         }
 
         onSubmitSuccess();
-        onClose();
 
     } catch (error) {
         console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} ${formData.schedulingType}:`, error);
@@ -504,7 +516,9 @@ const toDateString = (date: Date) => {
     }
   };
 
-  const filteredKeyRelationships = keyRelationships.filter(kr => formData.selectedRoleIds.includes(kr.role_id));
+  const filteredKeyRelationships = keyRelationships.filter(kr => 
+    formData.selectedRoleIds.length === 0 || formData.selectedRoleIds.includes(kr.role_id)
+  );
 
   // Dynamic placeholder text based on scheduling type
   const getTitlePlaceholder = () => {
@@ -780,9 +794,14 @@ const toDateString = (date: Date) => {
             {filteredKeyRelationships.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>Key Relationships</Text>
+                {/* Debug info */}
+                <Text style={{ fontSize: 10, color: '#999', marginBottom: 8 }}>
+                  Available: {filteredKeyRelationships.length}, Selected: {formData.selectedKeyRelationshipIds.length}
+                </Text>
                 <View style={styles.checkboxGrid}>
                   {filteredKeyRelationships.map(kr => {
                     const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
+                    console.log(`KR ${kr.name} (${kr.id}): selected = ${isSelected}`);
                     return (
                       <TouchableOpacity
                         key={kr.id}
