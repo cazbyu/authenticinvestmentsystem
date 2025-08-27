@@ -248,31 +248,31 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
             <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
               <View style={styles.checkmarkContainer}>
                 <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
-                  <Check size={16} color="#16a34a" />
+                  <Check size={20} color="#16a34a" strokeWidth={3} />
                 </Animated.View>
                 
                 {/* Animated circular outline */}
                 {isCompleting && (
                   <Svg 
                     style={styles.circleOverlay} 
-                    width="28" 
-                    height="28" 
-                    viewBox="0 0 28 28"
+                    width="32" 
+                    height="32" 
+                    viewBox="0 0 32 32"
                   >
                     <Circle
-                      cx="14"
-                      cy="14"
-                      r="12"
+                      cx="16"
+                      cy="16"
+                      r="14"
                       stroke="#16a34a"
-                      strokeWidth="2"
+                      strokeWidth="3"
                       fill="none"
-                      strokeDasharray="75.4" // 2 * π * 12 ≈ 75.4
+                      strokeDasharray="87.96" // 2 * π * 14 ≈ 87.96
                       strokeDashoffset={circleAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [75.4, 0], // Start fully hidden, end fully visible
+                        outputRange: [87.96, 0], // Start fully hidden, end fully visible
                       })}
                       strokeLinecap="round"
-                      transform="rotate(-90 14 14)" // Start from top
+                      transform="rotate(-90 16 16)" // Start from top
                     />
                   </Svg>
                 )}
@@ -438,8 +438,8 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
       },
       circleOverlay: {
         position: 'absolute',
-        top: -2,
-        left: -2,
+        top: -6,
+        left: -6,
       },
       celebrationOverlay: {
         position: 'absolute',
