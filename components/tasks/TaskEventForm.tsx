@@ -1000,11 +1000,18 @@ if (formData.schedulingType === 'event') {
             <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}>
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Calendar
-                  onDayPress={onCalendarDayPress}
-                  markedDates={{ [toDateString(formData.dueDate)]: { selected: true } }}
-                  dayComponent={CustomDayComponent}
-                  hideExtraDays={true}
-                />
+  onDayPress={onCalendarDayPress}
+  markedDates={{
+    [toDateString(
+      activeCalendarField === 'end'
+        ? ((formData as any).eventEndDate || formData.dueDate)
+        : formData.dueDate
+    )]: { selected: true }
+  }}
+  dayComponent={CustomDayComponent}
+  hideExtraDays={true}
+/>
+
               </ScrollView>
             </View>
           </TouchableOpacity>
