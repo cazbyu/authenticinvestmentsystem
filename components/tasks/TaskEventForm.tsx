@@ -731,11 +731,13 @@ if (formData.schedulingType === 'event') {
                           ref={dateInputRef}
                           style={styles.compactDateButton}
                           onPress={() => {
-                            dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
-                              setDatePickerPosition({ x: px, y: py, width, height });
-                              setShowMiniCalendar(!showMiniCalendar);
-                            });
-                          }}
+  dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
+    setDatePickerPosition({ x: px, y: py, width, height });
+    setActiveCalendarField('start');        // <-- add this
+    setShowMiniCalendar(!showMiniCalendar);
+  });
+}}
+
                         >
                           <Text style={styles.compactInputLabel}>Due Date</Text>
                           <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
