@@ -732,6 +732,7 @@ if (formData.schedulingType === 'event') {
                           onPress={() => {
                             dateInputRef.current?.measure((fx, fy, width, height, px, py) => {
                               setDatePickerPosition({ x: px, y: py, width, height });
+                              setActiveCalendarField('start');       // <-- add this
                               setShowMiniCalendar(!showMiniCalendar);
                             });
                           }}
