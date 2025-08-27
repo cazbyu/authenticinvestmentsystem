@@ -448,29 +448,31 @@ export default function CalendarScreen() {
                 ]}
                 onPress={() => setSelectedDate(dateString)}
               >
-                <Text style={[
-                  styles.weekDayLabel,
-                  isSelected && styles.selectedWeekDayLabel
-                ]}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
-                </Text>
-                <Text style={[
-                  styles.weekDayNumber,
-                  isSelected && styles.selectedWeekDayNumber,
-                  isToday && styles.todayWeekDayNumber
-                ]}>
-                  {date.getDate()}
-                </Text>
-                <View style={styles.weekDayEvents}>
-                  {dayEvents.slice(0, 3).map(event => (
-                    <View 
-                      key={event.id} 
-                      style={[styles.weekEventDot, { backgroundColor: event.color }]}
-                    />
-                  ))}
-                  {dayEvents.length > 3 && (
-                    <Text style={styles.moreEventsText}>+{dayEvents.length - 3}</Text>
-                  )}
+                <View>
+                  <Text style={[
+                    styles.weekDayLabel,
+                    isSelected && styles.selectedWeekDayLabel
+                  ]}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
+                  </Text>
+                  <Text style={[
+                    styles.weekDayNumber,
+                    isSelected && styles.selectedWeekDayNumber,
+                    isToday && styles.todayWeekDayNumber
+                  ]}>
+                    {date.getDate()}
+                  </Text>
+                  <View style={styles.weekDayEvents}>
+                    {dayEvents.slice(0, 3).map(event => (
+                      <View 
+                        key={event.id} 
+                        style={[styles.weekEventDot, { backgroundColor: event.color }]}
+                      />
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <Text style={styles.moreEventsText}>+{dayEvents.length - 3}</Text>
+                    )}
+                  </View>
                 </View>
               </TouchableOpacity>
             );
