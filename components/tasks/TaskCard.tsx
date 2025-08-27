@@ -7,11 +7,8 @@ export interface Task {
   id: string;
   title: string;
   due_date?: string;
-  start_date?: string;
-  end_date?: string;
   start_time?: string;
   end_time?: string;
-  recurrence_rule?: string;
   is_urgent?: boolean;
   is_important?: boolean;
   status?: string;
