@@ -350,6 +350,9 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                                   .eq('id', role.id);
 
                                 if (error) throw error;
+                                
+                                // Notify parent component of the update
+                                onUpdate?.();
                               } catch (error) {
                                 console.error('Error updating custom role:', error);
                                 Alert.alert('Error', 'Failed to update role');

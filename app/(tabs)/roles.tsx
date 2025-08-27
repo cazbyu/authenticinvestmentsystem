@@ -1001,6 +1001,7 @@ export default function Roles() {
       <ManageRolesModal
         visible={manageRolesVisible}
         onClose={() => setManageRolesVisible(false)}
+        onUpdate={fetchRoles}
       />
 
       <EditRoleModal
