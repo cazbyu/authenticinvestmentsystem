@@ -1021,9 +1021,6 @@ const styles = StyleSheet.create({
   allDayEvents: {
     gap: 8,
   },
-  hoursScrollView: {
-    flex: 1,
-  },
   timeGrid: {
     position: 'relative',
     paddingLeft: 8,
