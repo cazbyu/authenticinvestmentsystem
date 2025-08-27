@@ -619,8 +619,10 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 16,
   },
-  taskList: {
+  taskListContainer: {
     flex: 1,
+  },
+  taskList: {
     padding: 16,
   },
   loadingContainer: {

@@ -236,8 +236,10 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     color: '#1f2937' 
   },
-  content: { 
+  contentContainer: {
     flex: 1, 
+  },
+  content: {
     padding: 16 
   },
   ideaTitle: { 

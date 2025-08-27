@@ -537,7 +537,10 @@ const toDateString = (date: Date) => {
             </Text>
             <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
         </View>
-        <ScrollView style={styles.formContent}>
+        <ScrollView 
+          style={styles.formContentContainer}
+          contentContainerStyle={styles.formContent}
+        >
             <TextInput style={styles.input} placeholder={getTitlePlaceholder()} value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
 
             <View style={styles.schedulingToggle}>

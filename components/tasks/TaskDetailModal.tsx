@@ -203,8 +203,10 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     color: '#1f2937' 
   },
-  detailContent: { 
+  detailContentContainer: {
     flex: 1, 
+  },
+  detailContent: {
     padding: 16 
   },
   detailTaskTitle: { 

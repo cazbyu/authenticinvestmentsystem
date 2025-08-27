@@ -368,6 +368,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: 'white' },
   headerTitle: { fontSize: 18, fontWeight: '600' },
   closeButton: { padding: 4 },
+  contentContainer: { flex: 1 },
   content: { paddingHorizontal: 16 },
   mainSectionTitle: { fontSize: 18, fontWeight: '700', color: '#1f2937', marginBottom: 16, marginTop: 8},
   categoryContainer: { marginBottom: 16 },

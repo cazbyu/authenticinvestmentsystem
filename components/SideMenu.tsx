@@ -92,8 +92,10 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     opacity: 0.9,
   },
-  menuContainer: {
+  menuContainerWrapper: {
     flex: 1,
+  },
+  menuContainer: {
     paddingTop: 20,
   },
   menuItem: {

@@ -90,8 +90,10 @@ export function InvestmentList({ items, type, onItemPress }: InvestmentListProps
 }
 
 const styles = StyleSheet.create({
-  container: {
+  containerWrapper: {
     flex: 1,
+  },
+  container: {
     paddingHorizontal: 16,
   },
   item: {

@@ -767,8 +767,10 @@ const styles = StyleSheet.create({
   activeFilterButtonText: {
     color: '#ffffff',
   },
-  content: {
+  contentContainer: {
     flex: 1,
+  },
+  content: {
     padding: 16,
   },
   compositeScoreCard: {

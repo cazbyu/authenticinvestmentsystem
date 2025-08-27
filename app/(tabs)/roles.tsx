@@ -1245,6 +1245,8 @@ roleCardHalf: {
     paddingHorizontal: 16,
     fontStyle: 'italic',
   },
+  keyRelationshipsListContainer: {
+  },
   keyRelationshipsList: {
     flexDirection: 'row',
     paddingHorizontal: 16,
