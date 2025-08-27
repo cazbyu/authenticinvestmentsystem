@@ -68,16 +68,9 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
   const formatDueDate = (date?: string) => {
     if (!date) return "";
     try {
-      // Handle both YYYY-MM-DD format and full datetime strings
-      let d;
-      if (date.includes('T') || date.includes(' ')) {
-        // Full datetime string - use as is but be careful with timezone
-        d = new Date(date);
-      } else {
-        // Date-only string (YYYY-MM-DD) - parse as local date
-        const [year, month, day] = date.split('-').map(Number);
-        d = new Date(year, month - 1, day);
-      }
+      // Always parse date-only strings as local dates to avoid timezone shifts
+      const [year, month, day] = date.split('T')[0].split('-').map(Number);
+      const d = new Date(year, month - 1, day);
       
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -270,6 +270,17 @@ export default function CalendarScreen() {
     });
   };
 
+  const formatDateForDisplay = (dateString: string) => {
+    // Parse date-only strings (YYYY-MM-DD) as local dates to avoid timezone shifts
+    const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+    const localDate = new Date(year, month - 1, day);
+    return localDate.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
   const getMarkedDates = () => {
     const marked: any = {};
     
@@ -343,11 +354,7 @@ export default function CalendarScreen() {
             <ChevronLeft size={24} color="#0078d4" />
           </TouchableOpacity>
           <Text style={styles.dailyTitle}>
-            {currentDate.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+            {formatDateForDisplay(currentDate.toISOString().split('T')[0])}
           </Text>
           <TouchableOpacity onPress={() => navigateDate('next')}>
             <ChevronRight size={24} color="#0078d4" />
@@ -460,15 +467,7 @@ export default function CalendarScreen() {
         {/* Selected day details */}
         <View style={styles.selectedDayDetails}>
           <Text style={styles.selectedDayTitle}>
-            {new Date(selectedDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </Text>
-          <ScrollView 
-            style={styles.selectedDayEventsScroll}
-            contentContainerStyle={styles.selectedDayEvents}
+            {formatDateForDisplay(selectedDate)}
           >
             {tasks.filter(task => task.due_date === selectedDate).map(task => (
               <TaskCard
@@ -519,11 +518,7 @@ export default function CalendarScreen() {
         
         <View style={styles.selectedDateContainer}>
           <Text style={styles.selectedDateLabel}>
-            {new Date(selectedDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+            {formatDateForDisplay(selectedDate)}
           </Text>
           
           <ScrollView 
