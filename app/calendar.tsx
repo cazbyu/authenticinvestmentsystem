@@ -209,7 +209,8 @@ export default function CalendarScreen() {
           style={[
             styles.viewButton,
             currentView === view && styles.activeViewButton
-          ]}
+          style={styles.dailyContainer}
+          contentContainerStyle={styles.dailyContent}
           onPress={() => setCurrentView(view)}
         >
           <Text style={[
@@ -463,8 +464,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    backgroundColor: '#f8fafc',
   },
+  dailyContent: {
+    padding: 16,
   viewSelector: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
