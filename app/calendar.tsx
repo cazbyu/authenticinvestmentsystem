@@ -100,6 +100,12 @@ export default function CalendarScreen() {
           domains: taskDomains,
           color: primaryColor,
         };
+      }).filter(task => {
+        // Only include tasks with valid due dates to prevent WeekCalendar errors
+        return task.due_date && 
+               typeof task.due_date === 'string' && 
+               task.due_date.trim() !== '' &&
+               !isNaN(new Date(task.due_date).getTime());
       });
 
       setTasks(transformedTasks);
@@ -123,8 +129,10 @@ export default function CalendarScreen() {
 
     // Add tasks and events
     tasks.forEach(task => {
-      const taskDate = task.due_date?.split('T')[0];
-      if (taskDate) {
+      // Ensure due_date exists and is valid before processing
+      if (task.due_date && typeof task.due_date === 'string') {
+        const taskDate = task.due_date.split('T')[0];
+        if (taskDate && taskDate.length === 10) { // YYYY-MM-DD format
         if (marked[taskDate]) {
           // If date already marked, add dots
           if (!marked[taskDate].dots) {
@@ -149,6 +157,7 @@ export default function CalendarScreen() {
           marked[taskDate].selected = true;
           marked[taskDate].selectedColor = '#0078d4';
           marked[taskDate].selectedTextColor = '#ffffff';
+        }
         }
       }
     });
