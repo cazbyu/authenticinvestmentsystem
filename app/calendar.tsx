@@ -464,7 +464,6 @@ export default function CalendarScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.content}>
       <ScrollView style={styles.scrollViewBase} contentContainerStyle={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
