@@ -907,69 +907,69 @@ export default function Roles() {
         />
         
         <ScrollView style={styles.rolesList}>
-  {roles.length === 0 ? (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>No active roles found</Text>
-      <TouchableOpacity 
-        style={styles.manageButton}
-        onPress={() => setManageRolesVisible(true)}
-      >
-        <Text style={styles.manageButtonText}>Manage Roles</Text>
-      </TouchableOpacity>
-    </View>
-  ) : (
-    <View style={styles.rolesGrid}>
-      {roles.map(role => (
-        <View
-          key={role.id}
-          style={[
-            styles.roleCard,
-            styles.roleCardHalf, // ← requires styles.roleCardHalf
-            { borderLeftColor: role.color || '#0078d4' }
-          ]}
-        >
-          <View style={styles.roleCardContent}>
-            {/* LEFT side = navigate into the Role */}
-            <TouchableOpacity
-              style={styles.roleCardLeft}
-              onPress={() => handleRolePress(role)}
-              activeOpacity={0.8}
-            >
-              {role.image_path ? (
-                <Image 
-                  source={{ uri: getImageUrl(role.image_path) }} 
-                  style={styles.roleImage} 
-                />
-              ) : (
-                <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
-                  <Text style={styles.roleImageText}>
-                    {role.label.charAt(0).toUpperCase()}
-                  </Text>
+          {roles.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No active roles found</Text>
+              <TouchableOpacity 
+                style={styles.manageButton}
+                onPress={() => setManageRolesVisible(true)}
+              >
+                <Text style={styles.manageButtonText}>Manage Roles</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.rolesGrid}>
+              {roles.map(role => (
+                <View
+                  key={role.id}
+                  style={[
+                    styles.roleCard,
+                    styles.roleCardHalf,
+                    { borderLeftColor: role.color || '#0078d4' }
+                  ]}
+                >
+                  <View style={styles.roleCardContent}>
+                    {/* LEFT side = navigate into the Role */}
+                    <TouchableOpacity
+                      style={styles.roleCardLeft}
+                      onPress={() => handleRolePress(role)}
+                      activeOpacity={0.8}
+                    >
+                      {role.image_path ? (
+                        <Image 
+                          source={{ uri: getImageUrl(role.image_path) }} 
+                          style={styles.roleImage} 
+                        />
+                      ) : (
+                        <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
+                          <Text style={styles.roleImageText}>
+                            {role.label.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={styles.roleInfo}>
+                        <Text style={styles.roleName}>{role.label}</Text>
+                        {role.category && (
+                          <Text style={styles.roleCategory}>{role.category}</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* RIGHT side = edit role settings (image/color) */}
+                    <TouchableOpacity 
+                      style={styles.editRoleButton}
+                      onPress={() => handleEditRole(role)}
+                      hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                    >
+                      <Edit size={16} color="#6b7280" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              )}
-
-              <View style={styles.roleInfo}>
-                <Text style={styles.roleName}>{role.label}</Text>
-                {role.category && (
-                  <Text style={styles.roleCategory}>{role.category}</Text>
-                )}
-              </View>
-            </TouchableOpacity>
-
-            {/* RIGHT side = edit role settings (image/color) */}
-            <TouchableOpacity 
-              style={styles.editRoleButton}
-              onPress={() => handleEditRole(role)}
-              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-            >
-              <Edit size={16} color="#6b7280" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-    </View>
-  )}
-</ScrollView>
+              ))}
+            </View>
+          )}
+        </ScrollView>
 
       </View>
     );
@@ -1150,17 +1150,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
   },
-rolesGrid: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'space-between',
-  gap: 12,
-  paddingHorizontal: 16,    // nice gutters
-},
-roleCardHalf: {
-  width: '48%',
-},
-    roleCardLeft: {
+  rolesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 16,
+  },
+  roleCardHalf: {
+    width: '48%',
+  },
+  roleCardLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
@@ -1244,8 +1244,6 @@ roleCardHalf: {
     textAlign: 'center',
     paddingHorizontal: 16,
     fontStyle: 'italic',
-  },
-  keyRelationshipsListContainer: {
   },
   keyRelationshipsList: {
     flexDirection: 'row',
