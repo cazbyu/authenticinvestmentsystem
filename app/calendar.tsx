@@ -45,6 +45,7 @@ export default function CalendarScreen() {
   const [currentTimePosition, setCurrentTimePosition] = useState(0);
   const timeGridRef = useRef<View>(null);
   const [timeGridWidth, setTimeGridWidth] = useState(0);
+  const [allDayHeight, setAllDayHeight] = useState(0);
   
   // Modal states
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
