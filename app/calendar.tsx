@@ -32,7 +32,7 @@ interface CalendarEvent {
 }
 
 export default function CalendarScreen() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(ymdLocal());
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -76,38 +76,34 @@ export default function CalendarScreen() {
 
   // Auto-scroll to current time when viewing today in daily mode
   useEffect(() => {
-    if (viewMode === 'daily' && 
-        selectedDate === ymdLocal() && 
-        hoursScrollRef.current &&
-        hoursViewportH > 0 &&
-        !hasScrolledToNow) {
-      
-      // Calculate proper centering offset
-      const HOUR_HEIGHT = 90; // 60 minutes * 1.5 pixels per minute
-      const contentHeight = 24 * HOUR_HEIGHT; // Total content height
-      const viewportCenter = hoursViewportH / 2;
-      
-      // Target position: current time position minus half viewport height
-      let targetOffset = currentTimePosition - viewportCenter;
-      
-      // Clamp to valid scroll bounds
-      const maxOffset = Math.max(0, contentHeight - hoursViewportH);
-      targetOffset = Math.max(0, Math.min(targetOffset, maxOffset));
-      
-      setTimeout(() => {
-        hoursScrollRef.current?.scrollTo({ 
-          y: targetOffset, 
-          animated: true 
-        });
+    const isDaily = viewMode === 'daily';
+    const isToday = selectedDate === ymdLocal();
+
+    if (!isDaily || !isToday || hasScrolledToNow) return;
+    if (!hoursScrollRef.current || hoursViewportH <= 0) return;
+
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const currentTimeY = minutes * MINUTE_HEIGHT;
+    const contentH = 24 * 60 * MINUTE_HEIGHT;
+
+    let targetY = currentTimeY - hoursViewportH / 2;
+    if (targetY < 0) targetY = 0;
+    if (targetY > contentH - hoursViewportH) targetY = Math.max(0, contentH - hoursViewportH);
+
+    const cancel = InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        hoursScrollRef.current?.scrollTo({ y: targetY, animated: false });
         setHasScrolledToNow(true);
-      }, 200); // Allow time for layout measurements
-    }
-    
-    // Reset scroll flag when changing views or dates
-    if (viewMode !== 'daily' || selectedDate !== ymdLocal()) {
-      setHasScrolledToNow(false);
-    }
-  }, [viewMode, selectedDate, currentTimePosition, hoursViewportH, hasScrolledToNow]);
+      });
+    });
+
+    return () => cancel && (cancel as any).done === false && (cancel as any).cancel?.();
+  }, [viewMode, selectedDate, hoursViewportH, hasScrolledToNow]);
+
+  useEffect(() => {
+    setHasScrolledToNow(false);
+  }, [viewMode, selectedDate]);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -489,7 +485,7 @@ export default function CalendarScreen() {
     }
     
     setCurrentDate(newDate);
-    setSelectedDate(newDate.toISOString().split('T')[0]);
+    setSelectedDate(ymdLocal(newDate));
   };
 
   const renderDailyView = () => {
@@ -497,7 +493,6 @@ export default function CalendarScreen() {
     const dayTasks = tasks.filter(task => task.due_date === selectedDate);
     
     // Constants for time grid layout
-    const MINUTE_HEIGHT = 1.5; // pixels per minute
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT; // 90 pixels per hour
     const COLUMN_GUTTER = 4; // pixels between columns
     
@@ -523,7 +518,7 @@ export default function CalendarScreen() {
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
-      <View style={styles.dailyView}>
+      <View style={styles.dailyViewContainer}>
         <View style={styles.dailyHeader}>
           <TouchableOpacity onPress={() => navigateDate('prev')}>
             <ChevronLeft size={24} color="#0078d4" />
@@ -536,7 +531,7 @@ export default function CalendarScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.dailyContent}>
+        <View style={styles.dailyContent}>
           {/* All-day events and tasks without specific times */}
           {allDayItems.length > 0 && (
             <View 
@@ -563,12 +558,9 @@ export default function CalendarScreen() {
           {/* Time grid with hour slots */}
           <ScrollView
             ref={hoursScrollRef}
+            onLayout={(e) => setHoursViewportH(e.nativeEvent.layout.height)}
             style={styles.hoursScrollView}
             showsVerticalScrollIndicator={true}
-            onLayout={(event) => {
-              const { height } = event.nativeEvent.layout;
-              setHoursViewportH(height);
-            }}
           >
             <View 
               ref={timeGridRef}
@@ -643,7 +635,7 @@ export default function CalendarScreen() {
               )}
             </View>
           </ScrollView>
-        </ScrollView>
+        </View>
       </View>
     );
   };
@@ -827,14 +819,10 @@ export default function CalendarScreen() {
   };
 
   const renderContent = () => {
-    switch (viewMode) {
-      case 'daily':
-        return renderDailyView();
-      case 'weekly':
-        return renderWeeklyView();
-      case 'monthly':
-      default:
-        return renderMonthlyView();
+    if (viewMode === 'weekly') {
+      return renderWeeklyView();
+    } else {
+      return renderMonthlyView();
     }
   };
 
@@ -863,15 +851,27 @@ export default function CalendarScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.scrollViewBase} contentContainerStyle={styles.content}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading calendar...</Text>
-          </View>
-        ) : (
-          renderContent()
-        )}
-      </ScrollView>
+      {viewMode === 'daily' ? (
+        <View style={styles.dailyViewContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading calendar...</Text>
+            </View>
+          ) : (
+            renderDailyView()
+          )}
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollViewBase} contentContainerStyle={styles.content}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading calendar...</Text>
+            </View>
+          ) : (
+            renderContent()
+          )}
+        </ScrollView>
+      )}
 
       {/* Modals */}
       <TaskDetailModal
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
   },
   
   // Daily View Styles
-  dailyView: {
+  dailyViewContainer: {
     flex: 1,
     padding: 16,
   },
@@ -1005,7 +1005,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 8,
-    position: 'relative',
   },
   allDaySection: {
     backgroundColor: '#f8fafc',
