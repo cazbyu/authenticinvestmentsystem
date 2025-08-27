@@ -104,6 +104,7 @@ export function AddItemModal({ visible, onClose, onSubmit, type, title }: AddIte
                       </Text>
                     </TouchableOpacity>
                   ))}
+                </View>
               </ScrollView>
             </View>
           </View>
