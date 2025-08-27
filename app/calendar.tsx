@@ -634,7 +634,6 @@ export default function CalendarScreen() {
             </View>
           </ScrollView>
         </ScrollView>
-        </ScrollView>
       </View>
     );
   };
