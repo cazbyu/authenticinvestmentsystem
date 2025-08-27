@@ -107,22 +107,22 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
     celebrationAnim.setValue(0);
     pointsAnim.setValue(0);
     
-    // Enhanced celebration with larger explosion effect
+    // Enhanced celebration with larger explosion effect (2x size)
     Animated.parallel([
       Animated.timing(celebrationAnim, { 
         toValue: 1, 
-        duration: 1200, 
+        duration: 1500, 
         useNativeDriver: true 
       }),
       Animated.sequence([
         Animated.timing(pointsAnim, { 
           toValue: 1, 
-          duration: 600, 
+          duration: 750, 
           useNativeDriver: true 
         }),
         Animated.timing(pointsAnim, { 
           toValue: 0, 
-          duration: 600, 
+          duration: 750, 
           useNativeDriver: true 
         }),
       ]),
@@ -159,7 +159,7 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
       setTimeout(() => {
         onComplete(task.id);
         setIsCompleting(false);
-      }, 1200); // Match celebration duration
+      }, 1500); // Match celebration duration
     });
   };
 
@@ -246,12 +246,63 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
           </View>
           <View style={styles.taskActions}>
             <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-              <Check size={12} color="#0078d4" />
+              <View style={styles.checkmarkContainer}>
+                <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
+                  <Check size={16} color="#16a34a" />
+                </Animated.View>
+                
+                {/* Animated circular outline */}
+                {isCompleting && (
+                  <Svg 
+                    style={styles.circleOverlay} 
+                    width="28" 
+                    height="28" 
+                    viewBox="0 0 28 28"
+                  >
+                    <Circle
+                      cx="14"
+                      cy="14"
+                      r="12"
+                      stroke="#16a34a"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeDasharray="75.4" // 2 * π * 12 ≈ 75.4
+                      strokeDashoffset={circleAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [75.4, 0], // Start fully hidden, end fully visible
+                      })}
+                      strokeLinecap="round"
+                      transform="rotate(-90 14 14)" // Start from top
+                    />
+                  </Svg>
+                )}
+              </View>
             </TouchableOpacity>
             <Text style={styles.scoreText}>+{points}</Text>
           </View>
         </View>
         <Animated.View style={[styles.pointsAnimation, { opacity: pointsAnim, transform: [{ translateY: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) }] }]} pointerEvents="none"><Text style={styles.pointsAnimationText}>+{points}</Text></Animated.View>
+        
+        {/* Enhanced celebration overlay with 2x larger effect */}
+        <Animated.View 
+          style={[
+            styles.celebrationOverlay,
+            {
+              opacity: celebrationAnim,
+              transform: [
+                {
+                  scale: celebrationAnim.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [0.8, 1.4, 1.0], // 2x larger peak scale
+                  })
+                }
+              ]
+            }
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={styles.celebrationText}>🎉✨🎊</Text>
+        </Animated.View>
     </TouchableOpacity>
   );
   });
@@ -372,14 +423,23 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         color: '#0078d4',
       },
       completeButton: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: '#0078d4',
-        backgroundColor: '#ffffff',
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
+        position: 'relative',
+      },
+      checkmarkContainer: {
+        position: 'relative',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      circleOverlay: {
+        position: 'absolute',
+        top: -2,
+        left: -2,
       },
       celebrationOverlay: {
         position: 'absolute',
@@ -389,11 +449,11 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         bottom: 0,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderRadius: 8,
       },
       celebrationText: {
-        fontSize: 24,
+        fontSize: 32,
       },
       pointsAnimation: {
         position: 'absolute',
