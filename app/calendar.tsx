@@ -1,22 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar, Agenda } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars';
 import { Header } from '@/components/Header';
+import { TaskCard, Task } from '@/components/tasks/TaskCard';
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
+import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon } from 'lucide-react-native';
-
-interface Task {
-  id: string;
-  title: string;
-  due_date?: string;
-  start_time?: string;
-  end_time?: string;
-  type: 'task' | 'event';
-  is_all_day?: boolean;
-  roles?: Array<{id: string; label: string; color?: string}>;
-  roleColor?: string;
-}
 
 interface CalendarEvent {
   id: string;
@@ -36,10 +27,85 @@ export default function CalendarScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [authenticScore, setAuthenticScore] = useState(0);
+  
+  // Modal states
+  const [isFormModalVisible, setIsFormModalVisible] = useState(false);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
     fetchTasksAndEvents();
+    calculateAuthenticScore();
   }, []);
+
+  const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
+    let points = 0;
+    if (roles && roles.length > 0) points += roles.length;
+    if (domains && domains.length > 0) points += domains.length;
+    if (task.is_authentic_deposit) points += 2;
+    if (task.is_urgent && task.is_important) points += 1.5;
+    else if (!task.is_urgent && task.is_important) points += 3;
+    else if (task.is_urgent && !task.is_important) points += 1;
+    else points += 0.5;
+    if (task.is_twelve_week_goal) points += 2;
+    return Math.round(points * 10) / 10;
+  };
+
+  const calculateAuthenticScore = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Calculate deposits from completed tasks
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .not('completed_at', 'is', null);
+
+      if (tasksError) throw tasksError;
+
+      let totalDeposits = 0;
+      if (tasksData && tasksData.length > 0) {
+        const taskIds = tasksData.map(t => t.id);
+        const [
+          { data: rolesData },
+          { data: domainsData }
+        ] = await Promise.all([
+          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
+        ]);
+
+        for (const task of tasksData) {
+          const taskWithData = {
+            ...task,
+            roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+            domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+          };
+          totalDeposits += calculateTaskPoints(task, taskWithData.roles, taskWithData.domains);
+        }
+      }
+
+      // Calculate withdrawals
+      const { data: withdrawalsData, error: withdrawalsError } = await supabase
+        .from('0008-ap-withdrawals')
+        .select('amount')
+        .eq('user_id', user.id);
+
+      if (withdrawalsError) throw withdrawalsError;
+
+      const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
+      
+      const balance = totalDeposits - totalWithdrawals;
+      setAuthenticScore(Math.round(balance * 10) / 10);
+    } catch (error) {
+      console.error('Error calculating authentic score:', error);
+    }
+  };
 
   const fetchTasksAndEvents = async () => {
     setLoading(true);
@@ -68,14 +134,29 @@ export default function CalendarScreen() {
 
       const taskIds = tasksData.map(t => t.id);
 
-      // Fetch role information for color coding
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('0008-ap-universal-roles-join')
-        .select('parent_id, role:0008-ap-roles(id, label, color)')
-        .in('parent_id', taskIds)
-        .eq('parent_type', 'task');
+      // Fetch comprehensive task data
+      const [
+        { data: rolesData, error: rolesError },
+        { data: domainsData, error: domainsError },
+        { data: goalsData, error: goalsError },
+        { data: notesData, error: notesError },
+        { data: delegatesData, error: delegatesError },
+        { data: keyRelationshipsData, error: keyRelationshipsError }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', taskIds).eq('parent_type', 'task'),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+        supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+        supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+        supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
+      ]);
 
       if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (goalsError) throw goalsError;
+      if (notesError) throw notesError;
+      if (delegatesError) throw delegatesError;
+      if (keyRelationshipsError) throw keyRelationshipsError;
 
       // Transform tasks with role colors
       const transformedTasks = tasksData.map(task => {
@@ -85,6 +166,12 @@ export default function CalendarScreen() {
         return {
           ...task,
           roles: taskRoles,
+          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+          goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+          keyRelationships: keyRelationshipsData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+          has_notes: notesData?.some(n => n.parent_id === task.id),
+          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+          has_attachments: false,
           roleColor: primaryRole?.color || '#0078d4',
         };
       });
@@ -110,6 +197,68 @@ export default function CalendarScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('0008-ap-tasks')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      fetchTasksAndEvents();
+      calculateAuthenticScore();
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message);
+    }
+  };
+
+  const handleTaskDoublePress = (task: Task) => {
+    setSelectedTask(task);
+    setIsDetailModalVisible(true);
+  };
+
+  const handleUpdateTask = (task: Task) => {
+    setEditingTask(task);
+    setIsDetailModalVisible(false);
+    setTimeout(() => setIsFormModalVisible(true), 100);
+  };
+
+  const handleDelegateTask = (task: Task) => {
+    Alert.alert('Delegate', 'Delegation functionality coming soon!');
+    setIsDetailModalVisible(false);
+  };
+
+  const handleCancelTask = async (task: Task) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { error } = await supabase
+        .from('0008-ap-tasks')
+        .update({ status: 'cancelled' })
+        .eq('id', task.id);
+
+      if (error) throw error;
+      Alert.alert('Success', 'Task has been cancelled');
+      setIsDetailModalVisible(false);
+      fetchTasksAndEvents();
+      calculateAuthenticScore();
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message);
+    }
+  };
+
+  const handleFormSubmitSuccess = () => {
+    setIsFormModalVisible(false);
+    setEditingTask(null);
+    fetchTasksAndEvents();
+    calculateAuthenticScore();
+  };
+
+  const handleFormClose = () => {
+    setIsFormModalVisible(false);
+    setEditingTask(null);
   };
 
   const formatTime = (timeString: string) => {
@@ -184,6 +333,7 @@ export default function CalendarScreen() {
 
   const renderDailyView = () => {
     const dayEvents = getEventsForDate(selectedDate);
+    const dayTasks = tasks.filter(task => task.due_date === selectedDate);
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
@@ -213,29 +363,25 @@ export default function CalendarScreen() {
               return eventHour === hour;
             });
 
+            const hourTasks = dayTasks.filter(task => {
+              if (task.is_all_day) return hour === 0;
+              if (!task.start_time) return hour === 0;
+              const taskHour = new Date(task.start_time).getHours();
+              return taskHour === hour;
+            });
             return (
               <View key={hour} style={styles.hourSlot}>
                 <Text style={styles.hourLabel}>
                   {hour === 0 ? '12 AM' : hour <= 12 ? `${hour} AM` : `${hour - 12} PM`}
                 </Text>
                 <View style={styles.hourEvents}>
-                  {hourEvents.map(event => (
-                    <View 
-                      key={event.id} 
-                      style={[styles.eventItem, { borderLeftColor: event.color }]}
-                    >
-                      <Text style={styles.eventTitle} numberOfLines={1}>
-                        {event.title}
-                      </Text>
-                      {event.time && !event.isAllDay && (
-                        <Text style={styles.eventTime}>
-                          {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
-                        </Text>
-                      )}
-                      {event.isAllDay && (
-                        <Text style={styles.eventTime}>All day</Text>
-                      )}
-                    </View>
+                  {hourTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onComplete={handleCompleteTask}
+                      onDoublePress={handleTaskDoublePress}
+                    />
                   ))}
                 </View>
               </View>
@@ -324,26 +470,15 @@ export default function CalendarScreen() {
             style={styles.selectedDayEventsScroll}
             contentContainerStyle={styles.selectedDayEvents}
           >
-            {getEventsForDate(selectedDate).map(event => (
-              <View 
-                key={event.id} 
-                style={[styles.eventItem, { borderLeftColor: event.color }]}
-              >
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                {event.time && !event.isAllDay && (
-                  <Text style={styles.eventTime}>
-                    {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
-                  </Text>
-                )}
-                {event.isAllDay && (
-                  <Text style={styles.eventTime}>All day</Text>
-                )}
-                <Text style={styles.eventType}>
-                  {event.type === 'task' ? 'Task' : 'Event'}
-                </Text>
-              </View>
+            {tasks.filter(task => task.due_date === selectedDate).map(task => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onComplete={handleCompleteTask}
+                onDoublePress={handleTaskDoublePress}
+              />
             ))}
-            {getEventsForDate(selectedDate).length === 0 && (
+            {tasks.filter(task => task.due_date === selectedDate).length === 0 && (
               <Text style={styles.noEventsText}>No events for this day</Text>
             )}
           </ScrollView>
@@ -395,36 +530,15 @@ export default function CalendarScreen() {
             style={styles.dayEventsListScroll}
             contentContainerStyle={styles.dayEventsList}
           >
-            {getEventsForDate(selectedDate).map(event => (
-              <View 
-                key={event.id} 
-                style={[styles.eventItem, { borderLeftColor: event.color }]}
-              >
-                <View style={styles.eventHeader}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <View style={[styles.eventTypeBadge, { backgroundColor: event.color }]}>
-                    <Text style={styles.eventTypeBadgeText}>
-                      {event.type === 'task' ? 'Task' : 'Event'}
-                    </Text>
-                  </View>
-                </View>
-                {event.time && !event.isAllDay && (
-                  <View style={styles.eventTimeContainer}>
-                    <Clock size={12} color="#6b7280" />
-                    <Text style={styles.eventTime}>
-                      {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
-                    </Text>
-                  </View>
-                )}
-                {event.isAllDay && (
-                  <View style={styles.eventTimeContainer}>
-                    <CalendarIcon size={12} color="#6b7280" />
-                    <Text style={styles.eventTime}>All day</Text>
-                  </View>
-                )}
-              </View>
+            {tasks.filter(task => task.due_date === selectedDate).map(task => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onComplete={handleCompleteTask}
+                onDoublePress={handleTaskDoublePress}
+              />
             ))}
-            {getEventsForDate(selectedDate).length === 0 && (
+            {tasks.filter(task => task.due_date === selectedDate).length === 0 && (
               <Text style={styles.noEventsText}>No events for this day</Text>
             )}
           </ScrollView>
@@ -447,7 +561,7 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Calendar View" />
+      <Header title="Calendar View" authenticScore={authenticScore} />
       
       {/* View Mode Toggle */}
       <View style={styles.viewToggleContainer}>
@@ -479,6 +593,24 @@ export default function CalendarScreen() {
           renderContent()
         )}
       </ScrollView>
+
+      {/* Modals */}
+      <TaskDetailModal
+        visible={isDetailModalVisible}
+        task={selectedTask}
+        onClose={() => setIsDetailModalVisible(false)}
+        onUpdate={handleUpdateTask}
+        onDelegate={handleDelegateTask}
+        onCancel={handleCancelTask}
+      />
+
+      <TaskEventForm
+        visible={isFormModalVisible}
+        mode={editingTask ? "edit" : "create"}
+        initialData={editingTask || undefined}
+        onSubmitSuccess={handleFormSubmitSuccess}
+        onClose={handleFormClose}
+      />
     </SafeAreaView>
   );
 }
