@@ -216,7 +216,6 @@ export default function CalendarScreen() {
             styles.viewButton,
             currentView === view && styles.activeViewButton
           ]}
-          ]}
           onPress={() => setCurrentView(view)}
         >
           <Text style={[
