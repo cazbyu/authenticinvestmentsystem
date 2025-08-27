@@ -335,8 +335,12 @@ const handleEndDateInputChange = (text: string) => {
   };
 
   const getDurationLabel = (start: string, end: string) => {
+  let diff = timeStringToMinutes(end) - timeStringToMinutes(start);
+  if (diff <= 0) diff += 24 * 60;
+  return formatDuration(diff);
+};
 
-// Recurrence utilities
+// Recurrence utilities (TOP-LEVEL in TaskEventForm scope)
 const getRecurrenceDisplayText = () => {
   let text = recurrenceFrequency;
   if ((recurrenceFrequency === 'Weekly' || recurrenceFrequency === 'Bi-weekly') && selectedRecurrenceDays.length > 0) {
@@ -367,10 +371,7 @@ const constructRecurrenceRule = (): string => {
   }
   return `RRULE:${parts.join(';')}`;
 };
-    let diff = timeStringToMinutes(end) - timeStringToMinutes(start);
-    if (diff <= 0) diff += 24 * 60;
-    return formatDuration(diff);
-  };
+
 
   const handleSubmit = async () => {
     setLoading(true);
