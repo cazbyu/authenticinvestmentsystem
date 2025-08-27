@@ -465,6 +465,7 @@ export default function CalendarScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+      <ScrollView style={styles.scrollViewBase} contentContainerStyle={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading calendar...</Text>
@@ -482,8 +483,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  content: {
+  scrollViewBase: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
   },
   viewToggleContainer: {
     flexDirection: 'row',
