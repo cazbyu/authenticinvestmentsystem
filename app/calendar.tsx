@@ -288,9 +288,7 @@ export default function CalendarScreen() {
           </Text>
         </View>
 
-        <ScrollView 
-          style={styles.dayTasksList}
-        >
+        <ScrollView style={styles.dayTasksList}>
           {dayTasks.length === 0 ? (
             <View style={styles.emptyDay}>
               <CalendarIcon size={48} color="#d1d5db" />
@@ -465,6 +463,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    backgroundColor: '#f8fafc',
+    padding: 16,
+  },
+  dailyContainer: {
+    flex: 1,
+  },
+  dailyContent: {
     padding: 16,
   },
   viewSelector: {
