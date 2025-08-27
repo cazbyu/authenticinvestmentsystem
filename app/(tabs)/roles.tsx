@@ -350,12 +350,14 @@ export default function Roles() {
           { data: domainsData, error: domainsError },
           { data: goalsData, error: goalsError },
           { data: notesData, error: notesError },
-          { data: delegatesData, error: delegatesError }
+          { data: delegatesData, error: delegatesError },
+          { data: keyRelationshipsData, error: keyRelationshipsError }
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
         ]);
 
@@ -364,9 +366,10 @@ export default function Roles() {
         if (goalsError) throw goalsError;
         if (notesError) throw notesError;
         if (delegatesError) throw delegatesError;
+        if (keyRelationshipsError) throw keyRelationshipsError;
 
         // Filter tasks that have the selected key relationship
-        const krTaskIds = delegatesData?.filter(kr => kr.key_relationship?.id === krId).map(kr => kr.parent_id) || [];
+        const krTaskIds = keyRelationshipsData?.filter(kr => kr.key_relationship?.id === krId).map(kr => kr.parent_id) || [];
         const filteredTasks = tasksData.filter(task => krTaskIds.includes(task.id));
 
         const transformedTasks = filteredTasks.map(task => ({
@@ -374,6 +377,7 @@ export default function Roles() {
           roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
           goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+          keyRelationships: keyRelationshipsData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
           has_notes: notesData?.some(n => n.parent_id === task.id),
           has_delegates: delegatesData?.some(d => d.parent_id === task.id),
           has_attachments: false,
