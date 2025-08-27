@@ -295,7 +295,7 @@ export default function CalendarScreen() {
                   {date.getDate()}
                 </Text>
                 
-                <ScrollView style={styles.weekDayEvents}>
+                <View style={styles.weekDayEvents}>
                   {dayEvents.slice(0, 3).map(event => (
                     <View 
                       key={event.id} 
@@ -305,7 +305,7 @@ export default function CalendarScreen() {
                   {dayEvents.length > 3 && (
                     <Text style={styles.moreEventsText}>+{dayEvents.length - 3}</Text>
                   )}
-                </ScrollView>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -320,7 +320,10 @@ export default function CalendarScreen() {
               day: 'numeric' 
             })}
           </Text>
-          <ScrollView style={styles.selectedDayEvents}>
+          <ScrollView 
+            style={styles.selectedDayEventsScroll}
+            contentContainerStyle={styles.selectedDayEvents}
+          >
             {getEventsForDate(selectedDate).map(event => (
               <View 
                 key={event.id} 
@@ -388,7 +391,10 @@ export default function CalendarScreen() {
             })}
           </Text>
           
-          <ScrollView style={styles.dayEventsList}>
+          <ScrollView 
+            style={styles.dayEventsListScroll}
+            contentContainerStyle={styles.dayEventsList}
+          >
             {getEventsForDate(selectedDate).map(event => (
               <View 
                 key={event.id} 
@@ -550,8 +556,11 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 12,
   },
+  dayEventsListScroll: {
+    flex: 1,
+  },
   dayEventsList: {
-    maxHeight: 200,
+    flexGrow: 1,
   },
   
   // Daily View Styles
@@ -658,7 +667,9 @@ const styles = StyleSheet.create({
     color: '#0078d4',
   },
   weekDayEvents: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'flex-start',
     minHeight: 40,
   },
   weekEventDot: {
@@ -676,6 +687,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 8,
     padding: 16,
+    flex: 1,
   },
   selectedDayTitle: {
     fontSize: 16,
@@ -683,8 +695,11 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     marginBottom: 12,
   },
+  selectedDayEventsScroll: {
+    flex: 1,
+  },
   selectedDayEvents: {
-    maxHeight: 200,
+    flexGrow: 1,
   },
   
   // Event Item Styles
