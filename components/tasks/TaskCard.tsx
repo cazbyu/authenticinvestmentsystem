@@ -21,6 +21,7 @@ export interface Task {
   has_notes?: boolean;
   has_attachments?: boolean;
   has_delegates?: boolean;
+  keyRelationships?: Array<{id: string; name: string}>;
 }
 
 // Props for the TaskCard component
