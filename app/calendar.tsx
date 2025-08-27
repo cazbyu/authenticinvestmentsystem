@@ -10,6 +10,9 @@ import { CalendarEventDisplay } from '@/components/calendar/CalendarEventDisplay
 import { getSupabaseClient } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react-native';
 
+// Constants
+const MINUTE_HEIGHT = 1.5;
+
 const ymdLocal = (d = new Date()) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -36,9 +39,10 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
+  const hoursScrollRef = React.useRef<ScrollView>(null);
+  const [hoursViewportH, setHoursViewportH] = useState(0);
+  const [hasScrolledToNow, setHasScrolledToNow] = useState(false);
   const [currentTimePosition, setCurrentTimePosition] = useState(0);
-  const scrollViewRef = React.useRef<ScrollView>(null);
-  const hasScrolledToTime = React.useRef(false);
   const timeGridRef = useRef<View>(null);
   const [timeGridWidth, setTimeGridWidth] = useState(0);
   
@@ -49,8 +53,6 @@ export default function CalendarScreen() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   
   // Layout measurements for proper centering
-  const [allDayHeight, setAllDayHeight] = useState(0);
-  const [hoursScrollViewHeight, setHoursScrollViewHeight] = useState(0);
 
   useEffect(() => {
     fetchTasksAndEvents();
@@ -62,7 +64,7 @@ export default function CalendarScreen() {
       const hours = now.getHours();
       const minutes = now.getMinutes();
       const totalMinutes = hours * 60 + minutes;
-      setCurrentTimePosition(totalMinutes * 1.5); // 1.5 pixels per minute
+      setCurrentTimePosition(totalMinutes * MINUTE_HEIGHT);
     };
 
     updateCurrentTime();
