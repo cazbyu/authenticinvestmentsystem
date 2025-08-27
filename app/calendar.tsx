@@ -121,7 +121,7 @@ export default function CalendarScreen() {
         .eq('user_id', user.id)
         .not('status', 'in', '(completed,cancelled)')
         .in('type', ['task', 'event'])
-        .not('due_date', 'is', null);
+        .or('due_date.not.is.null,start_date.not.is.null');
 
       if (tasksError) throw tasksError;
 
@@ -182,12 +182,12 @@ export default function CalendarScreen() {
       const calendarEvents: CalendarEvent[] = transformedTasks.map(task => ({
         id: task.id,
         title: task.title,
-        date: task.due_date!,
+        date: task.start_date || task.due_date!,
         time: task.start_time ? formatTime(task.start_time) : undefined,
         endTime: task.end_time ? formatTime(task.end_time) : undefined,
         type: task.type as 'task' | 'event',
         color: task.roleColor,
-        isAllDay: task.is_all_day,
+        isAllDay: task.is_all_day || (!task.start_time && !task.end_time),
       }));
 
       setEvents(calendarEvents);
@@ -310,7 +310,15 @@ export default function CalendarScreen() {
   };
 
   const getEventsForDate = (date: string) => {
-    return events.filter(event => event.date === date);
+    return events.filter(event => {
+      // For events with start_date and end_date, check if the date falls within the range
+      const task = tasks.find(t => t.id === event.id);
+      if (task && task.start_date && task.end_date) {
+        return date >= task.start_date && date <= task.end_date;
+      }
+      // For single-day events or tasks, match exact date
+      return event.date === date;
+    });
   };
 
   const getWeekDates = (date: Date) => {
@@ -422,6 +430,12 @@ export default function CalendarScreen() {
             const dateString = date.toISOString().split('T')[0];
             const dayEvents = getEventsForDate(dateString);
             const isToday = dateString === new Date().toISOString().split('T')[0];
+            const dayTasksAndEvents = tasks.filter(task => {
+              if (task.start_date && task.end_date) {
+                return dateString >= task.start_date && dateString <= task.end_date;
+              }
+              return task.due_date === dateString || task.start_date === dateString;
+            });
             const isSelected = dateString === selectedDate;
 
             return (
@@ -447,7 +461,12 @@ export default function CalendarScreen() {
                 ]}>
                   {date.getDate()}
                 </Text>
-                
+                  {dayTasksAndEvents.filter(task => {
+                    if (task.is_all_day) return hour === 0;
+                    if (!task.start_time) return hour === 0;
+                    const taskHour = new Date(task.start_time).getHours();
+                    return taskHour === hour;
+                  }).map(task => (
                 <View style={styles.weekDayEvents}>
                   {dayEvents.slice(0, 3).map(event => (
                     <View 
@@ -473,7 +492,14 @@ export default function CalendarScreen() {
             style={styles.selectedDayEventsScroll}
             contentContainerStyle={styles.selectedDayEvents}
           >
-            {tasks.filter(task => task.due_date === selectedDate).map(task => (
+            {tasks.filter(task => {
+              // For events with start_date and end_date, check if selectedDate falls within range
+              if (task.start_date && task.end_date) {
+                return selectedDate >= task.start_date && selectedDate <= task.end_date;
+              }
+              // For single-day events or tasks, match exact date
+              return task.due_date === selectedDate || task.start_date === selectedDate;
+            }).map(task => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -481,7 +507,12 @@ export default function CalendarScreen() {
                 onDoublePress={handleTaskDoublePress}
               />
             ))}
-            {tasks.filter(task => task.due_date === selectedDate).length === 0 && (
+            {tasks.filter(task => {
+              if (task.start_date && task.end_date) {
+                return selectedDate >= task.start_date && selectedDate <= task.end_date;
+              }
+              return task.due_date === selectedDate || task.start_date === selectedDate;
+            }).length === 0 && (
               <Text style={styles.noEventsText}>No events for this day</Text>
             )}
           </ScrollView>
@@ -529,7 +560,14 @@ export default function CalendarScreen() {
             style={styles.dayEventsListScroll}
             contentContainerStyle={styles.dayEventsList}
           >
-            {tasks.filter(task => task.due_date === selectedDate).map(task => (
+            {tasks.filter(task => {
+              // For events with start_date and end_date, check if selectedDate falls within range
+              if (task.start_date && task.end_date) {
+                return selectedDate >= task.start_date && selectedDate <= task.end_date;
+              }
+              // For single-day events or tasks, match exact date
+              return task.due_date === selectedDate || task.start_date === selectedDate;
+            }).map(task => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -537,7 +575,12 @@ export default function CalendarScreen() {
                 onDoublePress={handleTaskDoublePress}
               />
             ))}
-            {tasks.filter(task => task.due_date === selectedDate).length === 0 && (
+            {tasks.filter(task => {
+              if (task.start_date && task.end_date) {
+                return selectedDate >= task.start_date && selectedDate <= task.end_date;
+              }
+              return task.due_date === selectedDate || task.start_date === selectedDate;
+            }).length === 0 && (
               <Text style={styles.noEventsText}>No events for this day</Text>
             )}
           </ScrollView>
