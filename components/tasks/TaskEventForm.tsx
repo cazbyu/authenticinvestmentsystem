@@ -145,6 +145,55 @@ const toDateString = (date: Date) => {
   const timeOptions = generateTimeOptions();
 
   useEffect(() => {
+    if (initialData) {
+      setFormData({
+        title: initialData.title || '',
+        notes: 
+          (initialData?.type === 'depositIdea' || initialData?.sourceDepositIdeaId)
+            ? ''
+            : (initialData?.notes || ''),
+        amount: initialData?.amount?.toString() || '',
+        withdrawalDate: initialData?.withdrawn_at ? new Date(initialData.withdrawn_at) : new Date(),
+        dueDate: initialData?.due_date ? new Date(initialData.due_date) : new Date(),
+        time: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
+        startTime: initialData?.start_time ? timestampToTimeString(initialData.start_time) : getDefaultTime(),
+        endTime: initialData?.end_time ? timestampToTimeString(initialData.end_time) : getDefaultTime(2),
+        isAnytime: initialData?.is_all_day || false,
+        is_urgent: initialData?.is_urgent || false,
+        is_important: initialData?.is_important || false,
+        is_authentic_deposit: initialData?.is_authentic_deposit || false,
+        is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
+        schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea' | 'withdrawal') || 'task',
+        selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
+        selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
+        selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
+        selectedGoalId: initialData?.goal_12wk_id || null as string | null,
+        selectedGoalIds: initialData?.goals?.map(g => g.id) || [] as string[],
+      });
+    } else {
+      // Reset form for new item
+      setFormData({
+        title: '',
+        notes: '',
+        amount: '',
+        withdrawalDate: new Date(),
+        dueDate: new Date(),
+        time: getDefaultTime(),
+        startTime: getDefaultTime(),
+        endTime: getDefaultTime(2),
+        isAnytime: false,
+        is_urgent: false,
+        is_important: false,
+        is_authentic_deposit: false,
+        is_twelve_week_goal: false,
+        schedulingType: 'task',
+        selectedRoleIds: [] as string[],
+        selectedDomainIds: [] as string[],
+        selectedKeyRelationshipIds: [] as string[],
+        selectedGoalId: null as string | null,
+        selectedGoalIds: [] as string[],
+      });
+    }
     const fetchOptions = async () => {
       try {
         const supabase = getSupabaseClient();
@@ -166,7 +215,7 @@ const toDateString = (date: Date) => {
       }
     };
     fetchOptions();
-  }, []);
+  }, [initialData]);
 
   const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds' | 'selectedGoalIds', id: string) => {
     setFormData(prev => {
