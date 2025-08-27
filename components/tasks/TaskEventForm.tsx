@@ -283,6 +283,13 @@ const onCalendarDayPress = (day: any) => {
   };
 
   const handleDateInputChange = (text: string) => {
+  setDateInputValue(text);
+  const parsedDate = new Date(text);
+  if (!isNaN(parsedDate.getTime())) {
+    const localDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+    setFormData(prev => ({ ...prev, dueDate: parsedDate }));
+  }
+};
 
 const handleEndDateInputChange = (text: string) => {
   setEndDateInputValue(text);
@@ -292,15 +299,6 @@ const handleEndDateInputChange = (text: string) => {
     setFormData(prev => ({ ...prev, eventEndDate: localDate } as any));
   }
 };
-    setDateInputValue(text);
-    const parsedDate = new Date(text);
-    // Only update if the parsed date is valid and use local time
-    if (!isNaN(parsedDate.getTime())) {
-      // Create a new date using local time components to avoid timezone issues
-      const localDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
-      setFormData(prev => ({ ...prev, dueDate: parsedDate }));
-    }
-  };
 
   const handleWithdrawalDateInputChange = (text: string) => {
     setWithdrawalDateInputValue(text);
