@@ -564,7 +564,8 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1, padding: 16 },
+  contentContainer: { flex: 1 },
+  content: { padding: 16 },
   section: { borderRadius: 12, padding: 16, marginBottom: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 16 },
   settingButton: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'transparent' },
