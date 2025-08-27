@@ -999,7 +999,11 @@ if (formData.schedulingType === 'event') {
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Calendar
                   onDayPress={onCalendarDayPress}
-                  markedDates={{ [toDateString(formData.dueDate)]: { selected: true } }}
+                  markedDates={{ [toDateString(
+                    activeCalendarField === 'end'
+                      ? ((formData as any).eventEndDate || formData.dueDate)
+                      : formData.dueDate
+                  )]: { selected: true } }}
                   dayComponent={CustomDayComponent}
                   hideExtraDays={true}
                 />
@@ -1085,6 +1089,7 @@ const weekdayOptions = ['SU','MO','TU','WE','TH','FR','SA'];
 const frequencyOptions = ['Daily','Weekly','Bi-weekly','Monthly','Yearly'];
 
 function RecurrenceSettingsModal({ visible, onClose, onSave, initialSettings }: RecurrenceSettingsModalProps) {
+  const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const [frequency, setFrequency] = useState<string>(initialSettings.frequency || 'Weekly');
   const [selectedDays, setSelectedDays] = useState<string[]>(initialSettings.selectedDays || []);
   const [until, setUntil] = useState<Date | null>(initialSettings.endDate || null);
@@ -1146,7 +1151,7 @@ function RecurrenceSettingsModal({ visible, onClose, onSave, initialSettings }: 
                     const d = new Date(day.year, day.month - 1, day.day);
                     setUntil(d);
                   }}
-                  markedDates={ until ? { [toDateString(until)]: { selected: true } } : {} }
+                  markedDates={ until ? { [toISO(until)]: { selected: true } } : {} }
                 />
               </View>
             )}
