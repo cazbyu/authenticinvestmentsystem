@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Check, FileText, Paperclip, Users } from 'lucide-react-native';
+import Svg, { Circle } from 'react-native-svg';
 
 // Interface for a Task
 export interface Task {
@@ -41,8 +42,11 @@ interface TaskCardProps {
 export const TaskCard = React.forwardRef<View, TaskCardProps>(
   ({ task, onComplete, onLongPress, onDoublePress, isDragging }, ref) => {
     const [lastTap, setLastTap] = useState(0);
-    const celebrationAnim = new Animated.Value(0);
-    const pointsAnim = new Animated.Value(0);
+    const [isCompleting, setIsCompleting] = useState(false);
+    const celebrationAnim = React.useRef(new Animated.Value(0)).current;
+    const pointsAnim = React.useRef(new Animated.Value(0)).current;
+    const circleAnim = React.useRef(new Animated.Value(0)).current;
+    const checkmarkScale = React.useRef(new Animated.Value(1)).current;
 
   // Determines the border color based on task priority
   const getBorderColor = () => {
@@ -99,23 +103,64 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
 
   // Triggers celebration animation on task completion
   const triggerCelebration = () => {
+    // Reset all animations
     celebrationAnim.setValue(0);
     pointsAnim.setValue(0);
+    
+    // Enhanced celebration with larger explosion effect
     Animated.parallel([
-      Animated.timing(celebrationAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      Animated.timing(celebrationAnim, { 
+        toValue: 1, 
+        duration: 1200, 
+        useNativeDriver: true 
+      }),
       Animated.sequence([
-        Animated.timing(pointsAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(pointsAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(pointsAnim, { 
+          toValue: 1, 
+          duration: 600, 
+          useNativeDriver: true 
+        }),
+        Animated.timing(pointsAnim, { 
+          toValue: 0, 
+          duration: 600, 
+          useNativeDriver: true 
+        }),
       ]),
     ]).start();
   };
 
   // Handles the completion of a task
   const handleComplete = () => {
-    triggerCelebration();
-    setTimeout(() => {
-      onComplete(task.id);
-    }, 1000);
+    if (isCompleting) return; // Prevent double-tap
+    
+    setIsCompleting(true);
+    
+    // Reset animations
+    circleAnim.setValue(0);
+    checkmarkScale.setValue(1);
+    
+    // Animate the circular outline (countdown ring)
+    Animated.sequence([
+      // Scale up checkmark slightly when pressed
+      Animated.timing(checkmarkScale, {
+        toValue: 1.1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      // Animate the circle outline
+      Animated.timing(circleAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: false, // Can't use native driver for SVG animations
+      }),
+    ]).start(() => {
+      // After circle completes, trigger celebration and complete task
+      triggerCelebration();
+      setTimeout(() => {
+        onComplete(task.id);
+        setIsCompleting(false);
+      }, 1200); // Match celebration duration
+    });
   };
 
   const points = calculatePoints();
