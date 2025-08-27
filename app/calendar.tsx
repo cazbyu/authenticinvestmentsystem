@@ -31,7 +31,9 @@ export default function CalendarScreen() {
   const [authenticScore, setAuthenticScore] = useState(0);
   const [currentTimePosition, setCurrentTimePosition] = useState(0);
   const scrollViewRef = React.useRef<ScrollView>(null);
-const hasScrolledToTime = React.useRef(false);
+  const hasScrolledToTime = React.useRef(false);
+  const timeGridRef = useRef<View>(null);
+  const [timeGridWidth, setTimeGridWidth] = useState(0);
   
   // Modal states
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
@@ -57,6 +59,31 @@ const hasScrolledToTime = React.useRef(false);
 
     return () => clearInterval(timeInterval);
   }, []);
+
+  // Auto-scroll to current time when viewing today in daily mode
+  useEffect(() => {
+    if (viewMode === 'daily' && 
+        selectedDate === new Date().toISOString().split('T')[0] && 
+        scrollViewRef.current && 
+        !hasScrolledToTime.current) {
+      
+      // Scroll to current time with some offset (2 hours above)
+      const scrollOffset = Math.max(0, currentTimePosition - (2 * 60 * 1.5)); // 2 hours * 60 minutes * 1.5 pixels
+      
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ 
+          y: scrollOffset, 
+          animated: true 
+        });
+        hasScrolledToTime.current = true;
+      }, 500); // Small delay to ensure layout is complete
+    }
+    
+    // Reset scroll flag when changing views or dates
+    if (viewMode !== 'daily' || selectedDate !== new Date().toISOString().split('T')[0]) {
+      hasScrolledToTime.current = false;
+    }
+  }, [viewMode, selectedDate, currentTimePosition]);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -353,6 +380,79 @@ const hasScrolledToTime = React.useRef(false);
     return week;
   };
 
+  // Overlap detection and column assignment algorithm
+  const calculateEventLayout = (events: Task[]) => {
+    if (events.length === 0) return [];
+
+    // Sort events by start time
+    const sortedEvents = [...events].sort((a, b) => {
+      const aStart = getTimeInMinutes(a.start_time!);
+      const bStart = getTimeInMinutes(b.start_time!);
+      return aStart - bStart;
+    });
+
+    const eventsWithLayout = sortedEvents.map(event => ({
+      ...event,
+      startMinutes: getTimeInMinutes(event.start_time!),
+      endMinutes: getTimeInMinutes(event.end_time!),
+      column: 0,
+      maxColumns: 1,
+    }));
+
+    // Assign columns using greedy algorithm
+    const columns: number[] = []; // Track end time of last event in each column
+
+    for (const event of eventsWithLayout) {
+      // Find first available column
+      let assignedColumn = -1;
+      for (let i = 0; i < columns.length; i++) {
+        if (columns[i] <= event.startMinutes) {
+          assignedColumn = i;
+          break;
+        }
+      }
+
+      if (assignedColumn === -1) {
+        // Create new column
+        assignedColumn = columns.length;
+        columns.push(event.endMinutes);
+      } else {
+        // Use existing column
+        columns[assignedColumn] = event.endMinutes;
+      }
+
+      event.column = assignedColumn;
+    }
+
+    // Calculate max overlapping columns for each event
+    for (const event of eventsWithLayout) {
+      let maxOverlaps = 1;
+      
+      // Find all events that overlap with this event
+      const overlappingEvents = eventsWithLayout.filter(other => 
+        other !== event &&
+        other.startMinutes < event.endMinutes &&
+        other.endMinutes > event.startMinutes
+      );
+
+      // Include the current event in the count
+      const allOverlappingEvents = [event, ...overlappingEvents];
+      
+      // Find the maximum column number among overlapping events + 1
+      maxOverlaps = Math.max(...allOverlappingEvents.map(e => e.column)) + 1;
+      
+      event.maxColumns = maxOverlaps;
+    }
+
+    return eventsWithLayout;
+  };
+
+  // Helper function to convert time string to minutes from midnight
+  const getTimeInMinutes = (timeString: string) => {
+    const date = new Date(timeString);
+    return date.getHours() * 60 + date.getMinutes();
+  };
+
   const navigateDate = (direction: 'prev' | 'next') => {
     const newDate = new Date(currentDate);
     
@@ -372,15 +472,10 @@ const hasScrolledToTime = React.useRef(false);
     const dayEvents = getEventsForDate(selectedDate);
     const dayTasks = tasks.filter(task => task.due_date === selectedDate);
     
-    // Helper function to convert time string to minutes from midnight
-    const getTimeInMinutes = (timeString: string) => {
-      const date = new Date(timeString);
-      return date.getHours() * 60 + date.getMinutes();
-    };
-    
     // Constants for time grid layout
     const MINUTE_HEIGHT = 1.5; // pixels per minute
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT; // 90 pixels per hour
+    const COLUMN_GUTTER = 4; // pixels between columns
     
     // Get events with specific times for absolute positioning
     const timedEvents = tasks.filter(task => {
@@ -389,6 +484,9 @@ const hasScrolledToTime = React.useRef(false);
         : task.due_date === selectedDate || task.start_date === selectedDate;
       return isInDateRange && task.start_time && task.end_time;
     });
+    
+    // Calculate layout for overlapping events
+    const eventsWithLayout = calculateEventLayout(timedEvents);
     
     // Get all-day events and tasks without specific times
     const allDayItems = tasks.filter(task => {
@@ -433,7 +531,14 @@ const hasScrolledToTime = React.useRef(false);
           )}
           
           {/* Time grid with hour slots */}
-          <View style={[styles.timeGrid, { height: 24 * HOUR_HEIGHT }]}>
+          <View 
+            ref={timeGridRef}
+            style={[styles.timeGrid, { height: 24 * HOUR_HEIGHT }]}
+            onLayout={(event) => {
+              const { width } = event.nativeEvent.layout;
+              setTimeGridWidth(width - 70); // Subtract hour label width
+            }}
+          >
             {/* Hour markers */}
             {hours.map(hour => (
               <View key={hour} style={[styles.hourSlot, { height: HOUR_HEIGHT }]}>
@@ -445,28 +550,53 @@ const hasScrolledToTime = React.useRef(false);
             ))}
             
             {/* Timed events with absolute positioning */}
-            {timedEvents.map(task => {
-              const startMinutes = getTimeInMinutes(task.start_time!);
-              const endMinutes = getTimeInMinutes(task.end_time!);
-              const top = startMinutes * MINUTE_HEIGHT;
-              const height = Math.max((endMinutes - startMinutes) * MINUTE_HEIGHT, 30); // Minimum 30px height
+            {eventsWithLayout.map(event => {
+              const top = event.startMinutes * MINUTE_HEIGHT;
+              const height = Math.max((event.endMinutes - event.startMinutes) * MINUTE_HEIGHT, 30); // Minimum 30px height
+              
+              // Calculate width and left position for overlapping events
+              const availableWidth = timeGridWidth > 0 ? timeGridWidth - 16 : 200; // Fallback width
+              const columnWidth = (availableWidth - (event.maxColumns - 1) * COLUMN_GUTTER) / event.maxColumns;
+              const leftOffset = event.column * (columnWidth + COLUMN_GUTTER);
               
               return (
                 <CalendarEventDisplay
-                  key={task.id}
-                  task={task}
+                  key={event.id}
+                  task={event}
                   onDoublePress={handleTaskDoublePress}
                   style={{
                     position: 'absolute',
                     top,
                     height,
-                    left: 70, // Account for hour label width
-                    right: 8,
+                    left: 70 + leftOffset, // Account for hour label width + column offset
+                    width: columnWidth,
                     zIndex: 1,
                   }}
                 />
               );
             })}
+            
+            {/* Current time indicator - only show for today */}
+            {selectedDate === new Date().toISOString().split('T')[0] && (
+              <View 
+                style={[
+                  styles.currentTimeLine,
+                  { top: currentTimePosition }
+                ]}
+              >
+                <View style={styles.currentTimeDot} />
+                <View style={styles.currentTimeLineBar} />
+                <View style={styles.currentTimeLabel}>
+                  <Text style={styles.currentTimeLabelText}>
+                    {new Date().toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit', 
+                      hour12: true 
+                    })}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -1045,7 +1175,7 @@ const styles = StyleSheet.create({
   currentTimeLine: {
     position: 'absolute',
     left: 70,
-    right: 8,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 10,
@@ -1064,14 +1194,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   currentTimeLabel: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dc2626',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  currentTimeLabelText: {
     fontSize: 10,
     fontWeight: '600',
     color: '#dc2626',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#dc2626',
   },
 });
