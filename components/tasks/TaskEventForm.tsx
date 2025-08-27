@@ -537,10 +537,7 @@ const toDateString = (date: Date) => {
             </Text>
             <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
         </View>
-        <ScrollView 
-          style={styles.formContentContainer}
-          contentContainerStyle={styles.formContent}
-        >
+        <ScrollView style={styles.formContent}>
             <TextInput style={styles.input} placeholder={getTitlePlaceholder()} value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
 
             <View style={styles.schedulingToggle}>
@@ -892,6 +889,7 @@ const styles = StyleSheet.create({
     formContainer: { flex: 1, backgroundColor: 'white' },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
     modalTitle: { fontSize: 18, fontWeight: '600' },
+    formContentContainer: { flex: 1 },
     formContent: { padding: 16 },
     input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16 },
     field: { marginBottom: 16 },
