@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Rocket, FileText, Paperclip, Users } from 'lucide-react-native';
+import { Check, FileText, Paperclip, Users } from 'lucide-react-native';
 
 // Interface for a Task
 export interface Task {
@@ -201,7 +201,7 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
           </View>
           <View style={styles.taskActions}>
             <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-              <Rocket size={9} color="#0078d4" />
+              <Check size={12} color="#0078d4" />
             </TouchableOpacity>
             <Text style={styles.scoreText}>+{points}</Text>
           </View>
