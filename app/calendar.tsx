@@ -1,45 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Calendar, WeekCalendar } from 'react-native-calendars';
+import { Calendar, Agenda } from 'react-native-calendars';
 import { Header } from '@/components/Header';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Clock, Calendar as CalendarIcon, Users } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon } from 'lucide-react-native';
 
-interface CalendarTask {
+interface Task {
   id: string;
   title: string;
   due_date?: string;
   start_time?: string;
   end_time?: string;
-  is_urgent?: boolean;
-  is_important?: boolean;
-  status?: string;
-  type?: string;
-  is_authentic_deposit?: boolean;
-  is_twelve_week_goal?: boolean;
+  type: 'task' | 'event';
   is_all_day?: boolean;
   roles?: Array<{id: string; label: string; color?: string}>;
-  domains?: Array<{id: string; name: string}>;
-  color?: string; // Primary role color for display
+  roleColor?: string;
 }
 
-type CalendarView = 'month' | 'week' | 'day';
+interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  endTime?: string;
+  type: 'task' | 'event';
+  color: string;
+  isAllDay?: boolean;
+}
 
 export default function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [currentView, setCurrentView] = useState<CalendarView>('month');
-  const [tasks, setTasks] = useState<CalendarTask[]>([]);
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
-  const [markedDates, setMarkedDates] = useState({});
 
   useEffect(() => {
     fetchTasksAndEvents();
   }, []);
-
-  useEffect(() => {
-    prepareMarkedDates();
-  }, [tasks, selectedDate]);
 
   const fetchTasksAndEvents = async () => {
     setLoading(true);
@@ -48,67 +48,62 @@ export default function CalendarScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch all active tasks and events
+      // Fetch tasks and events
       const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
         .select('*')
         .eq('user_id', user.id)
         .not('status', 'in', '(completed,cancelled)')
-        .in('type', ['task', 'event']);
+        .in('type', ['task', 'event'])
+        .not('due_date', 'is', null);
 
       if (tasksError) throw tasksError;
 
       if (!tasksData || tasksData.length === 0) {
         setTasks([]);
+        setEvents([]);
         setLoading(false);
         return;
       }
 
       const taskIds = tasksData.map(t => t.id);
 
-      // Fetch related data including role colors
-      const [
-        { data: rolesData, error: rolesError },
-        { data: domainsData, error: domainsError }
-      ] = await Promise.all([
-        supabase
-          .from('0008-ap-universal-roles-join')
-          .select('parent_id, role:0008-ap-roles(id, label, color)')
-          .in('parent_id', taskIds)
-          .eq('parent_type', 'task'),
-        supabase
-          .from('0008-ap-universal-domains-join')
-          .select('parent_id, domain:0008-ap-domains(id, name)')
-          .in('parent_id', taskIds)
-          .eq('parent_type', 'task')
-      ]);
+      // Fetch role information for color coding
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('0008-ap-universal-roles-join')
+        .select('parent_id, role:0008-ap-roles(id, label, color)')
+        .in('parent_id', taskIds)
+        .eq('parent_type', 'task');
 
       if (rolesError) throw rolesError;
-      if (domainsError) throw domainsError;
 
       // Transform tasks with role colors
-      const transformedTasks: CalendarTask[] = tasksData.map(task => {
+      const transformedTasks = tasksData.map(task => {
         const taskRoles = rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [];
-        const taskDomains = domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [];
+        const primaryRole = taskRoles[0];
         
-        // Use the first role's color as the primary color for the task
-        const primaryColor = taskRoles.length > 0 ? taskRoles[0].color || '#0078d4' : '#0078d4';
-
         return {
           ...task,
           roles: taskRoles,
-          domains: taskDomains,
-          color: primaryColor,
+          roleColor: primaryRole?.color || '#0078d4',
         };
-      }).filter(task => {
-        // Only include tasks with valid due dates to prevent WeekCalendar errors
-        return task.due_date && 
-               typeof task.due_date === 'string' && 
-               task.due_date.trim() !== '' &&
-               !isNaN(new Date(task.due_date).getTime());
       });
 
       setTasks(transformedTasks);
+
+      // Convert to calendar events
+      const calendarEvents: CalendarEvent[] = transformedTasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        date: task.due_date!,
+        time: task.start_time ? formatTime(task.start_time) : undefined,
+        endTime: task.end_time ? formatTime(task.end_time) : undefined,
+        type: task.type as 'task' | 'event',
+        color: task.roleColor,
+        isAllDay: task.is_all_day,
+      }));
+
+      setEvents(calendarEvents);
     } catch (error) {
       console.error('Error fetching tasks and events:', error);
       Alert.alert('Error', (error as Error).message);
@@ -117,71 +112,7 @@ export default function CalendarScreen() {
     }
   };
 
-  const prepareMarkedDates = () => {
-    const marked: any = {};
-
-    // Add selected date
-    marked[selectedDate] = {
-      selected: true,
-      selectedColor: '#0078d4',
-      selectedTextColor: '#ffffff',
-      dots: [],
-    };
-
-    // Add tasks and events
-    tasks.forEach(task => {
-      // Ensure due_date exists and is valid before processing
-      if (task.due_date && typeof task.due_date === 'string') {
-        const taskDate = task.due_date.split('T')[0];
-        if (taskDate && taskDate.length === 10) { // YYYY-MM-DD format
-        // Initialize marked date object if it doesn't exist
-        if (!marked[taskDate]) {
-          marked[taskDate] = {};
-        }
-        
-        if (marked[taskDate]) {
-          // If date already marked, add dots
-          if (!marked[taskDate].dots) {
-            marked[taskDate].dots = [];
-          }
-          marked[taskDate].dots.push({
-            color: task.color || '#0078d4',
-            selectedDotColor: '#ffffff',
-          });
-        } else {
-          // Create new marking
-          marked[taskDate] = {
-            dots: [{
-              color: task.color || '#0078d4',
-              selectedDotColor: '#ffffff',
-            }],
-          };
-        }
-
-        // Preserve selected state if this is the selected date
-        if (taskDate === selectedDate) {
-          marked[taskDate].selected = true;
-          marked[taskDate].selectedColor = '#0078d4';
-          marked[taskDate].selectedTextColor = '#ffffff';
-        }
-        }
-      }
-    });
-
-    setMarkedDates(marked);
-  };
-
-  const onDayPress = (day: any) => {
-    setSelectedDate(day.dateString);
-    setCurrentView('day');
-  };
-
-  const getTasksForDate = (date: string) => {
-    return tasks.filter(task => task.due_date?.split('T')[0] === date);
-  };
-
-  const formatTime = (timeString?: string) => {
-    if (!timeString) return '';
+  const formatTime = (timeString: string) => {
     const date = new Date(timeString);
     return date.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
@@ -190,234 +121,327 @@ export default function CalendarScreen() {
     });
   };
 
-  const formatDateHeader = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getPriorityColor = (task: CalendarTask) => {
-    if (task.is_urgent && task.is_important) return '#ef4444'; // Red
-    if (!task.is_urgent && task.is_important) return '#22c55e'; // Green
-    if (task.is_urgent && !task.is_important) return '#eab308'; // Yellow
-    return '#9ca3af'; // Gray
-  };
-
-  const renderViewSelector = () => (
-    <View style={styles.viewSelector}>
-      {(['month', 'week', 'day'] as CalendarView[]).map((view) => (
-        <TouchableOpacity
-          key={view}
-          style={[
-            styles.viewButton,
-            currentView === view && styles.activeViewButton
-          ]}
-          onPress={() => setCurrentView(view)}
-        >
-          <Text style={[
-            styles.viewButtonText,
-            currentView === view && styles.activeViewButtonText
-          ]}>
-            {view.charAt(0).toUpperCase() + view.slice(1)}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderMonthView = () => (
-    <Calendar
-      onDayPress={onDayPress}
-      markedDates={markedDates}
-      markingType="multi-dot"
-      theme={{
-        backgroundColor: '#ffffff',
-        calendarBackground: '#ffffff',
-        textSectionTitleColor: '#6b7280',
-        selectedDayBackgroundColor: '#0078d4',
-        selectedDayTextColor: '#ffffff',
-        todayTextColor: '#0078d4',
-        dayTextColor: '#1f2937',
-        textDisabledColor: '#d1d5db',
-        arrowColor: '#0078d4',
-        disabledArrowColor: '#d1d5db',
-        monthTextColor: '#0078d4',
-        indicatorColor: '#0078d4',
-        textDayFontWeight: '500',
-        textMonthFontWeight: '600',
-        textDayHeaderFontWeight: '500',
-        textDayFontSize: 16,
-        textMonthFontSize: 18,
-        textDayHeaderFontSize: 14
-      }}
-    />
-  );
-
-  const renderWeekView = () => (
-    <WeekCalendar
-      date={selectedDate}
-      onDayPress={onDayPress}
-      markedDates={markedDates}
-      markingType="multi-dot"
-      theme={{
-        backgroundColor: '#ffffff',
-        calendarBackground: '#ffffff',
-        textSectionTitleColor: '#6b7280',
-        selectedDayBackgroundColor: '#0078d4',
-        selectedDayTextColor: '#ffffff',
-        todayTextColor: '#0078d4',
-        dayTextColor: '#1f2937',
-        textDisabledColor: '#d1d5db',
-        arrowColor: '#0078d4',
-        disabledArrowColor: '#d1d5db',
-        textDayFontWeight: '500',
-        textDayHeaderFontWeight: '500',
-        textDayFontSize: 16,
-        textDayHeaderFontSize: 14
-      }}
-    />
-  );
-
-  const renderDayView = () => {
-    const dayTasks = getTasksForDate(selectedDate);
+  const getMarkedDates = () => {
+    const marked: any = {};
     
+    // Mark selected date
+    marked[selectedDate] = {
+      selected: true,
+      selectedColor: '#0078d4',
+    };
+
+    // Mark dates with events
+    events.forEach(event => {
+      if (marked[event.date]) {
+        marked[event.date] = {
+          ...marked[event.date],
+          marked: true,
+          dotColor: event.color,
+        };
+      } else {
+        marked[event.date] = {
+          marked: true,
+          dotColor: event.color,
+        };
+      }
+    });
+
+    return marked;
+  };
+
+  const getEventsForDate = (date: string) => {
+    return events.filter(event => event.date === date);
+  };
+
+  const getWeekDates = (date: Date) => {
+    const week = [];
+    const startOfWeek = new Date(date);
+    const day = startOfWeek.getDay();
+    startOfWeek.setDate(startOfWeek.getDate() - day);
+
+    for (let i = 0; i < 7; i++) {
+      const weekDate = new Date(startOfWeek);
+      weekDate.setDate(startOfWeek.getDate() + i);
+      week.push(weekDate);
+    }
+    return week;
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    
+    if (viewMode === 'daily') {
+      newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
+    } else if (viewMode === 'weekly') {
+      newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+    } else {
+      newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+    }
+    
+    setCurrentDate(newDate);
+    setSelectedDate(newDate.toISOString().split('T')[0]);
+  };
+
+  const renderDailyView = () => {
+    const dayEvents = getEventsForDate(selectedDate);
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+
     return (
-      <View style={styles.dayView}>
-        <View style={styles.dayHeader}>
-          <Text style={styles.dayHeaderText}>{formatDateHeader(selectedDate)}</Text>
-          <Text style={styles.dayTaskCount}>
-            {dayTasks.length} {dayTasks.length === 1 ? 'item' : 'items'}
+      <View style={styles.dailyView}>
+        <View style={styles.dailyHeader}>
+          <TouchableOpacity onPress={() => navigateDate('prev')}>
+            <ChevronLeft size={24} color="#0078d4" />
+          </TouchableOpacity>
+          <Text style={styles.dailyTitle}>
+            {currentDate.toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
           </Text>
+          <TouchableOpacity onPress={() => navigateDate('next')}>
+            <ChevronRight size={24} color="#0078d4" />
+          </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.dayTasksList}>
-          {dayTasks.length === 0 ? (
-            <View style={styles.emptyDay}>
-              <CalendarIcon size={48} color="#d1d5db" />
-              <Text style={styles.emptyDayText}>No tasks or events scheduled</Text>
-            </View>
-          ) : (
-            dayTasks
-              .sort((a, b) => {
-                // Sort by time: all-day first, then by start time
-                if (a.is_all_day && !b.is_all_day) return -1;
-                if (!a.is_all_day && b.is_all_day) return 1;
-                if (a.is_all_day && b.is_all_day) return 0;
-                
-                const aTime = a.start_time || a.due_date;
-                const bTime = b.start_time || b.due_date;
-                if (!aTime && !bTime) return 0;
-                if (!aTime) return 1;
-                if (!bTime) return -1;
-                
-                return new Date(aTime).getTime() - new Date(bTime).getTime();
-              })
-              .map(task => (
-                <View 
-                  key={task.id} 
-                  style={[
-                    styles.dayTaskItem,
-                    { borderLeftColor: task.color || '#0078d4' }
-                  ]}
-                >
-                  <View style={styles.taskTimeSection}>
-                    {task.is_all_day ? (
-                      <View style={styles.allDayBadge}>
-                        <Text style={styles.allDayText}>All Day</Text>
-                      </View>
-                    ) : task.type === 'event' && task.start_time && task.end_time ? (
-                      <View style={styles.timeRange}>
-                        <Text style={styles.timeText}>{formatTime(task.start_time)}</Text>
-                        <Text style={styles.timeSeparator}>-</Text>
-                        <Text style={styles.timeText}>{formatTime(task.end_time)}</Text>
-                      </View>
-                    ) : task.start_time ? (
-                      <View style={styles.singleTime}>
-                        <Clock size={14} color="#6b7280" />
-                        <Text style={styles.timeText}>{formatTime(task.start_time)}</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.singleTime}>
-                        <Text style={styles.noTimeText}>No time set</Text>
-                      </View>
-                    )}
-                  </View>
+        <ScrollView style={styles.dailyContent}>
+          {hours.map(hour => {
+            const hourEvents = dayEvents.filter(event => {
+              if (event.isAllDay) return hour === 0; // Show all-day events at top
+              if (!event.time) return hour === 0; // Show tasks without time at top
+              const eventHour = new Date(`2000-01-01 ${event.time}`).getHours();
+              return eventHour === hour;
+            });
 
-                  <View style={styles.taskContent}>
-                    <Text style={styles.taskTitle} numberOfLines={2}>
-                      {task.title}
-                    </Text>
-                    
-                    <View style={styles.taskMeta}>
-                      <View style={styles.taskType}>
-                        <Text style={[
-                          styles.taskTypeText,
-                          { color: task.type === 'event' ? '#7c3aed' : '#0078d4' }
-                        ]}>
-                          {task.type?.toUpperCase()}
+            return (
+              <View key={hour} style={styles.hourSlot}>
+                <Text style={styles.hourLabel}>
+                  {hour === 0 ? '12 AM' : hour <= 12 ? `${hour} AM` : `${hour - 12} PM`}
+                </Text>
+                <View style={styles.hourEvents}>
+                  {hourEvents.map(event => (
+                    <View 
+                      key={event.id} 
+                      style={[styles.eventItem, { borderLeftColor: event.color }]}
+                    >
+                      <Text style={styles.eventTitle} numberOfLines={1}>
+                        {event.title}
+                      </Text>
+                      {event.time && !event.isAllDay && (
+                        <Text style={styles.eventTime}>
+                          {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
                         </Text>
-                      </View>
-
-                      {task.roles && task.roles.length > 0 && (
-                        <View style={styles.roleIndicator}>
-                          <Users size={12} color="#6b7280" />
-                          <Text style={styles.roleText}>
-                            {task.roles[0].label}
-                            {task.roles.length > 1 && ` +${task.roles.length - 1}`}
-                          </Text>
-                        </View>
+                      )}
+                      {event.isAllDay && (
+                        <Text style={styles.eventTime}>All day</Text>
                       )}
                     </View>
-
-                    {(task.is_urgent || task.is_important || task.is_authentic_deposit) && (
-                      <View style={styles.taskFlags}>
-                        {task.is_urgent && (
-                          <View style={styles.flagBadge}>
-                            <Text style={styles.flagText}>URGENT</Text>
-                          </View>
-                        )}
-                        {task.is_important && (
-                          <View style={[styles.flagBadge, styles.importantBadge]}>
-                            <Text style={styles.flagText}>IMPORTANT</Text>
-                          </View>
-                        )}
-                        {task.is_authentic_deposit && (
-                          <View style={[styles.flagBadge, styles.authenticBadge]}>
-                            <Text style={styles.flagText}>AUTHENTIC</Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-
-                  <View 
-                    style={[
-                      styles.priorityIndicator,
-                      { backgroundColor: getPriorityColor(task) }
-                    ]}
-                  />
+                  ))}
                 </View>
-              ))
-          )}
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
     );
   };
 
-  const renderCalendarContent = () => {
-    switch (currentView) {
-      case 'month':
-        return renderMonthView();
-      case 'week':
-        return renderWeekView();
-      case 'day':
-        return renderDayView();
+  const renderWeeklyView = () => {
+    const weekDates = getWeekDates(currentDate);
+
+    return (
+      <View style={styles.weeklyView}>
+        <View style={styles.weeklyHeader}>
+          <TouchableOpacity onPress={() => navigateDate('prev')}>
+            <ChevronLeft size={24} color="#0078d4" />
+          </TouchableOpacity>
+          <Text style={styles.weeklyTitle}>
+            {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
+            {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </Text>
+          <TouchableOpacity onPress={() => navigateDate('next')}>
+            <ChevronRight size={24} color="#0078d4" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.weekGrid}>
+          {weekDates.map((date, index) => {
+            const dateString = date.toISOString().split('T')[0];
+            const dayEvents = getEventsForDate(dateString);
+            const isToday = dateString === new Date().toISOString().split('T')[0];
+            const isSelected = dateString === selectedDate;
+
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.weekDay,
+                  isSelected && styles.selectedWeekDay,
+                  isToday && styles.todayWeekDay
+                ]}
+                onPress={() => setSelectedDate(dateString)}
+              >
+                <Text style={[
+                  styles.weekDayLabel,
+                  isSelected && styles.selectedWeekDayLabel
+                ]}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
+                </Text>
+                <Text style={[
+                  styles.weekDayNumber,
+                  isSelected && styles.selectedWeekDayNumber,
+                  isToday && styles.todayWeekDayNumber
+                ]}>
+                  {date.getDate()}
+                </Text>
+                
+                <View style={styles.weekDayEvents}>
+                  {dayEvents.slice(0, 3).map(event => (
+                    <View 
+                      key={event.id} 
+                      style={[styles.weekEventDot, { backgroundColor: event.color }]}
+                    />
+                  ))}
+                  {dayEvents.length > 3 && (
+                    <Text style={styles.moreEventsText}>+{dayEvents.length - 3}</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Selected day details */}
+        <View style={styles.selectedDayDetails}>
+          <Text style={styles.selectedDayTitle}>
+            {new Date(selectedDate).toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </Text>
+          <ScrollView 
+            style={styles.selectedDayEventsScroll}
+            contentContainerStyle={styles.selectedDayEvents}
+          >
+            {getEventsForDate(selectedDate).map(event => (
+              <View 
+                key={event.id} 
+                style={[styles.eventItem, { borderLeftColor: event.color }]}
+              >
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                {event.time && !event.isAllDay && (
+                  <Text style={styles.eventTime}>
+                    {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
+                  </Text>
+                )}
+                {event.isAllDay && (
+                  <Text style={styles.eventTime}>All day</Text>
+                )}
+                <Text style={styles.eventType}>
+                  {event.type === 'task' ? 'Task' : 'Event'}
+                </Text>
+              </View>
+            ))}
+            {getEventsForDate(selectedDate).length === 0 && (
+              <Text style={styles.noEventsText}>No events for this day</Text>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+
+  const renderMonthlyView = () => {
+    return (
+      <View style={styles.monthlyView}>
+        <Calendar
+          onDayPress={(day) => setSelectedDate(day.dateString)}
+          markedDates={getMarkedDates()}
+          theme={{
+            backgroundColor: '#ffffff',
+            calendarBackground: '#ffffff',
+            textSectionTitleColor: '#b6c1cd',
+            selectedDayBackgroundColor: '#0078d4',
+            selectedDayTextColor: '#ffffff',
+            todayTextColor: '#0078d4',
+            dayTextColor: '#2d4150',
+            textDisabledColor: '#d9e1e8',
+            dotColor: '#00adf5',
+            selectedDotColor: '#ffffff',
+            arrowColor: '#0078d4',
+            disabledArrowColor: '#d9e1e8',
+            monthTextColor: '#0078d4',
+            indicatorColor: '#0078d4',
+            textDayFontWeight: '300',
+            textMonthFontWeight: 'bold',
+            textDayHeaderFontWeight: '300',
+            textDayFontSize: 16,
+            textMonthFontSize: 16,
+            textDayHeaderFontSize: 13
+          }}
+        />
+        
+        <View style={styles.selectedDateContainer}>
+          <Text style={styles.selectedDateLabel}>
+            {new Date(selectedDate).toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </Text>
+          
+          <ScrollView 
+            style={styles.dayEventsListScroll}
+            contentContainerStyle={styles.dayEventsList}
+          >
+            {getEventsForDate(selectedDate).map(event => (
+              <View 
+                key={event.id} 
+                style={[styles.eventItem, { borderLeftColor: event.color }]}
+              >
+                <View style={styles.eventHeader}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  <View style={[styles.eventTypeBadge, { backgroundColor: event.color }]}>
+                    <Text style={styles.eventTypeBadgeText}>
+                      {event.type === 'task' ? 'Task' : 'Event'}
+                    </Text>
+                  </View>
+                </View>
+                {event.time && !event.isAllDay && (
+                  <View style={styles.eventTimeContainer}>
+                    <Clock size={12} color="#6b7280" />
+                    <Text style={styles.eventTime}>
+                      {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
+                    </Text>
+                  </View>
+                )}
+                {event.isAllDay && (
+                  <View style={styles.eventTimeContainer}>
+                    <CalendarIcon size={12} color="#6b7280" />
+                    <Text style={styles.eventTime}>All day</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+            {getEventsForDate(selectedDate).length === 0 && (
+              <Text style={styles.noEventsText}>No events for this day</Text>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    );
+  };
+
+  const renderContent = () => {
+    switch (viewMode) {
+      case 'daily':
+        return renderDailyView();
+      case 'weekly':
+        return renderWeeklyView();
+      case 'monthly':
       default:
-        return renderMonthView();
+        return renderMonthlyView();
     }
   };
 
@@ -425,39 +449,36 @@ export default function CalendarScreen() {
     <SafeAreaView style={styles.container}>
       <Header title="Calendar View" />
       
-      <View style={styles.content}>
-        {renderViewSelector()}
-        
+      {/* View Mode Toggle */}
+      <View style={styles.viewToggleContainer}>
+        {(['daily', 'weekly', 'monthly'] as const).map((mode) => (
+          <TouchableOpacity
+            key={mode}
+            style={[
+              styles.viewToggleButton,
+              viewMode === mode && styles.activeViewToggleButton
+            ]}
+            onPress={() => setViewMode(mode)}
+          >
+            <Text style={[
+              styles.viewToggleText,
+              viewMode === mode && styles.activeViewToggleText
+            ]}>
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <ScrollView style={styles.scrollViewBase} contentContainerStyle={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading calendar...</Text>
           </View>
         ) : (
-          <View style={styles.calendarContainer}>
-            {renderCalendarContent()}
-          </View>
+          renderContent()
         )}
-
-        {currentView !== 'day' && (
-          <View style={styles.selectedDateContainer}>
-            <Text style={styles.selectedDateLabel}>Selected Date:</Text>
-            <Text style={styles.selectedDateText}>
-              {new Date(selectedDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-            </Text>
-            <TouchableOpacity 
-              style={styles.viewDayButton}
-              onPress={() => setCurrentView('day')}
-            >
-              <Text style={styles.viewDayButtonText}>View Day Details</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -467,64 +488,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  scrollViewBase: {
+    flex: 1,
+  },
   content: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    padding: 16,
+    flexGrow: 1,
   },
-  dailyContainer: {
-    flex: 1,
-  },
-  dailyContent: {
-    padding: 16,
-  },
-  viewSelector: {
+  viewToggleContainer: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginVertical: 8,
     borderRadius: 8,
     padding: 4,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
-  viewButton: {
+  viewToggleButton: {
     flex: 1,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 6,
     alignItems: 'center',
   },
-  activeViewButton: {
+  activeViewToggleButton: {
     backgroundColor: '#0078d4',
   },
-  viewButtonText: {
+  viewToggleText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#6b7280',
   },
-  activeViewButtonText: {
+  activeViewToggleText: {
     color: '#ffffff',
-    fontWeight: '600',
   },
-  calendarContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#6b7280',
+    fontSize: 16,
+  },
+  
+  // Monthly View Styles
+  monthlyView: {
+    flex: 1,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   selectedDateContainer: {
     backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 8,
-    alignItems: 'center',
+    marginTop: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -532,192 +551,208 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   selectedDateLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  selectedDateText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 12,
-  },
-  viewDayButton: {
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  viewDayButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  loadingText: {
-    color: '#6b7280',
-    fontSize: 16,
-  },
-  dayView: {
-    flex: 1,
-  },
-  dayHeader: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  dayHeaderText: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  dayTaskCount: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  dayTasksList: {
+  dayEventsListScroll: {
     flex: 1,
   },
-  emptyDay: {
+  dayEventsList: {
+    flexGrow: 1,
+  },
+  
+  // Daily View Styles
+  dailyView: {
+    flex: 1,
+    padding: 16,
+  },
+  dailyHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 8,
   },
-  emptyDayText: {
-    fontSize: 16,
-    color: '#9ca3af',
-    marginTop: 12,
-    textAlign: 'center',
+  dailyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
   },
-  dayTaskItem: {
+  dailyContent: {
+    flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 8,
-    borderLeftWidth: 4,
-    marginBottom: 12,
-    padding: 16,
+  },
+  hourSlot: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    position: 'relative',
+    minHeight: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
-  taskTimeSection: {
-    minWidth: 80,
-    marginRight: 16,
-    alignItems: 'flex-start',
-  },
-  allDayBadge: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  allDayText: {
-    fontSize: 10,
-    fontWeight: '600',
+  hourLabel: {
+    width: 60,
+    fontSize: 12,
     color: '#6b7280',
+    textAlign: 'right',
+    paddingRight: 8,
+    paddingTop: 4,
   },
-  timeRange: {
-    alignItems: 'center',
+  hourEvents: {
+    flex: 1,
+    paddingLeft: 8,
+    paddingVertical: 4,
   },
-  singleTime: {
+  
+  // Weekly View Styles
+  weeklyView: {
+    flex: 1,
+    padding: 16,
+  },
+  weeklyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 8,
   },
-  timeText: {
-    fontSize: 12,
+  weeklyTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1f2937',
   },
-  timeSeparator: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginVertical: 2,
+  weekGrid: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 16,
   },
-  noTimeText: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontStyle: 'italic',
-  },
-  taskContent: {
+  weekDay: {
     flex: 1,
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 6,
+    marginHorizontal: 2,
   },
-  taskTitle: {
+  selectedWeekDay: {
+    backgroundColor: '#0078d4',
+  },
+  todayWeekDay: {
+    backgroundColor: '#f0f9ff',
+  },
+  weekDayLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  selectedWeekDayLabel: {
+    color: '#ffffff',
+  },
+  weekDayNumber: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 8,
-    lineHeight: 22,
   },
-  taskMeta: {
-    flexDirection: 'row',
+  selectedWeekDayNumber: {
+    color: '#ffffff',
+  },
+  todayWeekDayNumber: {
+    color: '#0078d4',
+  },
+  weekDayEvents: {
+    flex: 1,
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'flex-start',
+    minHeight: 40,
+  },
+  weekEventDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginBottom: 2,
+  },
+  moreEventsText: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  selectedDayDetails: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 16,
+    flex: 1,
+  },
+  selectedDayTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  selectedDayEventsScroll: {
+    flex: 1,
+  },
+  selectedDayEvents: {
+    flexGrow: 1,
+  },
+  
+  // Event Item Styles
+  eventItem: {
+    backgroundColor: '#f8fafc',
+    borderLeftWidth: 4,
+    borderRadius: 6,
+    padding: 12,
     marginBottom: 8,
   },
-  taskType: {
-    backgroundColor: '#f8fafc',
+  eventHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
+  eventTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  eventTypeBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 10,
   },
-  taskTypeText: {
+  eventTypeBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    color: '#ffffff',
+    fontWeight: '600',
   },
-  roleIndicator: {
+  eventTimeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  roleText: {
+  eventTime: {
     fontSize: 12,
     color: '#6b7280',
+  },
+  eventType: {
+    fontSize: 10,
+    color: '#9ca3af',
     fontWeight: '500',
+    marginTop: 2,
   },
-  taskFlags: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  flagBadge: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  importantBadge: {
-    backgroundColor: '#dcfce7',
-  },
-  authenticBadge: {
-    backgroundColor: '#dbeafe',
-  },
-  flagText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#374151',
-    letterSpacing: 0.5,
-  },
-  priorityIndicator: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  noEventsText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: 20,
   },
 });
