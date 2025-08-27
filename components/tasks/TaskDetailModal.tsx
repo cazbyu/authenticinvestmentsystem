@@ -53,7 +53,24 @@ export function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, 
     }
   };
 
-  const formatDateTime = (dateTime) => dateTime ? new Date(dateTime).toLocaleString() : 'Not set';
+  const formatDateTime = (dateTime, isDateOnly = false) => {
+    if (!dateTime) return 'Not set';
+    
+    if (isDateOnly) {
+      // For date-only strings (YYYY-MM-DD), parse as local date to avoid timezone shifts
+      const [year, month, day] = dateTime.split('T')[0].split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      return localDate.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } else {
+      // For datetime strings with timezone info, use normal parsing
+      return new Date(dateTime).toLocaleString();
+    }
+  };
 
   if (!task) return null;
   
@@ -70,7 +87,7 @@ export function TaskDetailModal({ visible, task, onClose, onUpdate, onDelegate, 
           <Text style={styles.detailTaskTitle}>{task.title}</Text>
           <View style={styles.detailSection}>
             <Text style={styles.detailLabel}>Due Date:</Text>
-            <Text style={styles.detailValue}>{formatDateTime(task.due_date)}</Text>
+            <Text style={styles.detailValue}>{formatDateTime(task.due_date, true)}</Text>
           </View>
           {task.start_time && (
             <View style={styles.detailSection}>
