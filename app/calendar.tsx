@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, FlatList, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, FlatList, Modal, useRef } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { Header } from '@/components/Header';
@@ -29,6 +29,9 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
+  const [currentTimePosition, setCurrentTimePosition] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const hasScrolledToTime = useRef(false);
   
   // Modal states
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
@@ -39,6 +42,20 @@ export default function CalendarScreen() {
   useEffect(() => {
     fetchTasksAndEvents();
     calculateAuthenticScore();
+    
+    // Set up current time tracking
+    const updateCurrentTime = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const totalMinutes = hours * 60 + minutes;
+      setCurrentTimePosition(totalMinutes * 1.5); // 1.5 pixels per minute
+    };
+
+    updateCurrentTime();
+    const timeInterval = setInterval(updateCurrentTime, 60000); // Update every minute
+
+    return () => clearInterval(timeInterval);
   }, []);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
