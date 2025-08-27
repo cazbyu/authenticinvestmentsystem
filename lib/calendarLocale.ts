@@ -12,7 +12,7 @@ LocaleConfig.locales['en-short'] = {
   dayNames: [
     'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
   ],
-  dayNamesShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+  dayNamesShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 };
 
 LocaleConfig.defaultLocale = 'en-short';
