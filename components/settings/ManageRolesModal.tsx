@@ -18,6 +18,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 interface ManageRolesModalProps {
   visible: boolean;
   onClose: () => void;
+  onUpdate?: () => void;
 }
 interface PresetRole {
   id: string;
@@ -157,6 +158,9 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         setUserRoles(prev => prev.map(role =>
           role.id === tempRole.id ? data : role
         ));
+        
+        // Notify parent component of the update
+        onUpdate?.();
       } catch (error) {
         console.error('Error adding custom role:', error);
         Alert.alert('Error', 'Failed to add custom role');
@@ -194,6 +198,9 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
             .eq('id', existingUserRole.id);
 
           if (error) throw error;
+          
+          // Notify parent component of the update
+          onUpdate?.();
         } catch (error) {
           console.error('Error updating preset role:', error);
           Alert.alert('Error', 'Failed to update role');
@@ -236,6 +243,9 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
           setUserRoles(prev => prev.map(role =>
             role.id === tempRole.id ? data : role
           ));
+          
+          // Notify parent component of the update
+          onUpdate?.();
         } catch (error) {
           console.error('Error creating preset role:', error);
           Alert.alert('Error', 'Failed to activate role');
