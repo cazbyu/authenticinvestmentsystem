@@ -77,36 +77,36 @@ export default function CalendarScreen() {
   useEffect(() => {
     if (viewMode === 'daily' && 
         selectedDate === ymdLocal() && 
-        scrollViewRef.current &&
-        hoursScrollViewHeight > 0 &&
-        !hasScrolledToTime.current) {
+        hoursScrollRef.current &&
+        hoursViewportH > 0 &&
+        !hasScrolledToNow) {
       
       // Calculate proper centering offset
       const HOUR_HEIGHT = 90; // 60 minutes * 1.5 pixels per minute
       const contentHeight = 24 * HOUR_HEIGHT; // Total content height
-      const viewportCenter = hoursScrollViewHeight / 2;
+      const viewportCenter = hoursViewportH / 2;
       
       // Target position: current time position minus half viewport height
       let targetOffset = currentTimePosition - viewportCenter;
       
       // Clamp to valid scroll bounds
-      const maxOffset = Math.max(0, contentHeight - hoursScrollViewHeight);
+      const maxOffset = Math.max(0, contentHeight - hoursViewportH);
       targetOffset = Math.max(0, Math.min(targetOffset, maxOffset));
       
       setTimeout(() => {
-        scrollViewRef.current?.scrollTo({ 
+        hoursScrollRef.current?.scrollTo({ 
           y: targetOffset, 
           animated: true 
         });
-        hasScrolledToTime.current = true;
+        setHasScrolledToNow(true);
       }, 200); // Allow time for layout measurements
     }
     
     // Reset scroll flag when changing views or dates
     if (viewMode !== 'daily' || selectedDate !== ymdLocal()) {
-      hasScrolledToTime.current = false;
+      setHasScrolledToNow(false);
     }
-  }, [viewMode, selectedDate, currentTimePosition, hoursScrollViewHeight]);
+  }, [viewMode, selectedDate, currentTimePosition, hoursViewportH, hasScrolledToNow]);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
