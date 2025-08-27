@@ -468,6 +468,10 @@ export default function CalendarScreen() {
         <View style={styles.selectedDayDetails}>
           <Text style={styles.selectedDayTitle}>
             {formatDateForDisplay(selectedDate)}
+          </Text>
+          <ScrollView 
+            style={styles.selectedDayEventsScroll}
+            contentContainerStyle={styles.selectedDayEvents}
           >
             {tasks.filter(task => task.due_date === selectedDate).map(task => (
               <TaskCard
