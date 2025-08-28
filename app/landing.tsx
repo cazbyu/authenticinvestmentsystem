@@ -2,20 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { 
-  TrendingUp, 
-  Target, 
-  Users, 
-  Mail, 
-  ArrowRight, 
-  CheckCircle, 
-  Brain,
-  Heart,
-  Zap,
-  Shield,
-  Star,
-  Award
-} from 'lucide-react-native';
+import { TrendingUp, Target, Users, Mail, ArrowRight, CircleCheck as CheckCircle, Brain, Heart, Zap, Shield, Star, Award } from 'lucide-react-native';
 
 type TabType = 'home' | 'about' | 'products' | 'contact';
 
