@@ -834,7 +834,7 @@ const anytimeTasks = tasks.filter(t =>
   (t.due_date === dateString) &&
   (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time))
 );
-const expandedTasks = [...expandedEvents, ...anytimeTasks];
+const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
 
 const dayEvents = expandedTasks.map(task => ({
 
