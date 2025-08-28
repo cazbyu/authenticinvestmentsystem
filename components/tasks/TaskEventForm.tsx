@@ -180,10 +180,21 @@ const [activeCalendarField, setActiveCalendarField] = useState<'start' | 'end'>(
 
   const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [withdrawalDatePickerPosition, setWithdrawalDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  }
+}, [initialData, mode, scope]);
 
-
+// Auto-scroll time picker to current value when opened
 useEffect(() => {
+  if (!showTimePicker || !activeTimeField) return;
+  const currentValue = (formData as any)[activeTimeField] as string | undefined;
+  if (!currentValue) return;
+  const idx = timeOptions.indexOf(currentValue);
+  if (idx >= 0) {
+    // Wait a tick to ensure FlatList laid out
+    requestAnimationFrame(() => {
+      timeListRef.current?.scrollToIndex({ index: idx, animated: false });
+    });
+  const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   // Initialize end date to match start date by default
   setDateInputValue(formatDateForInput(formData.dueDate));
   const endInit = (formData as any).eventEndDate || formData.dueDate;
@@ -387,18 +398,6 @@ const timeListRef = useRef<FlatList<string>>(null);
 const TIME_ROW_HEIGHT = 44; // px, match your item padding/typography
 
     useEffect(() => {
-  if (!showTimePicker || !activeTimeField) return;
-  const currentValue = (formData as any)[activeTimeField] as string | undefined;
-  if (!currentValue) return;
-  const idx = timeOptions.indexOf(currentValue);
-  if (idx >= 0) {
-    // Wait a tick to ensure FlatList laid out
-    requestAnimationFrame(() => {
-      timeListRef.current?.scrollToIndex({ index: idx, animated: false });
-    });
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [showTimePicker, activeTimeField]);
 
   
 const handleEndDateInputChange = (text: string) => {
