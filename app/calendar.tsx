@@ -16,13 +16,18 @@ import { getVisibleWindow } from '@/lib/recurrenceUtils';
 const MINUTE_HEIGHT = 1.5;
 
 const ymdLocal = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 // Ensure no duplicate instances when merging arrays (e.g., expanded events + "Anytime" tasks)
-const uniqByIdAndDate = <T extends { id: string; start_date?: string; due_date?: string }>(arr: T[]) => {
+const uniqByIdAndDate = <T extends { id: string; start_date?: string; due_date?: string; occurrence_date?: string }>(arr: T[]) => {
   const seen = new Set<string>();
   const out: T[] = [];
   for (const item of arr) {
-    const dateKey = (item as any).occurrence_date || item.start_date || item.due_date || '';
+    const dateKey = (item as any).occurrence_date || (item as any).date || item.start_date || item.due_date || '';
     const k = `${item.id}::${dateKey}`;
     if (!seen.has(k)) {
       seen.add(k);
@@ -30,12 +35,6 @@ const uniqByIdAndDate = <T extends { id: string; start_date?: string; due_date?:
     }
   }
   return out;
-};
-  
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 };
 
 interface CalendarEvent {
