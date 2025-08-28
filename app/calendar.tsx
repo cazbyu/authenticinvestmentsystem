@@ -376,7 +376,6 @@ export default function CalendarScreen() {
     // Mark dates with events (including recurring instances)
     const window = getVisibleWindow('monthly', currentDate);
     const expandedRecurring = expandEventsWithRecurrence(tasks, 'monthly', currentDate);
-// Add all “Anytime” tasks that fall within the visible monthly window
 const { start, end } = getVisibleWindow('monthly', currentDate);
 const anytimeMonthly = tasks.filter(t => {
   const d = t.start_date || t.due_date;
@@ -385,7 +384,7 @@ const anytimeMonthly = tasks.filter(t => {
          (d >= start && d <= end) &&
          (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time));
 });
-const expandedTasks = [...expandedRecurring, ...anytimeMonthly];
+const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly]);
     
     // Count events per date for proper dot display
     const eventCounts: Record<string, { count: number; color: string }> = {};
