@@ -525,7 +525,9 @@ const expandedTasks = [...expandedRecurring, ...anytimeMonthly];
 ({ date, height = 0.5, viewMode }) => {
     // Local ref/height for this embedded grid so it scrolls independently
     const sliceScrollRef = useRef<ScrollView>(null);
-    const [sliceViewportH, setSliceViewportH] = useState(0);
+const [sliceViewportH, setSliceViewportH] = useState(0);
+const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
+
 
     // Constants consistent with main daily grid
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT;
