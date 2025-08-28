@@ -102,7 +102,7 @@ const toDateString = (date: Date) => {
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
     selectedGoalId: initialData?.goal_12wk_id || null as string | null,
     selectedGoalIds: initialData?.goals?.map(g => g.id) || [] as string[],
-  });
+      });
 
   const [roles, setRoles] = useState<Role[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -131,37 +131,6 @@ const [activeCalendarField, setActiveCalendarField] = useState<'start' | 'end'>(
   const [withdrawalDatePickerPosition, setWithdrawalDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
-
-useEffect(() => {
-  // Initialize end date to match start date by default
-  setDateInputValue(formatDateForInput(formData.dueDate));
-  const endInit = (formData as any).eventEndDate || formData.dueDate;
-  setEndDateInputValue(formatDateForInput(endInit));
-  if (!(formData as any).eventEndDate) {
-    setFormData(prev => ({ ...prev, eventEndDate: prev.dueDate } as any));
-  }
-}, []);
-  useEffect(() => {
-  setDateInputValue(formatDateForInput(formData.dueDate));
-
-  // If scheduling an event, ensure end date is never before start date
-  if (formData.schedulingType === 'event') {
-    const end = (formData as any).eventEndDate as Date | undefined;
-    const startStr = toDateString(formData.dueDate);
-    const endStr = end ? toDateString(end) : null;
-
-    if (!endStr || endStr < startStr) {
-      setFormData(prev => ({ ...prev, eventEndDate: prev.dueDate } as any));
-      setEndDateInputValue(formatDateForInput(formData.dueDate));
-    }
-  }
-}, [formData.dueDate, formData.schedulingType]);
-
-
-  useEffect(() => {
-    setWithdrawalDateInputValue(formatDateForInput(formData.withdrawalDate));
-  }, [formData.withdrawalDate]);
-
   const generateTimeOptions = () => {
     const times = [];
     for (let hour = 0; hour < 24; hour++) {
@@ -176,6 +145,9 @@ useEffect(() => {
   };
 
   const timeOptions = generateTimeOptions();
+
+  const timeListRef = useRef<FlatList<string>>(null);
+  const TIME_ROW_HEIGHT = 44; // px, match your item padding/typography
 
   useEffect(() => {
     if (initialData) {
@@ -228,6 +200,7 @@ useEffect(() => {
         selectedGoalIds: [] as string[],
       });
     }
+
     const fetchOptions = async () => {
       try {
         const supabase = getSupabaseClient();
@@ -250,6 +223,51 @@ useEffect(() => {
     };
     fetchOptions();
   }, [initialData]);
+
+// Auto-scroll time picker to current value when opened
+useEffect(() => {
+  if (!showTimePicker || !activeTimeField) return;
+  const currentValue = (formData as any)[activeTimeField] as string | undefined;
+  if (!currentValue) return;
+  const idx = timeOptions.indexOf(currentValue);
+  if (idx >= 0) {
+    // Wait a tick to ensure FlatList laid out
+    requestAnimationFrame(() => {
+      timeListRef.current?.scrollToIndex({ index: idx, animated: false });
+    });
+  }
+}, [showTimePicker, activeTimeField]);
+
+// Initialize end date to match start date by default
+useEffect(() => {
+  setDateInputValue(formatDateForInput(formData.dueDate));
+  const endInit = (formData as any).eventEndDate || formData.dueDate;
+  setEndDateInputValue(formatDateForInput(endInit));
+  if (!(formData as any).eventEndDate) {
+    setFormData(prev => ({ ...prev, eventEndDate: prev.dueDate } as any));
+  }
+}, []);
+
+  useEffect(() => {
+  setDateInputValue(formatDateForInput(formData.dueDate));
+
+  // If scheduling an event, ensure end date is never before start date
+  if (formData.schedulingType === 'event') {
+    const end = (formData as any).eventEndDate as Date | undefined;
+    const startStr = toDateString(formData.dueDate);
+    const endStr = end ? toDateString(end) : null;
+
+    if (!endStr || endStr < startStr) {
+      setFormData(prev => ({ ...prev, eventEndDate: prev.dueDate } as any));
+      setEndDateInputValue(formatDateForInput(formData.dueDate));
+    }
+  }
+}, [formData.dueDate, formData.schedulingType]);
+
+
+  useEffect(() => {
+    setWithdrawalDateInputValue(formatDateForInput(formData.withdrawalDate));
+  }, [formData.withdrawalDate]);
 
   const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds' | 'selectedGoalIds', id: string) => {
     setFormData(prev => {
@@ -332,24 +350,6 @@ const onCalendarDayPress = (day: any) => {
   }
 };
 
-const timeListRef = useRef<FlatList<string>>(null);
-const TIME_ROW_HEIGHT = 44; // px, match your item padding/typography
-
-    useEffect(() => {
-  if (!showTimePicker || !activeTimeField) return;
-  const currentValue = (formData as any)[activeTimeField] as string | undefined;
-  if (!currentValue) return;
-  const idx = timeOptions.indexOf(currentValue);
-  if (idx >= 0) {
-    // Wait a tick to ensure FlatList laid out
-    requestAnimationFrame(() => {
-      timeListRef.current?.scrollToIndex({ index: idx, animated: false });
-    });
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [showTimePicker, activeTimeField]);
-
-  
 const handleEndDateInputChange = (text: string) => {
   setEndDateInputValue(text);
   const parsedDate = new Date(text);
