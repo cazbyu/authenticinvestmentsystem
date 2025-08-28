@@ -102,57 +102,6 @@ const toDateString = (date: Date) => {
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
     selectedGoalId: initialData?.goal_12wk_id || null as string | null,
     selectedGoalIds: initialData?.goals?.map(g => g.id) || [] as string[],
-      });
-    } else {
-      // Reset form for new item
-      setFormData({
-        title: '',
-        notes: '',
-        amount: '',
-        withdrawalDate: new Date(),
-        dueDate: new Date(),
-        time: getDefaultTime(),
-        startTime: getDefaultTime(),
-        endTime: getDefaultTime(2),
-        isAnytime: false,
-        is_urgent: false,
-        is_important: false,
-        is_authentic_deposit: false,
-        is_twelve_week_goal: false,
-        schedulingType: 'task',
-        selectedRoleIds: [] as string[],
-        selectedDomainIds: [] as string[],
-        selectedKeyRelationshipIds: [] as string[],
-        selectedGoalId: null as string | null,
-        selectedGoalIds: [] as string[],
-      });
-    }
-
-    const fetchOptions = async () => {
-      try {
-        const supabase = getSupabaseClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: roleData } = await supabase.from('0008-ap-roles').select('id,label').eq('user_id', user.id).eq('is_active', true);
-        const { data: domainData } = await supabase.from('0008-ap-domains').select('id,name');
-        const { data: krData } = await supabase.from('0008-ap-key-relationships').select('id,name,role_id').eq('user_id', user.id);
-        const { data: goalData } = await supabase.from('0008-ap-goals-12wk').select('id,title').eq('user_id', user.id).eq('status', 'active');
-
-        setRoles(roleData || []);
-        setDomains(domainData || []);
-        setKeyRelationships(krData || []);
-        setTwelveWeekGoals(goalData || []);
-      } catch (error) {
-        console.error('Error fetching options:', error);
-        Alert.alert('Error', (error as Error).message || 'Failed to load options');
-      }
-    };
-    fetchOptions();
-  }, [initialData]);
-
-// --- keep your next hooks below, NOT inside the block above ---
-
   });
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -180,21 +129,10 @@ const [activeCalendarField, setActiveCalendarField] = useState<'start' | 'end'>(
 
   const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [withdrawalDatePickerPosition, setWithdrawalDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  }
-}, [initialData, mode, scope]);
-
-// Auto-scroll time picker to current value when opened
-useEffect(() => {
-  if (!showTimePicker || !activeTimeField) return;
-  const currentValue = (formData as any)[activeTimeField] as string | undefined;
-  if (!currentValue) return;
-  const idx = timeOptions.indexOf(currentValue);
-  if (idx >= 0) {
-    // Wait a tick to ensure FlatList laid out
-    requestAnimationFrame(() => {
-      timeListRef.current?.scrollToIndex({ index: idx, animated: false });
-    });
   const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
+
+useEffect(() => {
   // Initialize end date to match start date by default
   setDateInputValue(formatDateForInput(formData.dueDate));
   const endInit = (formData as any).eventEndDate || formData.dueDate;
@@ -398,6 +336,18 @@ const timeListRef = useRef<FlatList<string>>(null);
 const TIME_ROW_HEIGHT = 44; // px, match your item padding/typography
 
     useEffect(() => {
+  if (!showTimePicker || !activeTimeField) return;
+  const currentValue = (formData as any)[activeTimeField] as string | undefined;
+  if (!currentValue) return;
+  const idx = timeOptions.indexOf(currentValue);
+  if (idx >= 0) {
+    // Wait a tick to ensure FlatList laid out
+    requestAnimationFrame(() => {
+      timeListRef.current?.scrollToIndex({ index: idx, animated: false });
+    });
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [showTimePicker, activeTimeField]);
 
   
 const handleEndDateInputChange = (text: string) => {
