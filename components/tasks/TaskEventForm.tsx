@@ -417,7 +417,7 @@ const handleEndDateInputChange = (text: string) => {
     if (!isNaN(parsedDate.getTime())) {
       // Create a new date using local time components to avoid timezone issues
       const localDate = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
-      setFormData(prev => ({ ...prev, withdrawalDate: parsedDate }));
+      setFormData(prev => ({ ...prev, withdrawalDate: localDate }));
     }
   };
 
