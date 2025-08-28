@@ -808,7 +808,7 @@ const expandedTasks = [...expandedEvents, ...anytimeTasks];
 
         <View style={styles.weekGrid}>
           {weekDates.map((date, index) => {
-            const dateString = date.toISOString().split('T')[0];
+            const dateString = ymdLocal(date);
             const expandedEvents = expandEventsForDate(tasks, dateString);
 const anytimeTasks = tasks.filter(t =>
   (t.type === 'task') &&
