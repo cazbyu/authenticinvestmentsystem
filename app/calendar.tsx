@@ -881,7 +881,7 @@ const dayEvents = expandedTasks.map(task => ({
             {formatDateForDisplay(selectedDate)}
           </Text>
           {/* Bottom half: embedded daily slice for the selected day */}
-          <DailySlice date={selectedDate} height={0.5} />
+          <DailySlice date={selectedDate} height={0.5} viewMode="weekly" />
         </View>
       </View>
     );
@@ -922,7 +922,7 @@ const dayEvents = expandedTasks.map(task => ({
             {formatDateForDisplay(selectedDate)}
           </Text>
           {/* Bottom half: embedded daily slice for the selected date */}
-          <DailySlice date={selectedDate} height={0.5} />
+          <DailySlice date={selectedDate} height={0.5} viewMode="monthly" />
         </View>
       </View>
     );
