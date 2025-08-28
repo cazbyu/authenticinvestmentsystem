@@ -142,8 +142,21 @@ useEffect(() => {
   }
 }, []);
   useEffect(() => {
-    setDateInputValue(formatDateForInput(formData.dueDate));
-  }, [formData.dueDate]);
+  setDateInputValue(formatDateForInput(formData.dueDate));
+
+  // If scheduling an event, ensure end date is never before start date
+  if (formData.schedulingType === 'event') {
+    const end = (formData as any).eventEndDate as Date | undefined;
+    const startStr = toDateString(formData.dueDate);
+    const endStr = end ? toDateString(end) : null;
+
+    if (!endStr || endStr < startStr) {
+      setFormData(prev => ({ ...prev, eventEndDate: prev.dueDate } as any));
+      setEndDateInputValue(formatDateForInput(formData.dueDate));
+    }
+  }
+}, [formData.dueDate, formData.schedulingType]);
+
 
   useEffect(() => {
     setWithdrawalDateInputValue(formatDateForInput(formData.withdrawalDate));
@@ -250,11 +263,25 @@ useEffect(() => {
 const onCalendarDayPress = (day: any) => {
   // Create date using local time components to avoid timezone issues
   const selectedDate = new Date(day.year, day.month - 1, day.day);
+
   if (activeCalendarField === 'end') {
+    // Directly set end date
     setFormData(prev => ({ ...prev, eventEndDate: selectedDate } as any));
     setEndDateInputValue(formatDateForInput(selectedDate));
   } else {
-    setFormData(prev => ({ ...prev, dueDate: selectedDate }));
+    // Set start date
+    setFormData(prev => {
+      const next: any = { ...prev, dueDate: selectedDate };
+      // If event end date is missing or before new start date, sync it
+      if (prev.schedulingType === 'event') {
+        const end = (prev as any).eventEndDate as Date | undefined;
+        if (!end || toDateString(end) < toDateString(selectedDate)) {
+          next.eventEndDate = selectedDate;
+          setEndDateInputValue(formatDateForInput(selectedDate));
+        }
+      }
+      return next;
+    });
     setDateInputValue(formatDateForInput(selectedDate));
   }
   setShowMiniCalendar(false);
