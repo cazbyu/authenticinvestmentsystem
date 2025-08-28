@@ -663,7 +663,7 @@ const anytimeTasks = tasks.filter(t =>
   (t.due_date === selectedDate) &&
   (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time))
 );
-const expandedTasks = [...expandedEvents, ...anytimeTasks];
+const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
     
     // Constants for time grid layout
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT; // 90 pixels per hour
@@ -712,7 +712,7 @@ const expandedTasks = [...expandedEvents, ...anytimeTasks];
               <View style={styles.allDayEvents}>
                 {allDayItems.map(task => (
                   <TaskCard
-                    key={task.id}
+  key={`${task.id}-${task.start_date || task.due_date || selectedDate}`}
                     task={task}
                     onComplete={handleCompleteTask}
                     onDoublePress={handleTaskDoublePress}
@@ -764,7 +764,7 @@ const expandedTasks = [...expandedEvents, ...anytimeTasks];
                 
                 return (
                   <CalendarEventDisplay
-                    key={event.id}
+  key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}`}
                     task={event}
                     onDoublePress={handleTaskDoublePress}
                     style={{
