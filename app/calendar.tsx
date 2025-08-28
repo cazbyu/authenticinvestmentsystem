@@ -254,7 +254,7 @@ export default function CalendarScreen() {
         endTime: task.end_time ? formatTime(task.end_time) : undefined,
         type: task.type as 'task' | 'event',
         color: task.roleColor,
-        isAllDay: task.is_all_day || (!task.start_time && !task.end_time),
+        isAllDay: task.is_all_day || task.is_anytime || (!task.start_time && !task.end_time),
       }));
 
       setEvents(calendarEvents);
@@ -414,7 +414,7 @@ const expandedTasks = [...expandedRecurring, ...anytimeMonthly];
       endTime: task.end_time ? formatTime(task.end_time) : undefined,
       type: task.type as 'task' | 'event',
       color: task.roleColor,
-      isAllDay: task.is_all_day || (!task.start_time && !task.end_time),
+      isAllDay: task.is_all_day || task.is_anytime || (!task.start_time && !task.end_time),
     }));
   };
 
@@ -829,7 +829,7 @@ const dayEvents = expandedTasks.map(task => ({
               endTime: task.end_time ? formatTime(task.end_time) : undefined,
               type: task.type as 'task' | 'event',
               color: task.roleColor,
-              isAllDay: task.is_all_day || (!task.start_time && !task.end_time),
+              isAllDay: task.is_all_day || task.is_anytime || (!task.start_time && !task.end_time),
             }));
             const isToday = dateString === ymdLocal();
             const isSelected = dateString === selectedDate;
