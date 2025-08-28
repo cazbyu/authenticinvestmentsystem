@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
 import { getSupabaseClient } from '@/lib/supabase';
-import { BookOpen, Calendar, Target, Save, Plus, FileText, CheckSquare } from 'lucide-react-native';
+import { BookOpen, Calendar, Target, Save, Plus, FileText, SquareCheck as CheckSquare } from 'lucide-react-native';
 
 interface ReflectionEntry {
   id: string;
