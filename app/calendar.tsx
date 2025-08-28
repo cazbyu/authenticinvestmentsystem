@@ -9,6 +9,8 @@ import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { CalendarEventDisplay } from '@/components/calendar/CalendarEventDisplay';
 import { getSupabaseClient } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react-native';
+import { expandEventsWithRecurrence, expandEventsForDate } from '@/lib/recurrenceUtils';
+import { getVisibleWindow } from '@/lib/recurrenceUtils';
 
 // Constants
 const MINUTE_HEIGHT = 1.5;
@@ -355,18 +357,35 @@ export default function CalendarScreen() {
       selectedColor: '#0078d4',
     };
 
-    // Mark dates with events
-    events.forEach(event => {
-      if (marked[event.date]) {
-        marked[event.date] = {
-          ...marked[event.date],
+    // Mark dates with events (including recurring instances)
+    const window = getVisibleWindow('monthly', currentDate);
+    const expandedTasks = expandEventsWithRecurrence(tasks, 'monthly', currentDate);
+    
+    // Count events per date for proper dot display
+    const eventCounts: Record<string, { count: number; color: string }> = {};
+    
+    expandedTasks.forEach(task => {
+      const taskDate = task.start_date || task.due_date;
+      if (taskDate) {
+        if (!eventCounts[taskDate]) {
+          eventCounts[taskDate] = { count: 0, color: task.roleColor };
+        }
+        eventCounts[taskDate].count++;
+      }
+    });
+    
+    // Apply marks based on event counts
+    Object.entries(eventCounts).forEach(([date, { count, color }]) => {
+      if (marked[date]) {
+        marked[date] = {
+          ...marked[date],
           marked: true,
-          dotColor: event.color,
+          dotColor: color,
         };
       } else {
-        marked[event.date] = {
+        marked[date] = {
           marked: true,
-          dotColor: event.color,
+          dotColor: color,
         };
       }
     });
@@ -375,15 +394,18 @@ export default function CalendarScreen() {
   };
 
   const getEventsForDate = (date: string) => {
-    return events.filter(event => {
-      // For events with start_date and end_date, check if the date falls within the range
-      const task = tasks.find(t => t.id === event.id);
-      if (task && task.start_date && task.end_date) {
-        return date >= task.start_date && date <= task.end_date;
-      }
-      // For single-day events or tasks, match exact date
-      return event.date === date;
-    });
+    // Use the new recurrence expansion for the specific date
+    const expandedEvents = expandEventsForDate(tasks, date);
+    return expandedEvents.map(task => ({
+      id: task.id,
+      title: task.title,
+      date: task.start_date || task.due_date,
+      time: task.start_time ? formatTime(task.start_time) : undefined,
+      endTime: task.end_time ? formatTime(task.end_time) : undefined,
+      type: task.type as 'task' | 'event',
+      color: task.roleColor,
+      isAllDay: task.is_all_day || (!task.start_time && !task.end_time),
+    }));
   };
 
   const getWeekDates = (date: Date) => {
@@ -498,21 +520,18 @@ export default function CalendarScreen() {
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT;
     const COLUMN_GUTTER = 4;
 
+    // Get expanded events for this specific date (includes recurring instances)
+    const expandedTasks = expandEventsForDate(tasks, date);
+    
     // All-day / untimed for the given date
-    const allDayItems = tasks.filter(task => {
-      const inRange = task.start_date && task.end_date
-        ? date >= task.start_date && date <= task.end_date
-        : task.due_date === date || task.start_date === date;
-      return inRange && (!task.start_time || !task.end_time || task.is_all_day);
-    });
+    const allDayItems = expandedTasks.filter(task => 
+      !task.start_time || !task.end_time || task.is_all_day
+    );
 
     // Timed events for absolute positioning
-    const timedEvents = tasks.filter(task => {
-      const inRange = task.start_date && task.end_date
-        ? date >= task.start_date && date <= task.end_date
-        : task.due_date === date || task.start_date === date;
-      return inRange && task.start_time && task.end_time;
-    });
+    const timedEvents = expandedTasks.filter(task => 
+      task.start_time && task.end_time && !task.is_all_day
+    );
 
     const eventsWithLayout = calculateEventLayout(timedEvents);
     const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -607,31 +626,25 @@ export default function CalendarScreen() {
   };
 
   const renderDailyView = () => {
-    const dayEvents = getEventsForDate(selectedDate);
-    const dayTasks = tasks.filter(task => task.due_date === selectedDate);
+    // Get expanded tasks for the selected date (includes recurring instances)
+    const expandedTasks = expandEventsForDate(tasks, selectedDate);
     
     // Constants for time grid layout
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT; // 90 pixels per hour
     const COLUMN_GUTTER = 4; // pixels between columns
     
     // Get events with specific times for absolute positioning
-    const timedEvents = tasks.filter(task => {
-      const isInDateRange = task.start_date && task.end_date 
-        ? selectedDate >= task.start_date && selectedDate <= task.end_date
-        : task.due_date === selectedDate || task.start_date === selectedDate;
-      return isInDateRange && task.start_time && task.end_time;
-    });
+    const timedEvents = expandedTasks.filter(task => 
+      task.start_time && task.end_time && !task.is_all_day
+    );
     
     // Calculate layout for overlapping events
     const eventsWithLayout = calculateEventLayout(timedEvents);
     
     // Get all-day events and tasks without specific times
-    const allDayItems = tasks.filter(task => {
-      const isInDateRange = task.start_date && task.end_date 
-        ? selectedDate >= task.start_date && selectedDate <= task.end_date
-        : task.due_date === selectedDate || task.start_date === selectedDate;
-      return isInDateRange && (!task.start_time || !task.end_time || task.is_all_day);
-    });
+    const allDayItems = expandedTasks.filter(task => 
+      !task.start_time || !task.end_time || task.is_all_day
+    );
 
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
@@ -779,14 +792,18 @@ export default function CalendarScreen() {
         <View style={styles.weekGrid}>
           {weekDates.map((date, index) => {
             const dateString = date.toISOString().split('T')[0];
-            const dayEvents = getEventsForDate(dateString);
+            const expandedTasks = expandEventsForDate(tasks, dateString);
+            const dayEvents = expandedTasks.map(task => ({
+              id: task.id,
+              title: task.title,
+              date: task.start_date || task.due_date,
+              time: task.start_time ? formatTime(task.start_time) : undefined,
+              endTime: task.end_time ? formatTime(task.end_time) : undefined,
+              type: task.type as 'task' | 'event',
+              color: task.roleColor,
+              isAllDay: task.is_all_day || (!task.start_time && !task.end_time),
+            }));
             const isToday = dateString === ymdLocal();
-            const dayTasksAndEvents = tasks.filter(task => {
-              if (task.start_date && task.end_date) {
-                return dateString >= task.start_date && dateString <= task.end_date;
-              }
-              return task.due_date === dateString || task.start_date === dateString;
-            });
             const isSelected = dateString === selectedDate;
 
             return (
