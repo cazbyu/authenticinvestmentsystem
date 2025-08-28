@@ -202,6 +202,22 @@ useEffect(() => {
         selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
         selectedGoalId: initialData?.goal_12wk_id || null as string | null,
         selectedGoalIds: initialData?.goals?.map(g => g.id) || [] as string[],
+
+useEffect(() => {
+  if (!showTimePicker || !activeTimeField) return;
+  const currentValue = (formData as any)[activeTimeField] as string | undefined;
+  if (!currentValue) return;
+  const idx = timeOptions.indexOf(currentValue);
+  if (idx >= 0) {
+    // Wait a tick to ensure FlatList laid out
+    requestAnimationFrame(() => {
+      timeListRef.current?.scrollToIndex({ index: idx, animated: false });
+    });
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [showTimePicker, activeTimeField]);
+
+        
       });
     } else {
       // Reset form for new item
@@ -296,11 +312,24 @@ const onCalendarDayPress = (day: any) => {
   };
 
   const onTimeSelect = (time: string) => {
-    if (activeTimeField) {
-      setFormData(prev => ({ ...prev, [activeTimeField]: time }));
-    }
-    setShowTimePicker(false);
-  };
+  if (activeTimeField) {
+    setFormData(prev => {
+      const next: any = { ...prev, [activeTimeField]: time };
+
+      // If we changed startTime, ensure endTime remains after it (same-day)
+      if (activeTimeField === 'startTime' && !prev.isAnytime) {
+        const startIdx = timeOptions.indexOf(time);
+        const endIdx = timeOptions.indexOf(prev.endTime);
+        if (startIdx >= 0 && endIdx >= 0 && endIdx <= startIdx) {
+          const bump = Math.min(startIdx + 2, timeOptions.length - 1); // +30 minutes (2 slots of 15m)
+          next.endTime = timeOptions[bump];
+        }
+      }
+      return next;
+    });
+  }
+  setShowTimePicker(false);
+};
 
   const formatDateForInput = (date: Date) => {
     // Use local date components to avoid timezone conversion
@@ -318,6 +347,10 @@ const onCalendarDayPress = (day: any) => {
   }
 };
 
+const timeListRef = useRef<FlatList<string>>(null);
+const TIME_ROW_HEIGHT = 44; // px, match your item padding/typography
+
+  
 const handleEndDateInputChange = (text: string) => {
   setEndDateInputValue(text);
   const parsedDate = new Date(text);
@@ -1065,23 +1098,35 @@ if (formData.schedulingType === 'event') {
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
                 <View style={[styles.timePickerPopup, { top: timePickerPosition.y, left: timePickerPosition.x + timePickerPosition.width + 8 }]}>
                     <FlatList
-                        data={timeOptions}
-                        keyExtractor={(item) => item}
-                        renderItem={({ item }) => {
-                            const label = activeTimeField === 'endTime'
-                                ? `${item} (${getDurationLabel(formData.startTime, item)})`
-                                : item;
-                            return (
-                                <TouchableOpacity
-                                    style={styles.timeOptionPopup}
-                                    onPress={() => onTimeSelect(item)}
-                                    activeOpacity={0.1}
-                                >
-                                    <Text style={styles.timeOptionTextPopup}>{label}</Text>
-                                </TouchableOpacity>
-                            );
-                        }}
-                    />
+  ref={timeListRef}
+  data={timeOptions}
+  keyExtractor={(item) => item}
+  getItemLayout={(_, index) => ({
+    length: TIME_ROW_HEIGHT,
+    offset: TIME_ROW_HEIGHT * index,
+    index,
+  })}
+  initialScrollIndex={(() => {
+    const currentValue = activeTimeField ? (formData as any)[activeTimeField] : null;
+    const idx = currentValue ? timeOptions.indexOf(currentValue) : -1;
+    return idx >= 0 ? idx : 0;
+  })()}
+  renderItem={({ item }) => {
+    const label = activeTimeField === 'endTime'
+      ? `${item} (${getDurationLabel(formData.startTime, item)})`
+      : item;
+    return (
+      <TouchableOpacity
+        style={styles.timeOptionPopup}
+        onPress={() => onTimeSelect(item)}
+        activeOpacity={0.1}
+      >
+        <Text style={styles.timeOptionTextPopup}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }}
+/>
+
                 </View>
             </TouchableOpacity>
         </Modal>
