@@ -12,6 +12,8 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
+import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
@@ -26,6 +28,9 @@ export default function Dashboard() {
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
+
+  // 12-Week Goals
+  const { goals: twelveWeekGoals, goalProgress, loading: goalsLoading, refreshGoals } = useGoalProgress();
 
   const fetchData = async () => {
     setLoading(true);
@@ -308,6 +313,7 @@ export default function Dashboard() {
     setIsFormModalVisible(false);
     setEditingTask(null);
     fetchData();
+    refreshGoals();
   };
   const handleFormClose = () => {
     setIsFormModalVisible(false);
@@ -347,6 +353,38 @@ export default function Dashboard() {
     <SafeAreaView style={styles.container}>
       <Header activeView={activeView} onViewChange={setActiveView} onSortPress={() => setIsSortModalVisible(true)} authenticScore={authenticScore} />
       <View style={styles.content}>
+        {/* 12-Week Goals Section */}
+        {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
+          <View style={styles.goalsSection}>
+            <Text style={styles.goalsSectionTitle}>12-Week Goals</Text>
+            <View style={styles.goalsList}>
+              {twelveWeekGoals.map(goal => {
+                const progress = goalProgress[goal.id];
+                if (!progress) return null;
+                
+                return (
+                  <GoalProgressCard
+                    key={goal.id}
+                    goal={goal}
+                    progress={progress}
+                    onAddTask={() => {
+                      setEditingTask({
+                        type: 'task',
+                        selectedGoalIds: [goal.id],
+                        twelveWeekGoalChecked: true,
+                        countsTowardWeeklyProgress: true,
+                        selectedRoleIds: goal.roles?.map(r => r.id) || [],
+                        selectedDomainIds: goal.domains?.map(d => d.id) || [],
+                      } as any);
+                      setIsFormModalVisible(true);
+                    }}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {activeView === 'journal' ? (
           <JournalView
             scope={{ type: 'user' }}
@@ -457,4 +495,26 @@ const styles = StyleSheet.create({
     activeSortOption: { backgroundColor: '#eff6ff' },
     sortOptionText: { fontSize: 14, color: '#374151' },
     activeSortOptionText: { color: '#0078d4', fontWeight: '600' }
+  },
+  goalsSection: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  goalsSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  goalsList: {
+    gap: 12,
+  },
 });

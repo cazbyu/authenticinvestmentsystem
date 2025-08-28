@@ -16,6 +16,8 @@ import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -63,6 +65,16 @@ export default function Roles() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
   const [authenticScore, setAuthenticScore] = useState(0);
+
+  // 12-Week Goals for selected role
+  const { 
+    goals: twelveWeekGoals, 
+    goalProgress, 
+    loading: goalsLoading, 
+    refreshGoals 
+  } = useGoalProgress({
+    scope: selectedRole ? { type: 'role', id: selectedRole.id } : undefined
+  });
 
   const handleJournalEntryPress = (entry: any) => {
     if (entry.source_type === 'task') {
@@ -597,6 +609,7 @@ export default function Roles() {
     if (selectedKR) {
       fetchKRTasks(selectedKR.id, krView);
     }
+    refreshGoals();
   };
 
   const handleFormClose = () => {
@@ -792,6 +805,39 @@ export default function Roles() {
             onBackPress={() => setSelectedRole(null)}
           />
 
+          {/* 12-Week Goals Strip */}
+          {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
+            <View style={styles.goalsStrip}>
+              <Text style={styles.goalsStripTitle}>12-Week Goals</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.goalsStripContent}>
+                  {twelveWeekGoals.map(goal => {
+                    const progress = goalProgress[goal.id];
+                    if (!progress) return null;
+                    
+                    return (
+                      <GoalProgressCard
+                        key={goal.id}
+                        goal={goal}
+                        progress={progress}
+                        compact={true}
+                        onAddTask={() => {
+                          setEditingTask({
+                            type: 'task',
+                            selectedGoalIds: [goal.id],
+                            twelveWeekGoalChecked: true,
+                            countsTowardWeeklyProgress: true,
+                            selectedRoleIds: [selectedRole.id],
+                          } as any);
+                          setTaskFormVisible(true);
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          )}
           <ScrollView style={styles.taskList}>
             {activeView === 'journal' ? (
               <JournalView
@@ -1346,5 +1392,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  goalsStrip: {
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 12,
+  },
+  goalsStripTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
+    paddingHorizontal: 16,
+  },
+  goalsStripContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 12,
   },
 });

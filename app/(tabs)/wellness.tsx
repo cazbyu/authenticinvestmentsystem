@@ -13,6 +13,8 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -40,6 +42,16 @@ export default function Wellness() {
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [authenticScore, setAuthenticScore] = useState(0);
+
+  // 12-Week Goals for selected domain
+  const { 
+    goals: twelveWeekGoals, 
+    goalProgress, 
+    loading: goalsLoading, 
+    refreshGoals 
+  } = useGoalProgress({
+    scope: selectedDomain ? { type: 'domain', id: selectedDomain.id } : undefined
+  });
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -369,6 +381,7 @@ export default function Wellness() {
     if (selectedDomain) {
       fetchDomainTasks(selectedDomain.id, activeView);
     }
+    refreshGoals();
   };
 
   const handleFormClose = () => {
@@ -423,6 +436,36 @@ export default function Wellness() {
             onBackPress={() => setSelectedDomain(null)}
           />
 
+          {/* 12-Week Goals Section */}
+          {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
+            <View style={styles.goalsSection}>
+              <Text style={styles.goalsSectionTitle}>12-Week Goals</Text>
+              <View style={styles.goalsList}>
+                {twelveWeekGoals.map(goal => {
+                  const progress = goalProgress[goal.id];
+                  if (!progress) return null;
+                  
+                  return (
+                    <GoalProgressCard
+                      key={goal.id}
+                      goal={goal}
+                      progress={progress}
+                      onAddTask={() => {
+                        setEditingTask({
+                          type: 'task',
+                          selectedGoalIds: [goal.id],
+                          twelveWeekGoalChecked: true,
+                          countsTowardWeeklyProgress: true,
+                          selectedDomainIds: [selectedDomain.id],
+                        } as any);
+                        setTaskFormVisible(true);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+          )}
           <ScrollView style={styles.taskList}>
             {activeView === 'journal' ? (
               <JournalView
@@ -662,5 +705,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  goalsSection: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  goalsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  goalsList: {
+    gap: 12,
   },
 });
