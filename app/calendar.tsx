@@ -521,7 +521,8 @@ const expandedTasks = [...expandedRecurring, ...anytimeMonthly];
   };
 
   // Mini daily view used inside Weekly/Monthly: tasks/all-day on top, time grid below.
-  const DailySlice: React.FC<{ date: string; height?: number }> = ({ date, height = 0.5 }) => {
+  const DailySlice: React.FC<{ date: string; height?: number; viewMode?: 'daily' | 'weekly' | 'monthly' }> =
+({ date, height = 0.5, viewMode }) => {
     // Local ref/height for this embedded grid so it scrolls independently
     const sliceScrollRef = useRef<ScrollView>(null);
     const [sliceViewportH, setSliceViewportH] = useState(0);
