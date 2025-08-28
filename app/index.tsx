@@ -57,7 +57,7 @@ export default function Index() {
     return <Redirect href="/(tabs)/dashboard" />;
   }
 
-  return <Redirect href="/login" />;
+  return <Redirect href="/landing" />;
 }
 
 const styles = StyleSheet.create({
