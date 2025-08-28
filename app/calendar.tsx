@@ -627,7 +627,14 @@ export default function CalendarScreen() {
 
   const renderDailyView = () => {
     // Get expanded tasks for the selected date (includes recurring instances)
-    const expandedTasks = expandEventsForDate(tasks, selectedDate);
+    // Expand events (recurring) AND include same-day "Anytime" tasks
+const expandedEvents = expandEventsForDate(tasks, selectedDate);
+const anytimeTasks = tasks.filter(t =>
+  (t.type === 'task') &&
+  (t.due_date === selectedDate) &&
+  (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time))
+);
+const expandedTasks = [...expandedEvents, ...anytimeTasks];
     
     // Constants for time grid layout
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT; // 90 pixels per hour
@@ -792,8 +799,16 @@ export default function CalendarScreen() {
         <View style={styles.weekGrid}>
           {weekDates.map((date, index) => {
             const dateString = date.toISOString().split('T')[0];
-            const expandedTasks = expandEventsForDate(tasks, dateString);
-            const dayEvents = expandedTasks.map(task => ({
+            const expandedEvents = expandEventsForDate(tasks, dateString);
+const anytimeTasks = tasks.filter(t =>
+  (t.type === 'task') &&
+  (t.due_date === dateString) &&
+  (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time))
+);
+const expandedTasks = [...expandedEvents, ...anytimeTasks];
+
+const dayEvents = expandedTasks.map(task => ({
+
               id: task.id,
               title: task.title,
               date: task.start_date || task.due_date,
