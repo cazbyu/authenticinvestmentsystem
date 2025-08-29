@@ -34,9 +34,12 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
   const [totalBalance, setTotalBalance] = useState(0);
 
   const calculateTaskPoints = (task: any) => {
+    const roles = task.roles || [];
+    const domains = task.domains || [];
+    
     let points = 0;
-    if (task.roles && task.roles.length > 0) points += task.roles.length;
-    if (task.domains && task.domains.length > 0) points += task.domains.length;
+    if (roles.length > 0) points += roles.length;
+    if (domains.length > 0) points += domains.length;
     if (task.is_authentic_deposit) points += 2;
     if (task.is_urgent && task.is_important) points += 1.5;
     else if (!task.is_urgent && task.is_important) points += 3;
@@ -44,6 +47,23 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
     else points += 0.5;
     if (task.is_twelve_week_goal) points += 2;
     return Math.round(points * 10) / 10;
+  };
+
+  const buildScopeFilter = (tableName: string) => {
+    if (scope.type === 'user' || !scope.id) {
+      return null; // No additional filtering needed
+    }
+
+    switch (scope.type) {
+      case 'role':
+        return `${tableName}_roles!inner(role_id.eq.${scope.id})`;
+      case 'key_relationship':
+        return `${tableName}_key_relationships!inner(key_relationship_id.eq.${scope.id})`;
+      case 'domain':
+        return `${tableName}_domains!inner(domain_id.eq.${scope.id})`;
+      default:
+        return null;
+    }
   };
 
   const fetchJournalEntries = async () => {
@@ -66,88 +86,78 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
 
       const journalEntries: JournalEntry[] = [];
 
-      // Fetch deposits (completed tasks/events)
+      // Fetch deposits (completed tasks/events) with all related data in one query
       if (filter === 'all' || filter === 'deposits') {
         let tasksQuery = supabase
           .from('0008-ap-tasks')
-          .select('*')
+          .select(`
+            *,
+            task_roles:0008-ap-universal-roles-join!inner(
+              role:0008-ap-roles(id, label)
+            ),
+            task_domains:0008-ap-universal-domains-join(
+              domain:0008-ap-domains(id, name)
+            ),
+            task_goals:0008-ap-universal-goals-join(
+              goal:0008-ap-goals-12wk(id, title)
+            ),
+            task_key_relationships:0008-ap-universal-key-relationships-join(
+              key_relationship:0008-ap-key-relationships(id, name)
+            ),
+            task_notes:0008-ap-universal-notes-join(
+              note:0008-ap-notes(id, content, created_at)
+            )
+          `)
           .eq('user_id', user.id)
           .eq('status', 'completed')
-          .not('completed_at', 'is', null);
+          .not('completed_at', 'is', null)
+          .eq('0008-ap-universal-roles-join.parent_type', 'task')
+          .eq('0008-ap-universal-domains-join.parent_type', 'task')
+          .eq('0008-ap-universal-goals-join.parent_type', 'task')
+          .eq('0008-ap-universal-key-relationships-join.parent_type', 'task')
+          .eq('0008-ap-universal-notes-join.parent_type', 'task');
+
+        // Apply scope filtering at database level
+        if (scope.type !== 'user' && scope.id) {
+          switch (scope.type) {
+            case 'role':
+              tasksQuery = tasksQuery.eq('0008-ap-universal-roles-join.role_id', scope.id);
+              break;
+            case 'key_relationship':
+              tasksQuery = tasksQuery.eq('0008-ap-universal-key-relationships-join.key_relationship_id', scope.id);
+              break;
+            case 'domain':
+              tasksQuery = tasksQuery.eq('0008-ap-universal-domains-join.domain_id', scope.id);
+              break;
+          }
+        }
 
         if (dateFilter) {
           tasksQuery = tasksQuery.gte('completed_at', dateFilter);
         }
 
         const { data: tasksData, error: tasksError } = await tasksQuery;
-        if (tasksError) throw tasksError;
+        if (tasksError) {
+          console.error('Tasks query error:', tasksError);
+          // If the complex query fails, fall back to simpler approach
+          await fetchJournalEntriesSimple();
+          return;
+        }
 
-        // Process tasks data even if empty to ensure proper flow
         if (tasksData) {
-          const taskIds = tasksData.map(t => t.id);
-
-          // Only fetch related data if we have tasks
-          let rolesData = [], domainsData = [], goalsData = [], notesData = [], krData = [];
-          
-          if (taskIds.length > 0) {
-            const [
-              { data: rolesResult, error: rolesError },
-              { data: domainsResult, error: domainsError },
-              { data: goalsResult, error: goalsError },
-              { data: notesResult, error: notesError },
-              { data: krResult, error: krError }
-            ] = await Promise.all([
-              supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-              supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
-              supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
-              supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
-              supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
-            ]);
-
-            if (rolesError) throw rolesError;
-            if (domainsError) throw domainsError;
-            if (goalsError) throw goalsError;
-            if (notesError) throw notesError;
-            if (krError) throw krError;
-
-            rolesData = rolesResult || [];
-            domainsData = domainsResult || [];
-            goalsData = goalsResult || [];
-            notesData = notesResult || [];
-            krData = krResult || [];
-          }
-
-          // Apply scope filtering
-          let scopeFilteredTaskIds = taskIds;
-          if (scope.type !== 'user' && scope.id) {
-            switch (scope.type) {
-              case 'role':
-                scopeFilteredTaskIds = rolesData?.filter(r => r.role?.id === scope.id).map(r => r.parent_id) || [];
-                break;
-              case 'key_relationship':
-                scopeFilteredTaskIds = krData?.filter(kr => kr.key_relationship?.id === scope.id).map(kr => kr.parent_id) || [];
-                break;
-              case 'domain':
-                scopeFilteredTaskIds = domainsData?.filter(d => d.domain?.id === scope.id).map(d => d.parent_id) || [];
-                break;
-            }
-          }
-
-          const tasksWithNotes = new Set(notesData?.map(n => n.parent_id) || []);
-
-          // Create deposit entries for scope-filtered tasks
-          const scopedTasks = tasksData.filter(task => scopeFilteredTaskIds.includes(task.id));
-          
-          for (const task of scopedTasks) {
-            // Attach related data to task
+          for (const task of tasksData) {
+            // Transform nested data to flat structure
             const taskWithData = {
               ...task,
-              roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-              domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-              goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+              roles: task.task_roles?.map(tr => tr.role).filter(Boolean) || [],
+              domains: task.task_domains?.map(td => td.domain).filter(Boolean) || [],
+              goals: task.task_goals?.map(tg => tg.goal).filter(Boolean) || [],
+              keyRelationships: task.task_key_relationships?.map(tkr => tkr.key_relationship).filter(Boolean) || [],
             };
 
             const points = calculateTaskPoints(taskWithData);
+            const hasNotes = task.task_notes && task.task_notes.length > 0;
+
             journalEntries.push({
               id: task.id,
               date: task.completed_at?.split('T')[0] || task.due_date,
@@ -155,7 +165,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
               type: 'deposit',
               amount: points,
               balance: 0, // Will be calculated later
-              has_notes: tasksWithNotes.has(task.id),
+              has_notes: hasNotes,
               source_id: task.id,
               source_type: 'task',
               source_data: taskWithData,
@@ -164,80 +174,65 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
         }
       }
 
-      // Fetch withdrawals
+      // Fetch withdrawals with all related data in one query
       if (filter === 'all' || filter === 'withdrawals') {
         let withdrawalsQuery = supabase
           .from('0008-ap-withdrawals')
-          .select('*')
-          .eq('user_id', user.id);
+          .select(`
+            *,
+            withdrawal_roles:0008-ap-universal-roles-join(
+              role:0008-ap-roles(id, label)
+            ),
+            withdrawal_domains:0008-ap-universal-domains-join(
+              domain:0008-ap-domains(id, name)
+            ),
+            withdrawal_key_relationships:0008-ap-universal-key-relationships-join(
+              key_relationship:0008-ap-key-relationships(id, name)
+            ),
+            withdrawal_notes:0008-ap-universal-notes-join(
+              note:0008-ap-notes(id, content, created_at)
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('0008-ap-universal-roles-join.parent_type', 'withdrawal')
+          .eq('0008-ap-universal-domains-join.parent_type', 'withdrawal')
+          .eq('0008-ap-universal-key-relationships-join.parent_type', 'withdrawal')
+          .eq('0008-ap-universal-notes-join.parent_type', 'withdrawal');
+
+        // Apply scope filtering at database level
+        if (scope.type !== 'user' && scope.id) {
+          switch (scope.type) {
+            case 'role':
+              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-roles-join.role_id', scope.id);
+              break;
+            case 'key_relationship':
+              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-key-relationships-join.key_relationship_id', scope.id);
+              break;
+            case 'domain':
+              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-domains-join.domain_id', scope.id);
+              break;
+          }
+        }
 
         if (dateFilter) {
           withdrawalsQuery = withdrawalsQuery.gte('withdrawn_at', dateFilter);
         }
 
         const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
-        if (withdrawalsError) throw withdrawalsError;
-
-        // Process withdrawals data even if empty to ensure proper flow
-        if (withdrawalsData) {
-          const withdrawalIds = withdrawalsData.map(w => w.id);
-
-          // Only fetch related data if we have withdrawals
-          let rolesData = [], domainsData = [], krData = [], notesData = [];
-          
-          if (withdrawalIds.length > 0) {
-            const [
-              { data: rolesResult, error: rolesError },
-              { data: domainsResult, error: domainsError },
-              { data: krResult, error: krError },
-              { data: notesResult, error: notesError }
-            ] = await Promise.all([
-              supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
-              supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
-              supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal'),
-              supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', withdrawalIds).eq('parent_type', 'withdrawal')
-            ]);
-
-            if (rolesError) throw rolesError;
-            if (domainsError) throw domainsError;
-            if (krError) throw krError;
-            if (notesError) throw notesError;
-
-            rolesData = rolesResult || [];
-            domainsData = domainsResult || [];
-            krData = krResult || [];
-            notesData = notesResult || [];
-          }
-
-          // Apply scope filtering
-          let scopeFilteredWithdrawalIds = withdrawalIds;
-          if (scope.type !== 'user' && scope.id) {
-            switch (scope.type) {
-              case 'role':
-                scopeFilteredWithdrawalIds = rolesData?.filter(r => r.role?.id === scope.id).map(r => r.parent_id) || [];
-                break;
-              case 'key_relationship':
-                scopeFilteredWithdrawalIds = krData?.filter(kr => kr.key_relationship?.id === scope.id).map(kr => kr.parent_id) || [];
-                break;
-              case 'domain':
-                scopeFilteredWithdrawalIds = domainsData?.filter(d => d.domain?.id === scope.id).map(d => d.parent_id) || [];
-                break;
-            }
-          }
-
-          const withdrawalsWithNotes = new Set(notesData?.map(n => n.parent_id) || []);
-
-          // Create withdrawal entries for scope-filtered withdrawals
-          const scopedWithdrawals = withdrawalsData.filter(withdrawal => scopeFilteredWithdrawalIds.includes(withdrawal.id));
-          
-          for (const withdrawal of scopedWithdrawals) {
-            // Attach related data to withdrawal
+        if (withdrawalsError) {
+          console.error('Withdrawals query error:', withdrawalsError);
+          // Continue without withdrawals if query fails
+        } else if (withdrawalsData) {
+          for (const withdrawal of withdrawalsData) {
+            // Transform nested data to flat structure
             const withdrawalWithData = {
               ...withdrawal,
-              roles: rolesData?.filter(r => r.parent_id === withdrawal.id).map(r => r.role).filter(Boolean) || [],
-              domains: domainsData?.filter(d => d.parent_id === withdrawal.id).map(d => d.domain).filter(Boolean) || [],
-              keyRelationships: krData?.filter(kr => kr.parent_id === withdrawal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+              roles: withdrawal.withdrawal_roles?.map(wr => wr.role).filter(Boolean) || [],
+              domains: withdrawal.withdrawal_domains?.map(wd => wd.domain).filter(Boolean) || [],
+              keyRelationships: withdrawal.withdrawal_key_relationships?.map(wkr => wkr.key_relationship).filter(Boolean) || [],
             };
+
+            const hasNotes = withdrawal.withdrawal_notes && withdrawal.withdrawal_notes.length > 0;
 
             journalEntries.push({
               id: withdrawal.id,
@@ -246,7 +241,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
               type: 'withdrawal',
               amount: parseFloat(withdrawal.amount.toString()),
               balance: 0, // Will be calculated later
-              has_notes: withdrawalsWithNotes.has(withdrawal.id),
+              has_notes: hasNotes,
               source_id: withdrawal.id,
               source_type: 'withdrawal',
               source_data: withdrawalWithData,
@@ -282,11 +277,167 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
 
       setTotalBalance(runningBalance);
       setEntries(journalEntries);
+
     } catch (error) {
       console.error('Error fetching journal entries:', error);
       Alert.alert('Error', (error as Error).message);
+      // Fall back to simple approach if optimized query fails
+      await fetchJournalEntriesSimple();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fallback method using the original approach if optimized queries fail
+  const fetchJournalEntriesSimple = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Calculate date filter
+      let dateFilter = '';
+      const now = new Date();
+      if (dateRange === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        dateFilter = weekAgo.toISOString().split('T')[0];
+      } else if (dateRange === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        dateFilter = monthAgo.toISOString().split('T')[0];
+      }
+
+      const journalEntries: JournalEntry[] = [];
+
+      // Fetch deposits (completed tasks/events) - simplified version
+      if (filter === 'all' || filter === 'deposits') {
+        let tasksQuery = supabase
+          .from('0008-ap-tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'completed')
+          .not('completed_at', 'is', null);
+
+        if (dateFilter) {
+          tasksQuery = tasksQuery.gte('completed_at', dateFilter);
+        }
+
+        const { data: tasksData, error: tasksError } = await tasksQuery;
+        if (tasksError) throw tasksError;
+
+        if (tasksData && tasksData.length > 0) {
+          const taskIds = tasksData.map(t => t.id);
+
+          const [
+            { data: rolesData },
+            { data: domainsData },
+            { data: notesData }
+          ] = await Promise.all([
+            supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
+            supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
+            supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task')
+          ]);
+
+          // Apply scope filtering
+          let scopeFilteredTaskIds = taskIds;
+          if (scope.type !== 'user' && scope.id) {
+            switch (scope.type) {
+              case 'role':
+                scopeFilteredTaskIds = rolesData?.filter(r => r.role?.id === scope.id).map(r => r.parent_id) || [];
+                break;
+              case 'domain':
+                scopeFilteredTaskIds = domainsData?.filter(d => d.domain?.id === scope.id).map(d => d.parent_id) || [];
+                break;
+            }
+          }
+
+          const tasksWithNotes = new Set(notesData?.map(n => n.parent_id) || []);
+          const scopedTasks = tasksData.filter(task => scopeFilteredTaskIds.includes(task.id));
+          
+          for (const task of scopedTasks) {
+            const taskWithData = {
+              ...task,
+              roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
+              domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
+            };
+
+            const points = calculateTaskPoints(taskWithData);
+            journalEntries.push({
+              id: task.id,
+              date: task.completed_at?.split('T')[0] || task.due_date,
+              description: task.title,
+              type: 'deposit',
+              amount: points,
+              balance: 0,
+              has_notes: tasksWithNotes.has(task.id),
+              source_id: task.id,
+              source_type: 'task',
+              source_data: taskWithData,
+            });
+          }
+        }
+      }
+
+      // Fetch withdrawals - simplified version
+      if (filter === 'all' || filter === 'withdrawals') {
+        let withdrawalsQuery = supabase
+          .from('0008-ap-withdrawals')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (dateFilter) {
+          withdrawalsQuery = withdrawalsQuery.gte('withdrawn_at', dateFilter);
+        }
+
+        const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
+        if (withdrawalsError) throw withdrawalsError;
+
+        if (withdrawalsData && withdrawalsData.length > 0) {
+          for (const withdrawal of withdrawalsData) {
+            journalEntries.push({
+              id: withdrawal.id,
+              date: withdrawal.withdrawn_at,
+              description: withdrawal.title,
+              type: 'withdrawal',
+              amount: parseFloat(withdrawal.amount.toString()),
+              balance: 0,
+              has_notes: false,
+              source_id: withdrawal.id,
+              source_type: 'withdrawal',
+              source_data: withdrawal,
+            });
+          }
+        }
+      }
+
+      // Sort by date and calculate running balance
+      journalEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      let runningBalance = 0;
+      const chronologicalEntries = [...journalEntries].reverse();
+      for (const entry of chronologicalEntries) {
+        if (entry.type === 'deposit') {
+          runningBalance += entry.amount;
+        } else {
+          runningBalance -= entry.amount;
+        }
+      }
+      
+      let currentBalance = runningBalance;
+      for (const entry of journalEntries) {
+        entry.balance = currentBalance;
+        if (entry.type === 'deposit') {
+          currentBalance -= entry.amount;
+        } else {
+          currentBalance += entry.amount;
+        }
+      }
+
+      setTotalBalance(runningBalance);
+      setEntries(journalEntries);
+
+    } catch (error) {
+      console.error('Error in fallback journal fetch:', error);
+      Alert.alert('Error', (error as Error).message);
     }
   };
 
@@ -458,12 +609,6 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'column',
     gap: 12,
-  },
-  filterRowContent: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
   },
   filterRowContent: {
     flexDirection: 'row',
