@@ -145,12 +145,13 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   .from('v_user_cycle_weeks')
   .select('week_number, start_date:starts_on, end_date:ends_on, user_cycle_id')
   .eq('user_cycle_id', userCycleId)
-  .order('week_number', { ascending: true });
+  .order('week_number', { ascending: true })
+  .returns<CycleWeek[]>();   // ← type the response
 
-      if (error) throw error;
-      
-      setCycleWeeks(data || []);
-      return data || [];
+if (error) throw error;
+setCycleWeeks(data ?? []);
+return data ?? [];
+
     } catch (error) {
       console.error('Error fetching cycle weeks:', error);
       setCycleWeeks([]);
