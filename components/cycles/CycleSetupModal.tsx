@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { CustomDayComponent } from '@/components/tasks/TaskEventForm'; // Import CustomDayComponent
 import { Calendar } from 'react-native-calendars';
 import { X, Calendar as CalendarIcon, Users } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -44,6 +45,12 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
     }
   }, [visible, activeTab]);
 
+  // Helper to ensure consistent local date parsing
+  const toLocalDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day); // Creates a date in local timezone
+  };
+
   const fetchGlobalCycles = async () => {
     setFetchingGlobal(true);
     try {
@@ -65,15 +72,21 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   };
 
   const isValidStartDay = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = toLocalDate(dateString);
     const dayOfWeek = date.getDay();
     return dayOfWeek === 0 || dayOfWeek === 1; // Sunday (0) or Monday (1)
   };
 
   const getDayName = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = toLocalDate(dateString);
     const dayOfWeek = date.getDay();
-    return dayOfWeek === 0 ? 'Sunday' : dayOfWeek === 1 ? 'Monday' : 'Invalid';
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return dayNames[dayOfWeek];
+  };
+
+  const formatSelectedDateForDisplay = (dateString: string) => {
+    const date = toLocalDate(dateString);
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   const formatDateRange = (startDate: string, endDate: string) => {
@@ -225,7 +238,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
             styles.selectedDateContainer,
             { backgroundColor: isValidStartDay(selectedDate) ? '#f0fdf4' : '#fef2f2' }
           ]}>
-            <Text style={[
+            <Text style={[ // Changed from `getDayName` to `formatSelectedDateForDisplay`
               styles.selectedDateText,
               { color: isValidStartDay(selectedDate) ? '#16a34a' : '#dc2626' }
             ]}>
@@ -245,6 +258,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
         )}
 
         <Calendar
+          dayComponent={CustomDayComponent}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={getMarkedDates()}
           minDate={new Date().toISOString().split('T')[0]}
@@ -262,11 +276,11 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
             arrowColor: '#0078d4',
             monthTextColor: '#1f2937',
             textDayFontWeight: '500',
-            textMonthFontWeight: '600',
-            textDayHeaderFontWeight: '500',
-            textDayFontSize: 14,
-            textMonthFontSize: 16,
-            textDayHeaderFontSize: 12
+            textMonthFontWeight: 'bold',
+            textDayHeaderFontWeight: 'bold',
+            textDayFontSize: 12, // Will be overridden by CustomDayComponent
+            textMonthFontSize: 14,
+            textDayHeaderFontSize: 10
           }}
         />
       </View>
@@ -611,4 +625,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  // Styles for CustomDayComponent (copied from TaskEventForm.tsx)
+  dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  dayText: { fontSize: 8 },
+  selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
+  todayText: { color: '#0078d4', fontWeight: 'bold' },
+  disabledDayText: { color: '#d9e1e8' },
 });
