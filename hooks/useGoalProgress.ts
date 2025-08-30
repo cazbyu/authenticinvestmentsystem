@@ -142,10 +142,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     try {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from('v_user_cycle_weeks')
-        .select('*')
-        .eq('user_cycle_id', userCycleId)
-        .order('week_number', { ascending: true });
+  .from('v_user_cycle_weeks')
+  .select('week_number, start_date:starts_on, end_date:ends_on, user_cycle_id')
+  .eq('user_cycle_id', userCycleId)
+  .order('week_number', { ascending: true });
 
       if (error) throw error;
       
