@@ -118,11 +118,13 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       if (!user) return null;
 
       const { data, error } = await supabase
-        .from('0008-ap-user-cycles')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single();
+  .from('0008-ap-user-cycles')
+  .select('*')
+  .eq('user_id', uid)
+  .eq('status', 'active')
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle(); // returns `data` or null instead of throwing on 0 rows
 
       if (error && error.code !== 'PGRST116') throw error;
       
