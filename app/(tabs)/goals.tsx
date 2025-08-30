@@ -10,11 +10,68 @@ import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { Plus, Target, Calendar } from 'lucide-react-native';
 
+interface CycleChoiceModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onChooseGlobal: () => void;
+  onChooseCustom: () => void;
+}
+
+function CycleChoiceModal({ visible, onClose, onChooseGlobal, onChooseCustom }: CycleChoiceModalProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.choiceModalContent}>
+          <View style={styles.choiceModalHeader}>
+            <Text style={styles.choiceModalTitle}>Choose Your 12-Week Cycle</Text>
+          </View>
+          
+          <View style={styles.choiceModalBody}>
+            <Text style={styles.choiceModalDescription}>
+              We have a standard 12-week cycle that is synchronized with the Africa Thryves community. 
+              You can select that or customize your own cycle - which would you prefer?
+            </Text>
+            
+            <View style={styles.choiceButtons}>
+              <TouchableOpacity 
+                style={[styles.choiceButton, styles.communityButton]}
+                onPress={onChooseGlobal}
+              >
+                <Calendar size={20} color="#ffffff" />
+                <Text style={styles.choiceButtonText}>Join Community Cycle</Text>
+                <Text style={styles.choiceButtonSubtext}>Sync with Africa Thryves</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.choiceButton, styles.customButton]}
+                onPress={onChooseCustom}
+              >
+                <Target size={20} color="#ffffff" />
+                <Text style={styles.choiceButtonText}>Create Custom Cycle</Text>
+                <Text style={styles.choiceButtonSubtext}>Set your own dates</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.choiceModalCloseButton}
+            onPress={onClose}
+          >
+            <Text style={styles.choiceModalCloseText}>Maybe Later</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function Goals() {
   const [authenticScore, setAuthenticScore] = useState(0);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [cycleSetupVisible, setCycleSetupVisible] = useState(false);
+  const [cycleChoiceVisible, setCycleChoiceVisible] = useState(false);
+  const [cycleSetupMode, setCycleSetupMode] = useState<'custom' | 'global'>('custom');
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
 
   // 12-Week Goals
@@ -139,7 +196,20 @@ export default function Goals() {
 
   const handleCycleCreated = () => {
     setCycleSetupVisible(false);
+    setCycleChoiceVisible(false);
     refreshAllData();
+  };
+
+  const handleCycleChoiceGlobal = () => {
+    setCycleChoiceVisible(false);
+    setCycleSetupMode('global');
+    setCycleSetupVisible(true);
+  };
+
+  const handleCycleChoiceCustom = () => {
+    setCycleChoiceVisible(false);
+    setCycleSetupMode('custom');
+    setCycleSetupVisible(true);
   };
 
   const handleCreateGoalSuccess = () => {
@@ -265,7 +335,7 @@ export default function Goals() {
           </Text>
           <TouchableOpacity 
             style={styles.startCycleButton}
-            onPress={() => setCycleSetupVisible(true)}
+            onPress={() => setCycleChoiceVisible(true)}
           >
             <Calendar size={20} color="#ffffff" />
             <Text style={styles.startCycleButtonText}>Start 12-Week Cycle</Text>
@@ -282,6 +352,14 @@ export default function Goals() {
         <Plus size={24} color="#ffffff" />
       </TouchableOpacity>
 
+      {/* Cycle Choice Modal */}
+      <CycleChoiceModal
+        visible={cycleChoiceVisible}
+        onClose={() => setCycleChoiceVisible(false)}
+        onChooseGlobal={handleCycleChoiceGlobal}
+        onChooseCustom={handleCycleChoiceCustom}
+      />
+
       {/* Task Form Modal */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskEventForm
@@ -297,6 +375,7 @@ export default function Goals() {
         visible={cycleSetupVisible}
         onClose={() => setCycleSetupVisible(false)}
         onCycleCreated={handleCycleCreated}
+        initialTab={cycleSetupMode}
       />
 
       {/* Create Goal Modal */}
@@ -460,5 +539,86 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  choiceModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    margin: 20,
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  choiceModalHeader: {
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  choiceModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    textAlign: 'center',
+  },
+  choiceModalBody: {
+    padding: 24,
+  },
+  choiceModalDescription: {
+    fontSize: 16,
+    color: '#6b7280',
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  choiceButtons: {
+    gap: 16,
+  },
+  choiceButton: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  communityButton: {
+    backgroundColor: '#7c3aed',
+  },
+  customButton: {
+    backgroundColor: '#0078d4',
+  },
+  choiceButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  choiceButtonSubtext: {
+    color: '#ffffff',
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  choiceModalCloseButton: {
+    padding: 16,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  choiceModalCloseText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
   },
 });

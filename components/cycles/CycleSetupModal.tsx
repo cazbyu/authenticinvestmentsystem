@@ -15,6 +15,35 @@ import { Calendar } from 'react-native-calendars';
 import { X, Calendar as CalendarIcon, Users } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
+// Custom Day Component for minicalendar
+const CustomDayComponent = ({ date, state, marking, onPress }) => {
+  const isSelected = marking?.selected;
+  const isToday = state === 'today';
+  const isDisabled = state === 'disabled';
+  
+  return (
+    <TouchableOpacity
+      style={[
+        styles.dayContainer,
+        isSelected && styles.selectedDay,
+      ]}
+      onPress={() => onPress && onPress(date)}
+      disabled={isDisabled}
+    >
+      <Text
+        style={[
+          styles.dayText,
+          isSelected && styles.selectedDayText,
+          isToday && !isSelected && styles.todayText,
+          isDisabled && styles.disabledDayText,
+        ]}
+      >
+        {date.day}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
 interface GlobalCycle {
   id: string;
   title?: string;
@@ -28,10 +57,11 @@ interface CycleSetupModalProps {
   visible: boolean;
   onClose: () => void;
   onCycleCreated: () => void;
+  initialTab?: 'custom' | 'global';
 }
 
-export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetupModalProps) {
-  const [activeTab, setActiveTab] = useState<'custom' | 'global'>('custom');
+export function CycleSetupModal({ visible, onClose, onCycleCreated, initialTab = 'custom' }: CycleSetupModalProps) {
+  const [activeTab, setActiveTab] = useState<'custom' | 'global'>(initialTab);
   const [customTitle, setCustomTitle] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [globalCycles, setGlobalCycles] = useState<GlobalCycle[]>([]);
@@ -39,17 +69,21 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   const [loading, setLoading] = useState(false);
   const [fetchingGlobal, setFetchingGlobal] = useState(false);
 
+  // Helper to ensure consistent local date parsing
+  const toLocalDate = (dateString: string) => {
+    const [year, month, day] = dateString.split('-').map(Number);
+    return new Date(year, month - 1, day); // Creates a date in local timezone
+  };
+
   useEffect(() => {
     if (visible && activeTab === 'global') {
       fetchGlobalCycles();
     }
   }, [visible, activeTab]);
 
-  // Helper to ensure consistent local date parsing
-  const toLocalDate = (dateString: string) => {
-    const [year, month, day] = dateString.split('-').map(Number);
-    return new Date(year, month - 1, day); // Creates a date in local timezone
-  };
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const fetchGlobalCycles = async () => {
     setFetchingGlobal(true);
@@ -72,20 +106,20 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   };
 
   const isValidStartDay = (dateString: string) => {
-    const date = toLocalDate(dateString);
+    const date = new Date(dateString + 'T00:00:00'); // Parse as local date
     const dayOfWeek = date.getDay();
     return dayOfWeek === 0 || dayOfWeek === 1; // Sunday (0) or Monday (1)
   };
 
   const getDayName = (dateString: string) => {
-    const date = toLocalDate(dateString);
+    const date = new Date(dateString + 'T00:00:00'); // Parse as local date
     const dayOfWeek = date.getDay();
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return dayNames[dayOfWeek];
   };
 
   const formatSelectedDateForDisplay = (dateString: string) => {
-    const date = toLocalDate(dateString);
+    const date = new Date(dateString + 'T00:00:00'); // Parse as local date
     return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   };
 
@@ -259,6 +293,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
 
         <Calendar
           dayComponent={CustomDayComponent}
+          dayComponent={CustomDayComponent}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={getMarkedDates()}
           minDate={new Date().toISOString().split('T')[0]}
@@ -278,9 +313,9 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
             textDayFontWeight: '500',
             textMonthFontWeight: 'bold',
             textDayHeaderFontWeight: 'bold',
-            textDayFontSize: 12, // Will be overridden by CustomDayComponent
-            textMonthFontSize: 14,
-            textDayHeaderFontSize: 10
+            textDayFontSize: 10, // Smaller for minicalendar
+            textMonthFontSize: 12,
+            textDayHeaderFontSize: 8
           }}
         />
       </View>
@@ -624,6 +659,34 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  // CustomDayComponent styles for minicalendar
+  dayContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayText: {
+    fontSize: 8,
+    fontWeight: '500',
+  },
+  selectedDay: {
+    backgroundColor: '#0078d4',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+  },
+  selectedDayText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  todayText: {
+    color: '#0078d4',
+    fontWeight: 'bold',
+  },
+  disabledDayText: {
+    color: '#d9e1e8',
   },
   // Styles for CustomDayComponent (copied from TaskEventForm.tsx)
   dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
