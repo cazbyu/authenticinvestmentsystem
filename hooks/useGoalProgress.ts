@@ -12,7 +12,7 @@ export interface TwelveWeekGoal {
   total_target: number;
   start_date?: string;
   end_date?: string;
-  global_cycle_id?: string;
+  user_cycle_id?: string;
   created_at: string;
   updated_at: string;
   domains?: Array<{ id: string; name: string }>;
@@ -20,15 +20,56 @@ export interface TwelveWeekGoal {
   keyRelationships?: Array<{ id: string; name: string }>;
 }
 
-export interface GlobalCycle {
+export interface UserCycle {
   id: string;
+  user_id: string;
+  source: 'custom' | 'global';
   title?: string;
-  cycle_label?: string;
   start_date: string;
   end_date: string;
-  reflection_start?: string;
-  reflection_end?: string;
   is_active: boolean;
+  global_cycle_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CycleWeek {
+  week_number: number;
+  start_date: string;
+  end_date: string;
+  user_cycle_id: string;
+}
+
+export interface DaysLeftData {
+  days_left: number;
+  pct_elapsed: number;
+  user_cycle_id: string;
+}
+
+export interface TaskWeekPlan {
+  id: string;
+  task_id: string;
+  user_cycle_id: string;
+  week_number: number;
+  target_days: number;
+  created_at: string;
+}
+
+export interface TaskLog {
+  id: string;
+  task_id: string;
+  log_date: string;
+  completed: boolean;
+  created_at: string;
+}
+
+export interface WeeklyTaskData {
+  task: any;
+  weekPlan: TaskWeekPlan | null;
+  logs: TaskLog[];
+  completed: number;
+  target: number;
+  weeklyScore: number;
 }
 
 export interface GoalProgress {
@@ -51,7 +92,9 @@ interface UseGoalProgressOptions {
 
 export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [goals, setGoals] = useState<TwelveWeekGoal[]>([]);
-  const [currentCycle, setCurrentCycle] = useState<GlobalCycle | null>(null);
+  const [currentCycle, setCurrentCycle] = useState<UserCycle | null>(null);
+  const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
+  const [daysLeftData, setDaysLeftData] = useState<DaysLeftData | null>(null);
   const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgress>>({});
   const [loading, setLoading] = useState(false);
 
@@ -68,69 +111,82 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     return Math.round(points * 10) / 10;
   };
 
-  const getWeekStart = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    return new Date(d.setDate(diff));
-  };
-
-  const getCurrentWeekInCycle = (cycleStartDate: string) => {
-    const now = new Date();
-    const startDate = new Date(cycleStartDate);
-    const daysDiff = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const weekNumber = Math.floor(daysDiff / 7) + 1;
-    return Math.max(1, Math.min(12, weekNumber));
-  };
-
-  const getDaysRemainingInCycle = (cycleEndDate: string) => {
-    const now = new Date();
-    const endDate = new Date(cycleEndDate);
-    const daysDiff = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(0, daysDiff);
-  };
-
-  const getWeekDateRange = (cycleStartDate: string, weekNumber: number) => {
-    const startDate = new Date(cycleStartDate);
-    const weekStart = new Date(startDate);
-    weekStart.setDate(startDate.getDate() + (weekNumber - 1) * 7);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    return { start: weekStart, end: weekEnd };
-  };
-
-  const fetchCurrentCycle = async () => {
+  const fetchUserCycle = async () => {
     try {
       const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
       const { data, error } = await supabase
-        .from('0008-ap-global-cycles')
+        .from('0008-ap-user-cycles')
         .select('*')
+        .eq('user_id', user.id)
         .eq('is_active', true)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
+      
       setCurrentCycle(data);
       return data;
     } catch (error) {
-      console.error('Error fetching current cycle:', error);
+      console.error('Error fetching user cycle:', error);
       return null;
     }
   };
 
-  const fetchGoals = async (cycle: GlobalCycle | null) => {
-    if (!cycle) return;
+  const fetchCycleWeeks = async (userCycleId: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('v_user_cycle_weeks')
+        .select('*')
+        .eq('user_cycle_id', userCycleId)
+        .order('week_number', { ascending: true });
 
+      if (error) throw error;
+      
+      setCycleWeeks(data || []);
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching cycle weeks:', error);
+      setCycleWeeks([]);
+      return [];
+    }
+  };
+
+  const fetchDaysLeftData = async (userCycleId: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('v_user_cycle_days_left')
+        .select('*')
+        .eq('user_cycle_id', userCycleId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      
+      setDaysLeftData(data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching days left data:', error);
+      setDaysLeftData(null);
+      return null;
+    }
+  };
+
+  const fetchGoals = async (userCycleId: string) => {
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch 12-week goals
+      // Fetch 12-week goals for the user cycle
       const { data: goalsData, error: goalsError } = await supabase
         .from('0008-ap-goals-12wk')
         .select('*')
         .eq('user_id', user.id)
+        .eq('user_cycle_id', userCycleId)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
@@ -188,7 +244,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       setGoals(transformedGoals);
 
       // Calculate progress for each goal
-      await calculateGoalProgress(transformedGoals, cycle);
+      await calculateGoalProgress(transformedGoals, userCycleId);
 
     } catch (error) {
       console.error('Error fetching goals:', error);
@@ -198,7 +254,78 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const calculateGoalProgress = async (goals: TwelveWeekGoal[], cycle: GlobalCycle) => {
+  const fetchTasksAndPlansForWeek = async (userCycleId: string, weekNumber: number): Promise<WeeklyTaskData[]> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      // Fetch tasks for this user cycle
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('user_cycle_id', userCycleId)
+        .eq('input_kind', 'count')
+        .not('status', 'in', '(completed,cancelled)');
+
+      if (tasksError) throw tasksError;
+      if (!tasksData || tasksData.length === 0) return [];
+
+      const taskIds = tasksData.map(t => t.id);
+
+      // Fetch week plans for this specific week
+      const { data: weekPlansData, error: weekPlansError } = await supabase
+        .from('0008-ap-task-week-plan')
+        .select('*')
+        .in('task_id', taskIds)
+        .eq('user_cycle_id', userCycleId)
+        .eq('week_number', weekNumber);
+
+      if (weekPlansError) throw weekPlansError;
+
+      // Get the week date range
+      const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
+      if (!weekData) return [];
+
+      // Fetch task logs for this week's date range
+      const { data: taskLogsData, error: taskLogsError } = await supabase
+        .from('0008-ap-task-log')
+        .select('*')
+        .in('task_id', taskIds)
+        .gte('log_date', weekData.start_date)
+        .lte('log_date', weekData.end_date);
+
+      if (taskLogsError) throw taskLogsError;
+
+      // Transform data into WeeklyTaskData format
+      const weeklyTaskData: WeeklyTaskData[] = [];
+
+      for (const task of tasksData) {
+        const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id) || null;
+        const logs = taskLogsData?.filter(log => log.task_id === task.id) || [];
+        const completed = logs.filter(log => log.completed).length;
+        const target = weekPlan?.target_days || 0;
+        const weeklyScore = target > 0 ? Math.round((completed / target) * 100) : 0;
+
+        weeklyTaskData.push({
+          task,
+          weekPlan,
+          logs,
+          completed,
+          target,
+          weeklyScore,
+        });
+      }
+
+      return weeklyTaskData;
+    } catch (error) {
+      console.error('Error fetching tasks and plans for week:', error);
+      return [];
+    }
+  };
+
+  const calculateGoalProgress = async (goals: TwelveWeekGoal[], userCycleId: string) => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -206,20 +333,12 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       const progressData: Record<string, GoalProgress> = {};
 
+      // Get current week number from cycle weeks
+      const currentWeek = getCurrentWeekNumber();
+      const daysRemaining = daysLeftData?.days_left || 0;
+
       for (const goal of goals) {
-        const currentWeek = getCurrentWeekInCycle(cycle.start_date);
-        const daysRemaining = getDaysRemainingInCycle(cycle.end_date);
-
-        // Get current week date range
-        const currentWeekRange = getWeekDateRange(cycle.start_date, currentWeek);
-        const currentWeekStart = currentWeekRange.start.toISOString().split('T')[0];
-        const currentWeekEnd = currentWeekRange.end.toISOString().split('T')[0];
-
-        // Get cycle date range for overall progress
-        const cycleStart = cycle.start_date;
-        const cycleEnd = cycle.end_date;
-
-        // Fetch completed tasks for this goal
+        // Fetch tasks associated with this goal
         const { data: goalJoins } = await supabase
           .from('0008-ap-universal-goals-join')
           .select('parent_id')
@@ -242,32 +361,35 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           continue;
         }
 
-        // Fetch completed tasks for weekly progress
-        const { data: weeklyTasks } = await supabase
-          .from('0008-ap-tasks')
-          .select('*, completed_at')
-          .in('id', taskIds)
-          .eq('user_id', user.id)
-          .eq('status', 'completed')
-          .eq('is_twelve_week_goal', true)
-          .not('completed_at', 'is', null)
-          .gte('completed_at', currentWeekStart)
-          .lte('completed_at', currentWeekEnd + 'T23:59:59');
+        // Get current week date range
+        const currentWeekData = cycleWeeks.find(w => w.week_number === currentWeek);
+        
+        let weeklyActual = 0;
+        let overallActual = 0;
 
-        // Fetch completed tasks for overall progress
-        const { data: overallTasks } = await supabase
-          .from('0008-ap-tasks')
-          .select('*, completed_at')
-          .in('id', taskIds)
-          .eq('user_id', user.id)
-          .eq('status', 'completed')
-          .eq('is_twelve_week_goal', true)
-          .not('completed_at', 'is', null)
-          .gte('completed_at', cycleStart)
-          .lte('completed_at', cycleEnd + 'T23:59:59');
+        if (currentWeekData) {
+          // Fetch completed task logs for current week
+          const { data: weeklyLogs } = await supabase
+            .from('0008-ap-task-log')
+            .select('*')
+            .in('task_id', taskIds)
+            .eq('completed', true)
+            .gte('log_date', currentWeekData.start_date)
+            .lte('log_date', currentWeekData.end_date);
 
-        const weeklyActual = weeklyTasks?.length || 0;
-        const overallActual = overallTasks?.length || 0;
+          weeklyActual = weeklyLogs?.length || 0;
+        }
+
+        // Fetch completed task logs for entire cycle
+        const { data: overallLogs } = await supabase
+          .from('0008-ap-task-log')
+          .select('*')
+          .in('task_id', taskIds)
+          .eq('completed', true)
+          .gte('log_date', currentCycle?.start_date || '')
+          .lte('log_date', currentCycle?.end_date || '');
+
+        overallActual = overallLogs?.length || 0;
         const overallProgress = goal.total_target > 0 ? Math.round((overallActual / goal.total_target) * 100) : 0;
 
         progressData[goal.id] = {
@@ -288,29 +410,222 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
+  const getCurrentWeekNumber = (): number => {
+    if (!currentCycle || cycleWeeks.length === 0) return 1;
+    
+    const now = new Date();
+    const currentDateString = now.toISOString().split('T')[0];
+    
+    // Find which week we're currently in
+    const currentWeekData = cycleWeeks.find(week => 
+      currentDateString >= week.start_date && currentDateString <= week.end_date
+    );
+    
+    return currentWeekData?.week_number || 1;
+  };
+
+  const refreshAllData = async () => {
+    try {
+      // Fetch user cycle first
+      const cycle = await fetchUserCycle();
+      if (!cycle) {
+        // No active cycle, clear all dependent data
+        setCycleWeeks([]);
+        setDaysLeftData(null);
+        setGoals([]);
+        setGoalProgress({});
+        return;
+      }
+
+      // Fetch cycle-dependent data in parallel
+      const [weeks, daysLeft] = await Promise.all([
+        fetchCycleWeeks(cycle.id),
+        fetchDaysLeftData(cycle.id)
+      ]);
+
+      // Fetch goals after we have cycle data
+      await fetchGoals(cycle.id);
+    } catch (error) {
+      console.error('Error refreshing all data:', error);
+    }
+  };
+
+  const toggleTaskDay = async (taskId: string, date: string): Promise<boolean> => {
+    try {
+      const supabase = getSupabaseClient();
+      
+      // Call the RPC function to toggle the task day
+      const { data, error } = await supabase.rpc('ap_toggle_task_day', {
+        p_task_id: taskId,
+        p_date: date
+      });
+
+      if (error) throw error;
+      
+      return data; // Returns the new completed state
+    } catch (error) {
+      console.error('Error toggling task day:', error);
+      throw error;
+    }
+  };
+
+  const createGoal = async (goalData: {
+    title: string;
+    description?: string;
+    weekly_target?: number;
+    total_target?: number;
+  }): Promise<TwelveWeekGoal | null> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !currentCycle) return null;
+
+      const { data, error } = await supabase
+        .from('0008-ap-goals-12wk')
+        .insert({
+          user_id: user.id,
+          user_cycle_id: currentCycle.id,
+          title: goalData.title,
+          description: goalData.description,
+          weekly_target: goalData.weekly_target || 3,
+          total_target: goalData.total_target || 36,
+          status: 'active',
+          progress: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // Refresh goals to include the new one
+      await fetchGoals(currentCycle.id);
+      
+      return data;
+    } catch (error) {
+      console.error('Error creating goal:', error);
+      throw error;
+    }
+  };
+
+  const createTaskWithWeekPlan = async (taskData: {
+    title: string;
+    description?: string;
+    goal_id?: string;
+    selectedWeeks: Array<{ weekNumber: number; targetDays: number }>;
+  }): Promise<any> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !currentCycle) return null;
+
+      // Create the task
+      const { data: taskData, error: taskError } = await supabase
+        .from('0008-ap-tasks')
+        .insert({
+          user_id: user.id,
+          user_cycle_id: currentCycle.id,
+          title: taskData.title,
+          description: taskData.description,
+          type: 'task',
+          input_kind: 'count',
+          unit: 'days',
+          status: 'active',
+          is_twelve_week_goal: true,
+        })
+        .select()
+        .single();
+
+      if (taskError) throw taskError;
+
+      // Create week plans
+      const weekPlanInserts = taskData.selectedWeeks.map(week => ({
+        task_id: taskData.id,
+        user_cycle_id: currentCycle.id,
+        week_number: week.weekNumber,
+        target_days: week.targetDays,
+      }));
+
+      const { error: weekPlanError } = await supabase
+        .from('0008-ap-task-week-plan')
+        .insert(weekPlanInserts);
+
+      if (weekPlanError) throw weekPlanError;
+
+      // Link to goal if specified
+      if (taskData.goal_id) {
+        const { error: goalJoinError } = await supabase
+          .from('0008-ap-universal-goals-join')
+          .insert({
+            parent_id: taskData.id,
+            parent_type: 'task',
+            goal_id: taskData.goal_id,
+            user_id: user.id,
+          });
+
+        if (goalJoinError) throw goalJoinError;
+      }
+
+      return taskData;
+    } catch (error) {
+      console.error('Error creating task with week plan:', error);
+      throw error;
+    }
+  };
+
+  const getWeekDateRange = (weekNumber: number): { start: string; end: string } | null => {
+    const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
+    return weekData ? { start: weekData.start_date, end: weekData.end_date } : null;
+  };
+
   const refreshGoals = async () => {
-    const cycle = await fetchCurrentCycle();
-    if (cycle) {
-      await fetchGoals(cycle);
+    if (currentCycle) {
+      await fetchGoals(currentCycle.id);
     }
   };
 
   useEffect(() => {
-    const initializeData = async () => {
-      const cycle = await fetchCurrentCycle();
-      if (cycle) {
-        await fetchGoals(cycle);
-      }
+    refreshAllData();
+  }, [options.scope]);
+
+  // Auto-refresh days left data at midnight
+  useEffect(() => {
+    if (!currentCycle) return;
+
+    const updateDaysLeft = () => {
+      fetchDaysLeftData(currentCycle.id);
     };
 
-    initializeData();
-  }, [options.scope]);
+    // Calculate milliseconds until next midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    // Set timeout for midnight, then interval for every 24 hours
+    const midnightTimeout = setTimeout(() => {
+      updateDaysLeft();
+      const dailyInterval = setInterval(updateDaysLeft, 24 * 60 * 60 * 1000);
+      return () => clearInterval(dailyInterval);
+    }, msUntilMidnight);
+
+    return () => clearTimeout(midnightTimeout);
+  }, [currentCycle]);
 
   return {
     goals,
     currentCycle,
+    cycleWeeks,
+    daysLeftData,
     goalProgress,
     loading,
     refreshGoals,
+    refreshAllData,
+    fetchTasksAndPlansForWeek,
+    toggleTaskDay,
+    createGoal,
+    createTaskWithWeekPlan,
+    getWeekDateRange,
+    getCurrentWeekNumber,
   };
 }
