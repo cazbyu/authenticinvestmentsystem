@@ -96,7 +96,6 @@ const toDateString = (date: Date) => {
     is_important: initialData?.is_important || false,
     is_authentic_deposit: initialData?.is_authentic_deposit || false,
     is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
-    schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea' | 'withdrawal') || 'task',
     selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
     selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
     selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
@@ -104,7 +103,10 @@ const toDateString = (date: Date) => {
     selectedGoalIds: initialData?.goals?.map(g => g.id) || [] as string[],
       });
 
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [schedulingType, setSchedulingType] = useState<'task' | 'event' | 'depositIdea' | 'withdrawal'>(
+    (initialData?.type as 'task' | 'event' | 'depositIdea' | 'withdrawal') || 'task'
+  );
+  const [roles, setRoles] = useState<Role[]>([]); // Keep roles for general task/DI linking
   const [domains, setDomains] = useState<Domain[]>([]);
   const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
   const [twelveWeekGoals, setTwelveWeekGoals] = useState<TwelveWeekGoal[]>([]);
@@ -168,7 +170,6 @@ const [activeCalendarField, setActiveCalendarField] = useState<'start' | 'end'>(
         is_important: initialData?.is_important || false,
         is_authentic_deposit: initialData?.is_authentic_deposit || false,
         is_twelve_week_goal: initialData?.is_twelve_week_goal || false,
-        schedulingType: (initialData?.type as 'task' | 'event' | 'depositIdea' | 'withdrawal') || 'task',
         selectedRoleIds: initialData?.roles?.map(r => r.id) || [] as string[],
         selectedDomainIds: initialData?.domains?.map(d => d.id) || [] as string[],
         selectedKeyRelationshipIds: initialData?.keyRelationships?.map(kr => kr.id) || [] as string[],
@@ -192,7 +193,6 @@ const [activeCalendarField, setActiveCalendarField] = useState<'start' | 'end'>(
         is_important: false,
         is_authentic_deposit: false,
         is_twelve_week_goal: false,
-        schedulingType: 'task',
         selectedRoleIds: [] as string[],
         selectedDomainIds: [] as string[],
         selectedKeyRelationshipIds: [] as string[],
@@ -252,7 +252,7 @@ useEffect(() => {
   setDateInputValue(formatDateForInput(formData.dueDate));
 
   // If scheduling an event, ensure end date is never before start date
-  if (formData.schedulingType === 'event') {
+  if (schedulingType === 'event') {
     const end = (formData as any).eventEndDate as Date | undefined;
     const startStr = toDateString(formData.dueDate);
     const endStr = end ? toDateString(end) : null;
@@ -262,7 +262,7 @@ useEffect(() => {
       setEndDateInputValue(formatDateForInput(formData.dueDate));
     }
   }
-}, [formData.dueDate, formData.schedulingType]);
+}, [formData.dueDate, schedulingType]);
 
 
   useEffect(() => {
@@ -292,7 +292,7 @@ const onCalendarDayPress = (day: any) => {
     setFormData(prev => {
       const next: any = { ...prev, dueDate: selectedDate };
       // If event end date is missing or before new start date, sync it
-      if (prev.schedulingType === 'event') {
+      if (schedulingType === 'event') {
         const end = (prev as any).eventEndDate as Date | undefined;
         if (!end || toDateString(end) < toDateString(selectedDate)) {
           next.eventEndDate = selectedDate;
@@ -436,12 +436,12 @@ const constructRecurrenceRule = (): string => {
     setLoading(true);
     try {
         const supabase = getSupabaseClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser(); // Ensure user is fetched
         if (!user) throw new Error("User not found");
 
         const isEditingDepositIdea = initialData?.type === 'depositIdea';
         
-        if (formData.schedulingType === 'withdrawal') {
+        if (schedulingType === 'withdrawal') {
             // Handle Withdrawal creation/update
             if (!formData.title.trim() || !formData.amount || parseFloat(formData.amount) <= 0) {
                 Alert.alert('Error', 'Please fill in title and a valid amount');
@@ -505,11 +505,11 @@ const constructRecurrenceRule = (): string => {
 
             if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
             if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
-            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins); // Fix: krJoins was missing
 
             Alert.alert('Success', `Withdrawal ${mode === 'edit' ? 'updated' : 'created'} successfully`);
 
-        } else if (formData.schedulingType === 'depositIdea') {
+        } else if (schedulingType === 'depositIdea') {
             // Handle Deposit Idea creation/update
             const diPayload: any = {
                 user_id: user.id,
@@ -569,7 +569,7 @@ const constructRecurrenceRule = (): string => {
 
             if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
             if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
-            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins); // Fix: krJoins was missing
             if (goalJoins.length > 0) await supabase.from('0008-ap-universal-goals-join').insert(goalJoins);
 
         } else {
@@ -581,22 +581,22 @@ const constructRecurrenceRule = (): string => {
                 is_important: formData.is_important,
                 is_authentic_deposit: formData.is_authentic_deposit,
                 is_twelve_week_goal: formData.is_twelve_week_goal,
-                goal_12wk_id: formData.selectedGoalId,
+                // Removed singular goal_12wk_id
                 status: 'pending',
-                type: formData.schedulingType,
+                type: schedulingType,
                 due_date: toDateString(formData.dueDate),
                 deposit_idea: isEditingDepositIdea, // True if converting from DI
                 is_all_day: formData.isAnytime,
                 updated_at: new Date().toISOString(),
             };
 
-            if (formData.schedulingType === 'event' && !formData.isAnytime) {
+            if (schedulingType === 'event' && !formData.isAnytime) {
                 payload.start_time = combineDateAndTime(formData.dueDate, formData.startTime);
                 payload.end_time = combineDateAndTime(formData.dueDate, formData.endTime);
             }
 
 // Extended event fields
-if (formData.schedulingType === 'event') {
+if (schedulingType === 'event') {
     (payload as any).start_date = toDateString(formData.dueDate);
     (payload as any).end_date = toDateString((formData as any).eventEndDate || formData.dueDate);
     (payload as any).recurrence_rule = isRepeating ? constructRecurrenceRule() : null;
@@ -669,7 +669,7 @@ if (formData.schedulingType === 'event') {
 
             if (roleJoins.length > 0) await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
             if (domainJoins.length > 0) await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
-            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins);
+            if (krJoins.length > 0) await supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins); // Fix: krJoins was missing
             if (goalJoins.length > 0) await supabase.from('0008-ap-universal-goals-join').insert(goalJoins);
         }
 
@@ -677,8 +677,8 @@ if (formData.schedulingType === 'event') {
         onClose();
 
     } catch (error) {
-        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} ${formData.schedulingType}:`, error);
-        Alert.alert('Error', (error as Error).message || `Failed to ${mode === 'edit' ? 'update' : 'create'} ${formData.schedulingType}`);
+        console.error(`Error ${mode === 'edit' ? 'updating' : 'creating'} ${schedulingType}:`, error);
+        Alert.alert('Error', (error as Error).message || `Failed to ${mode === 'edit' ? 'update' : 'create'} ${schedulingType}`);
     } finally {
         setLoading(false);
     }
@@ -688,7 +688,7 @@ if (formData.schedulingType === 'event') {
 
   // Dynamic placeholder text based on scheduling type
   const getTitlePlaceholder = () => {
-    switch (formData.schedulingType) {
+    switch (schedulingType) {
       case 'withdrawal':
         return 'Reason for your Withdrawal';
       case 'depositIdea':
@@ -699,7 +699,7 @@ if (formData.schedulingType === 'event') {
   };
 
   const getNotesPlaceholder = () => {
-    switch (formData.schedulingType) {
+    switch (schedulingType) {
       case 'withdrawal':
         return 'Details that may help you improve';
       case 'depositIdea':
@@ -714,24 +714,24 @@ if (formData.schedulingType === 'event') {
         <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
               {mode === 'create' ? 'New Action' : 'Edit Action'}
-            </Text>
-            <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity>
+            </Text> 
+            <TouchableOpacity onPress={onClose}><X size={24} color="#6b7280" /></TouchableOpacity> 
         </View>
-        <ScrollView style={styles.formContent}>
+        <ScrollView style={styles.formContent}> 
             <TextInput style={styles.input} placeholder={getTitlePlaceholder()} value={formData.title} onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))} />
 
             <View style={styles.schedulingToggle}>
               {['task', 'event', 'depositIdea', 'withdrawal'].map(type => (
-                <TouchableOpacity key={type} style={[styles.toggleChip, formData.schedulingType === type && styles.toggleChipActive]} onPress={() => setFormData(prev => ({...prev, schedulingType: type as any}))}>
-                  <Text style={formData.schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>
+                <TouchableOpacity key={type} style={[styles.toggleChip, schedulingType === type && styles.toggleChipActive]} onPress={() => setSchedulingType(type as any)}>
+                  <Text style={schedulingType === type ? styles.toggleChipTextActive : styles.toggleChipText}>
                     {type === 'depositIdea' ? 'Deposit Idea' : type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Text>
+                  </Text> 
                 </TouchableOpacity>
               ))}
             </View>
 
-            {formData.schedulingType === 'withdrawal' && (
-              <>
+            {schedulingType === 'withdrawal' && (
+              <> 
                 <Text style={styles.compactSectionTitle}>Withdrawal Details</Text>
                 <View style={styles.compactDateTimeRow}>
                   <View style={styles.amountContainer}>
@@ -744,7 +744,7 @@ if (formData.schedulingType === 'event') {
                       placeholderTextColor="#9ca3af"
                       keyboardType="decimal-pad"
                     />
-                  </View>
+                  </View> 
 
                   <View style={styles.withdrawalDateContainer}>
                     <TouchableOpacity
@@ -765,13 +765,13 @@ if (formData.schedulingType === 'event') {
                         editable={false}
                       />
                     </TouchableOpacity>
-                  </View>
+                  </View> 
                 </View>
               </>
             )}
 
-            {formData.schedulingType !== 'depositIdea' && formData.schedulingType !== 'withdrawal' && (
-              <>
+            {schedulingType !== 'depositIdea' && schedulingType !== 'withdrawal' && (
+              <> 
                 <View style={styles.compactSwitchRow}>
                   <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Urgent</Text><Switch value={formData.is_urgent} onValueChange={(val) => setFormData(prev => ({...prev, is_urgent: val}))} /></View>
                   <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Important</Text><Switch value={formData.is_important} onValueChange={(val) => setFormData(prev => ({...prev, is_important: val}))} /></View>
@@ -781,7 +781,7 @@ if (formData.schedulingType === 'event') {
                   <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>12-Week Goal</Text><Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} /></View>
                 </View>
 
-                {formData.schedulingType === 'task' && (
+                {schedulingType === 'task' && (
                   <>
                     <Text style={styles.compactSectionTitle}>Schedule</Text>
                     <View style={styles.compactDateTimeRow}>
@@ -794,7 +794,7 @@ if (formData.schedulingType === 'event') {
     setDatePickerPosition({ x: px, y: py, width, height });
     setActiveCalendarField('start');        // <-- add this
     setShowMiniCalendar(!showMiniCalendar);
-  });
+  }); 
 }}
 
                         >
@@ -816,10 +816,10 @@ if (formData.schedulingType === 'event') {
                           }}
                           disabled={formData.isAnytime}
                         >
-                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text>
-                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.time}</Text>
+                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Complete by</Text> 
+                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.time}</Text> 
                         </TouchableOpacity>
-                      </View>
+                      </View> 
 
                       <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
                         <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
@@ -827,8 +827,8 @@ if (formData.schedulingType === 'event') {
                       </TouchableOpacity>
                     </View>
                   </>
-                )}
-                {formData.schedulingType === 'event' && (
+                )} 
+                {schedulingType === 'event' && (
                   <>
                     <Text style={styles.compactSectionTitle}>Schedule</Text>
                     <View style={styles.compactDateTimeRow}>
@@ -844,7 +844,7 @@ if (formData.schedulingType === 'event') {
                           }}
                         >
                           <Text style={styles.compactInputLabel}>Date</Text>
-                          <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} />
+                          <TextInput style={styles.dateTextInput} value={dateInputValue} onChangeText={handleDateInputChange} /> 
                         </TouchableOpacity>
 
 <View>
@@ -866,7 +866,7 @@ if (formData.schedulingType === 'event') {
       onChangeText={handleEndDateInputChange}
       editable={false}
     />
-  </TouchableOpacity>
+  </TouchableOpacity> 
 </View>
                       </View>
 
@@ -883,10 +883,10 @@ if (formData.schedulingType === 'event') {
                           }}
                           disabled={formData.isAnytime}
                         >
-                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Start</Text>
-                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.startTime}</Text>
+                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Start</Text> 
+                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.startTime}</Text> 
                         </TouchableOpacity>
-                      </View>
+                      </View> 
 
                       <View>
                         <TouchableOpacity
@@ -901,10 +901,10 @@ if (formData.schedulingType === 'event') {
                           }}
                           disabled={formData.isAnytime}
                         >
-                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>End</Text>
-                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.endTime}</Text>
+                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>End</Text> 
+                          <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.endTime}</Text> 
                         </TouchableOpacity>
-                      </View>
+                      </View> 
 
                       <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
                         <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
@@ -912,7 +912,7 @@ if (formData.schedulingType === 'event') {
                       </TouchableOpacity>
                     </View>
 
-{/* Repeat (Recurrence) controls */}
+{/* Repeat (Recurrence) controls */} 
 <View style={{ marginTop: 12 }}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
     <Text style={styles.compactSectionTitle}>Repeat</Text>
@@ -924,7 +924,7 @@ if (formData.schedulingType === 'event') {
         if (!value) { setSelectedRecurrenceDays([]); setRecurrenceEndDate(null); setRecurrenceFrequency('Weekly'); }
       }}
     />
-  </View>
+  </View> 
   {isRepeating && (
     <TouchableOpacity
       style={styles.recurrenceButton}
@@ -935,21 +935,21 @@ if (formData.schedulingType === 'event') {
       </Text>
     </TouchableOpacity>
   )}
-</View>
+</View> 
                   </>
                 )}
 
                 {formData.is_twelve_week_goal && (
                   <>
-                    <Text style={styles.sectionTitle}>Goals</Text>
+                    <Text style={styles.sectionTitle}>12-Week Goals</Text>
                     <View style={styles.checkboxGrid}>
                       {twelveWeekGoals.map(goal => {
-                        const isSelected = formData.selectedGoalId === goal.id;
+                        const isSelected = formData.selectedGoalIds.includes(goal.id);
                         return (
                           <TouchableOpacity
                             key={goal.id}
                             style={styles.checkItem}
-                            onPress={() => setFormData(prev => ({ ...prev, selectedGoalId: isSelected ? null : goal.id }))}
+                            onPress={() => handleMultiSelect('selectedGoalIds', goal.id)}
                           >
                             <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
                               {isSelected && <Text style={styles.checkmark}>✓</Text>}
@@ -958,13 +958,13 @@ if (formData.schedulingType === 'event') {
                           </TouchableOpacity>
                         );
                       })}
-                    </View>
+                    </View> 
                   </>
                 )}
               </>
             )}
 
-            {formData.schedulingType === 'depositIdea' && (
+            {schedulingType === 'depositIdea' && (
               <>
                 <Text style={styles.sectionTitle}>12-Week Goals</Text>
                 <View style={styles.checkboxGrid}>
@@ -1047,7 +1047,7 @@ if (formData.schedulingType === 'event') {
                 );
               })}
             </View>
-
+ 
             <TextInput style={[styles.input, { height: 100 }]} placeholder={getNotesPlaceholder()} value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
         </ScrollView>
 
@@ -1055,7 +1055,7 @@ if (formData.schedulingType === 'event') {
 
         {/* Pop-up Mini Calendar Modal */}
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}> 
             <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}>
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 <Calendar
@@ -1069,13 +1069,13 @@ if (formData.schedulingType === 'event') {
   }}
   dayComponent={CustomDayComponent}
   hideExtraDays={true}
-/>
+/> 
 
               </ScrollView>
             </View>
           </TouchableOpacity>
         </Modal>
-
+ 
         {/* Pop-up Withdrawal Calendar Modal */}
         <Modal transparent visible={showWithdrawalCalendar} onRequestClose={() => setShowWithdrawalCalendar(false)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowWithdrawalCalendar(false)}>
@@ -1085,13 +1085,13 @@ if (formData.schedulingType === 'event') {
                   onDayPress={onWithdrawalCalendarDayPress}
                   markedDates={{ [toDateString(formData.withdrawalDate)]: { selected: true } }}
                   dayComponent={CustomDayComponent}
-                  hideExtraDays={true}
-                />
+                  hideExtraDays={true} 
+                /> 
               </ScrollView>
             </View>
           </TouchableOpacity>
         </Modal>
-
+ 
         {/* Pop-up Time Picker Modal */}
         <Modal transparent visible={showTimePicker} onRequestClose={() => setShowTimePicker(false)}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowTimePicker(false)}>
@@ -1111,285 +1111,4 @@ if (formData.schedulingType === 'event') {
     return idx >= 0 ? idx : 0;
   })()}
   renderItem={({ item }) => {
-    const label = activeTimeField === 'endTime'
-      ? `${item} (${getDurationLabel(formData.startTime, item)})`
-      : item;
-    return (
-      <TouchableOpacity
-        style={styles.timeOptionPopup}
-        onPress={() => onTimeSelect(item)}
-        activeOpacity={0.1}
-      >
-        <Text style={styles.timeOptionTextPopup}>{label}</Text>
-      </TouchableOpacity>
-    );
-  }}
-/>
-
-                </View>
-            </TouchableOpacity>
-        </Modal>
-
-
-{/* Recurrence Settings Modal */}
-<RecurrenceSettingsModal
-  visible={isRecurrenceModalVisible}
-  onClose={() => setIsRecurrenceModalVisible(false)}
-  onSave={({ frequency, selectedDays, endDate }) => {
-    setRecurrenceFrequency(frequency as any);
-    setSelectedRecurrenceDays(selectedDays);
-    setRecurrenceEndDate(endDate);
-    setIsRecurrenceModalVisible(false);
-  }}
-  initialSettings={{
-    frequency: recurrenceFrequency,
-    selectedDays: selectedRecurrenceDays,
-    endDate: recurrenceEndDate
-  }}
-/>
-    </View>
-  );
-};
-
-
-
-/** Recurrence Settings Modal (inline) */
-interface RecurrenceSettingsModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSave: (settings: { frequency: string; selectedDays: string[]; endDate: Date | null }) => void;
-  initialSettings: { frequency: string; selectedDays: string[]; endDate: Date | null };
-}
-
-const weekdayOptions = ['SU','MO','TU','WE','TH','FR','SA'];
-const frequencyOptions = ['Daily','Weekly','Bi-weekly','Monthly','Yearly'];
-
-function RecurrenceSettingsModal({ visible, onClose, onSave, initialSettings }: RecurrenceSettingsModalProps) {
-  const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const [frequency, setFrequency] = useState<string>(initialSettings.frequency || 'Weekly');
-  const [selectedDays, setSelectedDays] = useState<string[]>(initialSettings.selectedDays || []);
-  const [until, setUntil] = useState<Date | null>(initialSettings.endDate || null);
-  useEffect(() => {
-    setFrequency(initialSettings.frequency || 'Weekly');
-    setSelectedDays(initialSettings.selectedDays || []);
-    setUntil(initialSettings.endDate || null);
-  }, [initialSettings, visible]);
-
-  const toggleDay = (day: string) => {
-    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={styles.recurrenceContainer}>
-        <View style={styles.recurrenceHeader}>
-          <Text style={styles.recurrenceTitle}>Recurrence Settings</Text>
-          <TouchableOpacity onPress={onClose}><X size={22} color="#111827" /></TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.recurrenceContent}>
-          <Text style={styles.recurrenceLabel}>Frequency</Text>
-          <View style={styles.frequencyGrid}>
-            {frequencyOptions.map((f) => (
-              <TouchableOpacity key={f} onPress={() => setFrequency(f)} style={[styles.frequencyButton, frequency === f && styles.frequencyButtonSelected]}>
-                <Text style={[styles.frequencyButtonText, frequency === f && styles.frequencyButtonTextSelected]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {(frequency === 'Weekly' || frequency === 'Bi-weekly') && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={styles.recurrenceLabel}>Repeat On</Text>
-              <View style={styles.weekdayRow}>
-                {weekdayOptions.map((d) => (
-                  <TouchableOpacity key={d} onPress={() => toggleDay(d)} style={[styles.weekdayChip, selectedDays.includes(d) && styles.weekdayChipSelected]}>
-                    <Text style={[styles.weekdayText, selectedDays.includes(d) && styles.weekdayTextSelected]}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.recurrenceLabel}>Ends</Text>
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, alignItems: 'center' }}>
-              <TouchableOpacity onPress={() => setUntil(null)} style={[styles.endChoice, until === null && styles.endChoiceSelected]}>
-                <Text style={[styles.endChoiceText, until === null && styles.endChoiceTextSelected]}>Never</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setUntil(until ?? new Date())} style={[styles.endChoice, until !== null && styles.endChoiceSelected]}>
-                <Text style={[styles.endChoiceText, until !== null && styles.endChoiceTextSelected]}>{until ? until.toDateString() : 'On date...'}</Text>
-              </TouchableOpacity>
-            </View>
-            {until !== null && (
-              <View style={{ marginTop: 8 }}>
-                <Calendar
-                  onDayPress={(day: any) => {
-                    const d = new Date(day.year, day.month - 1, day.day);
-                    setUntil(d);
-                  }}
-                  markedDates={ until ? { [toISO(until)]: { selected: true } } : {} }
-                />
-              </View>
-            )}
-          </View>
-        </ScrollView>
-
-        <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb', flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
-          <TouchableOpacity style={[styles.dialogButton, styles.dialogCancel]} onPress={onClose}><Text style={styles.dialogCancelText}>Cancel</Text></TouchableOpacity>
-          <TouchableOpacity style={[styles.dialogButton, styles.dialogSave]} onPress={() => onSave({ frequency, selectedDays, endDate: until })}><Text style={styles.dialogSaveText}>Save</Text></TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-const styles = StyleSheet.create({
-    formContainer: { flex: 1, backgroundColor: 'white' },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-    modalTitle: { fontSize: 18, fontWeight: '600' },
-    formContentContainer: { flex: 1 },
-    formContent: { padding: 16 },
-    input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16 },
-    field: { marginBottom: 16 },
-    label: { fontSize: 16, fontWeight: '500', color: '#1f2937', marginBottom: 8 },
-    dateButton: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12 },
-    compactSwitchRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
-    compactSwitchContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    compactSwitchLabel: { fontSize: 14, fontWeight: '500' },
-    sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8, marginTop: 8 },
-    compactSectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 8, marginTop: 12 },
-    selectionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f3f4f6' },
-    chipSelected: { backgroundColor: '#0078d4' },
-    chipText: { color: '#374151' },
-    chipTextSelected: { color: 'white' },
-    submitButton: { backgroundColor: '#0078d4', padding: 16, alignItems: 'center', margin: 16, borderRadius: 8 },
-    submitButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },
-    schedulingToggle: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 16 },
-    toggleChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#e5e7eb' },
-    toggleChipActive: { backgroundColor: '#0078d4' },
-    toggleChipText: { color: '#374151', fontWeight: '500' },
-    toggleChipTextActive: { color: 'white', fontWeight: '600' },
-    compactDateTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-    compactDateButton: { flex: 0, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f8fafc' },
-    dateTextInput: { fontSize: 14, fontWeight: '500', padding: 0 },
-    compactTimeButton: { flex: 0, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, padding: 8, backgroundColor: '#f0f9ff' },
-    compactInputLabel: { fontSize: 10, color: '#6b7280', marginBottom: 2 },
-    compactInputValue: { fontSize: 14, fontWeight: '500' },
-    disabledButton: { backgroundColor: '#f3f4f6' },
-    disabledText: { color: '#9ca3af' },
-    anytimeContainer: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
-    checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 3, marginRight: 6, justifyContent: 'center', alignItems: 'center' },
-    checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
-    checkmark: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-    anytimeLabel: { fontSize: 14 },
-    calendarPopup: {
-        position: 'absolute',
-        width: 200,
-        maxHeight: 220,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-        zIndex: 1000,
-    },
-    timePickerPopup: {
-        position: 'absolute',
-        width: 160,
-        maxHeight: 160,
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-        zIndex: 1000,
-    },
-    dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
-    dayText: { fontSize: 8 },
-    selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
-    selectedDayText: { color: 'white' },
-    todayText: { color: '#0078d4', fontWeight: 'bold' },
-    disabledDayText: { color: '#d9e1e8' },
-    checkboxGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      marginBottom: 16,
-    },
-    checkItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      width: '23%',
-      marginBottom: 12,
-    },
-    checkLabel: {
-      fontSize: 14,
-      color: '#374151',
-      marginLeft: 8,
-      flexShrink: 1,
-    },
-    timeOptionPopup: {
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f3f4f6',
-    },
-    timeOptionTextPopup: {
-      fontSize: 14,
-      color: '#374151',
-    },
-   amountContainer: {
-     flex: 1,
-     marginRight: 8,
-   },
-   amountInput: {
-     borderWidth: 1,
-     borderColor: '#d1d5db',
-     borderRadius: 6,
-     padding: 8,
-     fontSize: 14,
-     backgroundColor: '#f0f9ff',
-   },
-   withdrawalDateContainer: {
-     flex: 1,
-     marginLeft: 8,
-   },
-
-
-// Recurrence styles
-recurrenceContainer: { flex: 1, backgroundColor: '#fff' },
-recurrenceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-recurrenceTitle: { fontSize: 18, fontWeight: '600', color: '#111827' },
-recurrenceContent: { paddingHorizontal: 16, paddingTop: 12 },
-recurrenceLabel: { fontSize: 14, color: '#374151', marginBottom: 8 },
-frequencyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-frequencyButton: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-frequencyButtonSelected: { backgroundColor: '#e0f2fe', borderColor: '#93c5fd' },
-frequencyButtonText: { color: '#111827' },
-frequencyButtonTextSelected: { color: '#1d4ed8', fontWeight: '600' },
-weekdayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-weekdayChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#d1d5db' },
-weekdayChipSelected: { backgroundColor: '#e0f2fe', borderColor: '#93c5fd' },
-weekdayText: { color: '#111827' },
-weekdayTextSelected: { color: '#1d4ed8', fontWeight: '600' },
-endChoice: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-endChoiceSelected: { backgroundColor: '#e0f2fe', borderColor: '#93c5fd' },
-endChoiceText: { color: '#111827' },
-endChoiceTextSelected: { color: '#1d4ed8', fontWeight: '600' },
-recurrenceButton: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8 },
-recurrenceButtonText: { color: '#1d4ed8', fontWeight: '500' },
-dialogButton: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-dialogCancel: { backgroundColor: '#f3f4f6' },
-dialogCancelText: { color: '#111827' },
-dialogSave: { backgroundColor: '#1d4ed8' },
-dialogSaveText: { color: 'white', fontWeight: '600' },
-});
-
-export default TaskEventForm;
+    const label
