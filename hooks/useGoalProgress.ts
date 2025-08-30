@@ -25,12 +25,13 @@ export interface UserCycle {
   user_id: string;
   source: 'custom' | 'global';
   title?: string;
-  start_date: string;
-  end_date: string;
-  is_active: boolean;
-  global_cycle_id?: string;
+  start_date: string | null; // null when source='global'
+  end_date: string | null;
+  status: 'active' | 'completed' | 'archived';
+  global_cycle_id?: string | null;
   created_at: string;
   updated_at: string;
+  timezone?: string;
 }
 
 export interface CycleWeek {
@@ -136,7 +137,6 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     return null;
   }
 };
-
 
   const fetchCycleWeeks = async (userCycleId: string) => {
     try {
