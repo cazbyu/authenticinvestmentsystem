@@ -96,9 +96,9 @@ export function Header({
       {(activeView && onViewChange) && (
         <View style={styles.bottomSection}>
           {/* Always show both toggle groups */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {/* Deposits / Ideas */}
-            <View style={styles.toggleContainer}>
+            <View style={[styles.toggleContainer, { marginRight: 8 }]}>
               <TouchableOpacity
                 style={[styles.toggleButton, activeView === 'deposits' && styles.activeToggle]}
                 onPress={() => onViewChange && onViewChange('deposits')}
