@@ -112,29 +112,31 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   };
 
   const fetchUserCycle = async () => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw userErr;
+    if (!user) return null;
 
-      const { data, error } = await supabase
-  .from('0008-ap-user-cycles')
-  .select('*')
-  .eq('user_id', uid)
-  .eq('status', 'active')
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .maybeSingle(); // returns `data` or null instead of throwing on 0 rows
+    const { data, error } = await supabase
+      .from('0008-ap-user-cycles')
+      .select('*')
+      .eq('user_id', user.id)          // ← fix: use user.id (not uid)
+      .eq('status', 'active')          // ← also switch from is_active to status
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
-      
-      setCurrentCycle(data);
-      return data;
-    } catch (error) {
-      console.error('Error fetching user cycle:', error);
-      return null;
-    }
-  };
+    if (error && error.code !== 'PGRST116') throw error;
+
+    setCurrentCycle(data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching user cycle:', error);
+    return null;
+  }
+};
+
 
   const fetchCycleWeeks = async (userCycleId: string) => {
     try {
