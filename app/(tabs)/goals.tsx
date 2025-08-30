@@ -7,6 +7,7 @@ import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
+import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { Plus, Target, Calendar } from 'lucide-react-native';
 
 export default function Goals() {
@@ -14,6 +15,7 @@ export default function Goals() {
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [cycleSetupVisible, setCycleSetupVisible] = useState(false);
+  const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
 
   // 12-Week Goals
   const { 
@@ -23,7 +25,8 @@ export default function Goals() {
     goalProgress, 
     loading: goalsLoading, 
     refreshGoals,
-    refreshAllData 
+    refreshAllData,
+    createGoal
   } = useGoalProgress();
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
@@ -138,6 +141,11 @@ export default function Goals() {
     setCycleSetupVisible(false);
     refreshAllData();
   };
+
+  const handleCreateGoalSuccess = () => {
+    setCreateGoalModalVisible(false);
+    refreshAllData();
+  };
   const formatCycleDateRange = () => {
     if (!currentCycle?.start_date || !currentCycle?.end_date) return '';
     const startDate = new Date(currentCycle.start_date);
@@ -212,11 +220,7 @@ export default function Goals() {
               <TouchableOpacity 
                 style={styles.createGoalButton}
                 onPress={() => {
-                  setEditingTask({
-                    type: 'goal',
-                    twelveWeekGoalChecked: true,
-                  } as any);
-                  setTaskFormVisible(true);
+                  setCreateGoalModalVisible(true);
                 }}
               >
                 <Plus size={20} color="#ffffff" />
@@ -272,12 +276,7 @@ export default function Goals() {
       <TouchableOpacity 
         style={styles.fab} 
         onPress={() => {
-          setEditingTask({
-            type: 'task',
-            twelveWeekGoalChecked: true,
-            countsTowardWeeklyProgress: true,
-          } as any);
-          setTaskFormVisible(true);
+          setCreateGoalModalVisible(true);
         }}
       >
         <Plus size={24} color="#ffffff" />
@@ -298,6 +297,14 @@ export default function Goals() {
         visible={cycleSetupVisible}
         onClose={() => setCycleSetupVisible(false)}
         onCycleCreated={handleCycleCreated}
+      />
+
+      {/* Create Goal Modal */}
+      <CreateGoalModal
+        visible={createGoalModalVisible}
+        onClose={() => setCreateGoalModalVisible(false)}
+        onSubmitSuccess={handleCreateGoalSuccess}
+        createGoal={createGoal}
       />
     </SafeAreaView>
   );
