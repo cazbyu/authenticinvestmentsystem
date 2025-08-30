@@ -6,12 +6,14 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
+import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { Plus, Target, Calendar } from 'lucide-react-native';
 
 export default function Goals() {
   const [authenticScore, setAuthenticScore] = useState(0);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [cycleSetupVisible, setCycleSetupVisible] = useState(false);
 
   // 12-Week Goals
   const { goals: twelveWeekGoals, currentCycle, goalProgress, loading: goalsLoading, refreshGoals } = useGoalProgress();
@@ -99,6 +101,10 @@ export default function Goals() {
     setEditingTask(null);
   };
 
+  const handleCycleCreated = () => {
+    setCycleSetupVisible(false);
+    refreshGoals();
+  };
   const formatCycleDateRange = () => {
     if (!currentCycle?.start_date || !currentCycle?.end_date) return '';
     const startDate = new Date(currentCycle.start_date);
@@ -212,11 +218,18 @@ export default function Goals() {
         </ScrollView>
       ) : (
         <View style={styles.noCycleContainer}>
-          <Calendar size={48} color="#6b7280" />
-          <Text style={styles.noCycleTitle}>No Active Cycle</Text>
+          <Target size={64} color="#6b7280" />
+          <Text style={styles.noCycleTitle}>Start Your 12-Week Journey</Text>
           <Text style={styles.noCycleText}>
-            There's no active 12-week cycle currently running. Goals will be available when a cycle is active.
+            Create a custom 12-week cycle or sync with the community to begin tracking your authentic investments and achieving your goals.
           </Text>
+          <TouchableOpacity 
+            style={styles.startCycleButton}
+            onPress={() => setCycleSetupVisible(true)}
+          >
+            <Calendar size={20} color="#ffffff" />
+            <Text style={styles.startCycleButtonText}>Start 12-Week Cycle</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -243,6 +256,13 @@ export default function Goals() {
           onClose={handleFormClose}
         />
       </Modal>
+
+      {/* Cycle Setup Modal */}
+      <CycleSetupModal
+        visible={cycleSetupVisible}
+        onClose={() => setCycleSetupVisible(false)}
+        onCycleCreated={handleCycleCreated}
+      />
     </SafeAreaView>
   );
 }
@@ -361,6 +381,26 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 24,
+  },
+  startCycleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  startCycleButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',
