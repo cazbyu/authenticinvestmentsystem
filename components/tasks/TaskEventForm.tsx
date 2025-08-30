@@ -1111,4 +1111,6 @@ if (schedulingType === 'event') {
     return idx >= 0 ? idx : 0;
   })()}
   renderItem={({ item }) => {
-    const label
+    const label = activeTimeField === 'endTime'
+      ? `${item} (${getDurationLabel(formData.startTime, item)})`
+      : item;
