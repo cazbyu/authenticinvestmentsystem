@@ -1114,3 +1114,299 @@ if (schedulingType === 'event') {
     const label = activeTimeField === 'endTime'
       ? `${item} (${getDurationLabel(formData.startTime, item)})`
       : item;
+
+    return (
+      <TouchableOpacity
+        style={styles.timeOption}
+        onPress={() => onTimeSelect(item)}
+      >
+        <Text style={styles.timeOptionText}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }}
+/>
+                </View>
+            </TouchableOpacity>
+        </Modal>
+    </View>
+  );
+};
+
+export default TaskEventForm;
+
+const styles = StyleSheet.create({
+  formContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  formContent: {
+    flex: 1,
+    padding: 16,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
+    backgroundColor: '#ffffff',
+  },
+  schedulingToggle: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 4,
+  },
+  toggleChip: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  toggleChipActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleChipText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  toggleChipTextActive: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  compactSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  compactDateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 16,
+    gap: 12,
+  },
+  amountContainer: {
+    flex: 1,
+  },
+  amountInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+  },
+  withdrawalDateContainer: {
+    flex: 2,
+  },
+  compactDateButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#ffffff',
+  },
+  compactInputLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  dateTextInput: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  compactTimeButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#ffffff',
+    minWidth: 80,
+  },
+  compactInputValue: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  disabledButton: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+  },
+  disabledText: {
+    color: '#9ca3af',
+  },
+  anytimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkedBox: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  checkmark: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  anytimeLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  compactSwitchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  compactSwitchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  compactSwitchLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  recurrenceButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#ffffff',
+    marginTop: 8,
+  },
+  recurrenceButtonText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+    marginTop: 16,
+  },
+  checkboxGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  checkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+  },
+  checkLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  submitButton: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    margin: 16,
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  calendarPopup: {
+    position: 'absolute',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  timePickerPopup: {
+    position: 'absolute',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+    maxHeight: 200,
+    width: 150,
+  },
+  timeOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  timeOptionText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  dayContainer: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+  },
+  selectedDay: {
+    backgroundColor: '#3b82f6',
+  },
+  dayText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  todayText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  selectedDayText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  disabledDayText: {
+    color: '#d1d5db',
+  },
+});
