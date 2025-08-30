@@ -16,7 +16,15 @@ export default function Goals() {
   const [cycleSetupVisible, setCycleSetupVisible] = useState(false);
 
   // 12-Week Goals
-  const { goals: twelveWeekGoals, currentCycle, goalProgress, loading: goalsLoading, refreshGoals } = useGoalProgress();
+  const { 
+    goals: twelveWeekGoals, 
+    currentCycle, 
+    daysLeftData, 
+    goalProgress, 
+    loading: goalsLoading, 
+    refreshGoals,
+    refreshAllData 
+  } = useGoalProgress();
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -87,13 +95,38 @@ export default function Goals() {
 
   useEffect(() => {
     calculateAuthenticScore();
-    refreshGoals();
+    refreshAllData();
   }, []);
+
+  // Auto-refresh days left data at midnight
+  useEffect(() => {
+    if (!currentCycle) return;
+
+    const updateAtMidnight = () => {
+      refreshAllData();
+    };
+
+    // Calculate milliseconds until next midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    // Set timeout for midnight, then interval for every 24 hours
+    const midnightTimeout = setTimeout(() => {
+      updateAtMidnight();
+      const dailyInterval = setInterval(updateAtMidnight, 24 * 60 * 60 * 1000);
+      return () => clearInterval(dailyInterval);
+    }, msUntilMidnight);
+
+    return () => clearTimeout(midnightTimeout);
+  }, [currentCycle, refreshAllData]);
 
   const handleFormSubmitSuccess = () => {
     setTaskFormVisible(false);
     setEditingTask(null);
-    refreshGoals();
+    refreshAllData();
   };
 
   const handleFormClose = () => {
@@ -103,7 +136,7 @@ export default function Goals() {
 
   const handleCycleCreated = () => {
     setCycleSetupVisible(false);
-    refreshGoals();
+    refreshAllData();
   };
   const formatCycleDateRange = () => {
     if (!currentCycle?.start_date || !currentCycle?.end_date) return '';
@@ -131,6 +164,9 @@ export default function Goals() {
       <Header 
         title="Goal Bank" 
         authenticScore={authenticScore}
+        daysRemaining={daysLeftData?.days_left}
+        cycleProgressPercentage={daysLeftData?.pct_elapsed}
+        cycleTitle={currentCycle?.title}
       />
       
       {currentCycle ? (

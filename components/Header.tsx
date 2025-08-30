@@ -16,6 +16,9 @@ interface HeaderProps {
   onBackPress?: () => void;
   backgroundColor?: string;
   onEditPress?: () => void;
+  daysRemaining?: number;
+  cycleProgressPercentage?: number;
+  cycleTitle?: string;
 }
 
 export function Header({ 
@@ -26,7 +29,10 @@ export function Header({
   authenticScore = 85, 
   onBackPress, 
   backgroundColor, 
-  onEditPress 
+  onEditPress,
+  daysRemaining,
+  cycleProgressPercentage,
+  cycleTitle
 }: HeaderProps) {
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
@@ -66,6 +72,24 @@ export function Header({
           <Text style={styles.scoreLabel}>Authentic Total Score</Text>
           <Text style={styles.scoreValue}>{authenticScore}</Text>
         </View>
+        
+        {/* Cycle Progress Section */}
+        {daysRemaining !== undefined && cycleProgressPercentage !== undefined && (
+          <View style={styles.cycleContainer}>
+            <Text style={styles.cycleLabel}>
+              {cycleTitle ? cycleTitle.substring(0, 12) + (cycleTitle.length > 12 ? '...' : '') : 'Cycle'}
+            </Text>
+            <Text style={styles.cycleValue}>{daysRemaining}d</Text>
+            <View style={styles.cycleProgressBar}>
+              <View 
+                style={[
+                  styles.cycleProgressFill, 
+                  { width: `${Math.min(100, Math.max(0, cycleProgressPercentage))}%` }
+                ]} 
+              />
+            </View>
+          </View>
+        )}
       </View>
       
       {/* Bottom section with toggle and sort */}
@@ -185,6 +209,35 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 20,
     fontWeight: '700',
+  },
+  cycleContainer: {
+    alignItems: 'flex-end',
+    marginLeft: 16,
+    minWidth: 60,
+  },
+  cycleLabel: {
+    color: '#ffffff',
+    fontSize: 10,
+    opacity: 0.8,
+    marginBottom: 2,
+  },
+  cycleValue: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  cycleProgressBar: {
+    width: 50,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  cycleProgressFill: {
+    height: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 2,
   },
   bottomSection: {
     flexDirection: 'row',
