@@ -686,10 +686,5 @@ const styles = StyleSheet.create({
   disabledDayText: {
     color: '#d9e1e8',
   },
-  // Styles for CustomDayComponent (copied from TaskEventForm.tsx)
-  dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
-  dayText: { fontSize: 8 },
-  selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
-  todayText: { color: '#0078d4', fontWeight: 'bold' },
-  disabledDayText: { color: '#d9e1e8' },
+  
 });
