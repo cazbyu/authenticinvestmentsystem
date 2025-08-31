@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { CustomDayComponent } from '@/components/tasks/TaskEventForm'; // Import CustomDayComponent
 import { Calendar } from 'react-native-calendars';
 import { X, Calendar as CalendarIcon, Users } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -291,6 +292,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated, initialTab =
         )}
 
         <Calendar
+          dayComponent={CustomDayComponent}
           dayComponent={CustomDayComponent}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={getMarkedDates()}
@@ -686,5 +688,10 @@ const styles = StyleSheet.create({
   disabledDayText: {
     color: '#d9e1e8',
   },
-  
+  // Styles for CustomDayComponent (copied from TaskEventForm.tsx)
+  dayContainer: { width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  dayText: { fontSize: 8 },
+  selectedDay: { backgroundColor: '#0078d4', borderRadius: 10, width: 20, height: 20 },
+  todayText: { color: '#0078d4', fontWeight: 'bold' },
+  disabledDayText: { color: '#d9e1e8' },
 });

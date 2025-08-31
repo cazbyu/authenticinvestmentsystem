@@ -160,26 +160,28 @@ export default function Goals() {
 
   // Auto-refresh days left data at midnight
   useEffect(() => {
-  if (!currentCycle) return;
+    if (!currentCycle) return;
 
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  const scheduleNext = () => {
-    const now = new Date();
-    const next = new Date(now);
-    next.setDate(now.getDate() + 1);
-    next.setHours(0, 0, 0, 0);
-    const ms = next.getTime() - now.getTime();
-
-    timeoutId = setTimeout(() => {
+    const updateAtMidnight = () => {
       refreshAllData();
-      scheduleNext(); // schedule again after it runs
-    }, ms);
-  };
+    };
 
-  scheduleNext();
-  return () => { if (timeoutId) clearTimeout(timeoutId); };
-}, [currentCycle, refreshAllData]);
+    // Calculate milliseconds until next midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    // Set timeout for midnight, then interval for every 24 hours
+    const midnightTimeout = setTimeout(() => {
+      updateAtMidnight();
+      const dailyInterval = setInterval(updateAtMidnight, 24 * 60 * 60 * 1000);
+      return () => clearInterval(dailyInterval);
+    }, msUntilMidnight);
+
+    return () => clearTimeout(midnightTimeout);
+  }, [currentCycle, refreshAllData]);
 
   const handleFormSubmitSuccess = () => {
     setTaskFormVisible(false);
