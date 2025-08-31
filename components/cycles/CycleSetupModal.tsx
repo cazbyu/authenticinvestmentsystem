@@ -10,7 +10,6 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { CustomDayComponent } from '@/components/tasks/TaskEventForm'; // Import CustomDayComponent
 import { Calendar } from 'react-native-calendars';
 import { X, Calendar as CalendarIcon, Users } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
