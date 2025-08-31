@@ -292,7 +292,6 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated, initialTab =
 
         <Calendar
           dayComponent={CustomDayComponent}
-          dayComponent={CustomDayComponent}
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={getMarkedDates()}
           minDate={new Date().toISOString().split('T')[0]}
