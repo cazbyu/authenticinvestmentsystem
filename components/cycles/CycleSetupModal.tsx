@@ -468,42 +468,7 @@ console.log('Active cycle after global sync:', activeCycle);
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Community Cycles</Text>
 
-        {/* Week Start Day Toggle for Global Cycles */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Week Start Day</Text>
-          <View style={styles.weekStartToggle}>
-            <TouchableOpacity
-              style={[
-                styles.weekStartOption,
-                weekStartDay === 'sunday' && styles.activeWeekStartOption
-              ]}
-              onPress={() => setWeekStartDay('sunday')}
-            >
-              <Text style={[
-                styles.weekStartOptionText,
-                weekStartDay === 'sunday' && styles.activeWeekStartOptionText
-              ]}>
-                Sunday
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.weekStartOption,
-                weekStartDay === 'monday' && styles.activeWeekStartOption
-              ]}
-              onPress={() => setWeekStartDay('monday')}
-            >
-              <Text style={[
-                styles.weekStartOptionText,
-                weekStartDay === 'monday' && styles.activeWeekStartOptionText
-              ]}>
-                Monday
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {fetchingGlobal ? (
+                {fetchingGlobal ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0078d4" />
             <Text style={styles.loadingText}>Loading community cycles...</Text>
