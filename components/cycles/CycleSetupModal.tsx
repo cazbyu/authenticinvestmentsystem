@@ -176,28 +176,44 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
     // Mark days for current and next 3 months
     for (let monthOffset = 0; monthOffset < 4; monthOffset++) {
       const month = (currentMonth + monthOffset) % 12;
-    // Check if today is the target start day
-    const includeToday = currentDay === targetDay;
+      const year = currentYear + Math.floor((currentMonth + monthOffset) / 12);
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      // Check if today is the target start day
+      const currentDay = today.getDay();
+      const targetDay = weekStartDay === 'sunday' ? 0 : 1;
+      const includeToday = currentDay === targetDay;
+      
       for (let day = 1; day <= daysInMonth; day++) {
-    // Generate next 8 weeks, including today if it's the target day
-    for (let i = 0; i < 8; i++) {
-        const dateString = date.toISOString().split('T')[0];
+        const date = new Date(year, month, day);
+        const dayOfWeek = date.getDay();
         
-      if (i === 0 && includeToday) {
-        if ((weekStartDay === 'sunday' && dayOfWeek === 0) || 
-        // Calculate days to the next occurrence of target day
-        let daysToAdd = targetDay - currentDay;
-        if (daysToAdd <= 0) {
-          daysToAdd += 7; // Move to next week if target day has passed or is today
+        // Generate next 8 weeks, including today if it's the target day
+        for (let i = 0; i < 8; i++) {
+          const dateString = date.toISOString().split('T')[0];
+          
+          if (i === 0 && includeToday) {
+            if ((weekStartDay === 'sunday' && dayOfWeek === 0) || 
+                (weekStartDay === 'monday' && dayOfWeek === 1)) {
+              // Calculate days to the next occurrence of target day
+              let daysToAdd = targetDay - currentDay;
+              if (daysToAdd <= 0) {
+                daysToAdd += 7; // Move to next week if target day has passed or is today
+              }
+              
+              // Add additional weeks for subsequent options
+              const weekOffset = includeToday ? i : i - 1;
+              if (weekOffset > 0) {
+                daysToAdd += weekOffset * 7;
+              }
+              
+              marked[dateString] = {
+                marked: true,
+                dotColor: '#16a34a',
+              };
+            }
+          }
         }
-        
-        // Add additional weeks for subsequent options
-        const weekOffset = includeToday ? i : i - 1;
-        if (weekOffset > 0) {
-          daysToAdd += weekOffset * 7;
-        }
-        
-          marked[dateString] = {
       }
     }
 
