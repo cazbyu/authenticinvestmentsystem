@@ -114,28 +114,29 @@ export function getAvailableWeekStarts(weekStartDay: 'sunday' | 'monday' = 'sund
   const currentDay = today.getDay();
   const targetDay = weekStartDay === 'sunday' ? 0 : 1;
   
-  // Check if today is the target start day
-  const includeToday = currentDay === targetDay;
-  
   // Generate next 8 weeks
   for (let i = 0; i < 8; i++) {
     const weekStart = new Date(today);
     
-    if (i === 0 && includeToday) {
-      // Use today as the start date
-      // weekStart is already today, no changes needed
+    if (i === 0 && currentDay === targetDay) {
+      // Today is the target day, use today as start
+      // weekStart is already set to today
     } else {
-      // Calculate days to next occurrence of target day
+      // Calculate days to the next occurrence of target day
       let daysToAdd = targetDay - currentDay;
       if (daysToAdd <= 0) {
         daysToAdd += 7; // Move to next week if target day has passed
       }
       
-      // Add additional weeks for subsequent iterations
-      if (includeToday) {
-        daysToAdd += (i - 1) * 7; // Skip first iteration since we used today
+      // For subsequent weeks, add the appropriate offset
+      if (currentDay === targetDay) {
+        // If today is target day, subsequent weeks are i weeks later
+        daysToAdd += i * 7;
       } else {
-        daysToAdd += i * 7; // Add weeks normally
+        // If today is not target day, add weeks for subsequent options
+        if (i > 0) {
+          daysToAdd += (i - 1) * 7;
+        }
       }
       
       weekStart.setDate(weekStart.getDate() + daysToAdd);
