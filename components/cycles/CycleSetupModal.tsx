@@ -370,48 +370,46 @@ console.log('Active cycle after global sync:', activeCycle);
         </View>
 
         {/* Week Selection Dropdown */}
-        {!isEditMode && (
-          <View style={styles.field}>
-            <Text style={styles.label}>Select Start Week</Text>
-            <TouchableOpacity
-              style={styles.dropdown}
-              onPress={() => setShowWeekDropdown(!showWeekDropdown)}
-            >
-              <Text style={styles.dropdownText}>
-                {selectedWeekStart 
-                  ? availableWeeks.find(w => w.start === selectedWeekStart)?.label || 'Select week...'
-                  : 'Select week...'
-                }
-              </Text>
-              <Text style={styles.dropdownArrow}>{showWeekDropdown ? '▲' : '▼'}</Text>
-            </TouchableOpacity>
-            
-            {showWeekDropdown && (
-              <View style={styles.dropdownContent}>
-                {availableWeeks.map((week, index) => (
-                  <TouchableOpacity
-                    key={week.start}
-                    style={[
-                      styles.dropdownOption,
-                      selectedWeekStart === week.start && styles.selectedDropdownOption
-                    ]}
-                    onPress={() => {
-                      setSelectedWeekStart(week.start);
-                      setShowWeekDropdown(false);
-                    }}
-                  >
-                    <Text style={[
-                      styles.dropdownOptionText,
-                      selectedWeekStart === week.start && styles.selectedDropdownOptionText
-                    ]}>
-                      {week.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
+<View style={styles.field}>
+  <Text style={styles.label}>Select Start Week</Text>
+  <TouchableOpacity
+    style={styles.dropdown}
+    onPress={() => setShowWeekDropdown(!showWeekDropdown)}
+  >
+    <Text style={styles.dropdownText}>
+      {selectedWeekStart 
+        ? availableWeeks.find(w => w.start === selectedWeekStart)?.label || 'Select week...'
+        : 'Select week...'
+      }
+    </Text>
+    <Text style={styles.dropdownArrow}>{showWeekDropdown ? '▲' : '▼'}</Text>
+  </TouchableOpacity>
+  
+  {showWeekDropdown && (
+    <View style={styles.dropdownContent}>
+      {availableWeeks.map((week) => (
+        <TouchableOpacity
+          key={week.start}
+          style={[
+            styles.dropdownOption,
+            selectedWeekStart === week.start && styles.selectedDropdownOption
+          ]}
+          onPress={() => {
+            setSelectedWeekStart(week.start);
+            setShowWeekDropdown(false);
+          }}
+        >
+          <Text style={[
+            styles.dropdownOptionText,
+            selectedWeekStart === week.start && styles.selectedDropdownOptionText
+          ]}>
+            {week.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  )}
+</View>
 
         {selectedWeekStart && !isEditMode && (
           <View style={styles.selectedWeekContainer}>
