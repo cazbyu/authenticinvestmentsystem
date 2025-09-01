@@ -184,6 +184,21 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
         const dayOfWeek = date.getDay();
         const dateString = date.toISOString().split('T')[0];
         
+        // Mark Sundays (0) or Mondays (1) as selectable
+        if ((weekStartDay === 'sunday' && dayOfWeek === 0) || 
+            (weekStartDay === 'monday' && dayOfWeek === 1)) {
+          marked[dateString] = {
+            ...marked[dateString],
+            marked: true,
+            dotColor: '#0078d4',
+          };
+        }
+      }
+    }
+
+    return marked;
+  };
+
   const renderCustomTab = () => (
     <ScrollView style={styles.tabContent}>
       <View style={styles.section}>
