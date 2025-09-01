@@ -137,9 +137,9 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
             title: customTitle.trim() || null,
             global_cycle_id: null,
             start_date: selectedWeekStart || initialData.start_date,
-            end_date: selectedWeekStart ? 
-              new Date(new Date(selectedWeekStart).getTime() + 83 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : 
-              initialData.end_date,
+            end_date: selectedWeekStart
+  ? formatLocalDate(new Date(new Date(selectedWeekStart).getTime() + 83 * 24 * 60 * 60 * 1000))
+  : initialData.end_date,
             week_start_day: weekStartDay,
             updated_at: new Date().toISOString()
           })
