@@ -573,7 +573,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       if (!user || !currentCycle) return null;
 
       // Create the task
-      const { data: taskData, error: taskError } = await supabase
+      const { data: insertedTask, error: taskError } = await supabase
         .from('0008-ap-tasks')
         .insert({
           user_id: user.id,
@@ -589,7 +589,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .select()
         .single();
 
-      if (taskError) throw taskError;
+      if (taskError) throw taskError;*
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
