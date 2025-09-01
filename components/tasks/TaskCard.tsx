@@ -349,7 +349,14 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         flexDirection: 'row',
         marginBottom: 4,
       },
-      leftSection: {
+      
+    inlineGoalChip: {
+  fontSize: 12,
+  fontWeight: '500',
+  color: '#1f2937',
+},
+    
+    leftSection: {
         flex: 1,
         marginRight: 8,
       },
