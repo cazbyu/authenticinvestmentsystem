@@ -184,7 +184,6 @@ export default function Dashboard() {
 .not('status', 'in', '(completed,cancelled)')
 .in('type', ['task', 'event']);
 
-
       if (tasksError) throw tasksError;
 
       let totalDeposits = 0;
