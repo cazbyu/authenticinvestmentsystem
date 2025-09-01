@@ -98,6 +98,11 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
 
       if (error) throw error;
       setGlobalCycles(data || []);
+      // Auto-select the latest active cycle if none is selected
+if ((data && data.length > 0) && !selectedGlobalCycle) {
+  setSelectedGlobalCycle(data[0].id);
+}
+
     } catch (error) {
       console.error('Error fetching global cycles:', error);
       Alert.alert('Error', 'Failed to fetch global cycles');
