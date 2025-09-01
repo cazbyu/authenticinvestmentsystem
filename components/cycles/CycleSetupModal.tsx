@@ -135,6 +135,17 @@ if ((data && data.length > 0) && !selectedGlobalCycle) {
         p_week_start_day: weekStartDay,
       });
       if (error) throw error;
+
+// Verify which cycle is now active (debug + ensure parent sees it)
+const { data: activeCycle } = await supabase
+  .from('0008-ap-user-cycles')
+  .select('id, source, global_cycle_id, status, created_at')
+  .eq('status', 'active')
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+console.log('Active cycle after global sync:', activeCycle);
+      
     } else if (sourceChanged || startChanged) {
       // SWITCHING: create a fresh custom cycle (old one will auto-complete)
       const startDateForNew = selectedWeekStart || initialData.start_date;
@@ -194,6 +205,17 @@ if ((data && data.length > 0) && !selectedGlobalCycle) {
         p_week_start_day: weekStartDay,
       });
       if (error) throw error;
+
+// Verify which cycle is now active (debug + ensure parent sees it)
+const { data: activeCycle } = await supabase
+  .from('0008-ap-user-cycles')
+  .select('id, source, global_cycle_id, status, created_at')
+  .eq('status', 'active')
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+console.log('Active cycle after global sync:', activeCycle);
+      
     } else if (sourceChanged || globalChanged) {
       // SWITCHING: create a fresh global-linked cycle (old one auto-completes)
       const { error } = await supabase.rpc('ap_create_user_cycle', {
@@ -227,7 +249,6 @@ if ((data && data.length > 0) && !selectedGlobalCycle) {
     setLoading(false);
   }
 };
-
 
   const getMarkedDates = () => {
     const marked: any = {};
