@@ -106,8 +106,7 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
     }
   };
 
-  
-  const handleSaveCustomCycle = async () => {
+    const handleSaveCustomCycle = async () => {
     console.log('=== handleSaveCustomCycle called ===');
     console.log('isEditMode:', isEditMode);
     console.log('selectedWeekStart:', selectedWeekStart);
