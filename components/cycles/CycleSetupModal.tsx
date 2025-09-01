@@ -614,19 +614,15 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
               activeTab === 'global' && styles.activeTabButton,
             ]}
             onPress={() => {
-              if (isEditMode && originalCycleSource !== 'global') {
-                Alert.alert(
-                  'Switch to Community?',
-                  'This will sync your custom cycle to a community cycle. Are you sure?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Switch', onPress: () => setActiveTab('global') }
-                  ]
-                );
-              } else {
-                setActiveTab('global');
-              }
-            }}
+  // Always switch the tab immediately (works on web/mobile)
+  setActiveTab('global');
+
+  // Optional heads-up after switching; does not block the tab change
+  if (isEditMode && originalCycleSource !== 'global') {
+    console.log('Switched to Community tab from Custom while editing.');
+  }
+}}
+
           >
             <Users size={16} color={activeTab === 'global' ? '#ffffff' : '#6b7280'} />
             <Text style={[
