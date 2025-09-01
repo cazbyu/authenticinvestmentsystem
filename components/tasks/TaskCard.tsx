@@ -176,9 +176,13 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         <View style={styles.taskContent}>
           <View style={styles.taskHeader}>
             <Text style={styles.taskTitle} numberOfLines={2}>
-              {task.title}
-              {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
-            </Text>
+  {task.title}
+  {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
+  {task.goals && task.goals[0] && (
+    <Text style={styles.inlineGoalChip}>  •  {task.goals[0].title}</Text>
+  )}
+</Text>
+
           </View>
           <View style={styles.taskBody}>
             <View style={styles.leftSection}>
