@@ -75,7 +75,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       } else {
         // Calculate the start of the week based on preference
         let daysToAdd = targetDay - currentDay;
-        if (daysToAdd <= 0) {
+        if (daysToAdd <= 0 && !(i === 0 && includeToday)) {
           daysToAdd += 7; // Move to next week if target day has passed
         }
         daysToAdd += ((i - (includeToday ? 1 : 0)) * 7); // Add weeks
@@ -83,12 +83,12 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       }
       
       const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 6); // End of week (6 days later)
+      weekEnd.setDate(weekEnd.getDate() + 83); // 12 weeks = 84 days, minus 1 = 83
       
       const startStr = weekStart.toISOString().split('T')[0];
       const endStr = weekEnd.toISOString().split('T')[0];
       
-      const label = `${weekStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`;
+      const label = `${weekStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`;
       
       weeks.push({
         start: startStr,
