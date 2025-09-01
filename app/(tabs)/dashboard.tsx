@@ -12,6 +12,8 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
+import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
@@ -28,7 +30,9 @@ export default function Dashboard() {
   const [authenticScore, setAuthenticScore] = useState(0);
 
   // 12-Week Goals
-   const fetchData = async () => {
+  const { goals: twelveWeekGoals, goalProgress, loading: goalsLoading, refreshGoals } = useGoalProgress();
+
+  const fetchData = async () => {
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
@@ -39,11 +43,10 @@ export default function Dashboard() {
         // Fetch tasks/events
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-.select('*')
-.eq('user_id', user.id)
-.not('status', 'in', '(completed,cancelled)')
-.eq('user_cycle_id', /* active user cycle id here */)
-.in('type', ['task', 'event']);
+          .select('*')
+          .eq('user_id', user.id)
+          .not('status', 'in', '(completed,cancelled)')
+          .in('type', ['task', 'event']);
 
         if (tasksError) throw tasksError;
         if (!tasksData || tasksData.length === 0) {
@@ -179,10 +182,10 @@ export default function Dashboard() {
       // Calculate deposits from completed tasks
       const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
-.select('*')
-.eq('user_id', user.id)
-.not('status', 'in', '(completed,cancelled)')
-.in('type', ['task', 'event']);
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .not('completed_at', 'is', null);
 
       if (tasksError) throw tasksError;
 
