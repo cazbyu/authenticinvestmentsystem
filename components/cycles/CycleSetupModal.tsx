@@ -147,7 +147,13 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
         const { data, error } = await supabase
           .from('0008-ap-user-cycles')
           .update({
+            source: 'custom',
             title: customTitle.trim() || null,
+            global_cycle_id: null,
+            start_date: selectedWeekStart || initialData.start_date,
+            end_date: selectedWeekStart ? 
+              new Date(new Date(selectedWeekStart).getTime() + 83 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : 
+              initialData.end_date,
             week_start_day: weekStartDay,
             updated_at: new Date().toISOString()
           })
@@ -219,11 +225,24 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
       if (isEditMode && initialData) {
         console.log('Updating existing global cycle...');
         
-        // Update existing cycle
+        // Get the selected global cycle data first
+        const { data: globalCycleData, error: globalCycleError } = await supabase
+          .from('0008-ap-global-cycles')
+          .select('title, start_date, end_date')
+          .eq('id', selectedGlobalCycle)
+          .single();
+
+        if (globalCycleError) throw globalCycleError;
+
+        // Update existing cycle to sync with global cycle
         const { data, error } = await supabase
           .from('0008-ap-user-cycles')
           .update({
+            source: 'global',
             global_cycle_id: selectedGlobalCycle,
+            title: globalCycleData.title,
+            start_date: globalCycleData.start_date,
+            end_date: globalCycleData.end_date,
             week_start_day: weekStartDay,
             updated_at: new Date().toISOString()
           })
@@ -549,10 +568,12 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
                 style={[
                   styles.globalCycleCard,
                   selectedGlobalCycle === cycle.id && styles.selectedGlobalCycleCard,
-                  isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id !== cycle.id && styles.disabledGlobalCycleCard
                 ]}
                 onPress={() => {
-                  if (isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id !== cycle.id) {
+                  if (isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id === cycle.id) {
+                    // Already selected, just select it
+                    setSelectedGlobalCycle(cycle.id);
+                  } else if (isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id !== cycle.id) {
                     Alert.alert(
                       'Switch Global Cycle?',
                       'This will switch you to a different community cycle. Are you sure?',
@@ -565,7 +586,6 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
                     setSelectedGlobalCycle(cycle.id);
                   }
                 }}
-                disabled={isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id !== cycle.id}
               >
                 <View style={styles.globalCycleContent}>
                   <Text style={styles.globalCycleTitle}>
@@ -629,10 +649,9 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
             style={[
               styles.tabButton,
               activeTab === 'custom' && styles.activeTabButton,
-              isEditMode && originalCycleSource === 'global' && styles.disabledTabButton
             ]}
             onPress={() => {
-              if (isEditMode && originalCycleSource === 'global') {
+              if (isEditMode && originalCycleSource !== 'custom') {
                 Alert.alert(
                   'Switch to Custom?',
                   'This will convert your community-synced cycle to a custom cycle. Are you sure?',
@@ -645,7 +664,6 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
                 setActiveTab('custom');
               }
             }}
-            disabled={isEditMode && originalCycleSource === 'global'}
           >
             <CalendarIcon size={16} color={activeTab === 'custom' ? '#ffffff' : '#6b7280'} />
             <Text style={[
@@ -660,10 +678,9 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
             style={[
               styles.tabButton,
               activeTab === 'global' && styles.activeTabButton,
-              isEditMode && originalCycleSource === 'custom' && styles.disabledTabButton
             ]}
             onPress={() => {
-              if (isEditMode && originalCycleSource === 'custom') {
+              if (isEditMode && originalCycleSource !== 'global') {
                 Alert.alert(
                   'Switch to Community?',
                   'This will sync your custom cycle to a community cycle. Are you sure?',
@@ -676,7 +693,6 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
                 setActiveTab('global');
               }
             }}
-            disabled={isEditMode && originalCycleSource === 'custom'}
           >
             <Users size={16} color={activeTab === 'global' ? '#ffffff' : '#6b7280'} />
             <Text style={[
@@ -1001,8 +1017,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  disabledGlobalCycleCard: {
-    opacity: 0.5,
   },
 });
