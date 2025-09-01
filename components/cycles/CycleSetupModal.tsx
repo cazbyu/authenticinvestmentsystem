@@ -466,15 +466,7 @@ console.log('Active cycle after global sync:', activeCycle);
   const renderGlobalTab = () => (
     <ScrollView style={styles.tabContent}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          {isEditMode ? 'Edit Community Sync' : 'Community Cycles'}
-        </Text>
-        <Text style={styles.sectionDescription}>
-          {isEditMode 
-            ? 'Update your community sync settings and week start day preference'
-            : 'Sync your 12-week cycle with the community to stay aligned with others'
-          }
-        </Text>
+        <Text style={styles.sectionTitle}>Community Cycles</Text>
 
         {/* Week Start Day Toggle for Global Cycles */}
         <View style={styles.field}>
