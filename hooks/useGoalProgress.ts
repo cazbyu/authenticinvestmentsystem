@@ -466,7 +466,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     if (!currentCycle || cycleWeeks.length === 0) return 1;
     
     const now = new Date();
-    const currentDateString = now.toISOString().split('T')[0];
+    const currentDateString = formatLocalDate(now);
     
     // Find which week we're currently in
     const currentWeekData = cycleWeeks.find(week => 
