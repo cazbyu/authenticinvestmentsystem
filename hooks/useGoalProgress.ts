@@ -122,13 +122,35 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     if (!user) return null;
 
     const { data, error } = await supabase
-      .from('0008-ap-user-cycles')
-      .select('*')
-      .eq('user_id', user.id)          // ← fix: use user.id (not uid)
-      .eq('status', 'active')          // ← also switch from is_active to status
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  .from('0008-ap-user-cycles')
+  .select(`
+    *,
+    global:0008-ap-global-cycles(id, start_date, end_date, title)
+  `)
+  .eq('user_id', user.id)
+  .eq('status', 'active')
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+if (error && error.code !== 'PGRST116') throw error;
+
+// Build an object that always has start/end (effective dates)
+const effectiveStart = data?.start_date ?? data?.global?.start_date ?? null;
+const effectiveEnd   = data?.end_date   ?? data?.global?.end_date   ?? null;
+
+const hydrated = data
+  ? {
+      ...data,
+      start_date: effectiveStart,
+      end_date: effectiveEnd,
+      // Optional: show global title if user left their title null
+      title: data.title ?? data.global?.title ?? null,
+    }
+  : null;
+
+setCurrentCycle(hydrated as any);
+return hydrated;
 
     if (error && error.code !== 'PGRST116') throw error;
 
