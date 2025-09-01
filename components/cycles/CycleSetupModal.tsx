@@ -10,8 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Calendar } from 'react-native-calendars';
-import { X, Calendar as CalendarIcon, Users } from 'lucide-react-native';
+import { X, Calendar as CalendarIcon, Users, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
 interface GlobalCycle {
@@ -32,7 +31,10 @@ interface CycleSetupModalProps {
 export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetupModalProps) {
   const [activeTab, setActiveTab] = useState<'custom' | 'global'>('custom');
   const [customTitle, setCustomTitle] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedWeekStart, setSelectedWeekStart] = useState('');
+  const [weekStartDay, setWeekStartDay] = useState<'sunday' | 'monday'>('sunday');
+  const [showWeekDropdown, setShowWeekDropdown] = useState(false);
+  const [availableWeeks, setAvailableWeeks] = useState<Array<{start: string; end: string; label: string}>>([]);
   const [globalCycles, setGlobalCycles] = useState<GlobalCycle[]>([]);
   const [selectedGlobalCycle, setSelectedGlobalCycle] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,8 +44,60 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
     if (visible && activeTab === 'global') {
       fetchGlobalCycles();
     }
+    if (visible && activeTab === 'custom') {
+      generateAvailableWeeks();
+    }
   }, [visible, activeTab]);
 
+  useEffect(() => {
+    if (visible && activeTab === 'custom') {
+      generateAvailableWeeks();
+    }
+  }, [weekStartDay]);
+
+  const generateAvailableWeeks = () => {
+    const weeks = [];
+    const today = new Date();
+    
+    // Generate next 8 weeks starting from today
+    for (let i = 0; i < 8; i++) {
+      const weekStart = new Date(today);
+      
+      // Calculate the start of the week based on preference
+      const currentDay = weekStart.getDay();
+      const targetDay = weekStartDay === 'sunday' ? 0 : 1; // 0 = Sunday, 1 = Monday
+      
+      // Calculate days to add/subtract to get to the target start day
+      let daysToAdd = targetDay - currentDay;
+      if (daysToAdd <= 0) {
+        daysToAdd += 7; // Move to next week if target day has passed
+      }
+      daysToAdd += (i * 7); // Add weeks
+      
+      weekStart.setDate(weekStart.getDate() + daysToAdd);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6); // End of week (6 days later)
+      
+      const startStr = weekStart.toISOString().split('T')[0];
+      const endStr = weekEnd.toISOString().split('T')[0];
+      
+      const label = `${weekStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`;
+      
+      weeks.push({
+        start: startStr,
+        end: endStr,
+        label
+      });
+    }
+    
+    setAvailableWeeks(weeks);
+    
+    // Auto-select first week if none selected
+    if (!selectedWeekStart && weeks.length > 0) {
+      setSelectedWeekStart(weeks[0].start);
+    }
+  };
   const fetchGlobalCycles = async () => {
     setFetchingGlobal(true);
     try {
@@ -64,18 +118,6 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
     }
   };
 
-  const isValidStartDay = (dateString: string) => {
-    const date = new Date(dateString);
-    const dayOfWeek = date.getDay();
-    return dayOfWeek === 0 || dayOfWeek === 1; // Sunday (0) or Monday (1)
-  };
-
-  const getDayName = (dateString: string) => {
-    const date = new Date(dateString);
-    const dayOfWeek = date.getDay();
-    return dayOfWeek === 0 ? 'Sunday' : dayOfWeek === 1 ? 'Monday' : 'Invalid';
-  };
-
   const formatDateRange = (startDate: string, endDate: string) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -91,13 +133,8 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   };
 
   const handleCreateCustomCycle = async () => {
-    if (!selectedDate) {
+    if (!selectedWeekStart) {
       Alert.alert('Error', 'Please select a start date');
-      return;
-    }
-
-    if (!isValidStartDay(selectedDate)) {
-      Alert.alert('Error', 'Start date must be a Sunday or Monday');
       return;
     }
 
@@ -108,7 +145,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       // Call the RPC function to create a custom user cycle
       const { data, error } = await supabase.rpc('ap_create_user_cycle', {
         p_source: 'custom',
-        p_start_date: selectedDate,
+        p_start_date: selectedWeekStart,
         p_title: customTitle.trim() || null
       });
 
@@ -119,7 +156,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       onClose();
       
       // Reset form
-      setSelectedDate('');
+      setSelectedWeekStart('');
       setCustomTitle('');
     } catch (error) {
       console.error('Error creating custom cycle:', error);
@@ -192,92 +229,110 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
             marked[dateString] = {
               marked: true,
               dotColor: '#0078d4',
-            };
-          }
-        }
-      }
-    }
-
-    return marked;
-  };
-
-  const renderCustomTab = () => (
-    <ScrollView style={styles.tabContent}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Custom Cycle Title (Optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={customTitle}
-          onChangeText={setCustomTitle}
-          placeholder="e.g., Q1 2025 Focus, Spring Goals..."
-          placeholderTextColor="#9ca3af"
-        />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Start Date</Text>
-        <Text style={styles.sectionDescription}>
-          Your 12-week cycle must start on a Sunday or Monday
+          Choose when your 12-week cycle begins and whether weeks start on Sunday or Monday
         </Text>
         
-        {selectedDate && (
-          <View style={[
-            styles.selectedDateContainer,
-            { backgroundColor: isValidStartDay(selectedDate) ? '#f0fdf4' : '#fef2f2' }
-          ]}>
+        {/* Week Start Day Toggle */}
+        <View style={styles.weekStartToggle}>
+          <TouchableOpacity
+            style={[
+              styles.weekStartOption,
+              weekStartDay === 'sunday' && styles.activeWeekStartOption
+            ]}
+            onPress={() => setWeekStartDay('sunday')}
+          >
             <Text style={[
-              styles.selectedDateText,
-              { color: isValidStartDay(selectedDate) ? '#16a34a' : '#dc2626' }
+              styles.weekStartOptionText,
+              weekStartDay === 'sunday' && styles.activeWeekStartOptionText
             ]}>
-              Selected: {new Date(selectedDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              })}
+              Sunday
             </Text>
-            {!isValidStartDay(selectedDate) && (
-              <Text style={styles.errorText}>
-                Please select a Sunday or Monday
-              </Text>
-            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.weekStartOption,
+              weekStartDay === 'monday' && styles.activeWeekStartOption
+            ]}
+            onPress={() => setWeekStartDay('monday')}
+          >
+            <Text style={[
+              styles.weekStartOptionText,
+              weekStartDay === 'monday' && styles.activeWeekStartOptionText
+            ]}>
+              Monday
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Week Selection Dropdown */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Select Start Week</Text>
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setShowWeekDropdown(!showWeekDropdown)}
+          >
+            <Text style={styles.dropdownText}>
+              {selectedWeekStart 
+                ? availableWeeks.find(w => w.start === selectedWeekStart)?.label || 'Select week...'
+                : 'Select week...'
+              }
+            </Text>
+            <Text style={styles.dropdownArrow}>{showWeekDropdown ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          
+          {showWeekDropdown && (
+            <View style={styles.dropdownContent}>
+              {availableWeeks.map((week, index) => (
+                <TouchableOpacity
+                  key={week.start}
+                  style={[
+                    styles.dropdownOption,
+                    selectedWeekStart === week.start && styles.selectedDropdownOption
+                  ]}
+                  onPress={() => {
+                    setSelectedWeekStart(week.start);
+                    setShowWeekDropdown(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.dropdownOptionText,
+                    selectedWeekStart === week.start && styles.selectedDropdownOptionText
+                  ]}>
+                    {week.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {selectedWeekStart && (
+          <View style={styles.selectedWeekContainer}>
+            <Text style={styles.selectedWeekText}>
+              12-week cycle: {selectedWeekStart} to {
+                (() => {
+                  const start = new Date(selectedWeekStart);
+                  const end = new Date(start);
+                  end.setDate(end.getDate() + (12 * 7) - 1);
+                  return end.toLocaleDateString('en-US', { 
+                    day: 'numeric', 
+                    month: 'short',
+                    year: 'numeric'
+                  });
+                })()
+              }
+            </Text>
           </View>
         )}
-
-        <Calendar
-          onDayPress={(day) => setSelectedDate(day.dateString)}
-          markedDates={getMarkedDates()}
-          minDate={new Date().toISOString().split('T')[0]}
-          theme={{
-            backgroundColor: '#ffffff',
-            calendarBackground: '#ffffff',
-            textSectionTitleColor: '#6b7280',
-            selectedDayBackgroundColor: '#0078d4',
-            selectedDayTextColor: '#ffffff',
-            todayTextColor: '#0078d4',
-            dayTextColor: '#1f2937',
-            textDisabledColor: '#d1d5db',
-            dotColor: '#0078d4',
-            selectedDotColor: '#ffffff',
-            arrowColor: '#0078d4',
-            monthTextColor: '#1f2937',
-            textDayFontWeight: '500',
-            textMonthFontWeight: '600',
-            textDayHeaderFontWeight: '500',
-            textDayFontSize: 14,
-            textMonthFontSize: 16,
-            textDayHeaderFontSize: 12
-          }}
-        />
       </View>
 
       <TouchableOpacity
         style={[
           styles.createButton,
-          (!selectedDate || !isValidStartDay(selectedDate) || loading) && styles.createButtonDisabled
+          (!selectedWeekStart || loading) && styles.createButtonDisabled
         ]}
         onPress={handleCreateCustomCycle}
-        disabled={!selectedDate || !isValidStartDay(selectedDate) || loading}
+        disabled={!selectedWeekStart || loading}
       >
         {loading ? (
           <ActivityIndicator size="small" color="#ffffff" />
@@ -498,22 +553,102 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1f2937',
   },
-  selectedDateContainer: {
+  weekStartToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 2,
+    marginBottom: 16,
+  },
+  weekStartOption: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeWeekStartOption: {
+    backgroundColor: '#0078d4',
+  },
+  weekStartOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeWeekStartOptionText: {
+    color: '#ffffff',
+  },
+  field: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  dropdown: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  dropdownContent: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    marginTop: 4,
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dropdownOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  selectedDropdownOption: {
+    backgroundColor: '#f0f9ff',
+  },
+  dropdownOptionText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  selectedDropdownOptionText: {
+    color: '#0078d4',
+    fontWeight: '600',
+  },
+  selectedWeekContainer: {
     padding: 12,
+    backgroundColor: '#f0fdf4',
     borderRadius: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#16a34a',
   },
-  selectedDateText: {
+  selectedWeekText: {
     fontSize: 14,
     fontWeight: '500',
-    marginBottom: 4,
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#dc2626',
-    fontStyle: 'italic',
+    color: '#16a34a',
+    textAlign: 'center',
   },
   createButton: {
     flexDirection: 'row',
