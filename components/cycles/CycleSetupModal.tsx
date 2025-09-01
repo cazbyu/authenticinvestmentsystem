@@ -426,17 +426,7 @@ console.log('Active cycle after global sync:', activeCycle);
             </Text>
           </View>
         )}
-
-        {isEditMode && (
-          <View style={styles.editInfoContainer}>
-            <Text style={styles.editInfoText}>
-              Current cycle: {formatDateRange(initialData?.start_date || '', initialData?.end_date || '')}
-            </Text>
-            <Text style={styles.editInfoSubtext}>
-              Note: Changing week start day will affect how weeks are calculated
-            </Text>
-          </View>
-        )}
+        
       </View>
 
       <TouchableOpacity
