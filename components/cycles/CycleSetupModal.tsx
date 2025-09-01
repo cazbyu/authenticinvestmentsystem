@@ -91,25 +91,40 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   };
 
   const handleCreateCustomCycle = async () => {
+    console.log('=== handleCreateCustomCycle called ===');
+    console.log('selectedWeekStart:', selectedWeekStart);
+    console.log('customTitle:', customTitle);
+    console.log('weekStartDay:', weekStartDay);
+    
     if (!selectedWeekStart) {
+      console.log('ERROR: No selectedWeekStart, showing alert');
       Alert.alert('Error', 'Please select a start date');
       return;
     }
 
     setLoading(true);
+    console.log('Loading set to true, calling supabase...');
+    
     try {
       const supabase = getSupabaseClient();
+      console.log('Got supabase client');
       
-      // Call the RPC function to create a custom user cycle
-      const { data, error } = await supabase.rpc('ap_create_user_cycle', {
+      const rpcParams = {
         p_source: 'custom',
         p_start_date: selectedWeekStart,
         p_title: customTitle.trim() || null,
         p_week_start_day: weekStartDay
-      });
+      };
+      console.log('Calling ap_create_user_cycle with params:', rpcParams);
+      
+      // Call the RPC function to create a custom user cycle
+      const { data, error } = await supabase.rpc('ap_create_user_cycle', rpcParams);
 
+      console.log('RPC response - data:', data, 'error:', error);
+      
       if (error) throw error;
 
+      console.log('Success! Cycle created with ID:', data);
       Alert.alert('Success', 'Custom 12-week cycle created successfully!');
       onCycleCreated();
       onClose();
@@ -119,31 +134,47 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       setCustomTitle('');
     } catch (error) {
       console.error('Error creating custom cycle:', error);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
       Alert.alert('Error', (error as Error).message || 'Failed to create custom cycle');
     } finally {
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
 
   const handleSyncToGlobal = async () => {
+    console.log('=== handleSyncToGlobal called ===');
+    console.log('selectedGlobalCycle:', selectedGlobalCycle);
+    console.log('weekStartDay:', weekStartDay);
+    
     if (!selectedGlobalCycle) {
+      console.log('ERROR: No selectedGlobalCycle, showing alert');
       Alert.alert('Error', 'Please select a global cycle');
       return;
     }
 
     setLoading(true);
+    console.log('Loading set to true, calling supabase...');
+    
     try {
       const supabase = getSupabaseClient();
+      console.log('Got supabase client');
       
-      // Call the RPC function to sync to a global cycle
-      const { data, error } = await supabase.rpc('ap_create_user_cycle', {
+      const rpcParams = {
         p_source: 'global',
         p_global_cycle_id: selectedGlobalCycle,
         p_week_start_day: weekStartDay
-      });
+      };
+      console.log('Calling ap_create_user_cycle with params:', rpcParams);
+      
+      // Call the RPC function to sync to a global cycle
+      const { data, error } = await supabase.rpc('ap_create_user_cycle', rpcParams);
 
+      console.log('RPC response - data:', data, 'error:', error);
+      
       if (error) throw error;
 
+      console.log('Success! Synced to global cycle with ID:', data);
       Alert.alert('Success', 'Successfully synced to community cycle!');
       onCycleCreated();
       onClose();
@@ -152,8 +183,10 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       setSelectedGlobalCycle(null);
     } catch (error) {
       console.error('Error syncing to global cycle:', error);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
       Alert.alert('Error', (error as Error).message || 'Failed to sync to global cycle');
     } finally {
+      console.log('Setting loading to false');
       setLoading(false);
     }
   };
