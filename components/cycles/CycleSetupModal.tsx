@@ -58,23 +58,29 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   const generateAvailableWeeks = () => {
     const weeks = [];
     const today = new Date();
+    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const targetDay = weekStartDay === 'sunday' ? 0 : 1;
     
-    // Generate next 8 weeks starting from today
-    for (let i = 0; i < 8; i++) {
+    // Check if today is the target start day
+    const includeToday = currentDay === targetDay;
+    const startIndex = includeToday ? 0 : 1;
+    
+    // Generate next 8 weeks, including today if it's the target day
+    for (let i = startIndex; i < startIndex + 8; i++) {
       const weekStart = new Date(today);
       
-      // Calculate the start of the week based on preference
-      const currentDay = weekStart.getDay();
-      const targetDay = weekStartDay === 'sunday' ? 0 : 1; // 0 = Sunday, 1 = Monday
-      
-      // Calculate days to add/subtract to get to the target start day
-      let daysToAdd = targetDay - currentDay;
-      if (daysToAdd <= 0) {
-        daysToAdd += 7; // Move to next week if target day has passed
+      if (i === 0 && includeToday) {
+        // Use today as the start date
+        // weekStart is already set to today
+      } else {
+        // Calculate the start of the week based on preference
+        let daysToAdd = targetDay - currentDay;
+        if (daysToAdd <= 0) {
+          daysToAdd += 7; // Move to next week if target day has passed
+        }
+        daysToAdd += ((i - (includeToday ? 1 : 0)) * 7); // Add weeks
+        weekStart.setDate(weekStart.getDate() + daysToAdd);
       }
-      daysToAdd += (i * 7); // Add weeks
-      
-      weekStart.setDate(weekStart.getDate() + daysToAdd);
       
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6); // End of week (6 days later)
