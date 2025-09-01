@@ -720,9 +720,13 @@ export function CreateGoalModal({
                     setShowRecurrenceDropdown(false);
                   }}
                 >
-                  <Text style={[styles.dropdownOptionText, recurrenceType === option.value && styles.selectedDropdownOptionText]}>
-                    Week {week.week_number} • {formatDateRange(week.start_date, week.end_date)}
-                  </Text>
+                  <Text style={[
+  styles.dropdownOptionText,
+  recurrenceType === option.value && styles.selectedDropdownOptionText
+]}>
+  {option.label}
+</Text>
+
                 </TouchableOpacity>
               ))}
             </View>
