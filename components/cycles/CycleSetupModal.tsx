@@ -106,20 +106,7 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
     }
   };
 
-  const formatDateRange = (startDate: string, endDate: string) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    return `${start.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
-    })} - ${end.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    })}`;
-  };
-
+  
   const handleSaveCustomCycle = async () => {
     console.log('=== handleSaveCustomCycle called ===');
     console.log('isEditMode:', isEditMode);
