@@ -26,10 +26,11 @@ interface GlobalCycle {
 interface CycleSetupModalProps {
   visible: boolean;
   onClose: () => void;
-  onCycleCreated: () => void;
+  onSuccess: () => void;
+  initialData?: any; // UserCycle data for editing
 }
 
-export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetupModalProps) {
+export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: CycleSetupModalProps) {
   const [activeTab, setActiveTab] = useState<'custom' | 'global'>('custom');
   const [customTitle, setCustomTitle] = useState('');
   const [weekStartDay, setWeekStartDay] = useState<'sunday' | 'monday'>('sunday');
@@ -39,9 +40,38 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   const [selectedGlobalCycle, setSelectedGlobalCycle] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingGlobal, setFetchingGlobal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [originalCycleSource, setOriginalCycleSource] = useState<'custom' | 'global'>('custom');
 
   // Generate available weeks based on current settings
   const availableWeeks = getAvailableWeekStarts(weekStartDay);
+
+  useEffect(() => {
+    if (visible) {
+      // Check if we're in edit mode
+      if (initialData) {
+        console.log('=== Edit mode detected ===');
+        console.log('initialData:', initialData);
+        
+        setIsEditMode(true);
+        setOriginalCycleSource(initialData.source);
+        setActiveTab(initialData.source);
+        setCustomTitle(initialData.title || '');
+        setWeekStartDay(initialData.week_start_day || 'sunday');
+        setSelectedWeekStart(initialData.start_date || '');
+        setSelectedGlobalCycle(initialData.global_cycle_id || null);
+      } else {
+        console.log('=== Create mode detected ===');
+        setIsEditMode(false);
+        setOriginalCycleSource('custom');
+        setActiveTab('custom');
+        setCustomTitle('');
+        setWeekStartDay('sunday');
+        setSelectedWeekStart('');
+        setSelectedGlobalCycle(null);
+      }
+    }
+  }, [visible, initialData]);
 
   useEffect(() => {
     if (visible && activeTab === 'global') {
@@ -90,13 +120,14 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
     })}`;
   };
 
-  const handleCreateCustomCycle = async () => {
-    console.log('=== handleCreateCustomCycle called ===');
+  const handleSaveCustomCycle = async () => {
+    console.log('=== handleSaveCustomCycle called ===');
+    console.log('isEditMode:', isEditMode);
     console.log('selectedWeekStart:', selectedWeekStart);
     console.log('customTitle:', customTitle);
     console.log('weekStartDay:', weekStartDay);
     
-    if (!selectedWeekStart) {
+    if (!selectedWeekStart && !isEditMode) {
       console.log('ERROR: No selectedWeekStart, showing alert');
       Alert.alert('Error', 'Please select a start date');
       return;
@@ -109,24 +140,48 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       const supabase = getSupabaseClient();
       console.log('Got supabase client');
       
-      const rpcParams = {
-        p_source: 'custom',
-        p_start_date: selectedWeekStart,
-        p_title: customTitle.trim() || null,
-        p_week_start_day: weekStartDay
-      };
-      console.log('Calling ap_create_user_cycle with params:', rpcParams);
-      
-      // Call the RPC function to create a custom user cycle
-      const { data, error } = await supabase.rpc('ap_create_user_cycle', rpcParams);
+      if (isEditMode && initialData) {
+        console.log('Updating existing custom cycle...');
+        
+        // Update existing cycle
+        const { data, error } = await supabase
+          .from('0008-ap-user-cycles')
+          .update({
+            title: customTitle.trim() || null,
+            week_start_day: weekStartDay,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', initialData.id)
+          .select()
+          .single();
 
-      console.log('RPC response - data:', data, 'error:', error);
-      
-      if (error) throw error;
+        console.log('Update response - data:', data, 'error:', error);
+        
+        if (error) throw error;
+        console.log('Success! Cycle updated');
+        Alert.alert('Success', 'Cycle updated successfully!');
+      } else {
+        console.log('Creating new custom cycle...');
+        
+        const rpcParams = {
+          p_source: 'custom',
+          p_start_date: selectedWeekStart,
+          p_title: customTitle.trim() || null,
+          p_week_start_day: weekStartDay
+        };
+        console.log('Calling ap_create_user_cycle with params:', rpcParams);
+        
+        // Call the RPC function to create a custom user cycle
+        const { data, error } = await supabase.rpc('ap_create_user_cycle', rpcParams);
 
-      console.log('Success! Cycle created with ID:', data);
-      Alert.alert('Success', 'Custom 12-week cycle created successfully!');
-      onCycleCreated();
+        console.log('RPC response - data:', data, 'error:', error);
+        
+        if (error) throw error;
+        console.log('Success! Cycle created with ID:', data);
+        Alert.alert('Success', 'Custom 12-week cycle created successfully!');
+      }
+
+      onSuccess();
       onClose();
       
       // Reset form
@@ -143,7 +198,8 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   };
 
   const handleSyncToGlobal = async () => {
-    console.log('=== handleSyncToGlobal called ===');
+    console.log('=== handleSaveGlobalCycle called ===');
+    console.log('isEditMode:', isEditMode);
     console.log('selectedGlobalCycle:', selectedGlobalCycle);
     console.log('weekStartDay:', weekStartDay);
     
@@ -160,23 +216,47 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       const supabase = getSupabaseClient();
       console.log('Got supabase client');
       
-      const rpcParams = {
-        p_source: 'global',
-        p_global_cycle_id: selectedGlobalCycle,
-        p_week_start_day: weekStartDay
-      };
-      console.log('Calling ap_create_user_cycle with params:', rpcParams);
-      
-      // Call the RPC function to sync to a global cycle
-      const { data, error } = await supabase.rpc('ap_create_user_cycle', rpcParams);
+      if (isEditMode && initialData) {
+        console.log('Updating existing global cycle...');
+        
+        // Update existing cycle
+        const { data, error } = await supabase
+          .from('0008-ap-user-cycles')
+          .update({
+            global_cycle_id: selectedGlobalCycle,
+            week_start_day: weekStartDay,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', initialData.id)
+          .select()
+          .single();
 
-      console.log('RPC response - data:', data, 'error:', error);
-      
-      if (error) throw error;
+        console.log('Update response - data:', data, 'error:', error);
+        
+        if (error) throw error;
+        console.log('Success! Global cycle updated');
+        Alert.alert('Success', 'Cycle updated successfully!');
+      } else {
+        console.log('Syncing to new global cycle...');
+        
+        const rpcParams = {
+          p_source: 'global',
+          p_global_cycle_id: selectedGlobalCycle,
+          p_week_start_day: weekStartDay
+        };
+        console.log('Calling ap_create_user_cycle with params:', rpcParams);
+        
+        // Call the RPC function to sync to a global cycle
+        const { data, error } = await supabase.rpc('ap_create_user_cycle', rpcParams);
 
-      console.log('Success! Synced to global cycle with ID:', data);
-      Alert.alert('Success', 'Successfully synced to community cycle!');
-      onCycleCreated();
+        console.log('RPC response - data:', data, 'error:', error);
+        
+        if (error) throw error;
+        console.log('Success! Synced to global cycle with ID:', data);
+        Alert.alert('Success', 'Successfully synced to community cycle!');
+      }
+
+      onSuccess();
       onClose();
       
       // Reset form
@@ -256,11 +336,28 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   const renderCustomTab = () => (
     <ScrollView style={styles.tabContent}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Custom Cycle</Text>
+        <Text style={styles.sectionTitle}>
+          {isEditMode ? 'Edit Custom Cycle' : 'Custom Cycle'}
+        </Text>
         <Text style={styles.sectionDescription}>
-          Choose when your 12-week cycle begins and whether weeks start on Sunday or Monday
+          {isEditMode 
+            ? 'Update your cycle title and week start day preference'
+            : 'Choose when your 12-week cycle begins and whether weeks start on Sunday or Monday'
+          }
         </Text>
         
+        {/* Custom Title */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Cycle Title</Text>
+          <TextInput
+            style={styles.input}
+            value={customTitle}
+            onChangeText={setCustomTitle}
+            placeholder="Enter cycle title (optional)"
+            placeholderTextColor="#9ca3af"
+          />
+        </View>
+
         {/* Week Start Day Toggle */}
         <View style={styles.weekStartToggle}>
           <TouchableOpacity
@@ -294,48 +391,50 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
         </View>
 
         {/* Week Selection Dropdown */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Select Start Week</Text>
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => setShowWeekDropdown(!showWeekDropdown)}
-          >
-            <Text style={styles.dropdownText}>
-              {selectedWeekStart 
-                ? availableWeeks.find(w => w.start === selectedWeekStart)?.label || 'Select week...'
-                : 'Select week...'
-              }
-            </Text>
-            <Text style={styles.dropdownArrow}>{showWeekDropdown ? '▲' : '▼'}</Text>
-          </TouchableOpacity>
-          
-          {showWeekDropdown && (
-            <View style={styles.dropdownContent}>
-              {availableWeeks.map((week, index) => (
-                <TouchableOpacity
-                  key={week.start}
-                  style={[
-                    styles.dropdownOption,
-                    selectedWeekStart === week.start && styles.selectedDropdownOption
-                  ]}
-                  onPress={() => {
-                    setSelectedWeekStart(week.start);
-                    setShowWeekDropdown(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.dropdownOptionText,
-                    selectedWeekStart === week.start && styles.selectedDropdownOptionText
-                  ]}>
-                    {week.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+        {!isEditMode && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Select Start Week</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setShowWeekDropdown(!showWeekDropdown)}
+            >
+              <Text style={styles.dropdownText}>
+                {selectedWeekStart 
+                  ? availableWeeks.find(w => w.start === selectedWeekStart)?.label || 'Select week...'
+                  : 'Select week...'
+                }
+              </Text>
+              <Text style={styles.dropdownArrow}>{showWeekDropdown ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            
+            {showWeekDropdown && (
+              <View style={styles.dropdownContent}>
+                {availableWeeks.map((week, index) => (
+                  <TouchableOpacity
+                    key={week.start}
+                    style={[
+                      styles.dropdownOption,
+                      selectedWeekStart === week.start && styles.selectedDropdownOption
+                    ]}
+                    onPress={() => {
+                      setSelectedWeekStart(week.start);
+                      setShowWeekDropdown(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.dropdownOptionText,
+                      selectedWeekStart === week.start && styles.selectedDropdownOptionText
+                    ]}>
+                      {week.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
-        {selectedWeekStart && (
+        {selectedWeekStart && !isEditMode && (
           <View style={styles.selectedWeekContainer}>
             <Text style={styles.selectedWeekText}>
               12-week cycle: {
@@ -350,22 +449,35 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
             </Text>
           </View>
         )}
+
+        {isEditMode && (
+          <View style={styles.editInfoContainer}>
+            <Text style={styles.editInfoText}>
+              Current cycle: {formatDateRange(initialData?.start_date || '', initialData?.end_date || '')}
+            </Text>
+            <Text style={styles.editInfoSubtext}>
+              Note: Changing week start day will affect how weeks are calculated
+            </Text>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity
         style={[
           styles.createButton,
-          (!selectedWeekStart || loading) && styles.createButtonDisabled
+          ((!selectedWeekStart && !isEditMode) || loading) && styles.createButtonDisabled
         ]}
-        onPress={handleCreateCustomCycle}
-        disabled={!selectedWeekStart || loading}
+        onPress={handleSaveCustomCycle}
+        disabled={(!selectedWeekStart && !isEditMode) || loading}
       >
         {loading ? (
           <ActivityIndicator size="small" color="#ffffff" />
         ) : (
           <>
             <CalendarIcon size={20} color="#ffffff" />
-            <Text style={styles.createButtonText}>Create Custom Cycle</Text>
+            <Text style={styles.createButtonText}>
+              {isEditMode ? 'Update Cycle' : 'Create Custom Cycle'}
+            </Text>
           </>
         )}
       </TouchableOpacity>
@@ -375,10 +487,50 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
   const renderGlobalTab = () => (
     <ScrollView style={styles.tabContent}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Community Cycles</Text>
-        <Text style={styles.sectionDescription}>
-          Sync your 12-week cycle with the community to stay aligned with others
+        <Text style={styles.sectionTitle}>
+          {isEditMode ? 'Edit Community Sync' : 'Community Cycles'}
         </Text>
+        <Text style={styles.sectionDescription}>
+          {isEditMode 
+            ? 'Update your community sync settings and week start day preference'
+            : 'Sync your 12-week cycle with the community to stay aligned with others'
+          }
+        </Text>
+
+        {/* Week Start Day Toggle for Global Cycles */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Week Start Day</Text>
+          <View style={styles.weekStartToggle}>
+            <TouchableOpacity
+              style={[
+                styles.weekStartOption,
+                weekStartDay === 'sunday' && styles.activeWeekStartOption
+              ]}
+              onPress={() => setWeekStartDay('sunday')}
+            >
+              <Text style={[
+                styles.weekStartOptionText,
+                weekStartDay === 'sunday' && styles.activeWeekStartOptionText
+              ]}>
+                Sunday
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.weekStartOption,
+                weekStartDay === 'monday' && styles.activeWeekStartOption
+              ]}
+              onPress={() => setWeekStartDay('monday')}
+            >
+              <Text style={[
+                styles.weekStartOptionText,
+                weekStartDay === 'monday' && styles.activeWeekStartOptionText
+              ]}>
+                Monday
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {fetchingGlobal ? (
           <View style={styles.loadingContainer}>
@@ -396,9 +548,24 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
                 key={cycle.id}
                 style={[
                   styles.globalCycleCard,
-                  selectedGlobalCycle === cycle.id && styles.selectedGlobalCycleCard
+                  selectedGlobalCycle === cycle.id && styles.selectedGlobalCycleCard,
+                  isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id !== cycle.id && styles.disabledGlobalCycleCard
                 ]}
-                onPress={() => setSelectedGlobalCycle(cycle.id)}
+                onPress={() => {
+                  if (isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id !== cycle.id) {
+                    Alert.alert(
+                      'Switch Global Cycle?',
+                      'This will switch you to a different community cycle. Are you sure?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Switch', onPress: () => setSelectedGlobalCycle(cycle.id) }
+                      ]
+                    );
+                  } else {
+                    setSelectedGlobalCycle(cycle.id);
+                  }
+                }}
+                disabled={isEditMode && originalCycleSource === 'global' && initialData?.global_cycle_id !== cycle.id}
               >
                 <View style={styles.globalCycleContent}>
                   <Text style={styles.globalCycleTitle}>
@@ -435,7 +602,9 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
         ) : (
           <>
             <Users size={20} color="#ffffff" />
-            <Text style={styles.createButtonText}>Sync to Community</Text>
+            <Text style={styles.createButtonText}>
+              {isEditMode ? 'Update Community Sync' : 'Sync to Community'}
+            </Text>
           </>
         )}
       </TouchableOpacity>
@@ -446,7 +615,9 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Start 12-Week Cycle</Text>
+          <Text style={styles.headerTitle}>
+            {isEditMode ? 'Edit 12-Week Cycle' : 'Start 12-Week Cycle'}
+          </Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#1f2937" />
           </TouchableOpacity>
@@ -457,9 +628,24 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
           <TouchableOpacity
             style={[
               styles.tabButton,
-              activeTab === 'custom' && styles.activeTabButton
+              activeTab === 'custom' && styles.activeTabButton,
+              isEditMode && originalCycleSource === 'global' && styles.disabledTabButton
             ]}
-            onPress={() => setActiveTab('custom')}
+            onPress={() => {
+              if (isEditMode && originalCycleSource === 'global') {
+                Alert.alert(
+                  'Switch to Custom?',
+                  'This will convert your community-synced cycle to a custom cycle. Are you sure?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Switch', onPress: () => setActiveTab('custom') }
+                  ]
+                );
+              } else {
+                setActiveTab('custom');
+              }
+            }}
+            disabled={isEditMode && originalCycleSource === 'global'}
           >
             <CalendarIcon size={16} color={activeTab === 'custom' ? '#ffffff' : '#6b7280'} />
             <Text style={[
@@ -473,9 +659,24 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
           <TouchableOpacity
             style={[
               styles.tabButton,
-              activeTab === 'global' && styles.activeTabButton
+              activeTab === 'global' && styles.activeTabButton,
+              isEditMode && originalCycleSource === 'custom' && styles.disabledTabButton
             ]}
-            onPress={() => setActiveTab('global')}
+            onPress={() => {
+              if (isEditMode && originalCycleSource === 'custom') {
+                Alert.alert(
+                  'Switch to Community?',
+                  'This will sync your custom cycle to a community cycle. Are you sure?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Switch', onPress: () => setActiveTab('global') }
+                  ]
+                );
+              } else {
+                setActiveTab('global');
+              }
+            }}
+            disabled={isEditMode && originalCycleSource === 'custom'}
           >
             <Users size={16} color={activeTab === 'global' ? '#ffffff' : '#6b7280'} />
             <Text style={[
@@ -550,6 +751,9 @@ const styles = StyleSheet.create({
   activeTabButtonText: {
     color: '#ffffff',
   },
+  disabledTabButton: {
+    opacity: 0.5,
+  },
   tabContent: {
     flex: 1,
     padding: 16,
@@ -579,6 +783,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1f2937',
   },
+  field: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
   weekStartToggle: {
     flexDirection: 'row',
     backgroundColor: '#f3f4f6',
@@ -603,15 +816,6 @@ const styles = StyleSheet.create({
   },
   activeWeekStartOptionText: {
     color: '#ffffff',
-  },
-  field: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1f2937',
-    marginBottom: 8,
   },
   dropdown: {
     backgroundColor: '#ffffff',
@@ -678,6 +882,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   weekStartInfo: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  editInfoContainer: {
+    padding: 12,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#0078d4',
+  },
+  editInfoText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0078d4',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  editInfoSubtext: {
     fontSize: 12,
     color: '#6b7280',
     textAlign: 'center',
@@ -777,5 +1001,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  disabledGlobalCycleCard: {
+    opacity: 0.5,
   },
 });
