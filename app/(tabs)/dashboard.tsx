@@ -307,11 +307,11 @@ export default function Dashboard() {
   };
   const handleDelegateTask = (task: Task) => { Alert.alert('Delegate', 'Delegation functionality coming soon!'); setIsDetailModalVisible(false); };
   const handleFormSubmitSuccess = () => {
-    setIsFormModalVisible(false);
-    setEditingTask(null);
-    fetchData();
-    refreshGoals();
-  };
+  setIsFormModalVisible(false);
+  setEditingTask(null);
+  fetchData();
+};
+
   const handleFormClose = () => {
     setIsFormModalVisible(false);
     setEditingTask(null);
@@ -343,7 +343,6 @@ export default function Dashboard() {
     { value: 'domains', label: 'Domains' },
     { value: 'goals', label: 'Goals' },
     { value: 'delegated', label: 'Delegated' },
-    { value: 'authentic_points', label: 'Authentic Points' }
   ];
 
   return (
