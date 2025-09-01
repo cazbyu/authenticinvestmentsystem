@@ -353,38 +353,7 @@ export default function Dashboard() {
     <SafeAreaView style={styles.container}>
       <Header activeView={activeView} onViewChange={setActiveView} onSortPress={() => setIsSortModalVisible(true)} authenticScore={authenticScore} />
       <View style={styles.content}>
-        {/* 12-Week Goals Section */}
-        {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
-          <View style={styles.goalsSection}>
-            <Text style={styles.goalsSectionTitle}>12-Week Goals</Text>
-            <View style={styles.goalsList}>
-              {twelveWeekGoals.map(goal => {
-                const progress = goalProgress[goal.id];
-                if (!progress) return null;
-                
-                return (
-                  <GoalProgressCard
-                    key={goal.id}
-                    goal={goal}
-                    progress={progress}
-                    onAddTask={() => {
-                      setEditingTask({
-                        type: 'task',
-                        selectedGoalIds: [goal.id],
-                        twelveWeekGoalChecked: true,
-                        countsTowardWeeklyProgress: true,
-                        selectedRoleIds: goal.roles?.map(r => r.id) || [],
-                        selectedDomainIds: goal.domains?.map(d => d.id) || [],
-                      } as any);
-                      setIsFormModalVisible(true);
-                    }}
-                  />
-                );
-              })}
-            </View>
-          </View>
-        )}
-
+        
         {activeView === 'journal' ? (
           <JournalView
             scope={{ type: 'user' }}
