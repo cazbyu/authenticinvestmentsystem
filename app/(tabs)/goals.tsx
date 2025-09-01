@@ -9,6 +9,7 @@ import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { Plus, Target, Calendar } from 'lucide-react-native';
+import { formatDateRange } from '@/lib/dateUtils';
 
 export default function Goals() {
   const [authenticScore, setAuthenticScore] = useState(0);
@@ -148,9 +149,7 @@ export default function Goals() {
   };
   const formatCycleDateRange = () => {
     if (!currentCycle?.start_date || !currentCycle?.end_date) return '';
-    const startDate = new Date(currentCycle.start_date);
-    const endDate = new Date(currentCycle.end_date);
-    return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    return formatDateRange(currentCycle.start_date, currentCycle.end_date);
   };
 
   const calculateCycleProgress = () => {
@@ -188,6 +187,11 @@ export default function Goals() {
               <Text style={styles.cycleDates}>
                 {formatCycleDateRange()}
               </Text>
+              {currentCycle.week_start_day && (
+                <Text style={styles.weekStartInfo}>
+                  Weeks start on {currentCycle.week_start_day === 'sunday' ? 'Sunday' : 'Monday'}
+                </Text>
+              )}
             </View>
             
             <View style={styles.cycleProgress}>
@@ -342,6 +346,12 @@ const styles = StyleSheet.create({
   cycleDates: {
     fontSize: 14,
     color: '#6b7280',
+    marginBottom: 4,
+  },
+  weekStartInfo: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
   cycleProgress: {
     alignItems: 'center',

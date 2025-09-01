@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Alert } from 'react-native';
+import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 
 export interface TwelveWeekGoal {
   id: string;
@@ -32,6 +33,7 @@ export interface UserCycle {
   created_at: string;
   updated_at: string;
   timezone?: string;
+  week_start_day?: 'sunday' | 'monday';
 }
 
 export interface CycleWeek {
@@ -141,16 +143,61 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const fetchCycleWeeks = async (userCycleId: string) => {
     try {
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-  .from('v_user_cycle_weeks')
-  .select('week_number, start_date:starts_on, end_date:ends_on, user_cycle_id')
-  .eq('user_cycle_id', userCycleId)
-  .order('week_number', { ascending: true })
-  .returns<CycleWeek[]>();   // ← type the response
+      
+      // First try to get weeks from the database view
+      const { data: dbWeeks, error } = await supabase
+        .from('v_user_cycle_weeks')
+        .select('week_number, start_date:starts_on, end_date:ends_on, user_cycle_id')
+        .eq('user_cycle_id', userCycleId)
+        .order('week_number', { ascending: true })
+        .returns<CycleWeek[]>();
 
-if (error) throw error;
-setCycleWeeks(data ?? []);
-return data ?? [];
+      if (error) {
+        console.warn('Database week view failed, using client-side fallback:', error);
+        // Fallback to client-side calculation
+        if (currentCycle) {
+          const clientWeeks = generateCycleWeeks(
+            currentCycle.start_date!, 
+            currentCycle.week_start_day || 'monday'
+          ).map(week => ({
+            week_number: week.week_number,
+            start_date: week.start_date,
+            end_date: week.end_date,
+            user_cycle_id: userCycleId,
+          }));
+          setCycleWeeks(clientWeeks);
+          return clientWeeks;
+        }
+        setCycleWeeks([]);
+        return [];
+      }
+
+      // Validate that Week 1 aligns with the cycle's stored anchor
+      if (dbWeeks && dbWeeks.length > 0 && currentCycle) {
+        const week1 = dbWeeks[0];
+        const expectedWeek1Start = generateCycleWeeks(
+          currentCycle.start_date!, 
+          currentCycle.week_start_day || 'monday'
+        )[0];
+        
+        if (week1.start_date !== expectedWeek1Start.start_date) {
+          console.warn('Week alignment mismatch, using client-side calculation');
+          const clientWeeks = generateCycleWeeks(
+            currentCycle.start_date!, 
+            currentCycle.week_start_day || 'monday'
+          ).map(week => ({
+            week_number: week.week_number,
+            start_date: week.start_date,
+            end_date: week.end_date,
+            user_cycle_id: userCycleId,
+          }));
+          setCycleWeeks(clientWeeks);
+          return clientWeeks;
+        }
+      }
+
+      setCycleWeeks(dbWeeks ?? []);
+      return dbWeeks ?? [];
 
     } catch (error) {
       console.error('Error fetching cycle weeks:', error);
@@ -496,6 +543,8 @@ return data ?? [];
           total_target: goalData.total_target || 36,
           status: 'active',
           progress: 0,
+          start_date: currentCycle.start_date,
+          end_date: currentCycle.end_date,
         })
         .select()
         .single();

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { X, Calendar as CalendarIcon, Users, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
+import { getAvailableWeekStarts, formatDateRange } from '@/lib/dateUtils';
 
 interface GlobalCycle {
   id: string;
@@ -31,79 +32,29 @@ interface CycleSetupModalProps {
 export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetupModalProps) {
   const [activeTab, setActiveTab] = useState<'custom' | 'global'>('custom');
   const [customTitle, setCustomTitle] = useState('');
-  const [selectedWeekStart, setSelectedWeekStart] = useState('');
   const [weekStartDay, setWeekStartDay] = useState<'sunday' | 'monday'>('sunday');
+  const [selectedWeekStart, setSelectedWeekStart] = useState('');
   const [showWeekDropdown, setShowWeekDropdown] = useState(false);
-  const [availableWeeks, setAvailableWeeks] = useState<Array<{start: string; end: string; label: string}>>([]);
   const [globalCycles, setGlobalCycles] = useState<GlobalCycle[]>([]);
   const [selectedGlobalCycle, setSelectedGlobalCycle] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingGlobal, setFetchingGlobal] = useState(false);
 
+  // Generate available weeks based on current settings
+  const availableWeeks = getAvailableWeekStarts(weekStartDay);
+
   useEffect(() => {
     if (visible && activeTab === 'global') {
       fetchGlobalCycles();
     }
-    if (visible && activeTab === 'custom') {
-      generateAvailableWeeks();
-    }
   }, [visible, activeTab]);
 
   useEffect(() => {
-    if (visible && activeTab === 'custom') {
-      generateAvailableWeeks();
+    // Auto-select first week when week start day changes
+    if (availableWeeks.length > 0) {
+      setSelectedWeekStart(availableWeeks[0].start);
     }
-  }, [weekStartDay]);
-
-  const generateAvailableWeeks = () => {
-    const weeks = [];
-    const today = new Date();
-    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const targetDay = weekStartDay === 'sunday' ? 0 : 1;
-    
-    // Check if today is the target start day
-    const includeToday = currentDay === targetDay;
-    const startIndex = includeToday ? 0 : 1;
-    
-    // Generate next 8 weeks, including today if it's the target day
-    for (let i = startIndex; i < startIndex + 8; i++) {
-      const weekStart = new Date(today);
-      
-      if (i === 0 && includeToday) {
-        // Use today as the start date
-        // weekStart is already set to today
-      } else {
-        // Calculate the start of the week based on preference
-        let daysToAdd = targetDay - currentDay;
-        if (daysToAdd <= 0 && !(i === 0 && includeToday)) {
-          daysToAdd += 7; // Move to next week if target day has passed
-        }
-        daysToAdd += ((i - (includeToday ? 1 : 0)) * 7); // Add weeks
-        weekStart.setDate(weekStart.getDate() + daysToAdd);
-      }
-      
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 83); // 12 weeks = 84 days, minus 1 = 83
-      
-      const startStr = weekStart.toISOString().split('T')[0];
-      const endStr = weekEnd.toISOString().split('T')[0];
-      
-      const label = `${weekStart.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-      
-      weeks.push({
-        start: startStr,
-        end: endStr,
-        label
-      });
-    }
-    
-    setAvailableWeeks(weeks);
-    
-    // Auto-select first week if none selected
-    if (!selectedWeekStart && weeks.length > 0) {
-      setSelectedWeekStart(weeks[0].start);
-    }
-  };
+  }, [weekStartDay, availableWeeks]);
 
   const fetchGlobalCycles = async () => {
     setFetchingGlobal(true);
@@ -153,7 +104,8 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       const { data, error } = await supabase.rpc('ap_create_user_cycle', {
         p_source: 'custom',
         p_start_date: selectedWeekStart,
-        p_title: customTitle.trim() || null
+        p_title: customTitle.trim() || null,
+        p_week_start_day: weekStartDay
       });
 
       if (error) throw error;
@@ -186,7 +138,8 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       // Call the RPC function to sync to a global cycle
       const { data, error } = await supabase.rpc('ap_create_user_cycle', {
         p_source: 'global',
-        p_global_cycle_id: selectedGlobalCycle
+        p_global_cycle_id: selectedGlobalCycle,
+        p_week_start_day: weekStartDay
       });
 
       if (error) throw error;
@@ -231,20 +184,6 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
         const dayOfWeek = date.getDay();
         const dateString = date.toISOString().split('T')[0];
         
-        if ((dayOfWeek === 0 || dayOfWeek === 1) && date >= today) {
-          if (!marked[dateString]) {
-            marked[dateString] = {
-              marked: true,
-              dotColor: '#0078d4',
-            };
-          }
-        }
-      }
-    }
-
-    return marked;
-  };
-
   const renderCustomTab = () => (
     <ScrollView style={styles.tabContent}>
       <View style={styles.section}>
@@ -330,18 +269,15 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
         {selectedWeekStart && (
           <View style={styles.selectedWeekContainer}>
             <Text style={styles.selectedWeekText}>
-              12-week cycle: {selectedWeekStart} to {
+              12-week cycle: {
                 (() => {
-                  const start = new Date(selectedWeekStart);
-                  const end = new Date(start);
-                  end.setDate(end.getDate() + (12 * 7) - 1);
-                  return end.toLocaleDateString('en-US', { 
-                    day: 'numeric', 
-                    month: 'short',
-                    year: 'numeric'
-                  });
+                  const selectedWeek = availableWeeks.find(w => w.start === selectedWeekStart);
+                  return selectedWeek ? selectedWeek.label : '';
                 })()
               }
+            </Text>
+            <Text style={styles.weekStartInfo}>
+              Weeks start on {weekStartDay === 'sunday' ? 'Sunday' : 'Monday'}
             </Text>
           </View>
         )}
@@ -669,6 +605,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#16a34a',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  weekStartInfo: {
+    fontSize: 12,
+    color: '#6b7280',
     textAlign: 'center',
   },
   createButton: {

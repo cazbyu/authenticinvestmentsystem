@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { X, Target, Calendar, Users, Plus, FileText, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
+import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
 
 interface Role {
   id: string;
@@ -206,8 +207,8 @@ export function CreateGoalModal({
 
   const getDatesForRecurrence = (startDate: string, endDate: string, recurrenceType: string): string[] => {
     const dates: string[] = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
     
     // Calculate how many days per week based on recurrence type
     const daysPerWeek = recurrenceType === 'daily' ? 7 : parseInt(recurrenceType.replace('days', '').replace('day', ''));
@@ -217,7 +218,7 @@ export function CreateGoalModal({
     let dayCount = 0;
     
     while (current <= end && dayCount < daysPerWeek) {
-      dates.push(current.toISOString().split('T')[0]);
+      dates.push(formatLocalDate(current));
       current.setDate(current.getDate() + 1);
       dayCount++;
     }
@@ -720,7 +721,7 @@ export function CreateGoalModal({
                   }}
                 >
                   <Text style={[styles.dropdownOptionText, recurrenceType === option.value && styles.selectedDropdownOptionText]}>
-                    {option.label}
+                    Week {week.week_number} • {formatDateRange(week.start_date, week.end_date)}
                   </Text>
                 </TouchableOpacity>
               ))}
