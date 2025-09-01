@@ -28,9 +28,7 @@ export default function Dashboard() {
   const [authenticScore, setAuthenticScore] = useState(0);
 
   // 12-Week Goals
-  const { goals: twelveWeekGoals, goalProgress, loading: goalsLoading, refreshGoals } = useGoalProgress();
-
-  const fetchData = async () => {
+   const fetchData = async () => {
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
@@ -41,10 +39,11 @@ export default function Dashboard() {
         // Fetch tasks/events
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-          .select('*')
-          .eq('user_id', user.id)
-          .not('status', 'in', '(completed,cancelled)')
-          .in('type', ['task', 'event']);
+.select('*')
+.eq('user_id', user.id)
+.not('status', 'in', '(completed,cancelled)')
+.eq('user_cycle_id', /* active user cycle id here */)
+.in('type', ['task', 'event']);
 
         if (tasksError) throw tasksError;
         if (!tasksData || tasksData.length === 0) {
