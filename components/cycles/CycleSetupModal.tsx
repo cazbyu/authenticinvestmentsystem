@@ -568,17 +568,12 @@ console.log('Active cycle after global sync:', activeCycle);
               activeTab === 'custom' && styles.activeTabButton,
             ]}
             onPress={() => {
+  // Always switch immediately (works on web/mobile)
+  setActiveTab('custom');
+
+  // Optional note for logs—no blocking UI
   if (isEditMode && originalCycleSource !== 'custom') {
-    Alert.alert(
-      'Switch to Custom?',
-      'This will convert your community-synced cycle to a custom cycle. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Switch', onPress: () => setActiveTab('custom') }
-      ]
-    );
-  } else {
-    setActiveTab('custom');
+    console.log('Switched to Custom tab from Community while editing.');
   }
 }}
 
