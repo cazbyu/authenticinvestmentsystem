@@ -141,7 +141,7 @@ export function CreateGoalModal({
       const { data: domainsData } = await supabase
         .from('0008-ap-domains')
         .select('id, name')
-        .order('sort_order');
+        .order('name');
 
       setAllDomains(domainsData || []);
 
