@@ -17,6 +17,7 @@ export default function Goals() {
   const [editingTask, setEditingTask] = useState<any>(null);
   const [cycleSetupVisible, setCycleSetupVisible] = useState(false);
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
+  const [editingCycle, setEditingCycle] = useState<any>(null);
 
   // 12-Week Goals
   const { 
@@ -140,6 +141,7 @@ export default function Goals() {
 
   const handleCycleCreated = () => {
     setCycleSetupVisible(false);
+    setEditingCycle(null);
     refreshAllData();
   };
 
@@ -181,9 +183,22 @@ export default function Goals() {
           {/* Cycle Header */}
           <View style={styles.cycleHeader}>
             <View style={styles.cycleInfo}>
+              <View style={styles.cycleTitleRow}>
+                <View style={styles.cycleTitleContent}>
               <Text style={styles.cycleTitle}>
                 {currentCycle.title || '12-Week Cycle'}
               </Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.editCycleButton}
+                  onPress={() => {
+                    setEditingCycle(currentCycle);
+                    setCycleSetupVisible(true);
+                  }}
+                >
+                  <Text style={styles.editCycleButtonText}>Edit</Text>
+                </TouchableOpacity>
+              </View>
               <Text style={styles.cycleDates}>
                 {formatCycleDateRange()}
               </Text>
@@ -300,7 +315,8 @@ export default function Goals() {
       <CycleSetupModal
         visible={cycleSetupVisible}
         onClose={() => setCycleSetupVisible(false)}
-        onCycleCreated={handleCycleCreated}
+        onSuccess={handleCycleCreated}
+        initialData={editingCycle}
       />
 
       {/* Create Goal Modal */}
@@ -337,11 +353,32 @@ const styles = StyleSheet.create({
   cycleInfo: {
     marginBottom: 12,
   },
+  cycleTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  cycleTitleContent: {
+    flex: 1,
+  },
   cycleTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 4,
+  },
+  editCycleButton: {
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  editCycleButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078d4',
   },
   cycleDates: {
     fontSize: 14,
