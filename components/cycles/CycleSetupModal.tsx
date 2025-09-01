@@ -234,25 +234,12 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
 
         if (globalCycleError) throw globalCycleError;
 
-        // Get the selected global cycle data first
-        const { data: globalCycleData, error: globalCycleError } = await supabase
-          .from('0008-ap-global-cycles')
-          .select('title, start_date, end_date')
-          .eq('id', selectedGlobalCycle)
-          .single();
-
-        if (globalCycleError) throw globalCycleError;
-
         // Update existing cycle to sync with global cycle
         const { data, error } = await supabase
           .from('0008-ap-user-cycles')
           .update({
             source: 'global',
-            source: 'global',
             global_cycle_id: selectedGlobalCycle,
-            title: globalCycleData.title,
-            start_date: globalCycleData.start_date,
-            end_date: globalCycleData.end_date,
             title: globalCycleData.title,
             start_date: globalCycleData.start_date,
             end_date: globalCycleData.end_date,
