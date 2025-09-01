@@ -411,7 +411,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   goalsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     padding: 16,
+    gap: 12,
   },
   loadingContainer: {
     padding: 40,
