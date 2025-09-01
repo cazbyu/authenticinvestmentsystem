@@ -230,7 +230,6 @@ console.log('Active cycle after global sync:', activeCycle);
         .from('0008-ap-user-cycles')
         .update({
           week_start_day: weekStartDay,
-          // Optional: allow a custom title override; or omit to always use the shared title
           updated_at: new Date().toISOString(),
         })
         .eq('id', initialData.id);
