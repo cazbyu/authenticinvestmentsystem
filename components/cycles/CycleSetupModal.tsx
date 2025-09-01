@@ -568,19 +568,20 @@ console.log('Active cycle after global sync:', activeCycle);
               activeTab === 'custom' && styles.activeTabButton,
             ]}
             onPress={() => {
-              if (isEditMode && originalCycleSource !== 'custom') {
-                Alert.alert(
-                  'Switch to Custom?',
-                  'This will convert your community-synced cycle to a custom cycle. Are you sure?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Switch', onPress: () => setActiveTab('custom') }
-                  ]
-                );
-              } else {
-                setActiveTab('custom');
-              }
-            }}
+  if (isEditMode && originalCycleSource !== 'custom') {
+    Alert.alert(
+      'Switch to Custom?',
+      'This will convert your community-synced cycle to a custom cycle. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Switch', onPress: () => setActiveTab('custom') }
+      ]
+    );
+  } else {
+    setActiveTab('custom');
+  }
+}}
+
           >
             <CalendarIcon size={16} color={activeTab === 'custom' ? '#ffffff' : '#6b7280'} />
             <Text style={[
