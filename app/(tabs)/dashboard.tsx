@@ -28,8 +28,7 @@ export default function Dashboard() {
   const [authenticScore, setAuthenticScore] = useState(0);
 
   // 12-Week Goals
-  const { goals: twelveWeekGoals, goalProgress, loading: goalsLoading, refreshGoals } = useGoalProgress();
-
+  
   const fetchData = async () => {
     setLoading(true);
     try {
