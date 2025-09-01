@@ -179,10 +179,11 @@ export default function Dashboard() {
       // Calculate deposits from completed tasks
       const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .not('completed_at', 'is', null);
+.select('*')
+.eq('user_id', user.id)
+.not('status', 'in', '(completed,cancelled)')
+.in('type', ['task', 'event']);
+
 
       if (tasksError) throw tasksError;
 
