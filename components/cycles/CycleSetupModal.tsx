@@ -98,6 +98,7 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
       setSelectedWeekStart(weeks[0].start);
     }
   };
+
   const fetchGlobalCycles = async () => {
     setFetchingGlobal(true);
     try {
@@ -229,6 +230,20 @@ export function CycleSetupModal({ visible, onClose, onCycleCreated }: CycleSetup
             marked[dateString] = {
               marked: true,
               dotColor: '#0078d4',
+            };
+          }
+        }
+      }
+    }
+
+    return marked;
+  };
+
+  const renderCustomTab = () => (
+    <ScrollView style={styles.tabContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Custom Cycle</Text>
+        <Text style={styles.sectionDescription}>
           Choose when your 12-week cycle begins and whether weeks start on Sunday or Monday
         </Text>
         
