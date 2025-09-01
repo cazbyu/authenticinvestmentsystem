@@ -169,7 +169,7 @@ return hydrated;
       // First try to get weeks from the database view
       const { data: dbWeeks, error } = await supabase
         .from('v_user_cycle_weeks')
-        .select('week_number, start_date:starts_on, end_date:ends_on, user_cycle_id')
+        .select('week_number, start_date, end_date, user_cycle_id')
         .eq('user_cycle_id', userCycleId)
         .order('week_number', { ascending: true })
         .returns<CycleWeek[]>();
@@ -611,7 +611,6 @@ return hydrated;
         .select()
         .single();
 
-      if (taskError) throw taskError;
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
