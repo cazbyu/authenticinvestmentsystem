@@ -589,7 +589,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .select()
         .single();
 
-      if (taskError) throw taskError;*
+      if (taskError) throw taskError;
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
