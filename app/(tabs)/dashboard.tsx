@@ -12,8 +12,6 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
-import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
-import { useGoalProgress } from '@/hooks/useGoalProgress';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
