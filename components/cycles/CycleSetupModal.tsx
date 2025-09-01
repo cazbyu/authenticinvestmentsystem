@@ -168,91 +168,61 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
 };
 
   const handleSyncToGlobal = async () => {
-    console.log('=== handleSaveGlobalCycle called ===');
-    console.log('isEditMode:', isEditMode);
-    console.log('selectedGlobalCycle:', selectedGlobalCycle);
-    console.log('weekStartDay:', weekStartDay);
-    
-    if (!selectedGlobalCycle) {
-      console.log('ERROR: No selectedGlobalCycle, showing alert');
-      Alert.alert('Error', 'Please select a global cycle');
-      return;
+  if (!selectedGlobalCycle) {
+    Alert.alert('Error', 'Please select a global cycle');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const supabase = getSupabaseClient();
+
+    // Are we switching source or picking a different global cycle?
+    const sourceChanged = isEditMode && initialData && originalCycleSource !== 'global';
+    const globalChanged = isEditMode && initialData && initialData.global_cycle_id !== selectedGlobalCycle;
+
+    if (!isEditMode) {
+      // CREATE new global-linked cycle via RPC
+      const { error } = await supabase.rpc('ap_create_user_cycle', {
+        p_source: 'global',
+        p_global_cycle_id: selectedGlobalCycle,
+        p_week_start_day: weekStartDay,
+      });
+      if (error) throw error;
+    } else if (sourceChanged || globalChanged) {
+      // SWITCHING: create a fresh global-linked cycle (old one auto-completes)
+      const { error } = await supabase.rpc('ap_create_user_cycle', {
+        p_source: 'global',
+        p_global_cycle_id: selectedGlobalCycle,
+        p_week_start_day: weekStartDay,
+      });
+      if (error) throw error;
+    } else {
+      // Same global cycle, just metadata change → update in place
+      const { error } = await supabase
+        .from('0008-ap-user-cycles')
+        .update({
+          week_start_day: weekStartDay,
+          // Optional: allow a custom title override; or omit to always use the shared title
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', initialData.id);
+      if (error) throw error;
     }
 
-    setLoading(true);
-    console.log('Loading set to true, calling supabase...');
-    
-    try {
-      const supabase = getSupabaseClient();
-      console.log('Got supabase client');
-      
-      if (isEditMode && initialData) {
-        console.log('Updating existing global cycle...');
-        
-        // Get the selected global cycle data first
-        const { data: globalCycleData, error: globalCycleError } = await supabase
-          .from('0008-ap-global-cycles')
-          .select('title, start_date, end_date')
-          .eq('id', selectedGlobalCycle)
-          .single();
+    onSuccess();
+    onClose();
 
-        if (globalCycleError) throw globalCycleError;
+    // Reset local state
+    setSelectedGlobalCycle(null);
+  } catch (err) {
+    console.error('Error syncing to global cycle:', err);
+    Alert.alert('Error', (err as Error).message || 'Failed to sync to global cycle');
+  } finally {
+    setLoading(false);
+  }
+};
 
-        // Update existing cycle to sync with global cycle
-        const { data, error } = await supabase
-          .from('0008-ap-user-cycles')
-          .update({
-            source: 'global',
-            global_cycle_id: selectedGlobalCycle,
-            title: globalCycleData.title,
-            start_date: globalCycleData.start_date,
-            end_date: globalCycleData.end_date,
-            week_start_day: weekStartDay,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', initialData.id)
-          .select()
-          .single();
-
-        console.log('Update response - data:', data, 'error:', error);
-        
-        if (error) throw error;
-        console.log('Success! Cycle updated to sync with global cycle');
-        Alert.alert('Success', 'Cycle updated successfully!');
-      } else {
-        console.log('Syncing to new global cycle...');
-        
-        const rpcParams = {
-          p_source: 'global',
-          p_global_cycle_id: selectedGlobalCycle,
-          p_week_start_day: weekStartDay
-        };
-        console.log('Calling ap_create_user_cycle with params:', rpcParams);
-        
-        // Call the RPC function to sync to a global cycle
-        const { data, error } = await supabase.rpc('ap_create_user_cycle', rpcParams);
-
-        console.log('RPC response - data:', data, 'error:', error);
-        
-        if (error) throw error;
-        console.log('Success! Synced to global cycle with ID:', data);
-        Alert.alert('Success', 'Successfully synced to community cycle!');
-      }
-
-      onSuccess();
-      onClose();
-      
-      // Reset form
-      setSelectedGlobalCycle(null);
-    } catch (error) {
-      console.error('Error syncing to global cycle:', error);
-      console.error('Full error object:', JSON.stringify(error, null, 2));
-      Alert.alert('Error', (error as Error).message || 'Failed to sync to global cycle');
-    } finally {
-      console.log('Setting loading to false');
-      setLoading(false);
-    }
-  };
 
   const getMarkedDates = () => {
     const marked: any = {};
