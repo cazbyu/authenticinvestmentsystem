@@ -446,20 +446,6 @@ export default function Goals() {
   />
 );
 
-  {/* Actions List (This Week) */}
-  <View style={{ backgroundColor: '#ffffff', marginTop: 8, padding: 12, borderRadius: 10 }}>
-    {/* Header progress bar like screenshot */}
-    {(() => {
-      const planned = weeklyTasks.reduce((s, t) => s + (t.target || 0), 0);
-      const done = weeklyTasks.reduce((s, t) => s + (t.completed || 0), 0);
-      const pct = planned > 0 ? Math.min(100, Math.round((done / planned) * 100)) : 0;
-      return (
-        <View style={{ marginBottom: 8 }}>
-          <Text style={{ fontWeight: '600', marginBottom: 6 }}>{pct}% complete</Text>
-          <View style={{ height: 6, backgroundColor: '#e5e7eb', borderRadius: 4 }}>
-            <View style={{ width: `${pct}%`, height: 6, backgroundColor: '#111827', borderRadius: 4 }} />
-          </View>
-        </View>
       );
     })()}
 
