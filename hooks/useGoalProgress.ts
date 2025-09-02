@@ -514,9 +514,19 @@ return hydrated;
 
       // Fetch cycle-dependent data in parallel
       const [weeks, daysLeft] = await Promise.all([
-        fetchCycleWeeks(cycle.id),
-        fetchDaysLeftData(cycle.id)
-      ]);
+  fetchCycleWeeks(cycle.id),
+  fetchDaysLeftData(cycle.id)
+]);
+
+// Default to the current week if none selected
+if (!selectedWeekNumber && weeks.length > 0) {
+  const current = getCurrentWeekNumber();
+  setSelectedWeekNumber(current);
+}
+
+// Fetch goals after we have cycle data
+await fetchGoals(cycle.id);
+
 if (!selectedWeekNumber && weeks.length > 0) {
   const today = new Date();
   const match = weeks.find(
