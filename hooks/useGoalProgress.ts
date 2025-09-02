@@ -99,7 +99,6 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [daysLeftData, setDaysLeftData] = useState<DaysLeftData | null>(null);
   const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgress>>({});
-  const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
@@ -153,7 +152,11 @@ const hydrated = data
 setCurrentCycle(hydrated as any);
 return hydrated;
 
-      } catch (error) {
+    if (error && error.code !== 'PGRST116') throw error;
+
+    setCurrentCycle(data);
+    return data;
+  } catch (error) {
     console.error('Error fetching user cycle:', error);
     return null;
   }
@@ -396,64 +399,6 @@ return hydrated;
     }
   };
 
-  // Goal-scoped version: only tasks linked to a specific 12-week goal
-const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Promise<WeeklyTaskData[]> => {
-  try {
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !currentCycle) return [];
-
-    const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
-    if (!weekData) return [];
-
-    const { data: goalJoins } = await supabase
-      .from('0008-ap-universal-goals-join')
-      .select('parent_id')
-      .eq('goal_id', goalId)
-      .eq('parent_type', 'task');
-
-    const taskIds = (goalJoins || []).map(gj => gj.parent_id);
-    if (taskIds.length === 0) return [];
-
-    const { data: tasksData } = await supabase
-      .from('0008-ap-tasks')
-      .select('*')
-      .in('id', taskIds)
-      .eq('user_id', user.id)
-      .eq('user_cycle_id', currentCycle.id)
-      .eq('input_kind', 'count')
-      .not('status', 'in', '(completed,cancelled)');
-
-    if (!tasksData || tasksData.length === 0) return [];
-
-    const { data: weekPlansData } = await supabase
-      .from('0008-ap-task-week-plan')
-      .select('*')
-      .in('task_id', taskIds)
-      .eq('user_cycle_id', currentCycle.id)
-      .eq('week_number', weekNumber);
-
-    const { data: taskLogsData } = await supabase
-      .from('0008-ap-task-log')
-      .select('*')
-      .in('task_id', taskIds)
-      .gte('log_date', weekData.start_date)
-      .lte('log_date', weekData.end_date);
-
-    return tasksData.map(task => {
-      const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id) || null;
-      const logs = taskLogsData?.filter(log => log.task_id === task.id) || [];
-      const completed = logs.filter(log => log.completed).length;
-      const target = weekPlan?.target_days || 0;
-      const weeklyScore = target > 0 ? Math.round((completed / target) * 100) : 0;
-      return { task, weekPlan, logs, completed, target, weeklyScore };
-    });
-  } catch (e) {
-    console.error('Error in getWeeklyTaskDataForGoal:', e);
-    return [];
-  }
-};
-
   const calculateGoalProgress = async (goals: TwelveWeekGoal[], userCycleId: string) => {
     try {
       const supabase = getSupabaseClient();
@@ -568,26 +513,9 @@ const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Pro
 
       // Fetch cycle-dependent data in parallel
       const [weeks, daysLeft] = await Promise.all([
-  fetchCycleWeeks(cycle.id),
-  fetchDaysLeftData(cycle.id)
-]);
-
-// Default to the current week if none selected
-if (!selectedWeekNumber && weeks.length > 0) {
-  const current = getCurrentWeekNumber();
-  setSelectedWeekNumber(current);
-}
-
-// Fetch goals after we have cycle data
-await fetchGoals(cycle.id);
-
-if (!selectedWeekNumber && weeks.length > 0) {
-  const today = new Date();
-  const match = weeks.find(
-    w => new Date(w.start_date) <= today && today <= new Date(w.end_date)
-  );
-  setSelectedWeekNumber(match ? match.week_number : weeks[0].week_number);
-}
+        fetchCycleWeeks(cycle.id),
+        fetchDaysLeftData(cycle.id)
+      ]);
 
       // Fetch goals after we have cycle data
       await fetchGoals(cycle.id);
@@ -760,10 +688,7 @@ if (!selectedWeekNumber && weeks.length > 0) {
   }, [currentCycle]);
 
   return {
-    goals,   
-    getWeeklyTaskDataForGoal,
-    selectedWeekNumber,
-    setSelectedWeekNumber,
+    goals,
     currentCycle,
     cycleWeeks,
     daysLeftData,
