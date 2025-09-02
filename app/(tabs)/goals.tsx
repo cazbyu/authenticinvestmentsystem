@@ -287,25 +287,39 @@ export default function Goals() {
             {/* Week Navigator */}
             {cycleWeeks.length > 0 && (
               <View style={styles.weekNavigator}>
-                <TouchableOpacity 
-                  style={[styles.weekNavButton, selectedWeekIndex === 0 && styles.weekNavButtonDisabled]}
-                  onPress={goPrevWeek}
-                  disabled={selectedWeekIndex === 0}
-                >
-                  <ChevronLeft size={20} color={selectedWeekIndex === 0 ? '#9ca3af' : '#0078d4'} />
-                </TouchableOpacity>
-                
-                <Text style={styles.weekHeader}>
-                  {formatWeekHeader()}
-                </Text>
-                
-                <TouchableOpacity 
-                  style={[styles.weekNavButton, selectedWeekIndex === 11 && styles.weekNavButtonDisabled]}
-                  onPress={goNextWeek}
-                  disabled={selectedWeekIndex === 11}
-                >
-                  <ChevronRight size={20} color={selectedWeekIndex === 11 ? '#9ca3af' : '#0078d4'} />
-                </TouchableOpacity>
+                <View style={styles.weekNavContainer}>
+                  <TouchableOpacity 
+                    style={[styles.weekNavButton, selectedWeekIndex === 0 && styles.weekNavButtonDisabled]}
+                    onPress={goPrevWeek}
+                    disabled={selectedWeekIndex === 0}
+                  >
+                    <ChevronLeft size={16} color={selectedWeekIndex === 0 ? '#9ca3af' : '#0078d4'} />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.weekDisplay}>
+                    <Text style={styles.weekNumber}>
+                      Week {getWeekData(selectedWeekIndex)?.weekNumber || 1}
+                    </Text>
+                    <Text style={styles.weekDates}>
+                      {(() => {
+                        const weekData = getWeekData(selectedWeekIndex);
+                        if (!weekData) return '';
+                        const startDate = new Date(weekData.startDate);
+                        const endDate = new Date(weekData.endDate);
+                        const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+                      })()}
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={[styles.weekNavButton, selectedWeekIndex === 11 && styles.weekNavButtonDisabled]}
+                    onPress={goNextWeek}
+                    disabled={selectedWeekIndex === 11}
+                  >
+                    <ChevronRight size={16} color={selectedWeekIndex === 11 ? '#9ca3af' : '#0078d4'} />
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -504,19 +518,23 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   weekNavigator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
     marginTop: 16,
     marginBottom: 12,
   },
+  weekNavContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    maxWidth: 200,
+  },
   weekNavButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 6,
+    borderRadius: 16,
     backgroundColor: '#ffffff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -529,13 +547,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  weekHeader: {
-    fontSize: 16,
+  weekDisplay: {
+    alignItems: 'center',
+    marginHorizontal: 12,
+    minWidth: 100,
+  },
+  weekNumber: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#1f2937',
     textAlign: 'center',
-    flex: 1,
-    marginHorizontal: 16,
+    marginBottom: 2,
+  },
+  weekDates: {
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 14,
   },
   goalsList: {
     flexDirection: 'row',
