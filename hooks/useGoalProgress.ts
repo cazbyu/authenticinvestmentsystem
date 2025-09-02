@@ -153,11 +153,7 @@ const hydrated = data
 setCurrentCycle(hydrated as any);
 return hydrated;
 
-    if (error && error.code !== 'PGRST116') throw error;
-
-    setCurrentCycle(data);
-    return data;
-  } catch (error) {
+      } catch (error) {
     console.error('Error fetching user cycle:', error);
     return null;
   }
