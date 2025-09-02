@@ -602,6 +602,14 @@ if (formData.schedulingType === 'event') {
     (payload as any).recurrence_rule = isRepeating ? constructRecurrenceRule() : null;
 }
 
+// Extended task fields (enable recurrence for tasks too)
+if (formData.schedulingType === 'task') {
+  (payload as any).start_date = toDateString(formData.dueDate);
+  // If an "Ends" date was set in the recurrence modal, use it; otherwise keep dueDate
+  (payload as any).end_date = toDateString(recurrenceEndDate || formData.dueDate);
+  (payload as any).recurrence_rule = isRepeating ? constructRecurrenceRule() : null;
+}
+          
             let taskData;
             let taskError;
 
