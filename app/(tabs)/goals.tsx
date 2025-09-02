@@ -445,8 +445,6 @@ const goalsArray = Array.isArray(twelveWeekGoals)
     )}
   </View>
 
-          </View>
-
                 </ScrollView>
       ) : (
         <View style={styles.noCycleContainer}>
