@@ -443,9 +443,11 @@ const goalsArray = Array.isArray(twelveWeekGoals)
         />
       ) : null
     )}
-  </View>
-
+   </View>
+)}
+        </ScrollView>
       ) : (
+
         <View style={styles.noCycleContainer}>
           <Target size={64} color="#6b7280" />
           <Text style={styles.noCycleTitle}>Start Your 12-Week Journey</Text>
