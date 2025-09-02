@@ -433,11 +433,16 @@ export default function Goals() {
   }, [goal.id, selectedWeekNumber]);
  
       return (
-        <View key={goal.id} style={{ width: '48%' }}>
-  <GoalProgressCard
+  <GoalWithActions
+    key={goal.id}
     goal={goal}
     progress={progress}
-    onAddTask={() => {
+    cycleWeeks={cycleWeeks}
+    selectedWeekNumber={selectedWeekNumber}
+    getWeekDateRange={getWeekDateRange}
+    toggleTaskDay={toggleTaskDay}
+    getWeeklyTaskDataForGoal={getWeeklyTaskDataForGoal}
+    onAddTaskPress={() => {
       const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
       setEditingTask({
         type: 'task',
@@ -453,6 +458,7 @@ export default function Goals() {
       setTaskFormVisible(true);
     }}
   />
+);
 
   {/* Actions List (This Week) */}
   <View style={{ backgroundColor: '#ffffff', marginTop: 8, padding: 12, borderRadius: 10 }}>
