@@ -329,7 +329,7 @@ return hydrated;
     }
   };
 
-  const fetchTasksAndPlansForWeek = async (userCycleId: string, weekNumber: number): Promise<WeeklyTaskData[]> => {
+  *const fetchTasksAndPlansForWeek = async (userCycleId: string, weekNumber: number): Promise<WeeklyTaskData[]> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -399,6 +399,74 @@ return hydrated;
       return [];
     }
   };
+
+  // Goal-scoped version: only tasks linked to a specific 12-week goal
+const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Promise<WeeklyTaskData[]> => {
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !currentCycle) return [];
+
+    // Find the selected week's date range
+    const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
+    if (!weekData) return [];
+
+    // Get tasks joined to this goal
+    const { data: goalJoins } = await supabase
+      .from('0008-ap-universal-goals-join')
+      .select('parent_id')
+      .eq('goal_id', goalId)
+      .eq('parent_type', 'task');
+
+    const taskIds = (goalJoins || []).map(gj => gj.parent_id);
+    if (taskIds.length === 0) return [];
+
+    // Fetch tasks
+    const { data: tasksData, error: tasksError } = await supabase
+      .from('0008-ap-tasks')
+      .select('*')
+      .in('id', taskIds)
+      .eq('user_id', user.id)
+      .eq('user_cycle_id', currentCycle.id)
+      .eq('input_kind', 'count')
+      .not('status', 'in', '(completed,cancelled)');
+    if (tasksError) throw tasksError;
+
+    if (!tasksData || tasksData.length === 0) return [];
+
+    // Week plan rows for this goal’s tasks & week
+    const { data: weekPlansData } = await supabase
+      .from('0008-ap-task-week-plan')
+      .select('*')
+      .in('task_id', taskIds)
+      .eq('user_cycle_id', currentCycle.id)
+      .eq('week_number', weekNumber);
+
+    // Logs within the week window
+    const { data: taskLogsData } = await supabase
+      .from('0008-ap-task-log')
+      .select('*')
+      .in('task_id', taskIds)
+      .gte('log_date', weekData.start_date)
+      .lte('log_date', weekData.end_date);
+
+    const weeklyTaskData: WeeklyTaskData[] = [];
+    for (const task of tasksData) {
+      const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id) || null;
+      const logs = (taskLogsData || []).filter(l => l.task_id === task.id);
+      const completed = logs.filter(l => l.completed).length;
+      const target = weekPlan?.target_days || 0;
+      const weeklyScore = target > 0 ? Math.round((completed / target) * 100) : 0;
+
+      weeklyTaskData.push({ task, weekPlan, logs, completed, target, weeklyScore });
+    }
+    return weeklyTaskData;
+  } catch (e) {
+    console.error('Error in getWeeklyTaskDataForGoal:', e);
+    return [];
+  }
+};
+
 
   const calculateGoalProgress = async (goals: TwelveWeekGoal[], userCycleId: string) => {
     try {
