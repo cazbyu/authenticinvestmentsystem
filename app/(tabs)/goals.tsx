@@ -8,7 +8,7 @@ import { useGoalProgress } from '@/hooks/useGoalProgress';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
-import { Plus, Target, Calendar } from 'lucide-react-native';
+import { Plus, Target, Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { formatDateRange } from '@/lib/dateUtils';
 
 export default function Goals() {
@@ -18,6 +18,9 @@ export default function Goals() {
   const [cycleSetupVisible, setCycleSetupVisible] = useState(false);
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
   const [editingCycle, setEditingCycle] = useState<any>(null);
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
+  const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
+  const [loadingWeekActions, setLoadingWeekActions] = useState(false);
 
   // 12-Week Goals
   const { 
@@ -25,11 +28,68 @@ export default function Goals() {
     currentCycle, 
     daysLeftData, 
     goalProgress, 
+    cycleWeeks,
     loading: goalsLoading, 
     refreshGoals,
     refreshAllData,
-    createGoal
+    createGoal,
+    fetchGoalActionsForWeek,
+    getCurrentWeekIndex,
+    getWeekData,
   } = useGoalProgress();
+
+  // Initialize selected week to current week
+  useEffect(() => {
+    if (cycleWeeks.length > 0) {
+      const currentWeekIndex = getCurrentWeekIndex();
+      setSelectedWeekIndex(currentWeekIndex);
+    }
+  }, [cycleWeeks, getCurrentWeekIndex]);
+
+  // Fetch week-specific actions when week or goals change
+  useEffect(() => {
+    if (twelveWeekGoals.length > 0 && cycleWeeks.length > 0) {
+      fetchWeekActions();
+    }
+  }, [selectedWeekIndex, twelveWeekGoals, cycleWeeks]);
+
+  const fetchWeekActions = async () => {
+    const weekData = getWeekData(selectedWeekIndex);
+    if (!weekData || twelveWeekGoals.length === 0) return;
+
+    setLoadingWeekActions(true);
+    try {
+      const goalIds = twelveWeekGoals.map(g => g.id);
+      const actions = await fetchGoalActionsForWeek(goalIds, weekData.startDate, weekData.endDate);
+      setWeekGoalActions(actions);
+    } catch (error) {
+      console.error('Error fetching week actions:', error);
+    } finally {
+      setLoadingWeekActions(false);
+    }
+  };
+
+  const goPrevWeek = () => {
+    setSelectedWeekIndex(prev => Math.max(0, prev - 1));
+  };
+
+  const goNextWeek = () => {
+    setSelectedWeekIndex(prev => Math.min(11, prev + 1));
+  };
+
+  const formatWeekHeader = () => {
+    const weekData = getWeekData(selectedWeekIndex);
+    if (!weekData) return 'Week 1';
+    
+    const startDate = new Date(weekData.startDate);
+    const endDate = new Date(weekData.endDate);
+    
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+    
+    return `Week ${weekData.weekNumber} — ${formatDate(startDate)} – ${formatDate(endDate)}`;
+  };
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -223,7 +283,34 @@ export default function Goals() {
               </View>
             </View>
             {/* Goals List */}
-{goalsLoading ? (
+            
+            {/* Week Navigator */}
+            {cycleWeeks.length > 0 && (
+              <View style={styles.weekNavigator}>
+                <TouchableOpacity 
+                  style={[styles.weekNavButton, selectedWeekIndex === 0 && styles.weekNavButtonDisabled]}
+                  onPress={goPrevWeek}
+                  disabled={selectedWeekIndex === 0}
+                >
+                  <ChevronLeft size={20} color={selectedWeekIndex === 0 ? '#9ca3af' : '#0078d4'} />
+                </TouchableOpacity>
+                
+                <Text style={styles.weekHeader}>
+                  {formatWeekHeader()}
+                </Text>
+                
+                <TouchableOpacity 
+                  style={[styles.weekNavButton, selectedWeekIndex === 11 && styles.weekNavButtonDisabled]}
+                  onPress={goNextWeek}
+                  disabled={selectedWeekIndex === 11}
+                >
+                  <ChevronRight size={20} color={selectedWeekIndex === 11 ? '#9ca3af' : '#0078d4'} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Goals List */}
+            {goalsLoading ? (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
   </View>
@@ -246,6 +333,8 @@ export default function Goals() {
   <View style={styles.goalsList}>
     {twelveWeekGoals.map(goal => {
       const progress = goalProgress[goal.id];
+      const weekData = getWeekData(selectedWeekIndex);
+      const goalActions = weekGoalActions[goal.id] || [];
       if (!progress) return null;
 
       return (
@@ -253,12 +342,18 @@ export default function Goals() {
           key={goal.id}
           goal={goal}
           progress={progress}
+          week={weekData}
+          weekActions={goalActions}
+          loadingWeekActions={loadingWeekActions}
           onAddTask={() => {
+            const weekData = getWeekData(selectedWeekIndex);
             setEditingTask({
               type: 'task',
               selectedGoalIds: [goal.id],
               twelveWeekGoalChecked: true,
               countsTowardWeeklyProgress: true,
+              due_date: weekData?.startDate,
+              start_date: weekData?.startDate,
               selectedRoleIds: goal.roles?.map(r => r.id) || [],
               selectedDomainIds: goal.domains?.map(d => d.id) || [],
               selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
@@ -407,6 +502,40 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#0078d4',
     borderRadius: 4,
+  },
+  weekNavigator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  weekNavButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  weekNavButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  weekHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
+    flex: 1,
+    marginHorizontal: 16,
   },
   goalsList: {
     flexDirection: 'row',

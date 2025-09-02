@@ -1,11 +1,29 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Target, Calendar, Plus, TrendingUp } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Target, Calendar, Plus, TrendingUp, Check } from 'lucide-react-native';
 import { TwelveWeekGoal, GoalProgress } from '@/hooks/useGoalProgress';
+
+interface WeekData {
+  weekNumber: number;
+  startDate: string;
+  endDate: string;
+}
+
+interface TaskWithLogs {
+  id: string;
+  title: string;
+  input_kind?: string;
+  logs: Array<{ log_date: string; completed: boolean }>;
+  weeklyActual: number;
+  weeklyTarget: number;
+}
 
 interface GoalProgressCardProps {
   goal: TwelveWeekGoal;
   progress: GoalProgress;
+  week?: WeekData | null;
+  weekActions?: TaskWithLogs[];
+  loadingWeekActions?: boolean;
   onAddTask?: () => void;
   onPress?: () => void;
   compact?: boolean;
@@ -14,6 +32,9 @@ interface GoalProgressCardProps {
 export function GoalProgressCard({ 
   goal, 
   progress, 
+  week,
+  weekActions = [],
+  loadingWeekActions = false,
   onAddTask, 
   onPress, 
   compact = false 
@@ -35,6 +56,39 @@ export function GoalProgressCard({
 
   const primaryRole = goal.roles?.[0];
   const cardColor = primaryRole?.color || '#0078d4';
+
+  const generateWeekDays = (startDate: string, endDate: string, weekStartDay: 'sunday' | 'monday' = 'sunday') => {
+    const days = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // Generate 7 days starting from the week start
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      
+      if (day <= end) {
+        days.push({
+          date: day.toISOString().split('T')[0],
+          dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()],
+          dayOfWeek: day.getDay(),
+        });
+      }
+    }
+    
+    return days;
+  };
+
+  const calculateWeeklyProgress = () => {
+    if (!week || weekActions.length === 0) {
+      return { actual: progress.weeklyActual, target: progress.weeklyTarget };
+    }
+    
+    const totalActual = weekActions.reduce((sum, action) => sum + action.weeklyActual, 0);
+    const totalTarget = weekActions.reduce((sum, action) => sum + action.weeklyTarget, 0);
+    
+    return { actual: totalActual, target: totalTarget };
+  };
 
   if (compact) {
     return (
@@ -84,6 +138,8 @@ export function GoalProgressCard({
     );
   }
 
+  const weeklyProgress = calculateWeeklyProgress();
+
   return (
     <TouchableOpacity
       style={[styles.card, { borderLeftColor: cardColor }]}
@@ -123,9 +179,9 @@ export function GoalProgressCard({
             <Text style={styles.progressLabel}>This Week (Leading)</Text>
             <Text style={[
               styles.progressValue,
-              { color: getWeeklyProgressColor(progress.weeklyActual, progress.weeklyTarget) }
+              { color: getWeeklyProgressColor(weeklyProgress.actual, weeklyProgress.target) }
             ]}>
-              {formatWeeklyProgress(progress.weeklyActual, progress.weeklyTarget)}
+              {formatWeeklyProgress(weeklyProgress.actual, weeklyProgress.target)}
             </Text>
           </View>
           
@@ -134,8 +190,8 @@ export function GoalProgressCard({
               style={[
                 styles.progressFill,
                 {
-                  width: `${Math.min(100, (progress.weeklyActual / Math.max(1, progress.weeklyTarget)) * 100)}%`,
-                  backgroundColor: getWeeklyProgressColor(progress.weeklyActual, progress.weeklyTarget),
+                  width: `${Math.min(100, (weeklyProgress.actual / Math.max(1, weeklyProgress.target)) * 100)}%`,
+                  backgroundColor: getWeeklyProgressColor(weeklyProgress.actual, weeklyProgress.target),
                 }
               ]}
             />
@@ -166,6 +222,91 @@ export function GoalProgressCard({
             />
           </View>
         </View>
+
+        {/* Week-specific Actions (when week prop is provided) */}
+        {week && (
+          <View style={styles.weekActionsSection}>
+            <View style={styles.weekActionsHeader}>
+              <Text style={styles.weekActionsTitle}>
+                Week {week.weekNumber} Actions
+              </Text>
+              {onAddTask && (
+                <TouchableOpacity
+                  style={[styles.addActionButton, { borderColor: cardColor }]}
+                  onPress={onAddTask}
+                >
+                  <Plus size={12} color={cardColor} />
+                  <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {loadingWeekActions ? (
+              <View style={styles.loadingActions}>
+                <ActivityIndicator size="small" color={cardColor} />
+                <Text style={styles.loadingActionsText}>Loading actions...</Text>
+              </View>
+            ) : weekActions.length === 0 ? (
+              <View style={styles.emptyActions}>
+                <Text style={styles.emptyActionsText}>No actions this week</Text>
+                {onAddTask && (
+                  <TouchableOpacity
+                    style={[styles.addActionButton, { borderColor: cardColor }]}
+                    onPress={onAddTask}
+                  >
+                    <Plus size={12} color={cardColor} />
+                    <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add action</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={styles.actionsList}>
+                {weekActions.map(action => {
+                  const weekDays = generateWeekDays(week.startDate, week.endDate);
+                  
+                  return (
+                    <View key={action.id} style={styles.actionItem}>
+                      <View style={styles.actionHeader}>
+                        <Text style={styles.actionTitle} numberOfLines={1}>
+                          {action.title}
+                        </Text>
+                        <Text style={styles.actionCount}>
+                          {action.weeklyActual}/{action.weeklyTarget}
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.dayDots}>
+                        {weekDays.map(day => {
+                          const hasLog = action.logs.some(log => 
+                            log.log_date === day.date && log.completed
+                          );
+                          
+                          return (
+                            <View
+                              key={day.date}
+                              style={[
+                                styles.dayDot,
+                                hasLog && styles.dayDotCompleted,
+                                { backgroundColor: hasLog ? cardColor : '#e5e7eb' }
+                              ]}
+                            >
+                              <Text style={[
+                                styles.dayDotText,
+                                { color: hasLog ? '#ffffff' : '#6b7280' }
+                              ]}>
+                                {day.dayName.charAt(0)}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Tags */}
         {(goal.roles?.length > 0 || goal.domains?.length > 0) && (
@@ -364,5 +505,104 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     color: '#374151',
+  },
+  weekActionsSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  weekActionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  weekActionsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  addActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  addActionButtonText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  loadingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  loadingActionsText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  emptyActions: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  emptyActionsText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  actionsList: {
+    gap: 8,
+  },
+  actionItem: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 6,
+    padding: 8,
+  },
+  actionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  actionTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1f2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  actionCount: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  dayDots: {
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+  },
+  dayDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e5e7eb',
+  },
+  dayDotCompleted: {
+    backgroundColor: '#0078d4',
+  },
+  dayDotText: {
+    fontSize: 8,
+    fontWeight: '600',
+    color: '#6b7280',
   },
 });
