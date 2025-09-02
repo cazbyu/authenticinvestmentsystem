@@ -35,7 +35,7 @@ export function GoalProgressCard({
   week,
   weekActions = [],
   loadingWeekActions = false,
-  onAddTask, 
+  onAddAction, 
   onPress, 
   compact = false 
 }: GoalProgressCardProps) {
