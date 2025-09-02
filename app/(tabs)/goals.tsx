@@ -224,56 +224,58 @@ export default function Goals() {
             </View>
           </View>
 
-          {/* Goals List */}
-          {goalsLoading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading goals...</Text>
-            </View>
-          ) : twelveWeekGoals.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Target size={48} color="#6b7280" />
-              <Text style={styles.emptyTitle}>No 12-Week Goals Yet</Text>
-              <Text style={styles.emptyText}>
-                Create your first 12-week goal to start tracking your progress with leading and lagging indicators.
-              </Text>
-              <TouchableOpacity 
-                style={styles.createGoalButton}
-                onPress={() => {
-                  setCreateGoalModalVisible(true);
-                }}
-              >
-                <Plus size={20} color="#ffffff" />
-                <Text style={styles.createGoalButtonText}>Create First Goal</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.goalsList}>
-              {twelveWeekGoals.map(goal => {
-                const progress = goalProgress[goal.id];
-                if (!progress) return null;
-                
-                return (
-                  <GoalProgressCard
-                    key={goal.id}
-                    goal={goal}
-                    progress={progress}
-                    onAddTask={() => {
-                      setEditingTask({
-                        type: 'task',
-                        selectedGoalIds: [goal.id],
-                        twelveWeekGoalChecked: true,
-                        countsTowardWeeklyProgress: true,
-                        selectedRoleIds: goal.roles?.map(r => r.id) || [],
-                        selectedDomainIds: goal.domains?.map(d => d.id) || [],
-                        selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
-                      } as any);
-                      setTaskFormVisible(true);
-                    }}
-                  />
-                );
-              })}
-            </View>
-          )}
+          </View>  // closes styles.cycleProgress
+
+{/* Goals List */}
+{goalsLoading ? (
+  <View style={styles.loadingContainer}>
+    <ActivityIndicator size="small" color="#1f6feb" />
+  </View>
+) : twelveWeekGoals.length === 0 ? (
+  <View style={styles.noGoalsContainerInside}>
+    <Text style={styles.noGoalsTitle}>No 12-Week Goals Yet</Text>
+    <Text style={styles.noGoalsText}>
+      Create your first 12-week goal to start tracking this cycle.
+    </Text>
+    <TouchableOpacity
+      style={styles.createGoalButton}
+      onPress={() => setGoalModalVisible(true)}
+    >
+      <Plus color="#ffffff" />
+      <Text style={styles.createGoalButtonText}>Create First Goal</Text>
+    </TouchableOpacity>
+  </View>
+) : (
+  <View style={styles.goalsList}>
+    {twelveWeekGoals.map(goal => {
+      const progress = goalProgress[goal.id];
+      if (!progress) return null;
+
+      return (
+        <GoalProgressCard
+          key={goal.id}
+          goal={goal}
+          progress={progress}
+          onAddTask={() => {
+            setEditingTask({
+              type: 'task',
+              selectedGoalIds: [goal.id],
+              twelveWeekGoalChecked: true,
+              countsTowardWeeklyProgress: true,
+              selectedRoleIds: goal.roles?.map(r => r.id) || [],
+              selectedDomainIds: goal.domains?.map(d => d.id) || [],
+              selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
+            } as any);
+            setTaskFormVisible(true);
+          }}
+        />
+      );
+    })}
+  </View>
+)}
+
+</View>  // closes styles.cycleHeader
+
         </ScrollView>
       ) : (
         <View style={styles.noCycleContainer}>
