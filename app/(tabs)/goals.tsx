@@ -225,6 +225,33 @@ export default function Goals() {
                 />
               </View>
             </View>
+
+{/* Week Navigator */}
+<View style={{ marginTop: 8, marginBottom: 12 }}>
+  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    {cycleWeeks.map(w => (
+      <TouchableOpacity
+        key={w.week_number}
+        onPress={() => setSelectedWeekNumber(w.week_number)}
+        style={{
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 20,
+          marginRight: 8,
+          backgroundColor: selectedWeekNumber === w.week_number ? '#0078d4' : '#e5e7eb'
+        }}
+      >
+        <Text style={{ 
+          color: selectedWeekNumber === w.week_number ? 'white' : '#111827',
+          fontWeight: '600'
+        }}>
+          {`W${w.week_number}`}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+</View>
+            
             {/* Goals List */}
 {goalsLoading ? (
   <View style={styles.loadingContainer}>
