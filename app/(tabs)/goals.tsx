@@ -390,10 +390,7 @@ const goalsArray = Array.isArray(twelveWeekGoals)
           {formatDateRange(wk.start_date, wk.end_date)}
         </Text>
       );
-    })()}
-  </View>
-)}
-            
+                
             {/* Goals List */}
 {goalsLoading ? (
   <View style={styles.loadingContainer}>
