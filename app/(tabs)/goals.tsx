@@ -224,9 +224,7 @@ export default function Goals() {
             </View>
           </View>
 
-          </View>  // closes styles.cycleProgress
-
-{/* Goals List */}
+        {/* Goals List */}
 {goalsLoading ? (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
@@ -273,8 +271,6 @@ export default function Goals() {
     })}
   </View>
 )}
-
-</View>  // closes styles.cycleHeader
 
         </ScrollView>
       ) : (
