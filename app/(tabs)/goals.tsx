@@ -511,8 +511,6 @@ export default function Goals() {
     )}
   </View>
 
-
-  </View>
 )}
           </View>
 
