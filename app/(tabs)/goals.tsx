@@ -414,6 +414,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     gap: 12,
+    marginTop: 12,
   },
   loadingContainer: {
     padding: 40,
