@@ -11,120 +11,6 @@ import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { Plus, Target, Calendar } from 'lucide-react-native';
 import { formatDateRange } from '@/lib/dateUtils';
 
-function GoalWithActions({
-  goal,
-  progress,
-  cycleWeeks,
-  selectedWeekNumber,
-  getWeekDateRange,
-  toggleTaskDay,
-  getWeeklyTaskDataForGoal,
-  onAddTaskPress,
-}: {
-  goal: any;
-  progress: any;
-  cycleWeeks: any[];
-  selectedWeekNumber: number | null;
-  getWeekDateRange: (wk: number) => { start: string; end: string } | null;
-  toggleTaskDay: (taskId: string, date: string) => Promise<boolean>;
-  getWeeklyTaskDataForGoal: (goalId: string, weekNumber: number) => Promise<any[]>;
-  onAddTaskPress: () => void;
-}) {
-  const [weeklyTasks, setWeeklyTasks] = React.useState<any[]>([]);
-  const [actionsLoading, setActionsLoading] = React.useState(false);
-
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!selectedWeekNumber) return;
-      setActionsLoading(true);
-      const data = await getWeeklyTaskDataForGoal(goal.id, selectedWeekNumber);
-      if (mounted) setWeeklyTasks(data);
-      setActionsLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [goal.id, selectedWeekNumber]);
-
-  return (
-    <View style={{ width: '48%' }}>
-      <GoalProgressCard goal={goal} progress={progress} onAddTask={onAddTaskPress} />
-
-      {/* Actions List (This Week) */}
-      <View style={{ backgroundColor: '#ffffff', marginTop: 8, padding: 12, borderRadius: 10 }}>
-        {(() => {
-          const planned = weeklyTasks.reduce((s, t) => s + (t.target || 0), 0);
-          const done = weeklyTasks.reduce((s, t) => s + (t.completed || 0), 0);
-          const pct = planned > 0 ? Math.min(100, Math.round((done / planned) * 100)) : 0;
-          return (
-            <View style={{ marginBottom: 8 }}>
-              <Text style={{ fontWeight: '600', marginBottom: 6 }}>{pct}% complete</Text>
-              <View style={{ height: 6, backgroundColor: '#e5e7eb', borderRadius: 4 }}>
-                <View style={{ width: `${pct}%`, height: 6, backgroundColor: '#111827', borderRadius: 4 }} />
-              </View>
-            </View>
-          );
-        })()}
-
-        {actionsLoading ? (
-          <Text style={{ color: '#6b7280' }}>Loading actions…</Text>
-        ) : weeklyTasks.length === 0 ? (
-          <Text style={{ color: '#6b7280' }}>No actions planned for this week.</Text>
-        ) : (
-          weeklyTasks.map((it) => {
-            const range = selectedWeekNumber ? getWeekDateRange(selectedWeekNumber) : null;
-            const start = range?.start ? new Date(range.start) : null;
-            const days = start
-              ? [...Array(7)].map((_, i) => {
-                  const d = new Date(start);
-                  d.setDate(start.getDate() + i);
-                  return d.toISOString().slice(0, 10);
-                })
-              : [];
-            const completedDates = new Set((it.logs || []).filter((l: any) => l.completed).map((l: any) => l.log_date));
-
-            return (
-              <View key={it.task.id} style={{ marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ fontWeight: '600' }}>{it.task.title}</Text>
-                  <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
-                    <Text style={{ color: '#065f46', fontWeight: '600' }}>{it.completed}/{it.target || 0}</Text>
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                  {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((label, idx) => {
-                    const date = days[idx];
-                    const isChecked = date ? completedDates.has(date) : false;
-                    return (
-                      <TouchableOpacity
-                        key={label}
-                        onPress={async () => {
-                          if (!date) return;
-                          await toggleTaskDay(it.task.id, date);
-                          const data = await getWeeklyTaskDataForGoal(goal.id, selectedWeekNumber!);
-                          setWeeklyTasks(data);
-                        }}
-                        style={{
-                          width: 26, height: 26, borderRadius: 13,
-                          borderWidth: 1, borderColor: '#d1d5db',
-                          alignItems: 'center', justifyContent: 'center',
-                          backgroundColor: isChecked ? '#111827' : '#ffffff'
-                        }}
-                      >
-                        <Text style={{ color: isChecked ? '#ffffff' : '#9ca3af', fontSize: 10 }}>{label[0]}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })
-        )}
-      </View>
-    </View>
-  );
-}
-
 export default function Goals() {
   const [authenticScore, setAuthenticScore] = useState(0);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
@@ -142,19 +28,8 @@ export default function Goals() {
     loading: goalsLoading, 
     refreshGoals,
     refreshAllData,
-    createGoal,
-    cycleWeeks,
-    selectedWeekNumber,
-    setSelectedWeekNumber,
-    getCurrentWeekNumber,
-    getWeekDateRange,
-    toggleTaskDay,
-    getWeeklyTaskDataForGoal
+    createGoal
   } = useGoalProgress();
-  // Always work with an array to avoid ".map is not a function"
-const goalsArray = Array.isArray(twelveWeekGoals)
-  ? twelveWeekGoals
-  : (twelveWeekGoals ? Object.values(twelveWeekGoals as any) : []);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -347,63 +222,18 @@ const goalsArray = Array.isArray(twelveWeekGoals)
                 />
               </View>
             </View>
-
-{/* Week Navigator */}
-<View style={{ marginTop: 8, marginBottom: 12 }}>
-  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-    {cycleWeeks.map(w => {
-  // Highlight rule: use selectedWeekNumber if set; otherwise fall back to the current week
-  const isActive = (selectedWeekNumber ?? getCurrentWeekNumber()) === w.week_number;
-  return (
-    <TouchableOpacity
-      key={w.week_number}
-      onPress={() => setSelectedWeekNumber(w.week_number)}
-      style={{
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        marginRight: 8,
-        backgroundColor: isActive ? '#0078d4' : '#e5e7eb'
-      }}
-    >
-      <Text style={{ 
-        color: isActive ? '#ffffff' : '#111827',
-        fontWeight: '600'
-      }}>
-        {`W${w.week_number}`}
-      </Text>
-    </TouchableOpacity>
-  );
-})}
-
-  </ScrollView>
-</View>
-            
-{/* Selected Week Date Range */}
-{selectedWeekNumber && (
-  <View style={{ paddingHorizontal: 16, marginTop: 4, marginBottom: 8 }}>
-    {(() => {
-      const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
-      if (!wk) return null;
-      return (
-        <Text style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>
-          {formatDateRange(wk.start_date, wk.end_date)}
-        </Text>
-      );
-    })()}
-  </View>
-)}
-           {/* Goals List */}
+            {/* Goals List */}
 {goalsLoading ? (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
   </View>
-) : goalsArray.length === 0 ? (
-  <View style={styles.emptyContainer}>
+) : twelveWeekGoals.length === 0 ? (
+    <View style={styles.emptyContainer}>
     <Text style={styles.emptyTitle}>No 12-Week Goals Yet</Text>
     <Text style={styles.emptyText}>
       Create your first 12-week goal to start tracking this cycle.
     </Text>
+
     <TouchableOpacity
       style={styles.createGoalButton}
       onPress={() => setCreateGoalModalVisible(true)}
@@ -414,19 +244,16 @@ const goalsArray = Array.isArray(twelveWeekGoals)
   </View>
 ) : (
   <View style={styles.goalsList}>
-    {goalsArray.map(goal =>
-      goalProgress[goal.id] ? (
-        <GoalWithActions
+    {twelveWeekGoals.map(goal => {
+      const progress = goalProgress[goal.id];
+      if (!progress) return null;
+
+      return (
+        <GoalProgressCard
           key={goal.id}
           goal={goal}
-          progress={goalProgress[goal.id]}
-          cycleWeeks={cycleWeeks}
-          selectedWeekNumber={selectedWeekNumber}
-          getWeekDateRange={getWeekDateRange}
-          toggleTaskDay={toggleTaskDay}
-          getWeeklyTaskDataForGoal={getWeeklyTaskDataForGoal}
-          onAddTaskPress={() => {
-            const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
+          progress={progress}
+          onAddTask={() => {
             setEditingTask({
               type: 'task',
               selectedGoalIds: [goal.id],
@@ -435,19 +262,18 @@ const goalsArray = Array.isArray(twelveWeekGoals)
               selectedRoleIds: goal.roles?.map(r => r.id) || [],
               selectedDomainIds: goal.domains?.map(d => d.id) || [],
               selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
-              due_date: wk?.start_date ?? undefined,
-              end_date: wk?.end_date ?? undefined,
             } as any);
             setTaskFormVisible(true);
           }}
         />
-            ) : null
-    )}
+      );
+    })}
   </View>
 )}
-</ScrollView>
-) : (
+          </View>
 
+                </ScrollView>
+      ) : (
         <View style={styles.noCycleContainer}>
           <Target size={64} color="#6b7280" />
           <Text style={styles.noCycleTitle}>Start Your 12-Week Journey</Text>
