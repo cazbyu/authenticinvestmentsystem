@@ -407,11 +407,9 @@ const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Pro
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !currentCycle) return [];
 
-    // Find the selected week's date range
     const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
     if (!weekData) return [];
 
-    // Get tasks joined to this goal
     const { data: goalJoins } = await supabase
       .from('0008-ap-universal-goals-join')
       .select('parent_id')
@@ -421,8 +419,7 @@ const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Pro
     const taskIds = (goalJoins || []).map(gj => gj.parent_id);
     if (taskIds.length === 0) return [];
 
-    // Fetch tasks
-    const { data: tasksData, error: tasksError } = await supabase
+    const { data: tasksData } = await supabase
       .from('0008-ap-tasks')
       .select('*')
       .in('id', taskIds)
@@ -430,11 +427,9 @@ const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Pro
       .eq('user_cycle_id', currentCycle.id)
       .eq('input_kind', 'count')
       .not('status', 'in', '(completed,cancelled)');
-    if (tasksError) throw tasksError;
 
     if (!tasksData || tasksData.length === 0) return [];
 
-    // Week plan rows for this goal’s tasks & week
     const { data: weekPlansData } = await supabase
       .from('0008-ap-task-week-plan')
       .select('*')
@@ -442,7 +437,6 @@ const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Pro
       .eq('user_cycle_id', currentCycle.id)
       .eq('week_number', weekNumber);
 
-    // Logs within the week window
     const { data: taskLogsData } = await supabase
       .from('0008-ap-task-log')
       .select('*')
@@ -450,23 +444,19 @@ const getWeeklyTaskDataForGoal = async (goalId: string, weekNumber: number): Pro
       .gte('log_date', weekData.start_date)
       .lte('log_date', weekData.end_date);
 
-    const weeklyTaskData: WeeklyTaskData[] = [];
-    for (const task of tasksData) {
+    return tasksData.map(task => {
       const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id) || null;
-      const logs = (taskLogsData || []).filter(l => l.task_id === task.id);
-      const completed = logs.filter(l => l.completed).length;
+      const logs = taskLogsData?.filter(log => log.task_id === task.id) || [];
+      const completed = logs.filter(log => log.completed).length;
       const target = weekPlan?.target_days || 0;
       const weeklyScore = target > 0 ? Math.round((completed / target) * 100) : 0;
-
-      weeklyTaskData.push({ task, weekPlan, logs, completed, target, weeklyScore });
-    }
-    return weeklyTaskData;
+      return { task, weekPlan, logs, completed, target, weeklyScore };
+    });
   } catch (e) {
     console.error('Error in getWeeklyTaskDataForGoal:', e);
     return [];
   }
 };
-
 
   const calculateGoalProgress = async (goals: TwelveWeekGoal[], userCycleId: string) => {
     try {
