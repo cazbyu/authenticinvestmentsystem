@@ -826,6 +826,38 @@ if (formData.schedulingType === 'event') {
                         <Text style={styles.anytimeLabel}>Anytime</Text>
                       </TouchableOpacity>
                     </View>
+
+{/* Repeat (Recurrence) controls for TASKS */}
+<View style={{ marginTop: 12 }}>
+  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Text style={styles.compactSectionTitle}>Repeat</Text>
+    <Switch
+      value={isRepeating}
+      onValueChange={(value) => {
+        setIsRepeating(value);
+        if (value) {
+          setIsRecurrenceModalVisible(true);
+        } else {
+          setSelectedRecurrenceDays([]);
+          setRecurrenceEndDate(null);
+          setRecurrenceFrequency('Weekly');
+        }
+      }}
+    />
+  </View>
+
+  {isRepeating && (
+    <TouchableOpacity
+      style={styles.recurrenceButton}
+      onPress={() => setIsRecurrenceModalVisible(true)}
+    >
+      <Text style={styles.recurrenceButtonText}>
+        {getRecurrenceDisplayText()}
+      </Text>
+    </TouchableOpacity>
+  )}
+</View>
+                    
                   </>
                 )}
                 {formData.schedulingType === 'event' && (
