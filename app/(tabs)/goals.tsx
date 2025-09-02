@@ -31,7 +31,8 @@ export default function Goals() {
     createGoal,
     cycleWeeks,
     selectedWeekNumber,
-    setSelectedWeekNumber
+    setSelectedWeekNumber,
+    getCurrentWeekNumber
   } = useGoalProgress();
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
