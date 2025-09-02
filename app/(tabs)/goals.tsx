@@ -230,26 +230,31 @@ export default function Goals() {
 {/* Week Navigator */}
 <View style={{ marginTop: 8, marginBottom: 12 }}>
   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-    {cycleWeeks.map(w => (
-      <TouchableOpacity
-        key={w.week_number}
-        onPress={() => setSelectedWeekNumber(w.week_number)}
-        style={{
-          paddingHorizontal: 12,
-          paddingVertical: 6,
-          borderRadius: 20,
-          marginRight: 8,
-          backgroundColor: selectedWeekNumber === w.week_number ? '#0078d4' : '#e5e7eb'
-        }}
-      >
-        <Text style={{ 
-          color: selectedWeekNumber === w.week_number ? 'white' : '#111827',
-          fontWeight: '600'
-        }}>
-          {`W${w.week_number}`}
-        </Text>
-      </TouchableOpacity>
-    ))}
+    {cycleWeeks.map(w => {
+  // Highlight rule: use selectedWeekNumber if set; otherwise fall back to the current week
+  const isActive = (selectedWeekNumber ?? getCurrentWeekNumber()) === w.week_number;
+  return (
+    <TouchableOpacity
+      key={w.week_number}
+      onPress={() => setSelectedWeekNumber(w.week_number)}
+      style={{
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginRight: 8,
+        backgroundColor: isActive ? '#0078d4' : '#e5e7eb'
+      }}
+    >
+      <Text style={{ 
+        color: isActive ? '#ffffff' : '#111827',
+        fontWeight: '600'
+      }}>
+        {`W${w.week_number}`}
+      </Text>
+    </TouchableOpacity>
+  );
+})}
+
   </ScrollView>
 </View>
             
