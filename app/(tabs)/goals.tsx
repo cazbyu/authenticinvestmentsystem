@@ -446,7 +446,6 @@ export default function Goals() {
   />
 );
 
-      );
     })()}
 
     {actionsLoading ? (
