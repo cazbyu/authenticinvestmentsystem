@@ -151,6 +151,10 @@ export default function Goals() {
     toggleTaskDay,
     getWeeklyTaskDataForGoal
   } = useGoalProgress();
+  // Always work with an array to avoid ".map is not a function"
+const goalsArray = Array.isArray(twelveWeekGoals)
+  ? twelveWeekGoals
+  : (twelveWeekGoals ? Object.values(twelveWeekGoals as any) : []);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
