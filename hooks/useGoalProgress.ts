@@ -99,6 +99,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [daysLeftData, setDaysLeftData] = useState<DaysLeftData | null>(null);
   const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgress>>({});
+  const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
@@ -516,6 +517,13 @@ return hydrated;
         fetchCycleWeeks(cycle.id),
         fetchDaysLeftData(cycle.id)
       ]);
+if (!selectedWeekNumber && weeks.length > 0) {
+  const today = new Date();
+  const match = weeks.find(
+    w => new Date(w.start_date) <= today && today <= new Date(w.end_date)
+  );
+  setSelectedWeekNumber(match ? match.week_number : weeks[0].week_number);
+}
 
       // Fetch goals after we have cycle data
       await fetchGoals(cycle.id);
@@ -689,6 +697,8 @@ return hydrated;
 
   return {
     goals,
+    selectedWeekNumber,
+    setSelectedWeekNumber,
     currentCycle,
     cycleWeeks,
     daysLeftData,
