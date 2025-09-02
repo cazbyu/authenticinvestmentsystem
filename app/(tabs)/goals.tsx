@@ -271,7 +271,6 @@ export default function Goals() {
     })}
   </View>
 )}
-</View>
 
         </ScrollView>
       ) : (
