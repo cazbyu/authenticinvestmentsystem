@@ -399,13 +399,12 @@ const goalsArray = Array.isArray(twelveWeekGoals)
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
   </View>
-) : twelveWeekGoals.length === 0 ? (
-    <View style={styles.emptyContainer}>
+) : goalsArray.length === 0 ? (
+  <View style={styles.emptyContainer}>
     <Text style={styles.emptyTitle}>No 12-Week Goals Yet</Text>
     <Text style={styles.emptyText}>
       Create your first 12-week goal to start tracking this cycle.
     </Text>
-
     <TouchableOpacity
       style={styles.createGoalButton}
       onPress={() => setCreateGoalModalVisible(true)}
@@ -416,39 +415,37 @@ const goalsArray = Array.isArray(twelveWeekGoals)
   </View>
 ) : (
   <View style={styles.goalsList}>
-    {twelveWeekGoals.map(goal => {
-      const progress = goalProgress[goal.id];
-      if (!progress) return null;
-
-    // Per-goal weekly actions state
-   
-      return (
-  <GoalWithActions
-    key={goal.id}
-    goal={goal}
-    progress={progress}
-    cycleWeeks={cycleWeeks}
-    selectedWeekNumber={selectedWeekNumber}
-    getWeekDateRange={getWeekDateRange}
-    toggleTaskDay={toggleTaskDay}
-    getWeeklyTaskDataForGoal={getWeeklyTaskDataForGoal}
-    onAddTaskPress={() => {
-      const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
-      setEditingTask({
-        type: 'task',
-        selectedGoalIds: [goal.id],
-        twelveWeekGoalChecked: true,
-        countsTowardWeeklyProgress: true,
-        selectedRoleIds: goal.roles?.map(r => r.id) || [],
-        selectedDomainIds: goal.domains?.map(d => d.id) || [],
-        selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
-        due_date: wk?.start_date ?? undefined,
-        end_date: wk?.end_date ?? undefined,
-      } as any);
-      setTaskFormVisible(true);
-    }}
-  />
-);
+    {goalsArray.map(goal =>
+      goalProgress[goal.id] ? (
+        <GoalWithActions
+          key={goal.id}
+          goal={goal}
+          progress={goalProgress[goal.id]}
+          cycleWeeks={cycleWeeks}
+          selectedWeekNumber={selectedWeekNumber}
+          getWeekDateRange={getWeekDateRange}
+          toggleTaskDay={toggleTaskDay}
+          getWeeklyTaskDataForGoal={getWeeklyTaskDataForGoal}
+          onAddTaskPress={() => {
+            const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
+            setEditingTask({
+              type: 'task',
+              selectedGoalIds: [goal.id],
+              twelveWeekGoalChecked: true,
+              countsTowardWeeklyProgress: true,
+              selectedRoleIds: goal.roles?.map(r => r.id) || [],
+              selectedDomainIds: goal.domains?.map(d => d.id) || [],
+              selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
+              due_date: wk?.start_date ?? undefined,
+              end_date: wk?.end_date ?? undefined,
+            } as any);
+            setTaskFormVisible(true);
+          }}
+        />
+      ) : null
+    )}
+  </View>
+)}
 
     })()}
 
