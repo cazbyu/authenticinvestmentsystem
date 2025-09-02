@@ -236,7 +236,7 @@ export default function Goals() {
 
     <TouchableOpacity
       style={styles.createGoalButton}
-      onPress={() => setGoalModalVisible(true)}
+      onPress={() => setCreateGoalModalVisible(true)}
     >
       <Plus color="#ffffff" />
       <Text style={styles.createGoalButtonText}>Create First Goal</Text>
