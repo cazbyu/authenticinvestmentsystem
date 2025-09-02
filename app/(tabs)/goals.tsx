@@ -417,21 +417,7 @@ export default function Goals() {
       if (!progress) return null;
 
     // Per-goal weekly actions state
-  const [weeklyTasks, setWeeklyTasks] = useState<any[]>([]);
-  const [actionsLoading, setActionsLoading] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!selectedWeekNumber) return;
-      setActionsLoading(true);
-      const data = await getWeeklyTaskDataForGoal(goal.id, selectedWeekNumber);
-      if (mounted) setWeeklyTasks(data);
-      setActionsLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [goal.id, selectedWeekNumber]);
- 
+   
       return (
   <GoalWithActions
     key={goal.id}
