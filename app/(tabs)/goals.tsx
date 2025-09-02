@@ -359,7 +359,7 @@ export default function Goals() {
           week={weekData}
           weekActions={goalActions}
           loadingWeekActions={loadingWeekActions}
-          onAddTask={() => {
+          onAddAction={() => {
             const weekData = getWeekData(selectedWeekIndex);
             setEditingTask({
               type: 'task',
@@ -368,6 +368,7 @@ export default function Goals() {
               countsTowardWeeklyProgress: true,
               due_date: weekData?.startDate,
               start_date: weekData?.startDate,
+              end_date: weekData?.endDate, // Pass end_date for recurrence planning
               selectedRoleIds: goal.roles?.map(r => r.id) || [],
               selectedDomainIds: goal.domains?.map(d => d.id) || [],
               selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],

@@ -25,6 +25,7 @@ export interface Task {
   has_notes?: boolean;
   has_attachments?: boolean;
   has_delegates?: boolean;
+  logs?: Array<{ log_date: string; completed: boolean }>; // Added for GoalProgressCard
   keyRelationships?: Array<{id: string; name: string}>;
 }
 

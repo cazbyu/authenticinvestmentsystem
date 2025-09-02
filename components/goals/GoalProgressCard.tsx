@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Target, Calendar, Plus, TrendingUp, Check } from 'lucide-react-native';
 import { TwelveWeekGoal, GoalProgress } from '@/hooks/useGoalProgress';
 
@@ -24,7 +24,7 @@ interface GoalProgressCardProps {
   week?: WeekData | null;
   weekActions?: TaskWithLogs[];
   loadingWeekActions?: boolean;
-  onAddTask?: () => void;
+  onAddAction?: () => void; // Renamed from onAddTask
   onPress?: () => void;
   compact?: boolean;
 }
@@ -54,7 +54,7 @@ export function GoalProgressCard({
     return `${actual}/${target}`;
   };
 
-  const primaryRole = goal.roles?.[0];
+  const primaryRole = goal.roles?.[0]; // Used for card color
   const cardColor = primaryRole?.color || '#0078d4';
 
   const generateWeekDays = (startDate: string, endDate: string, weekStartDay: 'sunday' | 'monday' = 'sunday') => {
@@ -66,7 +66,7 @@ export function GoalProgressCard({
     for (let i = 0; i < 7; i++) {
       const day = new Date(start);
       day.setDate(start.getDate() + i);
-      
+
       if (day <= end) {
         days.push({
           date: day.toISOString().split('T')[0],
@@ -95,17 +95,17 @@ export function GoalProgressCard({
       <TouchableOpacity
         style={[styles.compactCard, { borderLeftColor: cardColor }]}
         onPress={onPress}
-        activeOpacity={0.8}
+        activeOpacity={onPress ? 0.8 : 1}
       >
         <View style={styles.compactContent}>
           <View style={styles.compactHeader}>
             <Text style={styles.compactTitle} numberOfLines={1}>
               {goal.title}
             </Text>
-            {onAddTask && (
+            {onAddAction && (
               <TouchableOpacity
                 style={[styles.addTaskButton, { backgroundColor: cardColor }]}
-                onPress={onAddTask}
+                onPress={onAddAction}
               >
                 <Plus size={12} color="#ffffff" />
               </TouchableOpacity>
@@ -144,7 +144,7 @@ export function GoalProgressCard({
     <TouchableOpacity
       style={[styles.card, { borderLeftColor: cardColor }]}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={onPress ? 0.8 : 1}
     >
       <View style={styles.cardContent}>
         <View style={styles.header}>
@@ -162,15 +162,15 @@ export function GoalProgressCard({
             </View>
           </View>
           
-          {onAddTask && (
+          {/* Removed the large "Task" button as per new requirements */}
+          {/* onAddTask && (
             <TouchableOpacity
               style={[styles.addTaskButtonLarge, { backgroundColor: cardColor }]}
               onPress={onAddTask}
             >
               <Plus size={16} color="#ffffff" />
               <Text style={styles.addTaskButtonText}>Task</Text>
-            </TouchableOpacity>
-          )}
+            </TouchableOpacity> */}
         </View>
 
         {/* Leading Indicator: Weekly Progress */}
@@ -230,10 +230,10 @@ export function GoalProgressCard({
               <Text style={styles.weekActionsTitle}>
                 Week {week.weekNumber} Actions
               </Text>
-              {onAddTask && (
+              {onAddAction && (
                 <TouchableOpacity
                   style={[styles.addActionButton, { borderColor: cardColor }]}
-                  onPress={onAddTask}
+                  onPress={onAddAction}
                 >
                   <Plus size={12} color={cardColor} />
                   <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
@@ -246,13 +246,13 @@ export function GoalProgressCard({
                 <ActivityIndicator size="small" color={cardColor} />
                 <Text style={styles.loadingActionsText}>Loading actions...</Text>
               </View>
-            ) : weekActions.length === 0 ? (
+            ) : weekActions.length === 0 && onAddAction ? (
               <View style={styles.emptyActions}>
                 <Text style={styles.emptyActionsText}>No actions this week</Text>
-                {onAddTask && (
+                {onAddAction && (
                   <TouchableOpacity
                     style={[styles.addActionButton, { borderColor: cardColor }]}
-                    onPress={onAddTask}
+                    onPress={onAddAction}
                   >
                     <Plus size={12} color={cardColor} />
                     <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add action</Text>
@@ -261,18 +261,29 @@ export function GoalProgressCard({
               </View>
             ) : (
               <View style={styles.actionsList}>
+                {/* Day labels above circles */}
+                <View style={styles.dayLabelsRow}>
+                  {generateWeekDays(week.startDate, week.endDate, goal.user_cycle_id ? (goal as any).user_cycle_week_start_day : 'sunday').map(day => (
+                    <Text key={day.date} style={styles.dayLabelText}>
+                      {day.dayName}
+                    </Text>
+                  ))}
+                </View>
+
                 {weekActions.map(action => {
-                  const weekDays = generateWeekDays(week.startDate, week.endDate);
-                  
+                  const weekDays = generateWeekDays(week.startDate, week.endDate, goal.user_cycle_id ? (goal as any).user_cycle_week_start_day : 'sunday');
+
                   return (
                     <View key={action.id} style={styles.actionItem}>
                       <View style={styles.actionHeader}>
                         <Text style={styles.actionTitle} numberOfLines={1}>
                           {action.title}
                         </Text>
-                        <Text style={styles.actionCount}>
-                          {action.weeklyActual}/{action.weeklyTarget}
-                        </Text>
+                        {action.input_kind === 'count' && (
+                          <Text style={styles.actionCount}>
+                            {action.weeklyActual}/{action.weeklyTarget}
+                          </Text>
+                        )}
                       </View>
                       
                       <View style={styles.dayDots}>
@@ -280,22 +291,13 @@ export function GoalProgressCard({
                           const hasLog = action.logs.some(log => 
                             log.log_date === day.date && log.completed
                           );
-                          
+
                           return (
                             <View
                               key={day.date}
-                              style={[
-                                styles.dayDot,
-                                hasLog && styles.dayDotCompleted,
-                                { backgroundColor: hasLog ? cardColor : '#e5e7eb' }
-                              ]}
+                              style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
                             >
-                              <Text style={[
-                                styles.dayDotText,
-                                { color: hasLog ? '#ffffff' : '#6b7280' }
-                              ]}>
-                                {day.dayName.charAt(0)}
-                              </Text>
+                              {hasLog && <Check size={12} color="#ffffff" />}
                             </View>
                           );
                         })}
@@ -422,9 +424,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addTaskButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28, // Slightly larger for better touch target
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -585,24 +587,35 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   dayDots: {
+    flexDirection: 'row', // Changed from 'row' to 'row'
+    gap: 8, // Increased gap for better spacing
+    justifyContent: 'center',
+  },
+  dayLabelsRow: {
     flexDirection: 'row',
-    gap: 4,
     justifyContent: 'center',
+    gap: 8, // Match gap with dayDots
+    marginBottom: 4, // Space between labels and circles
   },
-  dayDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#e5e7eb',
-  },
-  dayDotCompleted: {
-    backgroundColor: '#0078d4',
-  },
-  dayDotText: {
-    fontSize: 8,
+  dayLabelText: {
+    fontSize: 10,
     fontWeight: '600',
     color: '#6b7280',
+    width: 20, // Fixed width to align with circles
+    textAlign: 'center',
+  },
+  dayDot: {
+    width: 20, // Fixed width for circles
+    height: 20, // Fixed height for circles
+    borderRadius: 10, // Half of width/height for perfect circle
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent', // Empty circle
+    borderWidth: 1, // Outline
+    borderColor: '#6b7280', // Gray outline
+  },
+  dayDotCompleted: {
+    backgroundColor: '#1f2937', // Filled dark circle
+    borderColor: '#1f2937', // Match border color
   },
 });
