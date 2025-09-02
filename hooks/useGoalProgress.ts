@@ -765,7 +765,7 @@ if (!selectedWeekNumber && weeks.length > 0) {
 
   return {
     goals,   
-    getWeeklyTaskDataForGoal, // actions/progress
+    getWeeklyTaskDataForGoal,
     selectedWeekNumber,
     setSelectedWeekNumber,
     currentCycle,
