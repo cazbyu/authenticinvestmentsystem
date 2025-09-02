@@ -284,17 +284,22 @@ export default function Goals() {
           goal={goal}
           progress={progress}
           onAddTask={() => {
-            setEditingTask({
-              type: 'task',
-              selectedGoalIds: [goal.id],
-              twelveWeekGoalChecked: true,
-              countsTowardWeeklyProgress: true,
-              selectedRoleIds: goal.roles?.map(r => r.id) || [],
-              selectedDomainIds: goal.domains?.map(d => d.id) || [],
-              selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
-            } as any);
-            setTaskFormVisible(true);
-          }}
+  // Prefill the task form with the goal + selected week date window
+  const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
+  setEditingTask({
+    type: 'task',
+    selectedGoalIds: [goal.id],
+    twelveWeekGoalChecked: true,
+    countsTowardWeeklyProgress: true,
+    selectedRoleIds: goal.roles?.map(r => r.id) || [],
+    selectedDomainIds: goal.domains?.map(d => d.id) || [],
+    selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
+    // helpful defaults for the form:
+    due_date: wk?.start_date ?? undefined,
+    end_date: wk?.end_date ?? undefined,
+  } as any);
+  setTaskFormVisible(true);
+}}
         />
       );
     })}
