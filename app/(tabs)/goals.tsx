@@ -252,6 +252,21 @@ export default function Goals() {
   </ScrollView>
 </View>
             
+{/* Selected Week Date Range */}
+{selectedWeekNumber && (
+  <View style={{ paddingHorizontal: 16, marginTop: 4, marginBottom: 8 }}>
+    {(() => {
+      const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
+      if (!wk) return null;
+      return (
+        <Text style={{ fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>
+          {formatDateRange(wk.start_date, wk.end_date)}
+        </Text>
+      );
+    })()}
+  </View>
+)}
+            
             {/* Goals List */}
 {goalsLoading ? (
   <View style={styles.loadingContainer}>
