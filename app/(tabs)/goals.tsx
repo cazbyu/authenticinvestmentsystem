@@ -228,11 +228,12 @@ export default function Goals() {
     <ActivityIndicator size="small" color="#1f6feb" />
   </View>
 ) : twelveWeekGoals.length === 0 ? (
-  <View style={styles.noGoalsContainerInside}>
-    <Text style={styles.noGoalsTitle}>No 12-Week Goals Yet</Text>
-    <Text style={styles.noGoalsText}>
+    <View style={styles.emptyContainer}>
+    <Text style={styles.emptyTitle}>No 12-Week Goals Yet</Text>
+    <Text style={styles.emptyText}>
       Create your first 12-week goal to start tracking this cycle.
     </Text>
+
     <TouchableOpacity
       style={styles.createGoalButton}
       onPress={() => setGoalModalVisible(true)}
