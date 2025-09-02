@@ -393,8 +393,7 @@ const goalsArray = Array.isArray(twelveWeekGoals)
     })()}
   </View>
 )}
-                
-            {/* Goals List */}
+           {/* Goals List */}
 {goalsLoading ? (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
