@@ -13,6 +13,7 @@ export interface Task {
   start_time?: string;
   end_time?: string;
   recurrence_rule?: string;
+  recurrence_rule?: string;
   is_urgent?: boolean;
   is_important?: boolean;
   status?: string;

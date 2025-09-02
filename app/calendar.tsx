@@ -199,7 +199,7 @@ export default function CalendarScreen() {
       // Fetch tasks and events
       const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
-        .select('*')
+        .select('*, recurrence_rule')
         .eq('user_id', user.id)
         .not('status', 'in', '(completed,cancelled)')
         .in('type', ['task', 'event'])

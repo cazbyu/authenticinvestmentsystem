@@ -261,7 +261,7 @@ export function expandEventsWithRecurrence(
   const processedBaseEvents = new Set<string>();
 
   for (const event of events) {
-    if (event.recurrence_rule && event.type === 'event') {
+    if (event.recurrence_rule) {
       // Expand recurring event
       const instances = expandRecurrence(event, window.start, window.end);
       expandedEvents.push(...instances);
@@ -286,7 +286,7 @@ export function expandEventsForDate(events: any[], date: string): any[] {
   const processedBaseEvents = new Set<string>();
 
   for (const event of events) {
-    if (event.recurrence_rule && event.type === 'event') {
+    if (event.recurrence_rule) {
       // Expand recurring event for just this date
       const dayStart = new Date(targetDate);
       const dayEnd = new Date(targetDate);
