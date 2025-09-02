@@ -441,12 +441,12 @@ const goalsArray = Array.isArray(twelveWeekGoals)
             setTaskFormVisible(true);
           }}
         />
-      ) : null
+            ) : null
     )}
-   </View>
+  </View>
 )}
-        </ScrollView>
-      ) : (
+</ScrollView>
+) : (
 
         <View style={styles.noCycleContainer}>
           <Target size={64} color="#6b7280" />
