@@ -319,28 +319,108 @@ export default function Goals() {
   }, [goal.id, selectedWeekNumber]);
  
       return (
-        <GoalProgressCard
-          key={goal.id}
-          goal={goal}
-          progress={progress}
-          onAddTask={() => {
-  // Prefill the task form with the goal + selected week date window
-  const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
-  setEditingTask({
-    type: 'task',
-    selectedGoalIds: [goal.id],
-    twelveWeekGoalChecked: true,
-    countsTowardWeeklyProgress: true,
-    selectedRoleIds: goal.roles?.map(r => r.id) || [],
-    selectedDomainIds: goal.domains?.map(d => d.id) || [],
-    selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
-    // helpful defaults for the form:
-    due_date: wk?.start_date ?? undefined,
-    end_date: wk?.end_date ?? undefined,
-  } as any);
-  setTaskFormVisible(true);
-}}
-        />
+        <View key={goal.id} style={{ width: '48%' }}>
+  <GoalProgressCard
+    goal={goal}
+    progress={progress}
+    onAddTask={() => {
+      const wk = cycleWeeks?.find(w => w.week_number === selectedWeekNumber);
+      setEditingTask({
+        type: 'task',
+        selectedGoalIds: [goal.id],
+        twelveWeekGoalChecked: true,
+        countsTowardWeeklyProgress: true,
+        selectedRoleIds: goal.roles?.map(r => r.id) || [],
+        selectedDomainIds: goal.domains?.map(d => d.id) || [],
+        selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
+        due_date: wk?.start_date ?? undefined,
+        end_date: wk?.end_date ?? undefined,
+      } as any);
+      setTaskFormVisible(true);
+    }}
+  />
+
+  {/* Actions List (This Week) */}
+  <View style={{ backgroundColor: '#ffffff', marginTop: 8, padding: 12, borderRadius: 10 }}>
+    {/* Header progress bar like screenshot */}
+    {(() => {
+      const planned = weeklyTasks.reduce((s, t) => s + (t.target || 0), 0);
+      const done = weeklyTasks.reduce((s, t) => s + (t.completed || 0), 0);
+      const pct = planned > 0 ? Math.min(100, Math.round((done / planned) * 100)) : 0;
+      return (
+        <View style={{ marginBottom: 8 }}>
+          <Text style={{ fontWeight: '600', marginBottom: 6 }}>{pct}% complete</Text>
+          <View style={{ height: 6, backgroundColor: '#e5e7eb', borderRadius: 4 }}>
+            <View style={{ width: `${pct}%`, height: 6, backgroundColor: '#111827', borderRadius: 4 }} />
+          </View>
+        </View>
+      );
+    })()}
+
+    {actionsLoading ? (
+      <Text style={{ color: '#6b7280' }}>Loading actions…</Text>
+    ) : weeklyTasks.length === 0 ? (
+      <Text style={{ color: '#6b7280' }}>No actions planned for this week.</Text>
+    ) : (
+      weeklyTasks.map((it) => {
+        // Build the 7-day row for the selected week
+        const range = getWeekDateRange(selectedWeekNumber!);
+        const start = range?.start ? new Date(range.start) : null;
+        const days = start
+          ? [...Array(7)].map((_, i) => {
+              const d = new Date(start);
+              d.setDate(start.getDate() + i);
+              return d.toISOString().slice(0, 10); // YYYY-MM-DD (matches log_date)
+            })
+          : [];
+
+        const completedDates = new Set((it.logs || []).filter((l: any) => l.completed).map((l: any) => l.log_date));
+
+        return (
+          <View key={it.task.id} style={{ marginBottom: 12 }}>
+            {/* Row header: task title + badge (done/target) */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={{ fontWeight: '600' }}>{it.task.title}</Text>
+              <View style={{ backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                <Text style={{ color: '#065f46', fontWeight: '600' }}>{it.completed}/{it.target || 0}</Text>
+              </View>
+            </View>
+
+            {/* Weekday toggles */}
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((label, idx) => {
+                const date = days[idx];
+                const isChecked = date ? completedDates.has(date) : false;
+                return (
+                  <TouchableOpacity
+                    key={label}
+                    onPress={async () => {
+                      if (!date) return;
+                      // toggle in DB, then refresh this goal’s weekly data
+                      await toggleTaskDay(it.task.id, date);
+                      const data = await getWeeklyTaskDataForGoal(goal.id, selectedWeekNumber!);
+                      setWeeklyTasks(data);
+                    }}
+                    style={{
+                      width: 26, height: 26, borderRadius: 13,
+                      borderWidth: 1, borderColor: '#d1d5db',
+                      alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: isChecked ? '#111827' : '#ffffff'
+                    }}
+                  >
+                    {/* simple dot for checked state */}
+                    <Text style={{ color: isChecked ? '#ffffff' : '#9ca3af', fontSize: 10 }}>{label[0]}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })
+    )}
+  </View>
+</View>
+
       );
     })}
   </View>
