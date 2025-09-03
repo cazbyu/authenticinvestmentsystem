@@ -521,13 +521,21 @@ const hydrated = data
     };
   };
 
-  const fetchGoalActionsForWeek = async (goalIds: string[], weekStartDate: string, weekEndDate: string): Promise<Record<string, TaskWithLogs[]>> => {
+    const fetchGoalActionsForWeek = async (
+    goalIds: string[],
+    weekStartDate: string,
+    weekEndDate: string
+  ): Promise<Record<string, TaskWithLogs[]>> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || goalIds.length === 0) return {};
+      if (!user || goalIds.length === 0 || !currentCycle) return {};
 
-      // Fetch tasks linked to these goals that overlap with the week
+      // Find the cycle week object so we know the week_number for plans
+      const wk = cycleWeeks.find(w => w.start_date === weekStartDate && w.end_date === weekEndDate);
+      if (!wk) return {};
+
+      // 1) Tasks linked to these goals
       const { data: goalJoins } = await supabase
         .from('0008-ap-universal-goals-join')
         .select('parent_id, goal_id')
@@ -535,63 +543,56 @@ const hydrated = data
         .eq('parent_type', 'task');
 
       const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
-      if (taskIds.length === 0) return {};
+      if (!taskIds.length) return {};
 
-      // Fetch tasks that overlap with the week date range
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .in('id', taskIds)
-        .not('status', 'in', '(completed,cancelled)')
-        .or(`due_date.gte.${weekStartDate},due_date.lte.${weekEndDate},start_date.gte.${weekStartDate},start_date.lte.${weekEndDate}`);
+      // 2) Constrain to tasks that have a week plan for THIS week
+      const { data: weekPlans } = await supabase
+        .from('0008-ap-task-week-plan')
+        .select('task_id, target_days')
+        .in('task_id', taskIds)
+        .eq('user_cycle_id', currentCycle.id)
+        .eq('week_number', wk.week_number);
 
-      if (tasksError) throw tasksError;
-      if (!tasksData || tasksData.length === 0) return {};
+      const plannedTaskIds = weekPlans?.map(wp => wp.task_id) || [];
+      if (!plannedTaskIds.length) return {};
 
-      // Fetch task logs for the week date range
-      const { data: logsData, error: logsError } = await supabase
+      // 3) Pull logs for the week window
+      const { data: logsData } = await supabase
         .from('0008-ap-task-log')
         .select('*')
-        .in('task_id', tasksData.map(t => t.id))
+        .in('task_id', plannedTaskIds)
         .gte('log_date', weekStartDate)
         .lte('log_date', weekEndDate);
 
-      if (logsError) throw logsError;
+      // 4) Group by goal and compute weekly actual/target
+      const grouped: Record<string, TaskWithLogs[]> = {};
+      for (const taskId of plannedTaskIds) {
+        const wp = weekPlans!.find(p => p.task_id === taskId);
+        const tLogs = (logsData || []).filter(l => l.task_id === taskId);
+        const completed = tLogs.filter(l => l.completed).length;
+        const weeklyTarget = wp?.target_days ?? 0;
 
-      // Group tasks by goal_id and attach logs
-      const groupedActions: Record<string, TaskWithLogs[]> = {};
-      
-      for (const task of tasksData) {
-        // Find which goal this task belongs to
-        const goalJoin = goalJoins?.find(gj => gj.parent_id === task.id);
-        if (!goalJoin) continue;
-
-        const goalId = goalJoin.goal_id;
-        const taskLogs = logsData?.filter(log => log.task_id === task.id) || [];
-        
-        // Calculate weekly metrics
-        const completedLogs = taskLogs.filter(log => log.completed);
-        const weeklyActual = completedLogs.length;
-        const weeklyTarget = task.input_kind === 'count' ? 7 : 1; // Default targets
+        const goalId = (goalJoins || []).find(gj => gj.parent_id === taskId)?.goal_id;
+        if (!goalId) continue;
 
         const taskWithLogs: TaskWithLogs = {
-          ...task,
-          logs: taskLogs,
-          weeklyActual,
+          id: taskId,
+          logs: tLogs,
+          weeklyActual: completed,
           weeklyTarget,
-        };
+        } as any;
 
-        if (!groupedActions[goalId]) {
-          groupedActions[goalId] = [];
-        }
-        groupedActions[goalId].push(taskWithLogs);
+        if (!grouped[goalId]) grouped[goalId] = [];
+        grouped[goalId].push(taskWithLogs);
       }
 
-      return groupedActions;
+      return grouped;
     } catch (error) {
       console.error('Error fetching goal actions for week:', error);
       return {};
+    }
+  };
+
     }
   };
 
