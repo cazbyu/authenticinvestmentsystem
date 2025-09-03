@@ -380,17 +380,25 @@ export default function Goals() {
           onAddAction={() => {
          const weekData = getWeekData(selectedWeekIndex);
             setEditingTask({
-              type: 'task',
-              selectedGoalIds: [goal.id],
-              twelveWeekGoalChecked: true,
-              countsTowardWeeklyProgress: true,
-              due_date: weekData?.startDate,
-              start_date: weekData?.startDate,
-              end_date: weekData?.endDate, // Pass end_date for recurrence planning
-              selectedRoleIds: goal.roles?.map(r => r.id) || [],
-              selectedDomainIds: goal.domains?.map(d => d.id) || [],
-              selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
-            } as any);
+  title: '',
+  type: 'task',
+  // make it visibly a 12-week action
+  is_twelve_week_goal: true,
+
+  // 👇 TaskEventForm reads these:
+  goal_12wk_id: goal.id,
+  goals: [{ id: goal.id, title: goal.title }],
+
+  // 👇 pass objects with id keys (not arrays of ids)
+  roles: (goal.roles || []).map(r => ({ id: r.id, label: r.label })),
+  domains: (goal.domains || []).map(d => ({ id: d.id, name: d.name })),
+  keyRelationships: (goal.key_relationships || []).map(kr => ({ id: kr.id, name: kr.name })),
+
+  // optional sensible defaults the form already supports
+  is_all_day: true,
+  due_date: new Date().toISOString().slice(0,10), // will be shown; user can adjust
+});
+
             setTaskFormVisible(true);
           }}
           onToggleToday={handleToggleToday}   // <-- add this prop
