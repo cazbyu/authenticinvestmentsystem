@@ -71,6 +71,21 @@ export default function Goals() {
     }
   };
 
+  const handleToggleToday = async (actionId: string, completed: boolean) => {
+  const todayISO = new Date().toISOString().split('T')[0];
+
+  if (completed) {
+    // UNDO: delete today's completed occurrence
+    await undoActionOccurrence({ parentTaskId: actionId, whenISO: todayISO });
+  } else {
+    // COMPLETE: insert today's completed occurrence (+ copy joins via RPCs)
+    await completeActionSuggestion({ parentTaskId: actionId, whenISO: todayISO });
+  }
+
+  // Refresh week data so dots update
+  await fetchWeekActions();
+};
+
   const goPrevWeek = () => {
     setSelectedWeekIndex(prev => Math.max(0, prev - 1));
   };
