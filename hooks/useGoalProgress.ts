@@ -950,7 +950,8 @@ const transformedGoals = baseSet.map(goal => ({
     fetchTasksAndPlansForWeek,
     fetchGoalActionsForWeek,
     toggleTaskDay,
-    completeActionSuggestion,   // <-- add this line
+    completeActionSuggestion,   
+    getTodayActionSuggestions,  // <-- add this line
     createGoal,
     createTaskWithWeekPlan,
     getWeekDateRange,
