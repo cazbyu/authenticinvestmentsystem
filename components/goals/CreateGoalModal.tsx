@@ -287,6 +287,20 @@ export function CreateGoalModal({
     } finally {
       setLoading(false);
     }
+
+if (selectedKeyRelationshipIds?.length) {
+  const krJoins = selectedKeyRelationshipIds.map(id => ({
+    parent_id: createdGoal.id,
+    parent_type: 'goal',
+    key_relationship_id: id,
+    user_id: user.id,
+  }));
+  const { error: krError } = await supabase
+    .from('0008-ap-universal-key-relationships-join')
+    .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
+  if (krError) throw krError;
+}
+    
   };
 
   const handleCreateAction = async () => {
