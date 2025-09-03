@@ -320,96 +320,103 @@ if (selectedKeyRelationshipIds?.length) {
     }
 
     setSubmittingAction(true);
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
+try {
+  const supabase = getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not found');
+  if (!currentCycle?.id) throw new Error('No active cycle');
 
-      const tasksToCreate = [];
+  // 1) Create ONE parent Action (task)
+  const { data: parentTask, error: parentErr } = await supabase
+    .from('0008-ap-tasks')
+    .insert({
+      user_id: user.id,
+      user_cycle_id: currentCycle.id,
+      title: actionTitle.trim(),
+      description: actionNotes.trim() || null,
+      type: 'task',
+      status: 'active',
+      is_twelve_week_goal: true,
+      // Leave due_date null; occurrences will use due_date = the day they’re completed
+    })
+    .select('id')
+    .single();
 
-      // Generate tasks for each selected week
-      for (const weekNumber of selectedActionWeeks) {
-        const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
-        if (!weekData) continue;
+  if (parentErr) throw parentErr;
+  const parentTaskId = parentTask.id;
 
-        const dates = getDatesForRecurrence(weekData.start_date, weekData.end_date, recurrenceType);
-        
-        for (const date of dates) {
-          tasksToCreate.push({
-            user_id: user.id,
-            user_cycle_id: currentCycle?.id,
-            title: actionTitle.trim(),
-            description: actionNotes.trim() || null,
-            due_date: date,
-            type: 'task',
-            status: 'active',
-            is_twelve_week_goal: true,
-            is_authentic_deposit: true,
-            is_important: true,
-            is_urgent: false,
-          });
-        }
-      }
+  // 2) Link parent Action → Goal
+  const { error: linkGoalErr } = await supabase
+    .from('0008-ap-universal-goals-join')
+    .upsert(
+      [{ parent_id: parentTaskId, parent_type: 'task', goal_id: createdGoalId, user_id: user.id }],
+      { onConflict: 'parent_id,parent_type,goal_id' }
+    );
+  if (linkGoalErr) throw linkGoalErr;
 
-      // Insert all tasks
-      const { data: createdTasks, error: taskError } = await supabase
-        .from('0008-ap-tasks')
-        .insert(tasksToCreate)
-        .select();
+  // 3) Copy joins (roles/domains) from the Goal selection to the parent Action
+  if (formData.selectedRoleIds.length) {
+    const roleJoins = formData.selectedRoleIds.map(roleId => ({
+      parent_id: parentTaskId,
+      parent_type: 'task',
+      role_id,
+      user_id: user.id,
+    }));
+    const { error: roleErr } = await supabase
+      .from('0008-ap-universal-roles-join')
+      .upsert(roleJoins, { onConflict: 'parent_id,parent_type,role_id' });
+    if (roleErr) throw roleErr;
+  }
 
-      if (taskError) throw taskError;
+  if (formData.selectedDomainIds.length) {
+    const domainJoins = formData.selectedDomainIds.map(domainId => ({
+      parent_id: parentTaskId,
+      parent_type: 'task',
+      domain_id,
+      user_id: user.id,
+    }));
+    const { error: domErr } = await supabase
+      .from('0008-ap-universal-domains-join')
+      .upsert(domainJoins, { onConflict: 'parent_id,parent_type,domain_id' });
+    if (domErr) throw domErr;
+  }
 
-      // Create joins for each task
-      for (const task of createdTasks) {
-        // Link to goal
-        await supabase
-          .from('0008-ap-universal-goals-join')
-          .insert({
-            parent_id: task.id,
-            parent_type: 'task',
-            goal_id: createdGoalId,
-            user_id: user.id,
-          });
+  // 4) Upsert week-plan for selected weeks with target_days from recurrence
+  const daysPerWeek =
+    recurrenceType === 'daily' ? 7 :
+    recurrenceType === '6days' ? 6 :
+    recurrenceType === '5days' ? 5 :
+    recurrenceType === '4days' ? 4 :
+    recurrenceType === '3days' ? 3 :
+    recurrenceType === '2days' ? 2 :
+    recurrenceType === '1day'  ? 1 : 0;
 
-        // Link to roles
-        if (formData.selectedRoleIds.length > 0) {
-          const roleJoins = formData.selectedRoleIds.map(roleId => ({
-            parent_id: task.id,
-            parent_type: 'task',
-            role_id: roleId,
-            user_id: user.id,
-          }));
+  if (daysPerWeek <= 0) throw new Error('Invalid frequency');
 
-          await supabase
-            .from('0008-ap-universal-roles-join')
-            .insert(roleJoins);
-        }
+  const planRows = selectedActionWeeks.map(week_number => ({
+    task_id: parentTaskId,
+    user_cycle_id: currentCycle.id,
+    week_number,
+    target_days: daysPerWeek,
+  }));
 
-        // Link to domains
-        if (formData.selectedDomainIds.length > 0) {
-          const domainJoins = formData.selectedDomainIds.map(domainId => ({
-            parent_id: task.id,
-            parent_type: 'task',
-            domain_id: domainId,
-            user_id: user.id,
-          }));
+  const { error: planErr } = await supabase
+    .from('0008-ap-task-week-plan')
+    .upsert(planRows, { onConflict: 'task_id,user_cycle_id,week_number' });
 
-          await supabase
-            .from('0008-ap-universal-domains-join')
-            .insert(domainJoins);
-        }
-      }
+  if (planErr) throw planErr;
 
-      Alert.alert('Success', `Created ${createdTasks.length} action tasks!`);
-      resetActionForm();
-      setActiveSubForm('none');
+  Alert.alert('Success', 'Created action and weekly plan!');
+  resetActionForm();
+  setActiveSubForm('none');
 
-    } catch (error) {
-      console.error('Error creating actions:', error);
-      Alert.alert('Error', (error as Error).message || 'Failed to create actions');
-    } finally {
-      setSubmittingAction(false);
-    }
+} catch (error) {
+  console.error('Error creating actions:', error);
+  Alert.alert('Error', (error as Error).message || 'Failed to create actions');
+} finally {
+  setSubmittingAction(false);
+}
+
   };
 
   const handleCreateIdea = async () => {
