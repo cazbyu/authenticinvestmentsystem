@@ -733,7 +733,7 @@ const transformedGoals = baseSet.map(goal => ({
         const { error: goalJoinError } = await supabase
           .from('0008-ap-universal-goals-join')
           .insert({
-            parent_id: taskData.id,
+            parent_id: insertedTask.id,
             parent_type: 'task',
             goal_id: taskData.goal_id,
             user_id: user.id,
