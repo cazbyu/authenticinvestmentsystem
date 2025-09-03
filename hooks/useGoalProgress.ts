@@ -315,10 +315,13 @@ return hydrated;
       }
 
       // Transform goals with related data
-      const transformedGoals = goalsData
-        .filter(goal => filteredGoalIds.includes(goal.id))
-        .map(goal => ({
-          ...goal,
+      const baseSet =
+  (options.scope && options.scope.type !== 'user' && options.scope.id)
+    ? goalsData.filter(goal => filteredGoalIds.includes(goal.id))
+    : goalsData;
+
+const transformedGoals = baseSet.map(goal => ({
+  ...goal,
           domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
           roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
           keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
