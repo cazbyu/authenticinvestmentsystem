@@ -876,5 +876,10 @@ const upsertWeekPlans = async (input: {
     getWeekData,
     weekGoalActions,
     setWeekGoalActions,
-  };
+
+    // NEW: Action Effort helpers
+    createOrUpdateParentTask,
+    upsertWeekPlans,
+};
+
 }
