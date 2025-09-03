@@ -162,8 +162,13 @@ const hydrated = data
     }
   : null;
 
-        setCurrentCycle(hydrated as any);
-    return hydrated;
+setCurrentCycle(hydrated as any);
+return hydrated;
+
+    if (error && error.code !== 'PGRST116') throw error;
+
+    setCurrentCycle(data);
+    return data;
   } catch (error) {
     console.error('Error fetching user cycle:', error);
     return null;
@@ -522,21 +527,13 @@ const hydrated = data
     };
   };
 
-    const fetchGoalActionsForWeek = async (
-    goalIds: string[],
-    weekStartDate: string,
-    weekEndDate: string
-  ): Promise<Record<string, TaskWithLogs[]>> => {
+  const fetchGoalActionsForWeek = async (goalIds: string[], weekStartDate: string, weekEndDate: string): Promise<Record<string, TaskWithLogs[]>> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || goalIds.length === 0 || !currentCycle) return {};
+      if (!user || goalIds.length === 0) return {};
 
-      // Find the cycle week object so we know the week_number for plans
-      const wk = cycleWeeks.find(w => w.start_date === weekStartDate && w.end_date === weekEndDate);
-      if (!wk) return {};
-
-      // 1) Tasks linked to these goals
+      // Fetch tasks linked to these goals that overlap with the week
       const { data: goalJoins } = await supabase
         .from('0008-ap-universal-goals-join')
         .select('parent_id, goal_id')
@@ -544,56 +541,63 @@ const hydrated = data
         .eq('parent_type', 'task');
 
       const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
-      if (!taskIds.length) return {};
+      if (taskIds.length === 0) return {};
 
-      // 2) Constrain to tasks that have a week plan for THIS week
-      const { data: weekPlans } = await supabase
-        .from('0008-ap-task-week-plan')
-        .select('task_id, target_days')
-        .in('task_id', taskIds)
-        .eq('user_cycle_id', currentCycle.id)
-        .eq('week_number', wk.week_number);
+      // Fetch tasks that overlap with the week date range
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('id', taskIds)
+        .not('status', 'in', '(completed,cancelled)')
+        .or(`due_date.gte.${weekStartDate},due_date.lte.${weekEndDate},start_date.gte.${weekStartDate},start_date.lte.${weekEndDate}`);
 
-      const plannedTaskIds = weekPlans?.map(wp => wp.task_id) || [];
-      if (!plannedTaskIds.length) return {};
+      if (tasksError) throw tasksError;
+      if (!tasksData || tasksData.length === 0) return {};
 
-      // 3) Pull logs for the week window
-      const { data: logsData } = await supabase
+      // Fetch task logs for the week date range
+      const { data: logsData, error: logsError } = await supabase
         .from('0008-ap-task-log')
         .select('*')
-        .in('task_id', plannedTaskIds)
+        .in('task_id', tasksData.map(t => t.id))
         .gte('log_date', weekStartDate)
         .lte('log_date', weekEndDate);
 
-      // 4) Group by goal and compute weekly actual/target
-      const grouped: Record<string, TaskWithLogs[]> = {};
-      for (const taskId of plannedTaskIds) {
-        const wp = weekPlans!.find(p => p.task_id === taskId);
-        const tLogs = (logsData || []).filter(l => l.task_id === taskId);
-        const completed = tLogs.filter(l => l.completed).length;
-        const weeklyTarget = wp?.target_days ?? 0;
+      if (logsError) throw logsError;
 
-        const goalId = (goalJoins || []).find(gj => gj.parent_id === taskId)?.goal_id;
-        if (!goalId) continue;
+      // Group tasks by goal_id and attach logs
+      const groupedActions: Record<string, TaskWithLogs[]> = {};
+      
+      for (const task of tasksData) {
+        // Find which goal this task belongs to
+        const goalJoin = goalJoins?.find(gj => gj.parent_id === task.id);
+        if (!goalJoin) continue;
+
+        const goalId = goalJoin.goal_id;
+        const taskLogs = logsData?.filter(log => log.task_id === task.id) || [];
+        
+        // Calculate weekly metrics
+        const completedLogs = taskLogs.filter(log => log.completed);
+        const weeklyActual = completedLogs.length;
+        const weeklyTarget = task.input_kind === 'count' ? 7 : 1; // Default targets
 
         const taskWithLogs: TaskWithLogs = {
-          id: taskId,
-          logs: tLogs,
-          weeklyActual: completed,
+          ...task,
+          logs: taskLogs,
+          weeklyActual,
           weeklyTarget,
-        } as any;
+        };
 
-        if (!grouped[goalId]) grouped[goalId] = [];
-        grouped[goalId].push(taskWithLogs);
+        if (!groupedActions[goalId]) {
+          groupedActions[goalId] = [];
+        }
+        groupedActions[goalId].push(taskWithLogs);
       }
 
-      return grouped;
+      return groupedActions;
     } catch (error) {
       console.error('Error fetching goal actions for week:', error);
       return {};
-    }
-  };
-
     }
   };
 
@@ -713,7 +717,7 @@ const hydrated = data
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
-        task_id: insertedtask.id,
+        task_id: taskData.id,
         user_cycle_id: currentCycle.id,
         week_number: week.weekNumber,
         target_days: week.targetDays,
@@ -730,7 +734,7 @@ const hydrated = data
         const { error: goalJoinError } = await supabase
           .from('0008-ap-universal-goals-join')
           .insert({
-            parent_id: insertedTask.id,
+            parent_id: taskData.id,
             parent_type: 'task',
             goal_id: taskData.goal_id,
             user_id: user.id,
@@ -739,7 +743,7 @@ const hydrated = data
         if (goalJoinError) throw goalJoinError;
       }
 
-      return { id: insertedTask.id };
+      return taskData;
     } catch (error) {
       console.error('Error creating task with week plan:', error);
       throw error;
@@ -786,88 +790,6 @@ const hydrated = data
     return () => clearTimeout(midnightTimeout);
   }, [currentCycle]);
 
-// --- Action Effort helpers ---
-
-// 1) Create or update the single parent task for this Action
-const createOrUpdateParentTask = async (input: {
-  goal_id: string;
-  title: string;
-  notes?: string;
-  add_role_ids?: string[];
-  add_domain_ids?: string[];
-}): Promise<{ task_id: string }> => {
-  const supabase = getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !currentCycle) throw new Error('No active user cycle');
-
-  const { data: taskRow, error: taskErr } = await supabase
-    .from('0008-ap-tasks')
-    .insert({
-      user_id: user.id,
-      user_cycle_id: currentCycle.id,
-      title: input.title,
-      description: input.notes || null,
-      type: 'task',
-      input_kind: 'count',
-      unit: 'days',
-      status: 'active',
-      is_twelve_week_goal: true,
-    })
-    .select('id')
-    .single();
-
-  if (taskErr) throw taskErr;
-  const task_id = taskRow.id;
-
-  // Link to goal
-  const { error: goalJoinErr } = await supabase
-    .from('0008-ap-universal-goals-join')
-    .insert({ parent_id: task_id, parent_type: 'task', goal_id: input.goal_id, user_id: user.id });
-  if (goalJoinErr) throw goalJoinErr;
-
-  // Add additional roles
-  if (input.add_role_ids?.length) {
-    const { error: roleErr } = await supabase
-      .from('0008-ap-task-role-join')
-      .insert(input.add_role_ids.map((role_id) => ({ task_id, role_id })));
-    if (roleErr) throw roleErr;
-  }
-
-  // Add additional domains
-  if (input.add_domain_ids?.length) {
-    const { error: domErr } = await supabase
-      .from('0008-ap-task-domain-join')
-      .insert(input.add_domain_ids.map((domain_id) => ({ task_id, domain_id })));
-    if (domErr) throw domErr;
-  }
-
-  return { task_id };
-};
-
-// 2) Upsert week plans (target_days per selected week)
-const upsertWeekPlans = async (input: {
-  task_id: string;
-  user_cycle_id: string;
-  week_numbers: number[];
-  target_days: number;
-}) => {
-  const supabase = getSupabaseClient();
-  if (!input.week_numbers?.length) return;
-
-  const payload = input.week_numbers.map((week_number) => ({
-    task_id: input.task_id,
-    user_cycle_id: input.user_cycle_id,
-    week_number,
-    target_days: input.target_days,
-  }));
-
-  const { error } = await supabase
-    .from('0008-ap-task-week-plan')
-    .upsert(payload, { onConflict: 'task_id,user_cycle_id,week_number' });
-
-  if (error) throw error;
-};
-  
   return {
     goals,
     currentCycle,
@@ -888,10 +810,5 @@ const upsertWeekPlans = async (input: {
     getWeekData,
     weekGoalActions,
     setWeekGoalActions,
-
-    // NEW: Action Effort helpers
-    createOrUpdateParentTask,
-    upsertWeekPlans,
-};
-
+  };
 }
