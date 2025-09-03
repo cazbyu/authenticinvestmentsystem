@@ -392,7 +392,7 @@ export default function Goals() {
   // 👇 pass objects with id keys (not arrays of ids)
   roles: (goal.roles || []).map(r => ({ id: r.id, label: r.label })),
   domains: (goal.domains || []).map(d => ({ id: d.id, name: d.name })),
-  keyRelationships: (goal.key_relationships || []).map(kr => ({ id: kr.id, name: kr.name })),
+  keyRelationships: (goal.keyRelationships || []).map(kr => ({ id: kr.id, name: kr.name })),
 
   // optional sensible defaults the form already supports
   is_all_day: true,
