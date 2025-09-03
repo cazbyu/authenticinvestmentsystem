@@ -289,39 +289,33 @@ export function GoalProgressCard({
                       </View>
                       
                       <View style={styles.dayDots}>
-  {weekDays.map(day => {
-    const hasLog = action.logs.some(
-      log => log.log_date === day.date && log.completed
-    );
+                        {weekDays.map(day => {
+                          const hasLog = action.logs.some(
+                            log => log.log_date === day.date && log.completed
+                          );
 
-    const todayISO = new Date().toISOString().split('T')[0];
-    const isToday = day.date === todayISO;
+                          const todayISO = new Date().toISOString().split('T')[0];
+                          const isToday = day.date === todayISO;
 
-    if (isToday && onToggleToday) {
-      return (
-        <TouchableOpacity
-          key={day.date}
-          activeOpacity={0.8}
-          onPress={async () => {
-            await onToggleToday(action.id, hasLog);
-          }}
-          style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
-        >
-          {hasLog && <Check size={12} color="#ffffff" />}
-        </TouchableOpacity>
-      );
-    }
-
-    return (
-      <View
-        key={day.date}
-        style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
-      >
-        {hasLog && <Check size={12} color="#ffffff" />}
-      </View>
-    );
-  })}
-</View>
+                          return (
+                            <View key={day.date} style={[styles.dayDot, hasLog && styles.dayDotCompleted]}>
+                              {isToday && onToggleToday ? (
+                                <TouchableOpacity
+                                  activeOpacity={0.8}
+                                  onPress={async () => {
+                                    await onToggleToday(action.id, hasLog);
+                                  }}
+                                  style={styles.dayDotTouchable}
+                                >
+                                  {hasLog && <Check size={12} color="#ffffff" />}
+                                </TouchableOpacity>
+                              ) : (
+                                hasLog && <Check size={12} color="#ffffff" />
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
 
                     </View>
                   );
@@ -638,5 +632,11 @@ const styles = StyleSheet.create({
   dayDotCompleted: {
     backgroundColor: '#1f2937', // Filled dark circle
     borderColor: '#1f2937', // Match border color
+  },
+  dayDotTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
