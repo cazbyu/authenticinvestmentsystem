@@ -377,6 +377,7 @@ export default function Goals() {
           weekActions={goalActions}
           loadingWeekActions={loadingWeekActions}
           onAddAction={() => {
+            onToggleToday={handleToggleToday}   // <-- add this prop
             const weekData = getWeekData(selectedWeekIndex);
             setEditingTask({
               type: 'task',
