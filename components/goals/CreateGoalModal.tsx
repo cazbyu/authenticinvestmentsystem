@@ -256,8 +256,8 @@ export function CreateGoalModal({
         }));
 
         const { error: roleError } = await supabase
-          .from('0008-ap-universal-roles-join')
-          .insert(roleJoins);
+  .from('0008-ap-universal-roles-join')
+  .upsert(roleJoins, { onConflict: 'parent_id,parent_type,role_id' });
 
         if (roleError) throw roleError;
       }
