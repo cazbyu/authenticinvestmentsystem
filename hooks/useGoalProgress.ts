@@ -790,6 +790,72 @@ return hydrated;
     return () => clearTimeout(midnightTimeout);
   }, [currentCycle]);
 
+// --- Action Effort helpers ---
+
+// 1) Create or update the single parent task for this Action
+const createOrUpdateParentTask = async (input: {
+  goal_id: string;
+  title: string;
+  notes?: string;
+  add_role_ids?: string[];
+  add_domain_ids?: string[];
+}): Promise<{ task_id: string }> => {
+  const { data: taskRow, error: taskErr } = await supabase
+    .from('0008-ap-tasks')
+    .insert({
+      title: input.title,
+      type: 'task',
+      input_kind: 'count',
+      notes: input.notes || null,
+    })
+    .select('id')
+    .single();
+
+  if (taskErr) throw taskErr;
+
+  const task_id = taskRow.id;
+
+  // Link to goal (use your universal join table)
+  await supabase.from('0008-ap-universal-goals-join').insert({
+    task_id,
+    goal_id: input.goal_id,
+  });
+
+  if (input.add_role_ids?.length) {
+    await supabase.from('0008-ap-task-role-join').insert(
+      input.add_role_ids.map(id => ({ task_id, role_id: id }))
+    );
+  }
+  if (input.add_domain_ids?.length) {
+    await supabase.from('0008-ap-task-domain-join').insert(
+      input.add_domain_ids.map(id => ({ task_id, domain_id: id }))
+    );
+  }
+
+  return { task_id };
+};
+
+// 2) Upsert week plans (target_days per selected week)
+const upsertWeekPlans = async (input: {
+  task_id: string;
+  user_cycle_id: string;
+  week_numbers: number[];
+  target_days: number;
+}) => {
+  const payload = input.week_numbers.map(week_number => ({
+    task_id: input.task_id,
+    user_cycle_id: input.user_cycle_id,
+    week_number,
+    target_days: input.target_days,
+  }));
+
+  const { error } = await supabase
+    .from('0008-ap-task-week-plan')
+    .upsert(payload, { onConflict: 'task_id,user_cycle_id,week_number' });
+
+  if (error) throw error;
+};
+  
   return {
     goals,
     currentCycle,
