@@ -272,8 +272,8 @@ export function CreateGoalModal({
         }));
 
         const { error: domainError } = await supabase
-          .from('0008-ap-universal-domains-join')
-          .insert(domainJoins);
+  .from('0008-ap-universal-domains-join')
+  .upsert(domainJoins, { onConflict: 'parent_id,parent_type,domain_id' });
 
         if (domainError) throw domainError;
       }
