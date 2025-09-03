@@ -323,6 +323,7 @@ export function GoalProgressCard({
   })}
 </View>
 
+              </View>
             )}
           </View>
         )}
