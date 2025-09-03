@@ -742,7 +742,7 @@ const transformedGoals = baseSet.map(goal => ({
         if (goalJoinError) throw goalJoinError;
       }
 
-      return taskData;
+      return { id: insertedTask.id };
     } catch (error) {
       console.error('Error creating task with week plan:', error);
       throw error;
