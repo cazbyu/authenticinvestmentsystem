@@ -716,7 +716,7 @@ const transformedGoals = baseSet.map(goal => ({
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
-        task_id: taskData.id,
+        task_id: insertedTask.id,
         user_cycle_id: currentCycle.id,
         week_number: week.weekNumber,
         target_days: week.targetDays,
