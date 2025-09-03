@@ -526,6 +526,90 @@ const transformedGoals = baseSet.map(goal => ({
     };
   };
 
+    /**
+   * Returns synthetic "today" items for goal actions that still have remaining effort this week.
+   * No pending rows are created; we only insert a real occurrence when completed.
+   */
+  const getTodayActionSuggestions = async (): Promise<Array<{
+    suggested: true;
+    parent_task_id: string;
+    user_cycle_id: string;
+    date: string;               // today (YYYY-MM-DD)
+    remainingThisWeek: number;
+  }>> => {
+    try {
+      if (!currentCycle || cycleWeeks.length === 0) return [];
+
+      const supabase = getSupabaseClient();
+
+      // 1) Current week info + today's ISO (uses existing helpers you already have)
+      const weekNumber = getCurrentWeekNumber();
+      const currentDateISO = formatLocalDate(new Date());
+
+      const wk = cycleWeeks.find(w => w.week_number === weekNumber);
+      if (!wk) return [];
+      const weekStartISO = wk.start_date;
+      const weekEndISO   = wk.end_date;
+
+      // 2) Pull week plans for THIS week (parent task ids + targets)
+      const { data: planned, error: planErr } = await supabase
+        .from('0008-ap-task-week-plan')
+        .select('task_id, target_days')
+        .eq('user_cycle_id', currentCycle.id)
+        .eq('week_number', weekNumber);
+
+      if (planErr) throw planErr;
+
+      const parentIds = (planned ?? []).map(p => p.task_id);
+      if (parentIds.length === 0) return [];
+
+      // 3) Count completed OCCURRENCES this week (child rows with parent_task_id)
+      const { data: weekOcc, error: occErr } = await supabase
+        .from('0008-ap-tasks')
+        .select('parent_task_id, due_date')
+        .in('parent_task_id', parentIds)
+        .gte('due_date', weekStartISO)
+        .lte('due_date', weekEndISO)
+        .eq('status', 'completed');
+
+      if (occErr) throw occErr;
+
+      const completedByParent: Record<string, number> = {};
+      for (const row of weekOcc ?? []) {
+        completedByParent[row.parent_task_id] =
+          (completedByParent[row.parent_task_id] ?? 0) + 1;
+      }
+
+      // 4) Build "today" suggestions for parents that still have remaining effort
+      const out: Array<{
+        suggested: true;
+        parent_task_id: string;
+        user_cycle_id: string;
+        date: string;
+        remainingThisWeek: number;
+      }> = [];
+
+      for (const p of planned ?? []) {
+        const actual = completedByParent[p.task_id] ?? 0;
+        const remaining = (p.target_days ?? 0) - actual;
+        if (remaining > 0) {
+          out.push({
+            suggested: true as const,
+            parent_task_id: p.task_id,
+            user_cycle_id: currentCycle.id,
+            date: currentDateISO,
+            remainingThisWeek: remaining,
+          });
+        }
+      }
+
+      return out;
+    } catch (e) {
+      console.error('Error computing today suggestions:', e);
+      return [];
+    }
+  };
+  
   const fetchGoalActionsForWeek = async (goalIds: string[], weekStartDate: string, weekEndDate: string): Promise<Record<string, TaskWithLogs[]>> => {
     try {
       const supabase = getSupabaseClient();
