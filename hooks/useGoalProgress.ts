@@ -165,11 +165,7 @@ const hydrated = data
 setCurrentCycle(hydrated as any);
 return hydrated;
 
-    if (error && error.code !== 'PGRST116') throw error;
-
-    setCurrentCycle(data);
-    return data;
-  } catch (error) {
+    } catch (error) {
     console.error('Error fetching user cycle:', error);
     return null;
   }
@@ -270,12 +266,12 @@ return hydrated;
 
       // Fetch 12-week goals for the user cycle
       const { data: goalsData, error: goalsError } = await supabase
-        .from('0008-ap-goals-12wk')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('user_cycle_id', userCycleId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+  .from('0008-ap-goals-12wk')
+  .select('*')
+  .eq('user_id', user.id)
+  .or(`user_cycle_id.eq.${userCycleId},user_cycle_id.is.null`)
+  .in('status', ['active','draft'])
+  .order('created_at', { ascending: false });
 
       if (goalsError) throw goalsError;
 
