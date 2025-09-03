@@ -289,12 +289,12 @@ export function GoalProgressCard({
                       </View>
                       
                       <View style={styles.dayDots}>
-                        {weekDays.map(day => {
-                          const hasLog = action.logs.some(log => 
-                            log.log_date === day.date && log.completed
-                          );
+  {weekDays.map(day => {
+    const hasLog = action.logs.some(
+      log => log.log_date === day.date && log.completed
+    );
 
-                              const todayISO = new Date().toISOString().split('T')[0];
+    const todayISO = new Date().toISOString().split('T')[0];
     const isToday = day.date === todayISO;
 
     if (isToday && onToggleToday) {
@@ -303,7 +303,6 @@ export function GoalProgressCard({
           key={day.date}
           activeOpacity={0.8}
           onPress={async () => {
-            // If a log exists for today → uncheck (undo); else → complete (check)
             await onToggleToday(action.id, hasLog);
           }}
           style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
@@ -313,7 +312,6 @@ export function GoalProgressCard({
       );
     }
 
-    // All non-today dates stay as static dots
     return (
       <View
         key={day.date}
@@ -322,11 +320,9 @@ export function GoalProgressCard({
         {hasLog && <Check size={12} color="#ffffff" />}
       </View>
     );
+  })}
+</View>
 
-                    </View>
-                  );
-                })}
-              </View>
             )}
           </View>
         )}
