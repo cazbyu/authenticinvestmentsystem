@@ -269,8 +269,7 @@ return hydrated;
   .from('0008-ap-goals-12wk')
   .select('*')
   .eq('user_id', user.id)
-  .or(`user_cycle_id.eq.${userCycleId},user_cycle_id.is.null`)
-  .in('status', ['active','draft'])
+.not('status', 'eq', 'archived')
   .order('created_at', { ascending: false });
 
       if (goalsError) throw goalsError;
