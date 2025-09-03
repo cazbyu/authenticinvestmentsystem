@@ -162,12 +162,6 @@ const hydrated = data
     }
   : null;
 
-setCurrentCycle(hydrated as any);
-return hydrated;
-
-    if (error && error.code !== 'PGRST116') throw error;
-
-    setCurrentCycle(data);
     return data;
   } catch (error) {
     console.error('Error fetching user cycle:', error);
@@ -717,7 +711,7 @@ return hydrated;
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
-        task_id: taskData.id,
+        task_id: insertedtask.id,
         user_cycle_id: currentCycle.id,
         week_number: week.weekNumber,
         target_days: week.targetDays,
