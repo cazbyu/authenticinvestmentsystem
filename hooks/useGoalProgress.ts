@@ -795,36 +795,49 @@ const createOrUpdateParentTask = async (input: {
   add_role_ids?: string[];
   add_domain_ids?: string[];
 }): Promise<{ task_id: string }> => {
+  const supabase = getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !currentCycle) throw new Error('No active user cycle');
+
   const { data: taskRow, error: taskErr } = await supabase
     .from('0008-ap-tasks')
     .insert({
+      user_id: user.id,
+      user_cycle_id: currentCycle.id,
       title: input.title,
+      description: input.notes || null,
       type: 'task',
       input_kind: 'count',
-      notes: input.notes || null,
+      unit: 'days',
+      status: 'active',
+      is_twelve_week_goal: true,
     })
     .select('id')
     .single();
 
   if (taskErr) throw taskErr;
-
   const task_id = taskRow.id;
 
-  // Link to goal (use your universal join table)
-  await supabase.from('0008-ap-universal-goals-join').insert({
-    task_id,
-    goal_id: input.goal_id,
-  });
+  // Link to goal
+  const { error: goalJoinErr } = await supabase
+    .from('0008-ap-universal-goals-join')
+    .insert({ parent_id: task_id, parent_type: 'task', goal_id: input.goal_id, user_id: user.id });
+  if (goalJoinErr) throw goalJoinErr;
 
+  // Add additional roles
   if (input.add_role_ids?.length) {
-    await supabase.from('0008-ap-task-role-join').insert(
-      input.add_role_ids.map(id => ({ task_id, role_id: id }))
-    );
+    const { error: roleErr } = await supabase
+      .from('0008-ap-task-role-join')
+      .insert(input.add_role_ids.map((role_id) => ({ task_id, role_id })));
+    if (roleErr) throw roleErr;
   }
+
+  // Add additional domains
   if (input.add_domain_ids?.length) {
-    await supabase.from('0008-ap-task-domain-join').insert(
-      input.add_domain_ids.map(id => ({ task_id, domain_id: id }))
-    );
+    const { error: domErr } = await supabase
+      .from('0008-ap-task-domain-join')
+      .insert(input.add_domain_ids.map((domain_id) => ({ task_id, domain_id })));
+    if (domErr) throw domErr;
   }
 
   return { task_id };
@@ -837,7 +850,10 @@ const upsertWeekPlans = async (input: {
   week_numbers: number[];
   target_days: number;
 }) => {
-  const payload = input.week_numbers.map(week_number => ({
+  const supabase = getSupabaseClient();
+  if (!input.week_numbers?.length) return;
+
+  const payload = input.week_numbers.map((week_number) => ({
     task_id: input.task_id,
     user_cycle_id: input.user_cycle_id,
     week_number,
