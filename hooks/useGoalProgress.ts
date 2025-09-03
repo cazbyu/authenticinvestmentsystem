@@ -645,6 +645,71 @@ const transformedGoals = baseSet.map(goal => ({
     }
   };
 
+    /**
+   * Creates a completed "occurrence" of a 12-week goal action for a specific date,
+   * then copies Roles/Domains/Goal links from the parent action to the occurrence.
+   */
+  const completeActionSuggestion = async ({
+    parentTaskId,
+    whenISO,            // 'YYYY-MM-DD' (the day being checked)
+  }: {
+    parentTaskId: string;
+    whenISO: string;
+  }): Promise<string> => {
+    const supabase = getSupabaseClient();
+
+    // Require user + currentCycle so we can stamp the row
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw userErr;
+    if (!user || !currentCycle) throw new Error('Missing user or current cycle');
+
+    // 1) Load parent for title (you can select more fields if you want)
+    const { data: parent, error: pErr } = await supabase
+      .from('0008-ap-tasks')
+      .select('id, title')
+      .eq('id', parentTaskId)
+      .single();
+    if (pErr || !parent) throw pErr ?? new Error('Parent task not found');
+
+    // 2) Insert the completed occurrence row for the given day
+    const { data: occ, error: oErr } = await supabase
+      .from('0008-ap-tasks')
+      .insert({
+        user_id: user.id,
+        user_cycle_id: currentCycle.id,
+        title: parent.title,
+        type: 'task',
+        status: 'completed',
+        due_date: whenISO,                     // exact date of the check
+        completed_at: new Date().toISOString(),
+        parent_task_id: parentTaskId,          // <-- tie occurrence → parent
+        is_twelve_week_goal: true,
+      })
+      .select('id')
+      .single();
+    if (oErr || !occ) throw oErr ?? new Error('Failed to insert occurrence');
+    const occId = occ.id as string;
+
+    // 3) Copy Roles, Domains, and Goal links from parent → occurrence via RPCs
+    await Promise.all([
+      supabase.rpc('ap_copy_universal_roles_to_task', {
+        from_parent_id: parentTaskId,
+        to_task_id: occId,
+      }),
+      supabase.rpc('ap_copy_universal_domains_to_task', {
+        from_parent_id: parentTaskId,
+        to_task_id: occId,
+      }),
+      supabase.rpc('ap_copy_universal_goals_to_task', {
+        from_parent_id: parentTaskId,
+        to_task_id: occId,
+        p_user: user.id,
+      }),
+    ]);
+
+    return occId;
+  };
+
   const createGoal = async (goalData: {
     title: string;
     description?: string;
@@ -801,6 +866,7 @@ const transformedGoals = baseSet.map(goal => ({
     fetchTasksAndPlansForWeek,
     fetchGoalActionsForWeek,
     toggleTaskDay,
+    completeActionSuggestion,   // <-- add this line
     createGoal,
     createTaskWithWeekPlan,
     getWeekDateRange,
