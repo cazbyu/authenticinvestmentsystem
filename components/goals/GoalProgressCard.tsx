@@ -294,16 +294,35 @@ export function GoalProgressCard({
                             log.log_date === day.date && log.completed
                           );
 
-                          return (
-                            <View
-                              key={day.date}
-                              style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
-                            >
-                              {hasLog && <Check size={12} color="#ffffff" />}
-                            </View>
-                          );
-                        })}
-                      </View>
+                              const todayISO = new Date().toISOString().split('T')[0];
+    const isToday = day.date === todayISO;
+
+    if (isToday && onToggleToday) {
+      return (
+        <TouchableOpacity
+          key={day.date}
+          activeOpacity={0.8}
+          onPress={async () => {
+            // If a log exists for today → uncheck (undo); else → complete (check)
+            await onToggleToday(action.id, hasLog);
+          }}
+          style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
+        >
+          {hasLog && <Check size={12} color="#ffffff" />}
+        </TouchableOpacity>
+      );
+    }
+
+    // All non-today dates stay as static dots
+    return (
+      <View
+        key={day.date}
+        style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
+      >
+        {hasLog && <Check size={12} color="#ffffff" />}
+      </View>
+    );
+
                     </View>
                   );
                 })}
