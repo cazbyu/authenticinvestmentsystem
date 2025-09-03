@@ -36,6 +36,8 @@ export default function Goals() {
     fetchGoalActionsForWeek,
     getCurrentWeekIndex,
     getWeekData,
+    completeActionSuggestion,
+  undoActionOccurrence,
   } = useGoalProgress();
 
   // Initialize selected week to current week
