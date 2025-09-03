@@ -794,6 +794,36 @@ const transformedGoals = baseSet.map(goal => ({
     return occId;
   };
 
+    /**
+   * Undo today's completion for a parent 12-week Action.
+   * Deletes the occurrence row: (parent_task_id = action) AND (due_date = whenISO) AND (status='completed')
+   * Returns the number of rows deleted.
+   */
+  const undoActionOccurrence = async ({
+    parentTaskId,
+    whenISO,   // 'YYYY-MM-DD'
+  }: {
+    parentTaskId: string;
+    whenISO: string;
+  }): Promise<number> => {
+    const supabase = getSupabaseClient();
+
+    const { error, count } = await supabase
+      .from('0008-ap-tasks')
+      .delete({ count: 'exact' })
+      .eq('parent_task_id', parentTaskId)
+      .eq('due_date', whenISO)
+      .eq('status', 'completed');
+
+    if (error) {
+      console.error('undoActionOccurrence error:', error);
+      throw error;
+    }
+
+    // count can be null depending on PostgREST settings; normalize to number
+    return typeof count === 'number' ? count : 0;
+  };
+
   const createGoal = async (goalData: {
     title: string;
     description?: string;
