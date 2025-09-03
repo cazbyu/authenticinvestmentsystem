@@ -162,7 +162,8 @@ const hydrated = data
     }
   : null;
 
-    return data;
+        setCurrentCycle(hydrated as any);
+    return hydrated;
   } catch (error) {
     console.error('Error fetching user cycle:', error);
     return null;
