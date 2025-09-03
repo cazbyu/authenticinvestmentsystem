@@ -25,6 +25,7 @@ interface GoalProgressCardProps {
   weekActions?: TaskWithLogs[];
   loadingWeekActions?: boolean;
   onAddAction?: () => void; // Renamed from onAddTask
+  onToggleToday?: (actionId: string, completed: boolean) => Promise<void>;
   onPress?: () => void;
   compact?: boolean;
 }
