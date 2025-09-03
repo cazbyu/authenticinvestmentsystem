@@ -377,8 +377,7 @@ export default function Goals() {
           weekActions={goalActions}
           loadingWeekActions={loadingWeekActions}
           onAddAction={() => {
-            onToggleToday={handleToggleToday}   // <-- add this prop
-            const weekData = getWeekData(selectedWeekIndex);
+         const weekData = getWeekData(selectedWeekIndex);
             setEditingTask({
               type: 'task',
               selectedGoalIds: [goal.id],
@@ -393,6 +392,7 @@ export default function Goals() {
             } as any);
             setTaskFormVisible(true);
           }}
+          onToggleToday={handleToggleToday}   // <-- add this prop
         />
       );
     })}
