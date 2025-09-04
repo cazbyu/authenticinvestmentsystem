@@ -607,6 +607,14 @@ if (formData.selectedNoteIds.length) {
     onClose();
   };
 
+  // Derive Key Relationships based on selected roles
+  const filteredKeyRelationships = allKeyRelationships.filter(kr =>
+    roleKeyRelationships.some(join =>
+      formData.selectedRoleIds.includes(join.role_id) &&
+      join.key_relationship_id === kr.id
+    )
+  );
+  
   const renderMainForm = () => (
     <ScrollView style={styles.content}>
       <View style={styles.form}>
@@ -682,6 +690,35 @@ if (formData.selectedNoteIds.length) {
           </View>
         </View>
 
+        {/* Key Relationships */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Key Relationships</Text>
+          <View style={styles.checkboxGrid}>
+            {filteredKeyRelationships.map(kr => {
+              const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
+              return (
+                <TouchableOpacity
+                  key={kr.id}
+                  style={styles.checkItem}
+                  onPress={() =>
+                    setFormData(prev => ({
+                      ...prev,
+                      selectedKeyRelationshipIds: isSelected
+                        ? prev.selectedKeyRelationshipIds.filter(id => id !== kr.id)
+                        : [...prev.selectedKeyRelationshipIds, kr.id],
+                    }))
+                  }
+                >
+                  <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.checkLabel}>{kr.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+        
         {/* Notes */}
         <View style={styles.field}>
           <Text style={styles.label}>Notes</Text>
