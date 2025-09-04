@@ -144,9 +144,11 @@ export function CreateGoalModal({
       setAllRoles(rolesData || []);
 
           // Fetch role → key relationship mappings
-      const { data: roleKRData } = await supabase
-        .from('0008-ap-role-key-relationships')
-        .select('role_id, key_relationship_id');
+      // ✅ Use universal KR join table instead
+const { data: roleKRData, error: roleKRError } = await supabase
+  .from('0008-ap-universal-key-relationships-join')
+  .select('parent_id, key_relationship_id')
+  .eq('parent_type', 'role');
 
       setRoleKeyRelationships(roleKRData || []);
   
