@@ -375,12 +375,19 @@ const transformedGoals = baseSet.map(goal => ({
       if (!weekData) return [];
 
       // Fetch task logs for this week's date range
-      const { data: taskLogsData, error: taskLogsError } = await supabase
-        .from('0008-ap-task-log')
-.select('*')
-.in('task_id', taskIds)
-.gte('measured_on', weekData.start_date)
-.lte('measured_on', weekData.end_date);
+      let weeklyQuery = supabase
+  .from('0008-ap-task-log')
+  .select('*')
+  .in('task_id', taskIds);
+
+if (weekData.start_date) {
+  weeklyQuery = weeklyQuery.gte('measured_on', weekData.start_date);
+}
+if (weekData.end_date) {
+  weeklyQuery = weeklyQuery.lte('measured_on', weekData.end_date);
+}
+
+const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
 
       if (taskLogsError) throw taskLogsError;
 
