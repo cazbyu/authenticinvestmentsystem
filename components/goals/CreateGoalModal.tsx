@@ -274,7 +274,7 @@ setAllNotes(notesData || []);   // ✅ NEW
         {
           title: formData.title,
           description: formData.description,
-          cycle_id: currentCycle?.id,
+          user_cycle_id: currentCycle?.id,
           user_id: user.id,
         },
       ])
