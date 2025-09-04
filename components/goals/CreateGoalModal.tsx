@@ -656,7 +656,7 @@ if (formData.selectedNoteIds.length) {
               );
             })}
           </View>
-        </View>*
+        </View>
 
 {/* Notes */}
 <View style={styles.field}>
