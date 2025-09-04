@@ -640,10 +640,10 @@ const { data: overallLogs } = await supabase
       // Fetch task logs for the week date range
       const { data: logsData, error: logsError } = await supabase
         .from('0008-ap-task-log')
-        .select('*')
-        .in('task_id', tasksData.map(t => t.id))
-        .gte('log_date', weekStartDate)
-        .lte('log_date', weekEndDate);
+.select('*')
+.in('task_id', tasksData.map(t => t.id))
+.gte('measured_on', weekStartDate)
+.lte('measured_on', weekEndDate);
 
       if (logsError) throw logsError;
 
