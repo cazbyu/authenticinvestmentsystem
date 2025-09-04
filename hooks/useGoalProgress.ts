@@ -466,13 +466,13 @@ const transformedGoals = baseSet.map(goal => ({
         }
 
         // Fetch completed task logs for entire cycle
-        const { data: overallLogs } = await supabase
-          .from('0008-ap-task-log')
-          .select('*')
-          .in('task_id', taskIds)
-          .eq('completed', true)
-          .gte('log_date', currentCycle?.start_date || '')
-          .lte('log_date', currentCycle?.end_date || '');
+        // Fetch task logs for entire cycle
+const { data: overallLogs } = await supabase
+  .from('0008-ap-task-log')
+  .select('*')
+  .in('task_id', taskIds)
+  .gte('measured_on', currentCycle?.start_date || '')
+  .lte('measured_on', currentCycle?.end_date || '');
 
         overallActual = overallLogs?.length || 0;
         const overallProgress = goal.total_target > 0 ? Math.round((overallActual / goal.total_target) * 100) : 0;
