@@ -339,6 +339,29 @@ setAllNotes(notesData || []);   // ✅ NEW
       if (noteJoinError) throw noteJoinError;
     }
 
+// ALSO persist the Goal's Notes field (noteText) just like Task/Event forms do
+if (formData.noteText && formData.noteText.trim()) {
+  const { data: newNote2, error: note2Error } = await supabase
+    .from('0008-ap-notes')
+    .insert({
+      user_id: user.id,
+      content: formData.noteText.trim(),
+    })
+    .select()
+    .single();
+  if (note2Error) throw note2Error;
+
+  const { error: noteJoinError2 } = await supabase
+    .from('0008-ap-universal-notes-join')
+    .insert({
+      parent_id: goalData.id,
+      parent_type: 'goal',
+      note_id: newNote2.id,
+      user_id: user.id,
+    });
+  if (noteJoinError2) throw noteJoinError2;
+}
+    
     // Insert key relationship joins
 if (formData.selectedKeyRelationshipIds?.length) {
   const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
