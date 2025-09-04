@@ -454,6 +454,20 @@ if (formData.selectedNoteIds.length) {
   if (noteErr) throw noteErr;
 }
 
+  // Copy Key Relationships from Goal to Action
+  if (formData.selectedKeyRelationshipIds.length) {
+    const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
+      parent_id: parentTaskId,
+      parent_type: 'task',
+      key_relationship_id: krId,
+      user_id: user.id,
+    }));
+    const { error: krErr } = await supabase
+      .from('0008-ap-universal-key-relationships-join')
+      .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
+    if (krErr) throw krErr;
+  }
+  
   // 4) Upsert week-plan for selected weeks with target_days from recurrence
   const daysPerWeek =
     recurrenceType === 'daily' ? 7 :
