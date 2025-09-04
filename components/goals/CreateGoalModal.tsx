@@ -60,15 +60,17 @@ export function CreateGoalModal({
   createGoal 
 }: CreateGoalModalProps) {
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    selectedRoleIds: [] as string[],
-    selectedDomainIds: [] as string[],
-  });
+  title: '',
+  description: '',
+  selectedRoleIds: [] as string[],
+  selectedDomainIds: [] as string[],
+  selectedNoteIds: [] as string[],   // ✅ NEW
+});
 
   // Data fetching states
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [allDomains, setAllDomains] = useState<Domain[]>([]);
+  const [allNotes, setAllNotes] = useState<{ id: string; content: string }[]>([]);  // ✅ NEW
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [currentCycle, setCurrentCycle] = useState<any>(null);
 
@@ -145,6 +147,15 @@ export function CreateGoalModal({
         .order('name');
 
       setAllDomains(domainsData || []);
+
+      // Fetch all notes
+const { data: notesData } = await supabase
+  .from('0008-ap-notes')
+  .select('id, content')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false });
+
+setAllNotes(notesData || []);   // ✅ NEW
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -259,7 +270,11 @@ export function CreateGoalModal({
   .from('0008-ap-universal-roles-join')
   .upsert(roleJoins, { onConflict: 'parent_id,parent_type,role_id' });
 
-        if (roleError) throw roleError;
+        if (roleError) {
+  console.error('Role join insert failed:', roleError);
+  Alert.alert('Error', 'Could not save role joins');
+}
+
       }
 
       // Create domain joins
