@@ -293,6 +293,25 @@ setAllNotes(notesData || []);   // ✅ NEW
         if (domainError) throw domainError;
       }
 
+// Create note joins
+if (formData.selectedNoteIds.length > 0) {
+  const noteJoins = formData.selectedNoteIds.map(noteId => ({
+    parent_id: createdGoal.id,
+    parent_type: 'goal',
+    note_id: noteId,
+    user_id: user.id,
+  }));
+
+  const { error: noteError } = await supabase
+    .from('0008-ap-universal-notes-join')
+    .upsert(noteJoins, { onConflict: 'parent_id,parent_type,note_id' });
+
+  if (noteError) {
+    console.error('Note join insert failed:', noteError);
+    Alert.alert('Error', 'Could not save note joins');
+  }
+}
+      
       setCreatedGoalId(createdGoal.id);
       Alert.alert('Success', 'Goal created successfully! You can now add actions and ideas.');
       
@@ -579,7 +598,7 @@ try {
           />
         </View>
 
-        *{/* Wellness Domains */}
+        {/* Wellness Domains */}
         <View style={styles.field}>
           <Text style={styles.label}>Wellness Domains</Text>
           <View style={styles.checkboxGrid}>
