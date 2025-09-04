@@ -229,11 +229,6 @@ setAllNotes(notesData || []);   // ✅ NEW
       return { ...prev, [field]: newSelection };
     });
   };
-
-// Filter KR’s by selected Roles
-const filteredKeyRelationships = allKeyRelationships.filter(
-  kr => formData.selectedRoleIds.includes(kr.role_id)
-);
   
   const handleWeekSelect = (weekNumber: number) => {
     setSelectedActionWeeks(prev => 
