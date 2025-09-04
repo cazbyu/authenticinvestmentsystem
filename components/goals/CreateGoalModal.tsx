@@ -163,8 +163,8 @@ const { data: roleKRData, error: roleKRError } = await supabase
             // Fetch all key relationships
       const { data: krData } = await supabase
         .from('0008-ap-key-relationships')
-        .select('id, name')
-        .order('name');
+        .select('id, name, role_id')
+        .eq('user_id' user.id);
 
       setAllKeyRelationships(krData || []);
 
