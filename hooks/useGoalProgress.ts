@@ -466,8 +466,8 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
             .from('0008-ap-task-log')
 .select('*')
 .in('task_id', taskIds)
-.gte('measured_on', weekData.start_date)
-.lte('measured_on', weekData.end_date);
+.gte('measured_on', currentCycle?.start_date)
+.lte('measured_on', currentCycle?.end_date);
 
           weeklyActual = weeklyLogs?.length || 0;
         }
