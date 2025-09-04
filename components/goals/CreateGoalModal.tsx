@@ -324,7 +324,12 @@ Alert.alert(
   'Goal created successfully! You can now add actions and ideas.'
 );
 
-setLoading(false);
+} catch (error) {
+  console.error('Error creating goal:', error);
+  Alert.alert('Error', (error as Error).message || 'Failed to create goal');
+
+} finally {
+  setLoading(false);
 }
 
 if (formData.selectedKeyRelationshipIds?.length) {
