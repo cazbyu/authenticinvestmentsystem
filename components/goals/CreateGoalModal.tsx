@@ -65,7 +65,8 @@ export function CreateGoalModal({
   selectedRoleIds: [] as string[],
   selectedDomainIds: [] as string[],
   selectedNoteIds: [] as string[],   
-  selectedKeyRelationshipIds: [] as string[], });
+  selectedKeyRelationshipIds: [] as string[], 
+});
 
   // Data fetching states
   const [allRoles, setAllRoles] = useState<Role[]>([]);
@@ -705,34 +706,36 @@ if (formData.selectedNoteIds.length) {
           </View>
         </View>
 
-        {/* Key Relationships */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Key Relationships</Text>
-          <View style={styles.checkboxGrid}>
-            {filteredKeyRelationships.map(kr => {
-              const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
-              return (
-                <TouchableOpacity
-                  key={kr.id}
-                  style={styles.checkItem}
-                  onPress={() =>
-                    setFormData(prev => ({
-                      ...prev,
-                      selectedKeyRelationshipIds: isSelected
-                        ? prev.selectedKeyRelationshipIds.filter(id => id !== kr.id)
-                        : [...prev.selectedKeyRelationshipIds, kr.id],
-                    }))
-                  }
-                >
-                  <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={styles.checkLabel}>{kr.name}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+       {/* Key Relationships (filtered by selected Roles) */}
+{filteredKeyRelationships.length > 0 && (
+  <View style={styles.field}>
+    <Text style={styles.label}>Key Relationships</Text>
+    <View style={styles.checkboxGrid}>
+      {filteredKeyRelationships.map(kr => {
+        const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
+        return (
+          <TouchableOpacity
+            key={kr.id}
+            style={styles.checkItem}
+            onPress={() =>
+              setFormData(prev => ({
+                ...prev,
+                selectedKeyRelationshipIds: isSelected
+                  ? prev.selectedKeyRelationshipIds.filter(kid => kid !== kr.id)
+                  : [...prev.selectedKeyRelationshipIds, kr.id],
+              }))
+            }
+          >
+            <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+              {isSelected && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.checkLabel}>{kr.name}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  </View>
+)}
         
         {/* Notes */}
         <View style={styles.field}>
