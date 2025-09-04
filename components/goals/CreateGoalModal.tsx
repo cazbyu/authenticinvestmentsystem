@@ -143,6 +143,13 @@ export function CreateGoalModal({
 
       setAllRoles(rolesData || []);
 
+          // Fetch role → key relationship mappings
+      const { data: roleKRData } = await supabase
+        .from('0008-ap-role-key-relationships')
+        .select('role_id, key_relationship_id');
+
+      setRoleKeyRelationships(roleKRData || []);
+  
       // Fetch all domains
       const { data: domainsData } = await supabase
         .from('0008-ap-domains')
