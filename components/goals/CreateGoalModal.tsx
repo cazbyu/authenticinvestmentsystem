@@ -268,7 +268,7 @@ setAllNotes(notesData || []);   // ✅ NEW
 
     // Insert role joins
     if (formData.selectedRoleIds?.length) {
-      const roleJoins = formData.selectedRoleIds.map((roleId) => ({
+      const roleJoins = formData.selectedRoleIds.map(roleId => ({
         parent_id: goalData.id,
         parent_type: 'goal',
         role_id: roleId,
@@ -282,7 +282,7 @@ setAllNotes(notesData || []);   // ✅ NEW
 
     // Insert domain joins
     if (formData.selectedDomainIds?.length) {
-      const domainJoins = formData.selectedDomainIds.map((domainId) => ({
+      const domainJoins = formData.selectedDomainIds.map(domainId => ({
         parent_id: goalData.id,
         parent_type: 'goal',
         domain_id: domainId,
@@ -294,23 +294,32 @@ setAllNotes(notesData || []);   // ✅ NEW
       if (domainError) throw domainError;
     }
 
-    // Insert note joins
-    if (formData.selectedNoteIds?.length) {
-      const noteJoins = formData.selectedNoteIds.map((noteId) => ({
-        parent_id: goalData.id,
-        parent_type: 'goal',
-        note_id: noteId,
-        user_id: user.id,
-      }));
-      const { error: noteError } = await supabase
-        .from('0008-ap-universal-notes-join')
-        .upsert(noteJoins, { onConflict: 'parent_id,parent_type,note_id' });
+    // Insert note (single text field instead of all notes list)
+    if (formData.description?.trim()) {
+      const { data: newNote, error: noteError } = await supabase
+        .from('0008-ap-notes')
+        .insert({
+          user_id: user.id,
+          content: formData.description.trim(),
+        })
+        .select()
+        .single();
       if (noteError) throw noteError;
+
+      const { error: noteJoinError } = await supabase
+        .from('0008-ap-universal-notes-join')
+        .insert({
+          parent_id: goalData.id,
+          parent_type: 'goal',
+          note_id: newNote.id,
+          user_id: user.id,
+        });
+      if (noteJoinError) throw noteJoinError;
     }
 
     // Insert key relationship joins
     if (formData.selectedKeyRelationshipIds?.length) {
-      const krJoins = formData.selectedKeyRelationshipIds.map((krId) => ({
+      const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
         parent_id: goalData.id,
         parent_type: 'goal',
         key_relationship_id: krId,
@@ -322,11 +331,7 @@ setAllNotes(notesData || []);   // ✅ NEW
       if (krError) throw krError;
     }
 
-    // Success
-    Alert.alert(
-      'Success',
-      'Goal created successfully! You can now add actions and ideas.'
-    );
+    Alert.alert('Success', 'Goal created successfully! You can now add actions and ideas.');
 
   } catch (error) {
     console.error('Error creating goal:', error);
