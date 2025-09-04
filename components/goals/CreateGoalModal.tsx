@@ -579,7 +579,7 @@ try {
           />
         </View>
 
-        {/* Wellness Domains */}
+        *{/* Wellness Domains */}
         <View style={styles.field}>
           <Text style={styles.label}>Wellness Domains</Text>
           <View style={styles.checkboxGrid}>
@@ -621,8 +621,39 @@ try {
               );
             })}
           </View>
-        </View>
+        </View>*
 
+{/* Notes */}
+<View style={styles.field}>
+  <Text style={styles.label}>Notes</Text>
+  <View style={styles.checkboxGrid}>
+    {allNotes.map(note => {
+      const isSelected = formData.selectedNoteIds.includes(note.id);
+      return (
+        <TouchableOpacity
+          key={note.id}
+          style={styles.checkItem}
+          onPress={() =>
+            setFormData(prev => ({
+              ...prev,
+              selectedNoteIds: isSelected
+                ? prev.selectedNoteIds.filter(nid => nid !== note.id)
+                : [...prev.selectedNoteIds, note.id],
+            }))
+          }
+        >
+          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <Text style={styles.checkLabel}>
+            {note.content.length > 40 ? note.content.slice(0, 40) + '…' : note.content}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+</View>
+        
         {/* Action Buttons */}
         <View style={styles.actionButtonsSection}>
           <TouchableOpacity
