@@ -148,7 +148,7 @@ export function CreateGoalModal({
 const { data: roleKRData, error: roleKRError } = await supabase
   .from('0008-ap-universal-key-relationships-join')
   .select('parent_id, key_relationship_id')
-  .eq('parent_type', 'role');
+  .eq('parent_type', 'goal');
 
       setRoleKeyRelationships(roleKRData || []);
   
