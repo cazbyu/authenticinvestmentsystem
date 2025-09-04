@@ -457,11 +457,10 @@ const transformedGoals = baseSet.map(goal => ({
           // Fetch completed task logs for current week
           const { data: weeklyLogs } = await supabase
             .from('0008-ap-task-log')
-            .select('*')
-            .in('task_id', taskIds)
-            .eq('completed', true)
-            .gte('log_date', currentWeekData.start_date)
-            .lte('log_date', currentWeekData.end_date);
+.select('*')
+.in('task_id', taskIds)
+.gte('measured_on', weekData.start_date)
+.lte('measured_on', weekData.end_date);
 
           weeklyActual = weeklyLogs?.length || 0;
         }
