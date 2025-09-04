@@ -411,20 +411,44 @@ try {
   if (!currentCycle?.id) throw new Error('No active cycle');
 
   // 1) Create ONE parent Action (task)
-  const { data: parentTask, error: parentErr } = await supabase
-    .from('0008-ap-tasks')
+  // 1. Create the task (without description)
+const { data: parentTask, error: parentErr } = await supabase
+  .from('0008-ap-tasks')
+  .insert({
+    user_id: user.id,
+    user_cycle_id: currentCycle.id,
+    title: actionTitle.trim(),
+    type: 'task',
+    status: 'active',
+    is_twelve_week_goal: true,
+  })
+  .select('id')
+  .single();
+
+if (parentErr) throw parentErr;
+
+// 2. If there are notes, insert into notes + join
+if (actionNotes && actionNotes.trim()) {
+  const { data: newNote, error: noteErr } = await supabase
+    .from('0008-ap-notes')
     .insert({
       user_id: user.id,
-      user_cycle_id: currentCycle.id,
-      title: actionTitle.trim(),
-      description: actionNotes.trim() || null,
-      type: 'task',
-      status: 'active',
-      is_twelve_week_goal: true,
-      // Leave due_date null; occurrences will use due_date = the day they’re completed
+      content: actionNotes.trim(),
     })
-    .select('id')
+    .select()
     .single();
+  if (noteErr) throw noteErr;
+
+  const { error: noteJoinErr } = await supabase
+    .from('0008-ap-universal-notes-join')
+    .insert({
+      parent_id: parentTask.id,
+      parent_type: 'task',
+      note_id: newNote.id,
+      user_id: user.id,
+    });
+  if (noteJoinErr) throw noteJoinErr;
+}
 
   if (parentErr) throw parentErr;
   const parentTaskId = parentTask.id;
