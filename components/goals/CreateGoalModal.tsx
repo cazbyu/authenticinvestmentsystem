@@ -318,24 +318,14 @@ if (formData.selectedNoteIds.length > 0) {
 }
       
       setCreatedGoalId(createdGoal.id);
-     try {
-  // … your Supabase inserts and upserts …
 
-  Alert.alert(
-    'Success',
-    'Goal created successfully! You can now add actions and ideas.'
-  );
+Alert.alert(
+  'Success',
+  'Goal created successfully! You can now add actions and ideas.'
+);
 
-} catch (error) {
-  console.error('Error creating goal:', error);
-  Alert.alert('Error', (error as Error).message || 'Failed to create goal');
-
-} finally {
-  setLoading(false);
+setLoading(false);
 }
-
-      setLoading(false);
-    }
 
 if (formData.selectedKeyRelationshipIds?.length) {
   const krJoins = formData.selectedKeyRelationshipIds.map(id => ({
