@@ -626,7 +626,7 @@ if (formData.selectedNoteIds.length) {
   // Derive Key Relationships based on selected roles
   const filteredKeyRelationships = allKeyRelationships.filter(kr =>
     roleKeyRelationships.some(join =>
-      formData.selectedRoleIds.includes(join.role_id) &&
+      formData.selectedRoleIds.includes(join.parent_id) &&
       join.key_relationship_id === kr.id
     )
   );
