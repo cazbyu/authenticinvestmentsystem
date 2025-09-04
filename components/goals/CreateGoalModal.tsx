@@ -240,110 +240,103 @@ setAllNotes(notesData || []);   // ✅ NEW
   };
 
   const handleCreateGoal = async () => {
-    if (!validateMainForm()) return;
+  setLoading(true);
 
-    setLoading(true);
-    try {
-      const goalData = {
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        weekly_target: 3, // Default values since we're not using these fields anymore
-        total_target: 36,
-      };
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not found');
 
-      const createdGoal = await createGoal(goalData);
-      if (!createdGoal) throw new Error('Failed to create goal');
-
-      // Link goal to roles and domains
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
-
-      // Create role joins
-      if (formData.selectedRoleIds.length > 0) {
-        const roleJoins = formData.selectedRoleIds.map(roleId => ({
-          parent_id: createdGoal.id,
-          parent_type: 'goal',
-          role_id: roleId,
+    // Insert the new goal
+    const { data: goalData, error: goalError } = await supabase
+      .from('0008-ap-goals-12wk')
+      .insert([
+        {
+          title: formData.title,
+          description: formData.description,
+          cycle_id: currentCycle?.id,
           user_id: user.id,
-        }));
+        },
+      ])
+      .select()
+      .single();
 
-        const { error: roleError } = await supabase
-  .from('0008-ap-universal-roles-join')
-  .upsert(roleJoins, { onConflict: 'parent_id,parent_type,role_id' });
+    if (goalError) throw goalError;
+    if (!goalData) throw new Error('Failed to create goal');
 
-        if (roleError) {
-  console.error('Role join insert failed:', roleError);
-  Alert.alert('Error', 'Could not save role joins');
-}
+    setCreatedGoalId(goalData.id);
 
-      }
+    // Insert role joins
+    if (formData.selectedRoleIds?.length) {
+      const roleJoins = formData.selectedRoleIds.map((roleId) => ({
+        parent_id: goalData.id,
+        parent_type: 'goal',
+        role_id: roleId,
+        user_id: user.id,
+      }));
+      const { error: roleError } = await supabase
+        .from('0008-ap-universal-roles-join')
+        .upsert(roleJoins, { onConflict: 'parent_id,parent_type,role_id' });
+      if (roleError) throw roleError;
+    }
 
-      // Create domain joins
-      if (formData.selectedDomainIds.length > 0) {
-        const domainJoins = formData.selectedDomainIds.map(domainId => ({
-          parent_id: createdGoal.id,
-          parent_type: 'goal',
-          domain_id: domainId,
-          user_id: user.id,
-        }));
+    // Insert domain joins
+    if (formData.selectedDomainIds?.length) {
+      const domainJoins = formData.selectedDomainIds.map((domainId) => ({
+        parent_id: goalData.id,
+        parent_type: 'goal',
+        domain_id: domainId,
+        user_id: user.id,
+      }));
+      const { error: domainError } = await supabase
+        .from('0008-ap-universal-domains-join')
+        .upsert(domainJoins, { onConflict: 'parent_id,parent_type,domain_id' });
+      if (domainError) throw domainError;
+    }
 
-        const { error: domainError } = await supabase
-  .from('0008-ap-universal-domains-join')
-  .upsert(domainJoins, { onConflict: 'parent_id,parent_type,domain_id' });
+    // Insert note joins
+    if (formData.selectedNoteIds?.length) {
+      const noteJoins = formData.selectedNoteIds.map((noteId) => ({
+        parent_id: goalData.id,
+        parent_type: 'goal',
+        note_id: noteId,
+        user_id: user.id,
+      }));
+      const { error: noteError } = await supabase
+        .from('0008-ap-universal-notes-join')
+        .upsert(noteJoins, { onConflict: 'parent_id,parent_type,note_id' });
+      if (noteError) throw noteError;
+    }
 
-        if (domainError) {
-  console.error("Domain join insert failed:", domainError);
-  console.log("Payload sent:", domainJoins);
-  throw domainError;
-      }
+    // Insert key relationship joins
+    if (formData.selectedKeyRelationshipIds?.length) {
+      const krJoins = formData.selectedKeyRelationshipIds.map((krId) => ({
+        parent_id: goalData.id,
+        parent_type: 'goal',
+        key_relationship_id: krId,
+        user_id: user.id,
+      }));
+      const { error: krError } = await supabase
+        .from('0008-ap-universal-key-relationships-join')
+        .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
+      if (krError) throw krError;
+    }
 
-// Create note joins
-if (formData.selectedNoteIds.length > 0) {
-  const noteJoins = formData.selectedNoteIds.map(noteId => ({
-    parent_id: createdGoal.id,
-    parent_type: 'goal',
-    note_id: noteId,
-    user_id: user.id,
-  }));
+    // Success
+    Alert.alert(
+      'Success',
+      'Goal created successfully! You can now add actions and ideas.'
+    );
 
-  const { error: noteError } = await supabase
-    .from('0008-ap-universal-notes-join')
-    .upsert(noteJoins, { onConflict: 'parent_id,parent_type,note_id' });
+  } catch (error) {
+    console.error('Error creating goal:', error);
+    Alert.alert('Error', (error as Error).message || 'Failed to create goal');
 
-  if (noteError) {
-    console.error('Note join insert failed:', noteError);
-    Alert.alert('Error', 'Could not save note joins');
+  } finally {
+    setLoading(false);
   }
-}
-      
-      setCreatedGoalId(createdGoal.id);
+};
 
-Alert.alert(
-  'Success',
-  'Goal created successfully! You can now add actions and ideas.'
-);
-
-} catch (error) {
-  console.error('Error creating goal:', error);
-  Alert.alert('Error', (error as Error).message || 'Failed to create goal');
-
-} finally {
-  setLoading(false);
-}
-
-if (formData.selectedKeyRelationshipIds?.length) {
-  const krJoins = formData.selectedKeyRelationshipIds.map(id => ({
-    parent_id: createdGoal.id,
-    parent_type: 'goal', // or 'goal_12wk' if you picked UI-side fix
-    key_relationship_id: id,
-    user_id: user.id,
-  }));
-  await supabase
-    .from('0008-ap-universal-key-relationships-join')
-    .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
-}
-    
   };
 
   const handleCreateAction = async () => {
