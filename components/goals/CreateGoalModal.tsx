@@ -290,7 +290,10 @@ setAllNotes(notesData || []);   // ✅ NEW
   .from('0008-ap-universal-domains-join')
   .upsert(domainJoins, { onConflict: 'parent_id,parent_type,domain_id' });
 
-        if (domainError) throw domainError;
+        if (domainError) {
+  console.error("Domain join insert failed:", domainError);
+  console.log("Payload sent:", domainJoins);
+  throw domainError;
       }
 
 // Create note joins
