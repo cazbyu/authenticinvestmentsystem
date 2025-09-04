@@ -664,36 +664,22 @@ if (formData.selectedNoteIds.length) {
           </View>
         </View>
 
-{/* Notes */}
-<View style={styles.field}>
-  <Text style={styles.label}>Notes</Text>
-  <View style={styles.checkboxGrid}>
-    {allNotes.map(note => {
-      const isSelected = formData.selectedNoteIds.includes(note.id);
-      return (
-        <TouchableOpacity
-          key={note.id}
-          style={styles.checkItem}
-          onPress={() =>
-            setFormData(prev => ({
-              ...prev,
-              selectedNoteIds: isSelected
-                ? prev.selectedNoteIds.filter(nid => nid !== note.id)
-                : [...prev.selectedNoteIds, note.id],
-            }))
-          }
-        >
-          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-            {isSelected && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-          <Text style={styles.checkLabel}>
-            {note.content.length > 40 ? note.content.slice(0, 40) + '…' : note.content}
-          </Text>
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-</View>
+        {/* Notes */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Notes</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={formData.noteText || ''}
+            onChangeText={(text) =>
+              setFormData(prev => ({ ...prev, noteText: text }))
+            }
+            placeholder="Write a note for this goal..."
+            placeholderTextColor="#9ca3af"
+            multiline
+            numberOfLines={3}
+            maxLength={500}
+          />
+        </View>
         
         {/* Action Buttons */}
         <View style={styles.actionButtonsSection}>
