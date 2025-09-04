@@ -414,6 +414,22 @@ try {
     if (domErr) throw domErr;
   }
 
+ // Copy Note joins from Goal to Action
+if (formData.selectedNoteIds.length) {
+  const noteJoins = formData.selectedNoteIds.map(noteId => ({
+    parent_id: parentTaskId,
+    parent_type: 'task',
+    note_id: noteId,
+    user_id: user.id,
+  }));
+
+  const { error: noteErr } = await supabase
+    .from('0008-ap-universal-notes-join')
+    .upsert(noteJoins, { onConflict: 'parent_id,parent_type,note_id' });
+
+  if (noteErr) throw noteErr;
+}
+
   // 4) Upsert week-plan for selected weeks with target_days from recurrence
   const daysPerWeek =
     recurrenceType === 'daily' ? 7 :
