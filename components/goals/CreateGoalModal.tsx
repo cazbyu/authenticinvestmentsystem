@@ -149,6 +149,14 @@ export function CreateGoalModal({
 
       setAllDomains(domainsData || []);
 
+            // Fetch all key relationships
+      const { data: krData } = await supabase
+        .from('0008-ap-key-relationships')
+        .select('id, name')
+        .order('name');
+
+      setAllKeyRelationships(krData || []);
+
       // Fetch all notes
 const { data: notesData } = await supabase
   .from('0008-ap-notes')
