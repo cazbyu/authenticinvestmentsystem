@@ -148,16 +148,16 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
 if (error && error.code !== 'PGRST116') throw error;
 
-// Build an object that always has start/end (effective dates)
+// Ensure we always have start_date and end_date (fallback to global if NULL)
 const effectiveStart = data?.start_date ?? data?.global?.start_date ?? null;
-const effectiveEnd   = data?.end_date   ?? data?.global?.end_date   ?? null;
+const effectiveEnd   = data?.end_date   ?? data?.global?.end_date ?? null;
 
 const hydrated = data
   ? {
       ...data,
       start_date: effectiveStart,
       end_date: effectiveEnd,
-      // Optional: show global title if user left their title null
+      // optional: fallback title from global
       title: data.title ?? data.global?.title ?? null,
     }
   : null;
