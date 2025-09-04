@@ -72,7 +72,7 @@ export function CreateGoalModal({
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [allDomains, setAllDomains] = useState<Domain[]>([]);
   const [allNotes, setAllNotes] = useState<{ id: string; content: string }[]>([]);  // ✅ NEW
-    const [allKeyRelationships, setAllKeyRelationships] = useState<{ id: string; name: string }[]>([]);
+  const [allKeyRelationships, setAllKeyRelationships] = useState<{ id: string; name: string; role_id: string }[]>([]);
   const [roleKeyRelationships, setRoleKeyRelationships] = useState<{ role_id: string; key_relationship_id: string }[]>([]);
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [currentCycle, setCurrentCycle] = useState<any>(null);
