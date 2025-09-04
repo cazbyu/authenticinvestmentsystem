@@ -164,17 +164,19 @@ setAllNotes(notesData || []);   // ✅ NEW
   };
 
   const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      selectedRoleIds: [],
-      selectedDomainIds: [],
-    });
-    setActiveSubForm('none');
-    setCreatedGoalId(null);
-    resetActionForm();
-    resetIdeaForm();
-  };
+  setFormData({
+    title: '',
+    description: '',
+    selectedRoleIds: [],
+    selectedDomainIds: [],
+    selectedNoteIds: [],            // ✅ added so notes don’t go undefined
+    selectedKeyRelationshipIds: [], // ✅ added so KR’s don’t go undefined
+  });
+  setActiveSubForm('none');
+  setCreatedGoalId(null);
+  resetActionForm();
+  resetIdeaForm();
+};
 
   const resetActionForm = () => {
     setActionTitle('');
