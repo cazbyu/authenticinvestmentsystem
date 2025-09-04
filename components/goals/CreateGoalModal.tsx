@@ -66,6 +66,7 @@ export function CreateGoalModal({
   selectedDomainIds: [] as string[],
   selectedNoteIds: [] as string[],   
   selectedKeyRelationshipIds: [] as string[], 
+  noteText: '',  
 });
 
   // Data fetching states
