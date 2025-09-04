@@ -337,8 +337,6 @@ setAllNotes(notesData || []);   // ✅ NEW
   }
 };
 
-  };
-
   const handleCreateAction = async () => {
     if (!createdGoalId) {
       Alert.alert('Error', 'Please create the goal first');
