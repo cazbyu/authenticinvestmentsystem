@@ -192,6 +192,7 @@ setAllNotes(notesData || []);   // ✅ NEW
     selectedDomainIds: [],
     selectedNoteIds: [],            // ✅ added so notes don’t go undefined
     selectedKeyRelationshipIds: [], // ✅ added so KR’s don’t go undefined
+    noteText: '',
   });
   setActiveSubForm('none');
   setCreatedGoalId(null);
