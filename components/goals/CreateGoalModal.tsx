@@ -680,6 +680,35 @@ if (formData.selectedNoteIds.length) {
             maxLength={500}
           />
         </View>
+
+        {/* Key Relationships */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Key Relationships</Text>
+          <View style={styles.checkboxGrid}>
+            {allKeyRelationships.map(kr => {
+              const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
+              return (
+                <TouchableOpacity
+                  key={kr.id}
+                  style={styles.checkItem}
+                  onPress={() =>
+                    setFormData(prev => ({
+                      ...prev,
+                      selectedKeyRelationshipIds: isSelected
+                        ? prev.selectedKeyRelationshipIds.filter(id => id !== kr.id)
+                        : [...prev.selectedKeyRelationshipIds, kr.id],
+                    }))
+                  }
+                >
+                  <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.checkLabel}>{kr.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
         
         {/* Action Buttons */}
         <View style={styles.actionButtonsSection}>
