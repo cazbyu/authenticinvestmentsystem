@@ -652,14 +652,20 @@ const { data: overallLogs } = await overallQuery;
       if (!tasksData || tasksData.length === 0) return {};
 
       // Fetch task logs for the week date range
-      const { data: logsData, error: logsError } = await supabase
-        .from('0008-ap-task-log')
-.select('*')
-.in('task_id', tasksData.map(t => t.id))
-.gte('measured_on', weekStartDate)
-.lte('measured_on', weekEndDate);
+      let logsQuery = supabase
+  .from('0008-ap-task-log')
+  .select('*')
+  .in('task_id', tasksData.map(t => t.id));
 
-      if (logsError) throw logsError;
+if (weekStartDate) {
+  logsQuery = logsQuery.gte('measured_on', weekStartDate);
+}
+if (weekEndDate) {
+  logsQuery = logsQuery.lte('measured_on', weekEndDate);
+}
+
+const { data: logsData, error: logsError } = await logsQuery;
+if (logsError) throw logsError;
 
       // Group tasks by goal_id and attach logs
       const groupedActions: Record<string, TaskWithLogs[]> = {};
