@@ -64,9 +64,8 @@ export function CreateGoalModal({
   description: '',
   selectedRoleIds: [] as string[],
   selectedDomainIds: [] as string[],
-  selectedNoteIds: [] as string[],   // ✅ NEW
-    selectedKeyRelationshipIds: [], // ✅
-});
+  selectedNoteIds: [] as string[],   
+  selectedKeyRelationshipIds: [] as string[], });
 
   // Data fetching states
   const [allRoles, setAllRoles] = useState<Role[]>([]);
