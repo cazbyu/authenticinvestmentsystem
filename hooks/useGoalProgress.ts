@@ -474,12 +474,19 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
 
         // Fetch completed task logs for entire cycle
         // Fetch task logs for entire cycle
-const { data: overallLogs } = await supabase
+let overallQuery = supabase
   .from('0008-ap-task-log')
   .select('*')
-  .in('task_id', taskIds)
-  .gte('measured_on', currentCycle?.start_date || '')
-  .lte('measured_on', currentCycle?.end_date || '');
+  .in('task_id', taskIds);
+
+if (currentCycle?.start_date) {
+  overallQuery = overallQuery.gte('measured_on', currentCycle.start_date);
+}
+if (currentCycle?.end_date) {
+  overallQuery = overallQuery.lte('measured_on', currentCycle.end_date);
+}
+
+const { data: overallLogs } = await overallQuery;
 
         overallActual = overallLogs?.length || 0;
         const overallProgress = goal.total_target > 0 ? Math.round((overallActual / goal.total_target) * 100) : 0;
