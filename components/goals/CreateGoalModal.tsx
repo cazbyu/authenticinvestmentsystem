@@ -230,6 +230,11 @@ setAllNotes(notesData || []);   // ✅ NEW
     });
   };
 
+// Filter KR’s by selected Roles
+const filteredKeyRelationships = allKeyRelationships.filter(
+  kr => formData.selectedRoleIds.includes(kr.role_id)
+);
+  
   const handleWeekSelect = (weekNumber: number) => {
     setSelectedActionWeeks(prev => 
       prev.includes(weekNumber)
@@ -338,18 +343,18 @@ setAllNotes(notesData || []);   // ✅ NEW
     }
 
     // Insert key relationship joins
-    if (formData.selectedKeyRelationshipIds?.length) {
-      const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
-        parent_id: goalData.id,
-        parent_type: 'goal',
-        key_relationship_id: krId,
-        user_id: user.id,
-      }));
-      const { error: krError } = await supabase
-        .from('0008-ap-universal-key-relationships-join')
-        .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
-      if (krError) throw krError;
-    }
+if (formData.selectedKeyRelationshipIds?.length) {
+  const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
+    parent_id: goalData.id,
+    parent_type: 'goal',
+    key_relationship_id: krId,
+    user_id: user.id,
+  }));
+  const { error: krError } = await supabase
+    .from('0008-ap-universal-key-relationships-join')
+    .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
+  if (krError) throw krError;
+}
 
     Alert.alert('Success', 'Goal created successfully! You can now add actions and ideas.');
 
