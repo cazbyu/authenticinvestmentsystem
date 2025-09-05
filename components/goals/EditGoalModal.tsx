@@ -43,6 +43,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
 
   useEffect(() => {
     if (visible && goal) {
@@ -252,99 +253,90 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     console.log('Delete button clicked, goal:', goal);
     if (!goal) return;
+    setShowConfirmDeleteModal(true);
+  };
 
-    // Add setTimeout to fix modal rendering conflicts
-    setTimeout(() => {
-      Alert.alert(
-        'Delete Goal',
-        `Are you sure you want to delete "${goal.title}"? This action cannot be undone.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              console.log('Delete confirmed, starting deletion process...');
-              try {
-                setSaving(true);
-                console.log('Set saving to true');
-                const supabase = getSupabaseClient();
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) throw new Error('User not found');
-                console.log('User authenticated:', user.id);
-                
-                // Delete all join table entries for this goal
-                console.log('Deleting join table entries...');
-                await Promise.all([
-                  supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-                  supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-                  supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-                  supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-                ]);
-                console.log('Join table entries deleted');
+  const confirmDelete = async () => {
+    console.log('Delete confirmed, starting deletion process...');
+    if (!goal) return;
 
-                // Find and delete any tasks linked to this goal
-                console.log('Finding tasks linked to goal...');
-                const { data: goalTaskJoins, error: goalTaskJoinsError } = await supabase
-                  .from('0008-ap-universal-goals-join')
-                  .select('parent_id')
-                  .eq('goal_id', goal.id)
-                  .eq('parent_type', 'task');
+    try {
+      setSaving(true);
+      setShowConfirmDeleteModal(false);
+      console.log('Set saving to true');
+      
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not found');
+      console.log('User authenticated:', user.id);
+      
+      // Delete all join table entries for this goal
+      console.log('Deleting join table entries...');
+      await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+        supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+        supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+        supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+      ]);
+      console.log('Join table entries deleted');
 
-                if (goalTaskJoinsError) throw goalTaskJoinsError;
-                console.log('Found linked tasks:', goalTaskJoins);
+      // Find and delete any tasks linked to this goal
+      console.log('Finding tasks linked to goal...');
+      const { data: goalTaskJoins, error: goalTaskJoinsError } = await supabase
+        .from('0008-ap-universal-goals-join')
+        .select('parent_id')
+        .eq('goal_id', goal.id)
+        .eq('parent_type', 'task');
 
-                const taskIds = goalTaskJoins?.map(gtj => gtj.parent_id) || [];
-                
-                if (taskIds.length > 0) {
-                  console.log('Deleting linked tasks and their data...');
-                  await Promise.all([
-                    supabase.from('0008-ap-task-week-plan').delete().in('task_id', taskIds),
-                    supabase.from('0008-ap-task-log').delete().in('task_id', taskIds),
-                    supabase.from('0008-ap-universal-roles-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-                    supabase.from('0008-ap-universal-domains-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-                    supabase.from('0008-ap-universal-key-relationships-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-                    supabase.from('0008-ap-universal-notes-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-                    supabase.from('0008-ap-universal-goals-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-                    supabase.from('0008-ap-tasks').delete().in('id', taskIds)
-                  ]);
-                  console.log('Linked tasks deleted');
-                }
-                
-                // Delete any remaining goal joins (deposit ideas, etc.)
-                console.log('Deleting remaining goal joins...');
-                await supabase.from('0008-ap-universal-goals-join').delete().eq('goal_id', goal.id);
-                console.log('Remaining goal joins deleted');
-                
-                // Now delete the goal itself
-                console.log('Deleting goal itself...');
-                const { error } = await supabase
-                  .from('0008-ap-goals-12wk')
-                  .delete()
-                  .eq('id', goal.id);
+      if (goalTaskJoinsError) throw goalTaskJoinsError;
+      console.log('Found linked tasks:', goalTaskJoins);
 
-                if (error) throw error;
-                console.log('Goal deleted successfully');
+      const taskIds = goalTaskJoins?.map(gtj => gtj.parent_id) || [];
+      
+      if (taskIds.length > 0) {
+        console.log('Deleting linked tasks and their data...');
+        await Promise.all([
+          supabase.from('0008-ap-task-week-plan').delete().in('task_id', taskIds),
+          supabase.from('0008-ap-task-log').delete().in('task_id', taskIds),
+          supabase.from('0008-ap-universal-roles-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-domains-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-key-relationships-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-notes-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-goals-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-tasks').delete().in('id', taskIds)
+        ]);
+        console.log('Linked tasks deleted');
+      }
+      
+      // Delete any remaining goal joins (deposit ideas, etc.)
+      console.log('Deleting remaining goal joins...');
+      await supabase.from('0008-ap-universal-goals-join').delete().eq('goal_id', goal.id);
+      console.log('Remaining goal joins deleted');
+      
+      // Now delete the goal itself
+      console.log('Deleting goal itself...');
+      const { error } = await supabase
+        .from('0008-ap-goals-12wk')
+        .delete()
+        .eq('id', goal.id);
 
-                Alert.alert('Success', 'Goal deleted successfully!');
-                onUpdate();
-                onClose();
-              } catch (error) {
-                console.error('Error deleting goal:', error);
-                console.log('Delete error details:', error);
-                Alert.alert('Error', (error as Error).message || 'Failed to delete goal.');
-              } finally {
-                console.log('Setting saving to false');
-                setSaving(false);
-              }
-            },
-          },
-        ]
-      );
-    }, 100);
+      if (error) throw error;
+      console.log('Goal deleted successfully');
+
+      Alert.alert('Success', 'Goal deleted successfully!');
+      onUpdate();
+      onClose();
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      console.log('Delete error details:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to delete goal.');
+    } finally {
+      console.log('Setting saving to false');
+      setSaving(false);
+    }
   };
 
   const filteredKeyRelationships = allKeyRelationships.filter(kr =>
@@ -531,6 +523,48 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Custom Delete Confirmation Modal */}
+        <Modal 
+          visible={showConfirmDeleteModal} 
+          transparent 
+          animationType="fade"
+          onRequestClose={() => setShowConfirmDeleteModal(false)}
+        >
+          <View style={styles.confirmOverlay}>
+            <View style={styles.confirmContainer}>
+              <Text style={styles.confirmTitle}>Delete Goal</Text>
+              <Text style={styles.confirmMessage}>
+                Are you sure you want to delete "{goal?.title}"? This action cannot be undone.
+              </Text>
+              
+              <View style={styles.confirmActions}>
+                <TouchableOpacity 
+                  style={styles.confirmCancelButton}
+                  onPress={() => setShowConfirmDeleteModal(false)}
+                  disabled={saving}
+                >
+                  <Text style={styles.confirmCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.confirmDeleteButton, saving && styles.confirmDeleteButtonDisabled]}
+                  onPress={confirmDelete}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Trash2 size={16} color="#ffffff" />
+                      <Text style={styles.confirmDeleteButtonText}>Delete</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -668,6 +702,73 @@ const styles = StyleSheet.create({
     backgroundColor: '#9ca3af',
   },
   saveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 24,
+    minWidth: 300,
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  confirmMessage: {
+    fontSize: 16,
+    color: '#6b7280',
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmCancelButton: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  confirmCancelButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmDeleteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#dc2626',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  confirmDeleteButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  confirmDeleteButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
