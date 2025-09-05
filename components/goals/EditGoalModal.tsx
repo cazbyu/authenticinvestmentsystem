@@ -253,6 +253,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
   };
 
   const handleDelete = async () => {
+    console.log('Delete button clicked, goal:', goal);
     if (!goal) return;
 
     Alert.alert(
@@ -264,21 +265,27 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            console.log('Delete confirmed, starting deletion process...');
             try {
               setSaving(true);
+              console.log('Set saving to true');
               const supabase = getSupabaseClient();
               const { data: { user } } = await supabase.auth.getUser();
               if (!user) throw new Error('User not found');
+              console.log('User authenticated:', user.id);
               
               // Delete all join table entries for this goal
+              console.log('Deleting join table entries...');
               await Promise.all([
                 supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
                 supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
                 supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
                 supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
               ]);
+              console.log('Join table entries deleted');
 
               // Find and delete any tasks linked to this goal
+              console.log('Finding tasks linked to goal...');
               const { data: goalTaskJoins, error: goalTaskJoinsError } = await supabase
                 .from('0008-ap-universal-goals-join')
                 .select('parent_id')
@@ -286,10 +293,12 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
                 .eq('parent_type', 'task');
 
               if (goalTaskJoinsError) throw goalTaskJoinsError;
+              console.log('Found linked tasks:', goalTaskJoins);
 
               const taskIds = goalTaskJoins?.map(gtj => gtj.parent_id) || [];
               
               if (taskIds.length > 0) {
+                console.log('Deleting linked tasks and their data...');
                 await Promise.all([
                   supabase.from('0008-ap-task-week-plan').delete().in('task_id', taskIds),
                   supabase.from('0008-ap-task-log').delete().in('task_id', taskIds),
@@ -300,26 +309,33 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
                   supabase.from('0008-ap-universal-goals-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
                   supabase.from('0008-ap-tasks').delete().in('id', taskIds)
                 ]);
+                console.log('Linked tasks deleted');
               }
               
               // Delete any remaining goal joins (deposit ideas, etc.)
+              console.log('Deleting remaining goal joins...');
               await supabase.from('0008-ap-universal-goals-join').delete().eq('goal_id', goal.id);
+              console.log('Remaining goal joins deleted');
               
               // Now delete the goal itself
+              console.log('Deleting goal itself...');
               const { error } = await supabase
                 .from('0008-ap-goals-12wk')
                 .delete()
                 .eq('id', goal.id);
 
               if (error) throw error;
+              console.log('Goal deleted successfully');
 
               Alert.alert('Success', 'Goal deleted successfully!');
               onUpdate();
               onClose();
             } catch (error) {
               console.error('Error deleting goal:', error);
+              console.log('Delete error details:', error);
               Alert.alert('Error', (error as Error).message || 'Failed to delete goal.');
             } finally {
+              console.log('Setting saving to false');
               setSaving(false);
             }
           },
