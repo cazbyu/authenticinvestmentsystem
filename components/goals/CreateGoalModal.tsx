@@ -387,100 +387,42 @@ if (formData.selectedKeyRelationshipIds?.length) {
   }
 };
 
-  const handleCreateAction = async () => {
-  if (!actionTitle.trim()) return;
-  if (!user) return;
-
-  try {
-    // 1. Insert the Task (no description column here)
-    const { data: parentTask, error: parentErr } = await supabase
-      .from('0008-ap-tasks')
-      .insert({
-        user_id: user.id,
-        user_cycle_id: currentCycle.id,
-        title: actionTitle.trim(),
-        type: 'task',
-        status: 'active',
-        is_twelve_week_goal: true,
-      })
-      .select('id')
-      .single();
-
-    if (parentErr) throw parentErr;
-
-    const parentTaskId = parentTask.id;
-
-    // 2. If notes were entered, save them into notes + universal join
-    if (actionNotes && actionNotes.trim()) {
-      const { data: newNote, error: noteErr } = await supabase
-        .from('0008-ap-notes')
-        .insert({
-          user_id: user.id,
-          content: actionNotes.trim(),
-        })
-        .select()
-        .single();
-      if (noteErr) throw noteErr;
-
-      const { error: noteJoinErr } = await supabase
-        .from('0008-ap-universal-notes-join')
-        .insert({
-          parent_id: parentTaskId,
-          parent_type: 'task',
-          note_id: newNote.id,
-          user_id: user.id,
-        });
-      if (noteJoinErr) throw noteJoinErr;
-    }
-
-    // 3. Link Task → Goal (insert only, like TaskEventForm does)
-    await supabase
-      .from('0008-ap-universal-goals-join')
-      .insert([{
-        parent_id: parentTaskId,
-        parent_type: 'task',
-        goal_id: createdGoalId,
-        user_id: user.id,
-      }]);
-
-    // 4. Reset form state
-    setActionTitle('');
-    setActionNotes('');
-    setShowActionForm(false);
-
-  } catch (err) {
-    console.error('Error creating action:', err);
-    Alert.alert('Error', 'Could not create action.');
-  }
-};
-
-
   const handleCreateIdea = async () => {
-  if (!ideaTitle.trim()) return;
-  if (!user) return;
+  if (!createdGoalId) {
+    Alert.alert('Error', 'Please create the goal first');
+    return;
+  }
 
+  if (!ideaTitle.trim()) {
+    Alert.alert('Error', 'Please enter an idea title');
+    return;
+  }
+
+  setSubmittingIdea(true);
   try {
-    // 1. Insert the Deposit Idea
-    const { data: parentIdea, error: ideaErr } = await supabase
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not found');
+
+    // 1. Create deposit idea (use actual schema fields: is_active, archived, follow_up)
+    const { data: createdIdea, error: ideaError } = await supabase
       .from('0008-ap-deposit-ideas')
       .insert({
         user_id: user.id,
         user_cycle_id: currentCycle.id,
         title: ideaTitle.trim(),
-        type: 'depositIdea',
-        status: 'active',
-        is_twelve_week_goal: true,
+        is_active: true,
+        archived: false,
+        follow_up: false,
       })
-      .select('id')
+      .select()
       .single();
 
-    if (ideaErr) throw ideaErr;
+    if (ideaError) throw ideaError;
 
-    const parentIdeaId = parentIdea.id;
-
-    // 2. If notes were entered, save them into notes + universal join
-    if (ideaNotes && ideaNotes.trim()) {
-      const { data: newNote, error: noteErr } = await supabase
+    // 2. Add notes if provided
+    if (ideaNotes.trim()) {
+      const { data: noteData, error: noteError } = await supabase
         .from('0008-ap-notes')
         .insert({
           user_id: user.id,
@@ -488,37 +430,60 @@ if (formData.selectedKeyRelationshipIds?.length) {
         })
         .select()
         .single();
-      if (noteErr) throw noteErr;
 
-      const { error: noteJoinErr } = await supabase
+      if (noteError) throw noteError;
+
+      await supabase
         .from('0008-ap-universal-notes-join')
         .insert({
-          parent_id: parentIdeaId,
+          parent_id: createdIdea.id,
           parent_type: 'depositIdea',
-          note_id: newNote.id,
+          note_id: noteData.id,
           user_id: user.id,
         });
-      if (noteJoinErr) throw noteJoinErr;
     }
 
-    // 3. Link Deposit Idea → Goal (insert only, like TaskEventForm pattern)
+    // 3. Link deposit idea → goal
     await supabase
       .from('0008-ap-universal-goals-join')
-      .insert([{
-        parent_id: parentIdeaId,
+      .insert({
+        parent_id: createdIdea.id,
         parent_type: 'depositIdea',
         goal_id: createdGoalId,
         user_id: user.id,
-      }]);
+      });
 
-    // 4. Reset form state
-    setIdeaTitle('');
-    setIdeaNotes('');
-    setShowIdeaForm(false);
+    // 4. Link to roles
+    if (formData.selectedRoleIds.length > 0) {
+      const roleJoins = formData.selectedRoleIds.map(roleId => ({
+        parent_id: createdIdea.id,
+        parent_type: 'depositIdea',
+        role_id: roleId,
+        user_id: user.id,
+      }));
+      await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
+    }
 
-  } catch (err) {
-    console.error('Error creating idea:', err);
-    Alert.alert('Error', 'Could not create deposit idea.');
+    // 5. Link to domains
+    if (formData.selectedDomainIds.length > 0) {
+      const domainJoins = formData.selectedDomainIds.map(domainId => ({
+        parent_id: createdIdea.id,
+        parent_type: 'depositIdea',
+        domain_id: domainId,
+        user_id: user.id,
+      }));
+      await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
+    }
+
+    Alert.alert('Success', 'Deposit idea created successfully!');
+    resetIdeaForm();
+    setActiveSubForm('none');
+
+  } catch (error) {
+    console.error('Error creating idea:', error);
+    Alert.alert('Error', (error as Error).message || 'Failed to create idea');
+  } finally {
+    setSubmittingIdea(false);
   }
 };
 
