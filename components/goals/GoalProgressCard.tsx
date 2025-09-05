@@ -208,31 +208,6 @@ export function GoalProgressCard({
           </View>
         </View>
 
-        {/* Lagging Indicator: Overall Progress */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>Overall (Lagging)</Text>
-            <Text style={[
-              styles.progressValue,
-              { color: getProgressColor(progress.overallProgress) }
-            ]}>
-              {progress.overallActual}/{progress.overallTarget} ({progress.overallProgress}%)
-            </Text>
-          </View>
-          
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${progress.overallProgress}%`,
-                  backgroundColor: getProgressColor(progress.overallProgress),
-                }
-              ]}
-            />
-          </View>
-        </View>
-
         {/* Week-specific Actions (when week prop is provided) */}
         {week && (
           <View style={styles.weekActionsSection}>

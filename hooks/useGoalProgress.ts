@@ -113,6 +113,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgress>>({});
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, TaskWithLogs[]>>({});
   const [loading, setLoading] = useState(false);
+  const [loadingWeekActions, setLoadingWeekActions] = useState(false);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -629,7 +630,7 @@ const { data: overallLogs } = await overallQuery;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || goalIds.length === 0) return {};
 
-      // Fetch tasks linked to these goals that overlap with the week
+      // Fetch tasks linked to these goals
       const { data: goalJoins } = await supabase
         .from('0008-ap-universal-goals-join')
         .select('parent_id, goal_id')
@@ -639,33 +640,37 @@ const { data: overallLogs } = await overallQuery;
       const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
       if (taskIds.length === 0) return {};
 
-      // Fetch tasks that overlap with the week date range
+      // Fetch tasks for this user cycle
       const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
         .select('*')
         .eq('user_id', user.id)
         .in('id', taskIds)
-        .not('status', 'in', '(completed,cancelled)')
-        .or(`due_date.gte.${weekStartDate},due_date.lte.${weekEndDate},start_date.gte.${weekStartDate},start_date.lte.${weekEndDate}`);
+        .eq('input_kind', 'count')
+        .not('status', 'in', '(completed,cancelled)');
 
       if (tasksError) throw tasksError;
       if (!tasksData || tasksData.length === 0) return {};
 
-      // Fetch task logs for the week date range
-      let logsQuery = supabase
-  .from('0008-ap-task-log')
-  .select('*')
-  .in('task_id', tasksData.map(t => t.id));
+      // Fetch week plans for this specific week
+      const weekNumber = cycleWeeks.findIndex(w => w.start_date === weekStartDate) + 1;
+      const { data: weekPlansData, error: weekPlansError } = await supabase
+        .from('0008-ap-task-week-plan')
+        .select('*')
+        .in('task_id', taskIds)
+        .eq('week_number', weekNumber);
 
-if (weekStartDate) {
-  logsQuery = logsQuery.gte('measured_on', weekStartDate);
-}
-if (weekEndDate) {
-  logsQuery = logsQuery.lte('measured_on', weekEndDate);
-}
+      if (weekPlansError) throw weekPlansError;
 
-const { data: logsData, error: logsError } = await logsQuery;
-if (logsError) throw logsError;
+      // Fetch task logs for this week's date range
+      const { data: logsData, error: logsError } = await supabase
+        .from('0008-ap-task-log')
+        .select('*')
+        .in('task_id', taskIds)
+        .gte('log_date', weekStartDate)
+        .lte('log_date', weekEndDate);
+
+      if (logsError) throw logsError;
 
       // Group tasks by goal_id and attach logs
       const groupedActions: Record<string, TaskWithLogs[]> = {};
@@ -675,13 +680,17 @@ if (logsError) throw logsError;
         const goalJoin = goalJoins?.find(gj => gj.parent_id === task.id);
         if (!goalJoin) continue;
 
+        // Check if this task has a week plan for the current week
+        const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id);
+        if (!weekPlan) continue; // Skip tasks not planned for this week
+
         const goalId = goalJoin.goal_id;
         const taskLogs = logsData?.filter(log => log.task_id === task.id) || [];
         
         // Calculate weekly metrics
         const completedLogs = taskLogs.filter(log => log.completed);
         const weeklyActual = completedLogs.length;
-        const weeklyTarget = task.input_kind === 'count' ? 7 : 1; // Default targets
+        const weeklyTarget = weekPlan.target_days;
 
         const taskWithLogs: TaskWithLogs = {
           ...task,
@@ -1072,6 +1081,8 @@ if (logsError) throw logsError;
     daysLeftData,
     goalProgress,
     loading,
+    loadingWeekActions,
+    setLoadingWeekActions,
     refreshGoals,
     refreshAllData,
     fetchTasksAndPlansForWeek,

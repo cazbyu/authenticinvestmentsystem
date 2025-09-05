@@ -36,6 +36,8 @@ export default function Goals() {
     goalProgress, 
     cycleWeeks,
     loading: goalsLoading, 
+    loadingWeekActions: hookLoadingWeekActions,
+    setLoadingWeekActions,
     refreshGoals,
     refreshAllData,
     createGoal,
@@ -65,9 +67,17 @@ export default function Goals() {
   const fetchWeekActions = async () => {
   try {
     setLoadingWeekActions(true);
+    
+    const weekData = getWeekData(selectedWeekIndex);
+    if (!weekData || twelveWeekGoals.length === 0) {
+      setWeekGoalActions({});
+      return;
+    }
 
-    // existing code that loads week actions for selectedGoalIds/weekData…
-    // (leave your queries intact)
+    const goalIds = twelveWeekGoals.map(g => g.id);
+    const actions = await fetchGoalActionsForWeek(goalIds, weekData.startDate, weekData.endDate);
+    setWeekGoalActions(actions);
+
 
   } catch (err: any) {
     // Ignore transient preview/network/auth refresh errors (status 0)
@@ -284,7 +294,7 @@ export default function Goals() {
                 <TouchableOpacity 
                   style={styles.editCycleButton}
                   onPress={() => {
-                    setEditingCycle(currentCycle);
+                        loadingWeekActions={hookLoadingWeekActions}
                     setCycleSetupVisible(true);
                   }}
                 >
