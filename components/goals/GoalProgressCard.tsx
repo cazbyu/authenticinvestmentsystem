@@ -101,7 +101,7 @@ export function GoalProgressCard({
       return { actual: progress.weeklyActual, target: progress.weeklyTarget };
     }
     
-    const totalActual = weekActions.reduce((sum, action) => sum + action.weeklyActual, 0);
+    const totalActual = weekActions.reduce((sum, action) => sum + Math.min(action.weeklyActual, action.weeklyTarget), 0);
     const totalTarget = weekActions.reduce((sum, action) => sum + action.weeklyTarget, 0);
     
     return { actual: totalActual, target: totalTarget };
