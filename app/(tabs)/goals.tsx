@@ -114,6 +114,17 @@ export default function Goals() {
         await completeActionSuggestion({ parentTaskId: actionId, whenISO: todayISO });
       }
 
+      // Refresh week data so dots update
+      console.log('Refreshing week actions after toggle');
+      await fetchWeekActions();
+      
+      // Also refresh goals to update weekly progress
+      await refreshGoals();
+    } catch (error) {
+      console.error('Error in handleToggleToday:', error);
+      Alert.alert('Error', 'Failed to update completion status');
+    }
+  };
 
   const goPrevWeek = () => {
     console.log('goPrevWeek called, current index:', selectedWeekIndex);
@@ -315,7 +326,6 @@ export default function Goals() {
                 <TouchableOpacity 
                   style={styles.editCycleButton}
                   onPress={() => {
-                        loadingWeekActions={hookLoadingWeekActions}
                     setCycleSetupVisible(true);
                   }}
                 >
