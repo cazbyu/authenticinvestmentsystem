@@ -61,7 +61,8 @@ export function GoalProgressCard({
   };
 
   const formatWeeklyProgress = (actual: number, target: number) => {
-    return `${actual}/${target}`;
+    const percentage = target > 0 ? Math.round((actual / target) * 100) : 0;
+    return `${percentage}%`;
   };
 
   const primaryRole = goal.roles?.[0]; // Used for card color
@@ -289,26 +290,22 @@ export function GoalProgressCard({
                            console.log(`Day ${day.date}: hasLog=${hasLog}, isToday=${isToday}`);
 
                            return (
-                             <View key={day.date} style={[styles.dayDot, hasLog && styles.dayDotCompleted]}>
-                               {isToday && onToggleToday ? (
-                                 <TouchableOpacity
-                                   activeOpacity={0.8}
-                                   onPress={async () => {
-                                     console.log('Day dot clicked:', { actionId: action.id, date: day.date, hasLog });
-                                     try {
-                                       await onToggleToday(action.id, hasLog);
-                                     } catch (error) {
-                                       console.error('Error toggling today:', error);
-                                     }
-                                   }}
-                                   style={styles.dayDotTouchable}
-                                 >
-                                   {hasLog && <Check size={12} color="#ffffff" />}
-                                 </TouchableOpacity>
-                               ) : (
-                                 hasLog && <Check size={12} color="#ffffff" />
-                               )}
-                             </View>
+                             <TouchableOpacity
+                               key={day.date}
+                               style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
+                               onPress={isToday && onToggleToday ? async () => {
+                                 console.log('Day dot clicked:', { actionId: action.id, date: day.date, hasLog });
+                                 try {
+                                   await onToggleToday(action.id, hasLog);
+                                 } catch (error) {
+                                   console.error('Error toggling today:', error);
+                                 }
+                               } : undefined}
+                               disabled={!isToday || !onToggleToday}
+                               activeOpacity={isToday && onToggleToday ? 0.7 : 1}
+                             >
+                               {hasLog && <Check size={12} color="#ffffff" />}
+                             </TouchableOpacity>
                            );
                          })}
 

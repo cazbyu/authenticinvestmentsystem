@@ -99,30 +99,24 @@ export default function Goals() {
 };
 
   const handleToggleToday = async (actionId: string, completed: boolean) => {
-  console.log('handleToggleToday called:', { actionId, completed });
-  const todayISO = new Date().toISOString().split('T')[0];
-  console.log('Today ISO:', todayISO);
+    console.log('handleToggleToday called:', { actionId, completed });
+    const todayISO = new Date().toISOString().split('T')[0];
+    console.log('Today ISO:', todayISO);
 
-  try {
-  if (completed) {
-    // UNDO: delete today's completed occurrence
-    console.log('Undoing completion for:', actionId);
-    await undoActionOccurrence({ parentTaskId: actionId, whenISO: todayISO });
-  } else {
-    // COMPLETE: insert today's completed occurrence (+ copy joins via RPCs)
-    console.log('Completing action for:', actionId);
-    await completeActionSuggestion({ parentTaskId: actionId, whenISO: todayISO });
-  }
+    try {
+      if (completed) {
+        // UNDO: delete today's completed occurrence
+        console.log('Undoing completion for:', actionId);
+        await undoActionOccurrence({ parentTaskId: actionId, whenISO: todayISO });
+      } else {
+        // COMPLETE: insert today's completed occurrence (+ copy joins via RPCs)
+        console.log('Completing action for:', actionId);
+        await completeActionSuggestion({ parentTaskId: actionId, whenISO: todayISO });
+      }
 
-  // Refresh week data so dots update
-  console.log('Refreshing week actions after toggle');
-  await fetchWeekActions();
-  } catch (error) {
-    console.error('Error in handleToggleToday:', error);
-  }
-};
 
   const goPrevWeek = () => {
+    console.log('goPrevWeek called, current index:', selectedWeekIndex);
     setSelectedWeekIndex(prev => {
       const newIndex = Math.max(0, prev - 1);
       console.log('goPrevWeek: changing from', prev, 'to', newIndex);
@@ -131,6 +125,7 @@ export default function Goals() {
   };
 
   const goNextWeek = () => {
+    console.log('goNextWeek called, current index:', selectedWeekIndex, 'max:', cycleWeeks.length - 1);
     setSelectedWeekIndex(prev => {
       const newIndex = Math.min(cycleWeeks.length - 1, prev + 1);
       console.log('goNextWeek: changing from', prev, 'to', newIndex);
