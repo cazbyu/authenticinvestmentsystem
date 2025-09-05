@@ -527,7 +527,9 @@ const { data: overallLogs } = await overallQuery;
   };
 
   const getCurrentWeekIndex = (): number => {
-    return Math.max(0, getCurrentWeekNumber() - 1); // Convert to 0-based index
+    const weekIndex = Math.max(0, getCurrentWeekNumber() - 1); // Convert to 0-based index
+    console.log('getCurrentWeekIndex:', weekIndex, 'from weekNumber:', getCurrentWeekNumber());
+    return weekIndex;
   };
 
   const getWeekData = (weekIndex: number): WeekData | null => {
@@ -628,6 +630,7 @@ const { data: overallLogs } = await overallQuery;
   
   const fetchGoalActionsForWeek = async (goalIds: string[], weekStartDate: string, weekEndDate: string): Promise<Record<string, TaskWithLogs[]>> => {
     try {
+      console.log('fetchGoalActionsForWeek called:', { goalIds, weekStartDate, weekEndDate });
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || goalIds.length === 0) return {};
@@ -642,6 +645,8 @@ const { data: overallLogs } = await overallQuery;
       const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
       if (taskIds.length === 0) return {};
 
+      console.log('Found task IDs linked to goals:', taskIds);
+
       // Fetch tasks for this user cycle
       const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
@@ -654,8 +659,12 @@ const { data: overallLogs } = await overallQuery;
       if (tasksError) throw tasksError;
       if (!tasksData || tasksData.length === 0) return {};
 
+      console.log('Found tasks:', tasksData.length);
+
       // Fetch week plans for this specific week
       const weekNumber = cycleWeeks.findIndex(w => w.start_date === weekStartDate) + 1;
+      console.log('Week number for date range:', weekNumber);
+      
       const { data: weekPlansData, error: weekPlansError } = await supabase
         .from('0008-ap-task-week-plan')
         .select('*')
@@ -664,15 +673,20 @@ const { data: overallLogs } = await overallQuery;
 
       if (weekPlansError) throw weekPlansError;
 
-      // Fetch task logs for this week's date range
-      const { data: logsData, error: logsError } = await supabase
-        .from('0008-ap-task-log')
-        .select('*')
-        .in('task_id', taskIds)
-        .gte('measured_on', weekStartDate)
-        .lte('measured_on', weekEndDate);
+      console.log('Found week plans:', weekPlansData?.length || 0);
 
-      if (logsError) throw logsError;
+      // Fetch completed occurrence tasks for this week's date range
+      const { data: occurrenceData, error: occurrenceError } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .in('parent_task_id', taskIds)
+        .eq('status', 'completed')
+        .gte('due_date', weekStartDate)
+        .lte('due_date', weekEndDate);
+
+      if (occurrenceError) throw occurrenceError;
+
+      console.log('Found completed occurrences:', occurrenceData?.length || 0);
 
       // Group tasks by goal_id and attach logs
       const groupedActions: Record<string, TaskWithLogs[]> = {};
@@ -687,12 +701,24 @@ const { data: overallLogs } = await overallQuery;
         if (!weekPlan) continue; // Skip tasks not planned for this week
 
         const goalId = goalJoin.goal_id;
-        const taskLogs = logsData?.filter(log => log.task_id === task.id) || [];
+        
+        // Convert completed occurrences to TaskLog format
+        const taskLogs = occurrenceData?.filter(occ => occ.parent_task_id === task.id).map(occ => ({
+          id: occ.id,
+          task_id: task.id,
+          measured_on: occ.due_date,
+          week_number: weekNumber,
+          day_of_week: new Date(occ.due_date).getDay(),
+          value: 1,
+          completed: true,
+          created_at: occ.created_at,
+        })) || [];
         
         // Calculate weekly metrics
-        const completedLogs = taskLogs.filter(log => log.completed);
-        const weeklyActual = completedLogs.length;
+        const weeklyActual = taskLogs.length; // All are completed
         const weeklyTarget = weekPlan.target_days;
+
+        console.log(`Task ${task.title}: ${weeklyActual}/${weeklyTarget} completed`);
 
         const taskWithLogs: TaskWithLogs = {
           ...task,
@@ -707,6 +733,7 @@ const { data: overallLogs } = await overallQuery;
         groupedActions[goalId].push(taskWithLogs);
       }
 
+      console.log('Grouped actions by goal:', Object.keys(groupedActions).length);
       return groupedActions;
     } catch (error) {
       console.error('Error fetching goal actions for week:', error);
@@ -770,6 +797,7 @@ const { data: overallLogs } = await overallQuery;
     parentTaskId: string;
     whenISO: string;
   }): Promise<string> => {
+    console.log('completeActionSuggestion called:', { parentTaskId, whenISO });
     const supabase = getSupabaseClient();
 
     // Require user + currentCycle so we can stamp the row
@@ -804,6 +832,8 @@ const { data: overallLogs } = await overallQuery;
     if (oErr || !occ) throw oErr ?? new Error('Failed to insert occurrence');
     const occId = occ.id as string;
 
+    console.log('Created occurrence:', occId);
+
     // 3) Copy Roles, Domains, and Goal links from parent → occurrence via RPCs
     await Promise.all([
       supabase.rpc('ap_copy_universal_roles_to_task', {
@@ -836,6 +866,7 @@ const { data: overallLogs } = await overallQuery;
     parentTaskId: string;
     whenISO: string;
   }): Promise<number> => {
+    console.log('undoActionOccurrence called:', { parentTaskId, whenISO });
     const supabase = getSupabaseClient();
 
     const { error, count } = await supabase
@@ -851,7 +882,9 @@ const { data: overallLogs } = await overallQuery;
     }
 
     // count can be null depending on PostgREST settings; normalize to number
-    return typeof count === 'number' ? count : 0;
+    const deletedCount = typeof count === 'number' ? count : 0;
+    console.log('Deleted occurrences:', deletedCount);
+    return deletedCount;
   };
 
   const createGoal = async (goalData: {

@@ -279,31 +279,38 @@ export function GoalProgressCard({
                       
                       <View style={styles.dayDots}>
                         {weekDays.map(day => {
-  const hasLog = action.logs.some(
-    log => log.measured_on === day.date && log.completed
-  );
+                           const hasLog = action.logs.some(
+                             log => log.measured_on === day.date && log.completed
+                           );
 
-  const todayISO = new Date().toISOString().split('T')[0];
-  const isToday = day.date === todayISO;
+                           const todayISO = new Date().toISOString().split('T')[0];
+                           const isToday = day.date === todayISO;
 
-  return (
-    <View key={day.date} style={[styles.dayDot, hasLog && styles.dayDotCompleted]}>
-      {isToday && onToggleToday ? (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={async () => {
-            await onToggleToday(action.id, hasLog);
-          }}
-          style={styles.dayDotTouchable}
-        >
-          {hasLog && <Check size={12} color="#ffffff" />}
-        </TouchableOpacity>
-      ) : (
-        hasLog && <Check size={12} color="#ffffff" />
-      )}
-    </View>
-  );
-})}
+                           console.log(`Day ${day.date}: hasLog=${hasLog}, isToday=${isToday}`);
+
+                           return (
+                             <View key={day.date} style={[styles.dayDot, hasLog && styles.dayDotCompleted]}>
+                               {isToday && onToggleToday ? (
+                                 <TouchableOpacity
+                                   activeOpacity={0.8}
+                                   onPress={async () => {
+                                     console.log('Day dot clicked:', { actionId: action.id, date: day.date, hasLog });
+                                     try {
+                                       await onToggleToday(action.id, hasLog);
+                                     } catch (error) {
+                                       console.error('Error toggling today:', error);
+                                     }
+                                   }}
+                                   style={styles.dayDotTouchable}
+                                 >
+                                   {hasLog && <Check size={12} color="#ffffff" />}
+                                 </TouchableOpacity>
+                               ) : (
+                                 hasLog && <Check size={12} color="#ffffff" />
+                               )}
+                             </View>
+                           );
+                         })}
 
                       </View>
 

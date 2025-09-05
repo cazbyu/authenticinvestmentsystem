@@ -58,6 +58,11 @@ export default function Goals() {
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
+    console.log('useEffect triggered for fetchWeekActions:', { 
+      selectedWeekIndex, 
+      goalsCount: twelveWeekGoals.length, 
+      cycleWeeksCount: cycleWeeks.length 
+    });
     if (twelveWeekGoals.length > 0 && cycleWeeks.length > 0) {
       fetchWeekActions();
     }
@@ -65,16 +70,21 @@ export default function Goals() {
 
   const fetchWeekActions = async () => {
   try {
+    console.log('fetchWeekActions starting for week index:', selectedWeekIndex);
     setLoadingWeekActions(true);
     
     const weekData = getWeekData(selectedWeekIndex);
+    console.log('Week data for index', selectedWeekIndex, ':', weekData);
     if (!weekData || twelveWeekGoals.length === 0) {
+      console.log('No week data or goals, clearing actions');
       setWeekGoalActions({});
       return;
     }
 
     const goalIds = twelveWeekGoals.map(g => g.id);
+    console.log('Fetching actions for goals:', goalIds);
     const actions = await fetchGoalActionsForWeek(goalIds, weekData.startDate, weekData.endDate);
+    console.log('Received actions:', actions);
     setWeekGoalActions(actions);
 
 
@@ -89,26 +99,43 @@ export default function Goals() {
 };
 
   const handleToggleToday = async (actionId: string, completed: boolean) => {
+  console.log('handleToggleToday called:', { actionId, completed });
   const todayISO = new Date().toISOString().split('T')[0];
+  console.log('Today ISO:', todayISO);
 
+  try {
   if (completed) {
     // UNDO: delete today's completed occurrence
+    console.log('Undoing completion for:', actionId);
     await undoActionOccurrence({ parentTaskId: actionId, whenISO: todayISO });
   } else {
     // COMPLETE: insert today's completed occurrence (+ copy joins via RPCs)
+    console.log('Completing action for:', actionId);
     await completeActionSuggestion({ parentTaskId: actionId, whenISO: todayISO });
   }
 
   // Refresh week data so dots update
+  console.log('Refreshing week actions after toggle');
   await fetchWeekActions();
+  } catch (error) {
+    console.error('Error in handleToggleToday:', error);
+  }
 };
 
   const goPrevWeek = () => {
-    setSelectedWeekIndex(prev => Math.max(0, prev - 1));
+    setSelectedWeekIndex(prev => {
+      const newIndex = Math.max(0, prev - 1);
+      console.log('goPrevWeek: changing from', prev, 'to', newIndex);
+      return newIndex;
+    });
   };
 
   const goNextWeek = () => {
-    setSelectedWeekIndex(prev => Math.min(11, prev + 1));
+    setSelectedWeekIndex(prev => {
+      const newIndex = Math.min(11, prev + 1);
+      console.log('goNextWeek: changing from', prev, 'to', newIndex);
+      return newIndex;
+    });
   };
 
   const formatWeekHeader = () => {
