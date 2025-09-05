@@ -836,21 +836,22 @@ const { data: overallLogs } = await overallQuery;
 
     // 3) Copy Roles, Domains, and Goal links from parent → occurrence via RPCs
     await Promise.all([
-      supabase.rpc('ap_copy_universal_roles_to_task', {
-        from_parent_id: parentTaskId,
-        to_task_id: occId,
-      }),
-      supabase.rpc('ap_copy_universal_domains_to_task', {
-  from_parent_id: parentTaskId,
-  to_task_id: occId,
-  user_id: user.id,   // ✅ add this
-      }),
-      supabase.rpc('ap_copy_universal_goals_to_task', {
-        from_parent_id: parentTaskId,
-        to_task_id: occId,
-        p_user: user.id,
-      }),
-    ]);
+  supabase.rpc('ap_copy_universal_roles_to_task', {
+    from_parent_id: parentTaskId,
+    to_task_id: occId,
+    user_id: user.id,   // ✅ added
+  }),
+  supabase.rpc('ap_copy_universal_domains_to_task', {
+    from_parent_id: parentTaskId,
+    to_task_id: occId,
+    user_id: user.id,   // ✅ added
+  }),
+  supabase.rpc('ap_copy_universal_goals_to_task', {
+    from_parent_id: parentTaskId,
+    to_task_id: occId,
+    p_user: user.id,    // already correct
+  }),
+]);
 
     return occId;
   };
