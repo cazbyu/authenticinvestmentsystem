@@ -280,7 +280,7 @@ export function GoalProgressCard({
                       <View style={styles.dayDots}>
                         {weekDays.map(day => {
                           const hasLog = action.logs.some(
-                            log => log.log_date === day.date && log.completed
+                            log => log.measured_on === day.date && log.completed
                           );
 
                           const todayISO = new Date().toISOString().split('T')[0];
