@@ -841,8 +841,9 @@ const { data: overallLogs } = await overallQuery;
         to_task_id: occId,
       }),
       supabase.rpc('ap_copy_universal_domains_to_task', {
-        from_parent_id: parentTaskId,
-        to_task_id: occId,
+  from_parent_id: parentTaskId,
+  to_task_id: occId,
+  user_id: user.id,   // ✅ add this
       }),
       supabase.rpc('ap_copy_universal_goals_to_task', {
         from_parent_id: parentTaskId,
