@@ -31,7 +31,7 @@ interface GoalProgressCardProps {
   weekActions?: TaskWithLogs[];
   loadingWeekActions?: boolean;
   onAddAction?: () => void; // Renamed from onAddTask
-  onToggleToday?: (actionId: string, completed: boolean) => Promise<void>;
+  onToggleToday?: (actionId: string, date: string, completed: boolean) => Promise<void>;
   onEdit?: () => void; // New onEdit prop
   onPress?: () => void;
   compact?: boolean;
@@ -73,10 +73,13 @@ export function GoalProgressCard({
     const start = new Date(startDate);
     const end = new Date(endDate);
     
-    // Generate 7 days starting from the week start
+    // Generate 7 days starting from Sunday (0) to Saturday (6)
     for (let i = 0; i < 7; i++) {
       const day = new Date(start);
-      day.setDate(start.getDate() + i);
+      // Calculate the Sunday of this week
+      const dayOfWeek = start.getDay();
+      const daysFromSunday = dayOfWeek; // Sunday = 0, Monday = 1, etc.
+      day.setDate(start.getDate() - daysFromSunday + i);
 
       if (day <= end) {
         days.push({
@@ -255,7 +258,7 @@ export function GoalProgressCard({
               <View style={styles.actionsList}>
                 {/* Day labels above circles */}
                 <View style={styles.dayLabelsRow}>
-                  {generateWeekDays(week.startDate, week.endDate, goal.user_cycle_id ? (goal as any).user_cycle_week_start_day : 'sunday').map(day => (
+                  {generateWeekDays(week.startDate, week.endDate, 'sunday').map(day => (
                     <Text key={day.date} style={styles.dayLabelText}>
                       {day.dayName}
                     </Text>
@@ -263,7 +266,7 @@ export function GoalProgressCard({
                 </View>
 
                 {weekActions.map(action => {
-                  const weekDays = generateWeekDays(week.startDate, week.endDate, goal.user_cycle_id ? (goal as any).user_cycle_week_start_day : 'sunday');
+                  const weekDays = generateWeekDays(week.startDate, week.endDate, 'sunday');
 
                   return (
                     <View key={action.id} style={styles.actionItem}>
@@ -284,25 +287,22 @@ export function GoalProgressCard({
                              log => log.measured_on === day.date && log.completed
                            );
 
-                           const todayISO = new Date().toISOString().split('T')[0];
-                           const isToday = day.date === todayISO;
-
-                           console.log(`Day ${day.date}: hasLog=${hasLog}, isToday=${isToday}`);
+                           console.log(`Day ${day.date}: hasLog=${hasLog}`);
 
                            return (
                              <TouchableOpacity
                                key={day.date}
                                style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
-                               onPress={isToday && onToggleToday ? async () => {
+                               onPress={onToggleToday ? async () => {
                                  console.log('Day dot clicked:', { actionId: action.id, date: day.date, hasLog });
                                  try {
-                                   await onToggleToday(action.id, hasLog);
+                                   await onToggleToday(action.id, day.date, hasLog);
                                  } catch (error) {
                                    console.error('Error toggling today:', error);
                                  }
                                } : undefined}
-                               disabled={!isToday || !onToggleToday}
-                               activeOpacity={isToday && onToggleToday ? 0.7 : 1}
+                               disabled={!onToggleToday}
+                               activeOpacity={onToggleToday ? 0.7 : 1}
                              >
                                {hasLog && <Check size={12} color="#ffffff" />}
                              </TouchableOpacity>
@@ -596,27 +596,27 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   dayDots: {
-    flexDirection: 'row', // Changed from 'row' to 'row'
-    gap: 8, // Increased gap for better spacing
+    flexDirection: 'row',
+    gap: 10, // Match gap with dayLabelsRow
     justifyContent: 'center',
   },
   dayLabelsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8, // Match gap with dayDots
+    gap: 10, // Slightly increased gap for better spacing
     marginBottom: 4, // Space between labels and circles
   },
   dayLabelText: {
     fontSize: 10,
     fontWeight: '600',
     color: '#6b7280',
-    width: 20, // Fixed width to align with circles
+    width: 22, // Slightly increased width to prevent letter wrapping
     textAlign: 'center',
   },
   dayDot: {
-    width: 20, // Fixed width for circles
-    height: 20, // Fixed height for circles
-    borderRadius: 10, // Half of width/height for perfect circle
+    width: 22, // Increased to match label width
+    height: 22, // Increased to match label width
+    borderRadius: 11, // Half of width/height for perfect circle
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent', // Empty circle

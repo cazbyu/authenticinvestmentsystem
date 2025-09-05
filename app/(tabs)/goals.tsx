@@ -98,23 +98,26 @@ export default function Goals() {
   }
 };
 
-  const handleToggleToday = async (actionId: string, completed: boolean) => {
-    console.log('handleToggleToday called:', { actionId, completed });
-    const todayISO = new Date().toISOString().split('T')[0];
-    console.log('Today ISO:', todayISO);
+  const handleToggleToday = async (actionId: string, date: string, completed: boolean) => {
+    console.log('handleToggleToday called:', { actionId, date, completed });
 
     try {
       if (completed) {
-        // UNDO: delete today's completed occurrence
+        // UNDO: delete the completed occurrence for this date
         console.log('Undoing completion for:', actionId);
-        await undoActionOccurrence({ parentTaskId: actionId, whenISO: todayISO });
+        await undoActionOccurrence({ parentTaskId: actionId, whenISO: date });
       } else {
-        // COMPLETE: insert today's completed occurrence (+ copy joins via RPCs)
+        // COMPLETE: insert completed occurrence for this date (+ copy joins via RPCs)
         console.log('Completing action for:', actionId);
-        await completeActionSuggestion({ parentTaskId: actionId, whenISO: todayISO });
+        await completeActionSuggestion({ parentTaskId: actionId, whenISO: date });
       }
+      
+      // Refresh the week actions to show updated completion status
+      await fetchWeekActions();
+      await refreshGoals();
     } catch (error) {
       console.error('Error toggling action completion:', error);
+      Alert.alert('Error', 'Failed to update completion status');
     }
   };
 
