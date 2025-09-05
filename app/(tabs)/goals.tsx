@@ -26,7 +26,6 @@ export default function Goals() {
   const [editingCycle, setEditingCycle] = useState<any>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
-  const [loadingWeekActions, setLoadingWeekActions] = useState(false);
 
   // 12-Week Goals
   const { 
@@ -36,7 +35,7 @@ export default function Goals() {
     goalProgress, 
     cycleWeeks,
     loading: goalsLoading, 
-    loadingWeekActions: hookLoadingWeekActions,
+    loadingWeekActions,
     setLoadingWeekActions,
     refreshGoals,
     refreshAllData,
