@@ -113,16 +113,8 @@ export default function Goals() {
         console.log('Completing action for:', actionId);
         await completeActionSuggestion({ parentTaskId: actionId, whenISO: todayISO });
       }
-
-      // Refresh week data so dots update
-      console.log('Refreshing week actions after toggle');
-      await fetchWeekActions();
-      
-      // Also refresh goals to update weekly progress
-      await refreshGoals();
     } catch (error) {
-      console.error('Error in handleToggleToday:', error);
-      Alert.alert('Error', 'Failed to update completion status');
+      console.error('Error toggling action completion:', error);
     }
   };
 
@@ -355,7 +347,6 @@ export default function Goals() {
                 />
               </View>
             </View>
-            {/* Goals List */}
             
             {/* Week Navigator */}
             {cycleWeeks.length > 0 && (
