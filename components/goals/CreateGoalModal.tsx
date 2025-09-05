@@ -388,174 +388,72 @@ if (formData.selectedKeyRelationshipIds?.length) {
 };
 
   const handleCreateAction = async () => {
-    if (!createdGoalId) {
-      Alert.alert('Error', 'Please create the goal first');
-      return;
+  if (!actionTitle.trim()) return;
+  if (!user) return;
+
+  try {
+    // 1. Insert the Task (no description column here)
+    const { data: parentTask, error: parentErr } = await supabase
+      .from('0008-ap-tasks')
+      .insert({
+        user_id: user.id,
+        user_cycle_id: currentCycle.id,
+        title: actionTitle.trim(),
+        type: 'task',
+        status: 'active',
+        is_twelve_week_goal: true,
+      })
+      .select('id')
+      .single();
+
+    if (parentErr) throw parentErr;
+
+    const parentTaskId = parentTask.id;
+
+    // 2. If notes were entered, save them into notes + universal join
+    if (actionNotes && actionNotes.trim()) {
+      const { data: newNote, error: noteErr } = await supabase
+        .from('0008-ap-notes')
+        .insert({
+          user_id: user.id,
+          content: actionNotes.trim(),
+        })
+        .select()
+        .single();
+      if (noteErr) throw noteErr;
+
+      const { error: noteJoinErr } = await supabase
+        .from('0008-ap-universal-notes-join')
+        .insert({
+          parent_id: parentTaskId,
+          parent_type: 'task',
+          note_id: newNote.id,
+          user_id: user.id,
+        });
+      if (noteJoinErr) throw noteJoinErr;
     }
 
-    if (!actionTitle.trim()) {
-      Alert.alert('Error', 'Please enter an action title');
-      return;
-    }
+    // 3. Link Task → Goal (insert only, like TaskEventForm does)
+    await supabase
+      .from('0008-ap-universal-goals-join')
+      .insert([{
+        parent_id: parentTaskId,
+        parent_type: 'task',
+        goal_id: createdGoalId,
+        user_id: user.id,
+      }]);
 
-    if (selectedActionWeeks.length === 0) {
-      Alert.alert('Error', 'Please select at least one week');
-      return;
-    }
+    // 4. Reset form state
+    setActionTitle('');
+    setActionNotes('');
+    setShowActionForm(false);
 
-    setSubmittingAction(true);
-try {
-  const supabase = getSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('User not found');
-  if (!currentCycle?.id) throw new Error('No active cycle');
-
-  // 1) Create ONE parent Action (task)
-  // 1. Create the task (without description)
-const { data: parentTask, error: parentErr } = await supabase
-  .from('0008-ap-tasks')
-  .insert({
-    user_id: user.id,
-    user_cycle_id: currentCycle.id,
-    title: actionTitle.trim(),
-    type: 'task',
-    status: 'active',
-    is_twelve_week_goal: true,
-  })
-  .select('id')
-  .single();
-
-if (parentErr) throw parentErr;
-
-// 2. If there are notes, insert into notes + join
-if (actionNotes && actionNotes.trim()) {
-  const { data: newNote, error: noteErr } = await supabase
-    .from('0008-ap-notes')
-    .insert({
-      user_id: user.id,
-      content: actionNotes.trim(),
-    })
-    .select()
-    .single();
-  if (noteErr) throw noteErr;
-
-  const { error: noteJoinErr } = await supabase
-    .from('0008-ap-universal-notes-join')
-    .insert({
-      parent_id: parentTask.id,
-      parent_type: 'task',
-      note_id: newNote.id,
-      user_id: user.id,
-    });
-  if (noteJoinErr) throw noteJoinErr;
-}
-
-  if (parentErr) throw parentErr;
-  const parentTaskId = parentTask.id;
-
-  // 2) Link parent Action → Goal
-  const { error: linkGoalErr } = await supabase
-    .from('0008-ap-universal-goals-join')
-    .upsert(
-      [{ parent_id: parentTaskId, parent_type: 'task', goal_id: createdGoalId, user_id: user.id }],
-      { onConflict: 'parent_id,parent_type,goal_id' }
-    );
-  if (linkGoalErr) throw linkGoalErr;
-
-  // 3) Copy joins (roles/domains) from the Goal selection to the parent Action
-  if (formData.selectedRoleIds.length) {
-    const roleJoins = formData.selectedRoleIds.map(roleId => ({
-      parent_id: parentTaskId,
-      parent_type: 'task',
-      role_id,
-      user_id: user.id,
-    }));
-    const { error: roleErr } = await supabase
-      .from('0008-ap-universal-roles-join')
-      .upsert(roleJoins, { onConflict: 'parent_id,parent_type,role_id' });
-    if (roleErr) throw roleErr;
+  } catch (err) {
+    console.error('Error creating action:', err);
+    Alert.alert('Error', 'Could not create action.');
   }
+};
 
-  if (formData.selectedDomainIds.length) {
-    const domainJoins = formData.selectedDomainIds.map(domainId => ({
-      parent_id: parentTaskId,
-      parent_type: 'task',
-      domain_id,
-      user_id: user.id,
-    }));
-    const { error: domErr } = await supabase
-      .from('0008-ap-universal-domains-join')
-      .upsert(domainJoins, { onConflict: 'parent_id,parent_type,domain_id' });
-    if (domErr) throw domErr;
-  }
-
- // Copy Note joins from Goal to Action
-if (formData.selectedNoteIds.length) {
-  const noteJoins = formData.selectedNoteIds.map(noteId => ({
-    parent_id: parentTaskId,
-    parent_type: 'task',
-    note_id: noteId,
-    user_id: user.id,
-  }));
-
-  const { error: noteErr } = await supabase
-    .from('0008-ap-universal-notes-join')
-    .upsert(noteJoins, { onConflict: 'parent_id,parent_type,note_id' });
-
-  if (noteErr) throw noteErr;
-}
-
-  // Copy Key Relationships from Goal to Action
-  if (formData.selectedKeyRelationshipIds.length) {
-    const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
-      parent_id: parentTaskId,
-      parent_type: 'task',
-      key_relationship_id: krId,
-      user_id: user.id,
-    }));
-    const { error: krErr } = await supabase
-      .from('0008-ap-universal-key-relationships-join')
-      .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
-    if (krErr) throw krErr;
-  }
-  
-  // 4) Upsert week-plan for selected weeks with target_days from recurrence
-  const daysPerWeek =
-    recurrenceType === 'daily' ? 7 :
-    recurrenceType === '6days' ? 6 :
-    recurrenceType === '5days' ? 5 :
-    recurrenceType === '4days' ? 4 :
-    recurrenceType === '3days' ? 3 :
-    recurrenceType === '2days' ? 2 :
-    recurrenceType === '1day'  ? 1 : 0;
-
-  if (daysPerWeek <= 0) throw new Error('Invalid frequency');
-
-  const planRows = selectedActionWeeks.map(week_number => ({
-    task_id: parentTaskId,
-    user_cycle_id: currentCycle.id,
-    week_number,
-    target_days: daysPerWeek,
-  }));
-
-  const { error: planErr } = await supabase
-    .from('0008-ap-task-week-plan')
-    .upsert(planRows, { onConflict: 'task_id,user_cycle_id,week_number' });
-
-  if (planErr) throw planErr;
-
-  Alert.alert('Success', 'Created action and weekly plan!');
-  resetActionForm();
-  setActiveSubForm('none');
-
-} catch (error) {
-  console.error('Error creating actions:', error);
-  Alert.alert('Error', (error as Error).message || 'Failed to create actions');
-} finally {
-  setSubmittingAction(false);
-}
-
-  };
 
   const handleCreateIdea = async () => {
     if (!createdGoalId) {
