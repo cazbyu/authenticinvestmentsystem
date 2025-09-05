@@ -11,6 +11,24 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
+import { getSupabaseClient } from '@/lib/supabase';
+
+interface Role {
+  id: string;
+  label: string;
+  color?: string;
+}
+
+interface Domain {
+  id: string;
+  name: string;
+}
+
+interface KeyRelationship {
+  id: string;
+  name: string;
+  role_id: string;
+}
 
 interface TwelveWeekGoal {
   id: string;
@@ -33,8 +51,7 @@ interface ActionEffortModalProps {
   onClose: () => void;
   goal: TwelveWeekGoal | null;
   cycleWeeks: CycleWeek[];
-  createOrUpdateParentTask: (taskData: any) => Promise<any>;
-  upsertWeekPlans: (taskId: string, weekPlans: any[]) => Promise<void>;
+  createTaskWithWeekPlan: (taskData: any) => Promise<any>;
 }
 
 const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
@@ -42,32 +59,121 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
   onClose,
   goal,
   cycleWeeks,
-  createOrUpdateParentTask,
-  upsertWeekPlans,
+  createTaskWithWeekPlan,
 }) => {
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
   const [frequency, setFrequency] = useState(7); // Daily by default
-  const [additionalRoleIds, setAdditionalRoleIds] = useState('');
-  const [additionalDomainIds, setAdditionalDomainIds] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Multi-select states
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
+  const [selectedKeyRelationshipIds, setSelectedKeyRelationshipIds] = useState<string[]>([]);
+
+  // Data fetching states
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
+  const [allDomains, setAllDomains] = useState<Domain[]>([]);
+  const [allKeyRelationships, setAllKeyRelationships] = useState<KeyRelationship[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      // Reset form when modal opens
-      setTitle('');
-      setNotes('');
-      setSelectedWeeks([]);
-      setFrequency(7);
-      setAdditionalRoleIds('');
-      setAdditionalDomainIds('');
+      fetchData();
+      resetForm();
     }
-  }, [visible]);
+  }, [visible, goal]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch all roles
+      const { data: rolesData } = await supabase
+        .from('0008-ap-roles')
+        .select('id, label, color')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('label');
+
+      setAllRoles(rolesData || []);
+
+      // Fetch all domains
+      const { data: domainsData } = await supabase
+        .from('0008-ap-domains')
+        .select('id, name')
+        .order('name');
+
+      setAllDomains(domainsData || []);
+
+      // Fetch all key relationships
+      const { data: krData } = await supabase
+        .from('0008-ap-key-relationships')
+        .select('id, name, role_id')
+        .eq('user_id', user.id);
+
+      setAllKeyRelationships(krData || []);
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      Alert.alert('Error', 'Failed to load form data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setTitle('');
+    setNotes('');
+    setSelectedWeeks([]);
+    setFrequency(7);
+
+    // Pre-select inherited items from goal
+    if (goal) {
+      setSelectedRoleIds(goal.roles?.map(r => r.id) || []);
+      setSelectedDomainIds(goal.domains?.map(d => d.id) || []);
+      setSelectedKeyRelationshipIds(goal.keyRelationships?.map(kr => kr.id) || []);
+    } else {
+      setSelectedRoleIds([]);
+      setSelectedDomainIds([]);
+      setSelectedKeyRelationshipIds([]);
+    }
+  };
+
+  const handleMultiSelect = (field: 'roles' | 'domains' | 'keyRelationships', id: string) => {
+    let setter: React.Dispatch<React.SetStateAction<string[]>>;
+    let currentSelection: string[];
+
+    switch (field) {
+      case 'roles':
+        setter = setSelectedRoleIds;
+        currentSelection = selectedRoleIds;
+        break;
+      case 'domains':
+        setter = setSelectedDomainIds;
+        currentSelection = selectedDomainIds;
+        break;
+      case 'keyRelationships':
+        setter = setSelectedKeyRelationshipIds;
+        currentSelection = selectedKeyRelationshipIds;
+        break;
+      default:
+        return;
+    }
+
+    const newSelection = currentSelection.includes(id)
+      ? currentSelection.filter(itemId => itemId !== id)
+      : [...currentSelection, id];
+    setter(newSelection);
+  };
 
   const handleWeekToggle = (weekNumber: number) => {
     setSelectedWeeks(prev => 
-      prev.includes(weekNumber) 
+      prev.includes(weekNumber)
         ? prev.filter(w => w !== weekNumber)
         : [...prev, weekNumber]
     );
@@ -98,47 +204,21 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
 
     setSaving(true);
     try {
-      // Prepare inherited role and domain IDs from the goal
-      const inheritedRoleIds = goal?.roles?.map(r => r.id) || [];
-      const inheritedDomainIds = goal?.domains?.map(d => d.id) || [];
-
-      // Parse additional role and domain IDs
-      const addRoleIds = additionalRoleIds
-        .split(',')
-        .map(id => id.trim())
-        .filter(id => id.length > 0);
-      
-      const addDomainIds = additionalDomainIds
-        .split(',')
-        .map(id => id.trim())
-        .filter(id => id.length > 0);
-
-      // Create the parent task
+      // Create the task with week plan
       const taskData = {
         title: title.trim(),
         description: notes.trim() || undefined,
         goal_id: goal?.id,
-        inherited_role_ids: inheritedRoleIds,
-        inherited_domain_ids: inheritedDomainIds,
-        add_role_ids: addRoleIds,
-        add_domain_ids: addDomainIds,
+        selectedRoleIds,
+        selectedDomainIds,
+        selectedKeyRelationshipIds,
         selectedWeeks: selectedWeeks.map(weekNumber => ({
           weekNumber,
           targetDays: frequency,
         })),
       };
 
-      const result = await createOrUpdateParentTask(taskData);
-      
-      if (result?.id) {
-        // Create week plans
-        const weekPlans = selectedWeeks.map(weekNumber => ({
-          week_number: weekNumber,
-          target_days: frequency,
-        }));
-        
-        await upsertWeekPlans(result.id, weekPlans);
-      }
+      await createTaskWithWeekPlan(taskData);
 
       Alert.alert('Success', 'Action created successfully!');
       onClose();
@@ -163,6 +243,11 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
     }
   };
 
+  // Filter key relationships based on selected roles
+  const filteredKeyRelationships = allKeyRelationships.filter(kr =>
+    selectedRoleIds.includes(kr.role_id)
+  );
+
   if (!goal) return null;
 
   return (
@@ -175,142 +260,186 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content}>
-          <View style={styles.form}>
-            {/* Linked to Goal */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Linked to Goal</Text>
-              <View style={styles.goalInfo}>
-                <Text style={styles.goalTitle}>{goal.title}</Text>
-                <View style={styles.inheritedTags}>
-                  {goal.roles?.map(role => (
-                    <View key={role.id} style={[styles.tag, styles.roleTag, { backgroundColor: role.color || '#f3e8ff' }]}>
-                      <Text style={styles.tagText}>{role.label}</Text>
-                    </View>
-                  ))}
-                  {goal.domains?.map(domain => (
-                    <View key={domain.id} style={[styles.tag, styles.domainTag]}>
-                      <Text style={styles.tagText}>{domain.name}</Text>
-                    </View>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0078d4" />
+            <Text style={styles.loadingText}>Loading form data...</Text>
+          </View>
+        ) : (
+          <ScrollView style={styles.content}>
+            <View style={styles.form}>
+              {/* Linked to Goal */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Linked to Goal</Text>
+                <View style={styles.goalInfo}>
+                  <Text style={styles.goalTitle}>{goal.title}</Text>
+                </View>
+              </View>
+
+              {/* Title */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Title *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="e.g., Do 100 push-ups"
+                  placeholderTextColor="#9ca3af"
+                  maxLength={100}
+                />
+              </View>
+
+              {/* Weeks */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Weeks *</Text>
+                <View style={styles.weekSelector}>
+                  <TouchableOpacity
+                    style={[styles.weekButton, selectedWeeks.length === 12 && styles.weekButtonSelected]}
+                    onPress={handleSelectAll}
+                  >
+                    <Text style={[styles.weekButtonText, selectedWeeks.length === 12 && styles.weekButtonTextSelected]}>
+                      Select All
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(week => (
+                    <TouchableOpacity
+                      key={week}
+                      style={[styles.weekButton, selectedWeeks.includes(week) && styles.weekButtonSelected]}
+                      onPress={() => handleWeekToggle(week)}
+                    >
+                      <Text style={[styles.weekButtonText, selectedWeeks.includes(week) && styles.weekButtonTextSelected]}>
+                        Week {week}
+                      </Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
-            </View>
 
-            {/* Title */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Title</Text>
-              <TextInput
-                style={styles.input}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="e.g., Do 100 push-ups"
-                placeholderTextColor="#9ca3af"
-                maxLength={100}
-              />
-            </View>
+              {/* Frequency */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Frequency per week *</Text>
+                <View style={styles.frequencySelector}>
+                  {[7, 6, 5, 4, 3, 2, 1].map(freq => (
+                    <TouchableOpacity
+                      key={freq}
+                      style={[styles.frequencyButton, frequency === freq && styles.frequencyButtonSelected]}
+                      onPress={() => handleFrequencySelect(freq)}
+                    >
+                      <Text style={[styles.frequencyButtonText, frequency === freq && styles.frequencyButtonTextSelected]}>
+                        {getFrequencyLabel(freq)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
-            {/* Weeks */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Weeks</Text>
-              <View style={styles.weekSelector}>
-                <TouchableOpacity
-                  style={[styles.weekButton, selectedWeeks.length === 12 && styles.weekButtonSelected]}
-                  onPress={handleSelectAll}
-                >
-                  <Text style={[styles.weekButtonText, selectedWeeks.length === 12 && styles.weekButtonTextSelected]}>
-                    Select All
-                  </Text>
-                </TouchableOpacity>
-                
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(week => (
-                  <TouchableOpacity
-                    key={week}
-                    style={[styles.weekButton, selectedWeeks.includes(week) && styles.weekButtonSelected]}
-                    onPress={() => handleWeekToggle(week)}
-                  >
-                    <Text style={[styles.weekButtonText, selectedWeeks.includes(week) && styles.weekButtonTextSelected]}>
-                      Week {week}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              {/* Roles */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Roles</Text>
+                <View style={styles.checkboxGrid}>
+                  {allRoles.map(role => {
+                    const isSelected = selectedRoleIds.includes(role.id);
+                    const isInherited = goal.roles?.some(gr => gr.id === role.id);
+                    return (
+                      <TouchableOpacity
+                        key={role.id}
+                        style={styles.checkItem}
+                        onPress={() => handleMultiSelect('roles', role.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={[
+                          styles.checkLabel,
+                          isInherited && styles.inheritedLabel
+                        ]}>
+                          {role.label}
+                          {isInherited && ' (from goal)'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Domains */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Domains</Text>
+                <View style={styles.checkboxGrid}>
+                  {allDomains.map(domain => {
+                    const isSelected = selectedDomainIds.includes(domain.id);
+                    const isInherited = goal.domains?.some(gd => gd.id === domain.id);
+                    return (
+                      <TouchableOpacity
+                        key={domain.id}
+                        style={styles.checkItem}
+                        onPress={() => handleMultiSelect('domains', domain.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={[
+                          styles.checkLabel,
+                          isInherited && styles.inheritedLabel
+                        ]}>
+                          {domain.name}
+                          {isInherited && ' (from goal)'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Key Relationships (filtered by selected roles) */}
+              {filteredKeyRelationships.length > 0 && (
+                <View style={styles.field}>
+                  <Text style={styles.label}>Key Relationships</Text>
+                  <View style={styles.checkboxGrid}>
+                    {filteredKeyRelationships.map(kr => {
+                      const isSelected = selectedKeyRelationshipIds.includes(kr.id);
+                      const isInherited = goal.keyRelationships?.some(gkr => gkr.id === kr.id);
+                      return (
+                        <TouchableOpacity
+                          key={kr.id}
+                          style={styles.checkItem}
+                          onPress={() => handleMultiSelect('keyRelationships', kr.id)}
+                        >
+                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                          <Text style={[
+                            styles.checkLabel,
+                            isInherited && styles.inheritedLabel
+                          ]}>
+                            {kr.name}
+                            {isInherited && ' (from goal)'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Notes */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Notes (optional)</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Add details if useful"
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                />
               </View>
             </View>
-
-            {/* Frequency */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Frequency per week</Text>
-              <View style={styles.frequencySelector}>
-                {[7, 6, 5, 4, 3, 2, 1].map(freq => (
-                  <TouchableOpacity
-                    key={freq}
-                    style={[styles.frequencyButton, frequency === freq && styles.frequencyButtonSelected]}
-                    onPress={() => handleFrequencySelect(freq)}
-                  >
-                    <Text style={[styles.frequencyButtonText, frequency === freq && styles.frequencyButtonTextSelected]}>
-                      {getFrequencyLabel(freq)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Notes */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Notes (optional)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Add details if useful"
-                placeholderTextColor="#9ca3af"
-                multiline
-                numberOfLines={3}
-                maxLength={500}
-              />
-            </View>
-
-            {/* Roles */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Roles (goal defaults locked)</Text>
-              <Text style={styles.inheritedInfo}>
-                Inherited: {goal.roles?.length || 0}. You can add more below.
-              </Text>
-              {goal.roles && goal.roles.length > 0 && (
-                <Text style={styles.inheritedList}>
-                  {goal.roles.map(r => r.label).join(', ')}
-                </Text>
-              )}
-              <TextInput
-                style={styles.input}
-                value={additionalRoleIds}
-                onChangeText={setAdditionalRoleIds}
-                placeholder="Add role ids comma-separated"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-
-            {/* Domains */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Domains (goal defaults locked)</Text>
-              <Text style={styles.inheritedInfo}>
-                Inherited: {goal.domains?.length || 0}. You can add more below.
-              </Text>
-              {goal.domains && goal.domains.length > 0 && (
-                <Text style={styles.inheritedList}>
-                  {goal.domains.map(d => d.name).join(', ')}
-                </Text>
-              )}
-              <TextInput
-                style={styles.input}
-                value={additionalDomainIds}
-                onChangeText={setAdditionalDomainIds}
-                placeholder="Add domain ids comma-separated"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
 
         <View style={styles.actions}>
           <TouchableOpacity
@@ -360,6 +489,17 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#6b7280',
+  },
   content: {
     flex: 1,
   },
@@ -387,31 +527,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 8,
-  },
-  inheritedTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  tag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  roleTag: {
-    backgroundColor: '#fce7f3',
-    borderColor: '#f3e8ff',
-  },
-  domainTag: {
-    backgroundColor: '#fed7aa',
-    borderColor: '#fdba74',
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#374151',
   },
   input: {
     backgroundColor: '#ffffff',
@@ -477,16 +592,44 @@ const styles = StyleSheet.create({
   frequencyButtonTextSelected: {
     color: '#ffffff',
   },
-  inheritedInfo: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 4,
+  checkboxGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  inheritedList: {
+  checkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 8,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 3,
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkedBox: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  checkmark: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checkLabel: {
     fontSize: 14,
     color: '#374151',
-    fontStyle: 'italic',
-    marginBottom: 8,
+    flex: 1,
+  },
+  inheritedLabel: {
+    fontWeight: '600',
+    color: '#0078d4',
   },
   actions: {
     flexDirection: 'row',

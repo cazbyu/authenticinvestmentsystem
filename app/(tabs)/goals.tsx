@@ -39,8 +39,7 @@ export default function Goals() {
     refreshGoals,
     refreshAllData,
     createGoal,
-    createOrUpdateParentTask,
-    upsertWeekPlans,
+    createTaskWithWeekPlan,
     fetchGoalActionsForWeek,
     getCurrentWeekIndex,
     getWeekData,
@@ -479,8 +478,7 @@ export default function Goals() {
         }}
         goal={selectedGoalForAction}
         cycleWeeks={cycleWeeks}
-        createOrUpdateParentTask={createOrUpdateParentTask}
-        upsertWeekPlans={upsertWeekPlans}
+        createTaskWithWeekPlan={createTaskWithWeekPlan}
       />
     </SafeAreaView>
   );

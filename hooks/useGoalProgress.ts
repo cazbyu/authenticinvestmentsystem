@@ -887,10 +887,9 @@ if (logsError) throw logsError;
     title: string;
     description?: string;
     goal_id?: string;
-    inherited_role_ids?: string[];
-    inherited_domain_ids?: string[];
-    add_role_ids?: string[];
-    add_domain_ids?: string[];
+    selectedRoleIds?: string[];
+    selectedDomainIds?: string[];
+    selectedKeyRelationshipIds?: string[];
     selectedWeeks: Array<{ weekNumber: number; targetDays: number }>;
   }): Promise<any> => {
     try {
@@ -945,21 +944,9 @@ if (logsError) throw logsError;
         if (goalJoinError) throw goalJoinError;
       }
 
-      // Combine inherited and additional role IDs
-      const allRoleIds = [
-        ...(taskData.inherited_role_ids || []),
-        ...(taskData.add_role_ids || [])
-      ].filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
-
-      // Combine inherited and additional domain IDs
-      const allDomainIds = [
-        ...(taskData.inherited_domain_ids || []),
-        ...(taskData.add_domain_ids || [])
-      ].filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
-
       // Link roles to task
-      if (allRoleIds.length > 0) {
-        const roleJoins = allRoleIds.map(roleId => ({
+      if (taskData.selectedRoleIds && taskData.selectedRoleIds.length > 0) {
+        const roleJoins = taskData.selectedRoleIds.map(roleId => ({
           parent_id: insertedTask.id,
           parent_type: 'task',
           role_id: roleId,
@@ -974,8 +961,8 @@ if (logsError) throw logsError;
       }
 
       // Link domains to task
-      if (allDomainIds.length > 0) {
-        const domainJoins = allDomainIds.map(domainId => ({
+      if (taskData.selectedDomainIds && taskData.selectedDomainIds.length > 0) {
+        const domainJoins = taskData.selectedDomainIds.map(domainId => ({
           parent_id: insertedTask.id,
           parent_type: 'task',
           domain_id: domainId,
@@ -987,6 +974,22 @@ if (logsError) throw logsError;
           .insert(domainJoins);
 
         if (domainJoinError) throw domainJoinError;
+      }
+
+      // Link key relationships to task
+      if (taskData.selectedKeyRelationshipIds && taskData.selectedKeyRelationshipIds.length > 0) {
+        const krJoins = taskData.selectedKeyRelationshipIds.map(krId => ({
+          parent_id: insertedTask.id,
+          parent_type: 'task',
+          key_relationship_id: krId,
+          user_id: user.id,
+        }));
+
+        const { error: krJoinError } = await supabase
+          .from('0008-ap-universal-key-relationships-join')
+          .insert(krJoins);
+
+        if (krJoinError) throw krJoinError;
       }
 
       return { id: insertedTask.id };
