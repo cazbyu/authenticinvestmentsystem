@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
@@ -56,7 +56,7 @@ export default function Goals() {
     setSelectedWeekIndex(currentWeekIndex);
     initializedWeekRef.current = true; // initialize once
   }
-}, [cycleWeeks]); // ← remove getCurrentWeekIndex from deps
+}, [cycleWeeks]); // ← removed getCurrentWeekIndex from deps
 
     }
   }, [cycleWeeks, getCurrentWeekIndex]);
