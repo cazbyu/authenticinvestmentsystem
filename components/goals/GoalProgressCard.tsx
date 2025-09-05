@@ -272,11 +272,11 @@ export function GoalProgressCard({
                     <View key={action.id} style={styles.actionItem}>
                       <View style={styles.actionHeader}>
                         <Text style={styles.actionTitle} numberOfLines={1}>
-                          {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
+                          {action.title}
                         </Text>
                         {action.input_kind === 'count' && (
                           <Text style={styles.actionCount}>
-                            {action.weeklyActual}/{action.weeklyTarget}
+                            {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
                           </Text>
                         )}
                       </View>
