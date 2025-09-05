@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit } from 'lucide-react-native';
 import { TwelveWeekGoal, GoalProgress } from '@/hooks/useGoalProgress';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 interface WeekData {
   weekNumber: number;
@@ -70,7 +71,7 @@ export function GoalProgressCard({
 
   const generateWeekDays = (startDateString: string) => {
     const days = [];
-    const start = new Date(startDateString); // This is already the correct start of the week
+    const start = parseLocalDate(startDateString); // Use parseLocalDate to avoid timezone shifts
     
     console.log('=== GENERATE WEEK DAYS DEBUG ===');
     console.log('Input start date string:', startDateString);

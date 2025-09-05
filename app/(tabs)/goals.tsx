@@ -11,7 +11,7 @@ import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { formatDateRange } from '@/lib/dateUtils';
+import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
 export default function Goals() {
   const [authenticScore, setAuthenticScore] = useState(0);
@@ -155,8 +155,8 @@ export default function Goals() {
     const weekData = getWeekData(selectedWeekIndex);
     if (!weekData) return 'Week 1';
     
-    const startDate = new Date(weekData.startDate);
-    const endDate = new Date(weekData.endDate);
+    const startDate = parseLocalDate(weekData.startDate);
+    const endDate = parseLocalDate(weekData.endDate);
     
     const formatDate = (date: Date) => {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
