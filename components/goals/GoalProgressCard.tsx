@@ -13,7 +13,13 @@ interface TaskWithLogs {
   id: string;
   title: string;
   input_kind?: string;
-  logs: Array<{ log_date: string; completed: boolean }>;
+  logs: Array<{
+    measured_on: string;   // ✅ correct field
+    week_number: number;   // ✅ optional but available
+    day_of_week?: number;  // ✅ nullable in schema
+    value: number;         // ✅ numeric, default 1
+    completed: boolean;    // ✅ derive from value > 0
+  }>;
   weeklyActual: number;
   weeklyTarget: number;
 }
