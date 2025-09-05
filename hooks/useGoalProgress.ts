@@ -61,8 +61,10 @@ export interface TaskWeekPlan {
 export interface TaskLog {
   id: string;
   task_id: string;
-  log_date: string;
-  completed: boolean;
+  measured_on: string;  // ✅ correct field name
+  week_number: number;  // ✅ add this
+  day_of_week?: number; // ✅ optional, nullable in schema
+  value: number;        // ✅ add this, default = 1
   created_at: string;
 }
 
