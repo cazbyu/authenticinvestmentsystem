@@ -50,16 +50,14 @@ export default function Goals() {
   } = useGoalProgress();
 
   // Initialize selected week to current week
-  useEffect(() => {
+  // Initialize selected week to current week (run once when cycleWeeks arrive)
+useEffect(() => {
   if (!initializedWeekRef.current && cycleWeeks.length > 0) {
     const currentWeekIndex = getCurrentWeekIndex();
     setSelectedWeekIndex(currentWeekIndex);
-    initializedWeekRef.current = true; // initialize once
+    initializedWeekRef.current = true;
   }
-}, [cycleWeeks]); // ← removed getCurrentWeekIndex from deps
-
-    }
-  }, [cycleWeeks, getCurrentWeekIndex]);
+}, [cycleWeeks]);
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
