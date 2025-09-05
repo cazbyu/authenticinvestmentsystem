@@ -907,7 +907,7 @@ if (logsError) throw logsError;
           type: 'task',
           input_kind: 'count',
           unit: 'days',
-          status: 'active',
+          status: 'pending',
           is_twelve_week_goal: true,
         })
         .select()
