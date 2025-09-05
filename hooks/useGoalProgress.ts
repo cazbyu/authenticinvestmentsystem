@@ -689,9 +689,14 @@ const { data: overallLogs } = await overallQuery;
     try {
       console.log('=== fetchGoalActionsForWeek START ===');
       console.log('Input params:', { goalIds, weekStartDate, weekEndDate });
+      console.log('Current cycle weeks available:', cycleWeeks.length);
+      console.log('Current loading state at start:', loadingWeekActions);
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || goalIds.length === 0) return {};
+      if (!user || goalIds.length === 0) {
+        console.log('Early return: no user or no goalIds');
+        return {};
+      }
 
       // Fetch tasks linked to these goals
       const { data: goalJoins } = await supabase
@@ -716,7 +721,10 @@ const { data: overallLogs } = await overallQuery;
         .not('status', 'in', '(completed,cancelled)');
 
       if (tasksError) throw tasksError;
-      if (!tasksData || tasksData.length === 0) return {};
+      if (!tasksData || tasksData.length === 0) {
+        console.log('No tasks data found for goal IDs:', goalIds);
+        return {};
+      }
 
       console.log('Tasks data found:', tasksData.length, 'tasks');
       console.log('Tasks details:', tasksData.map(t => ({ id: t.id, title: t.title, user_cycle_id: t.user_cycle_id })));
@@ -736,11 +744,18 @@ const { data: overallLogs } = await overallQuery;
       console.log('Week plans data:', weekPlansData);
       console.log('Week plans count:', weekPlansData?.length || 0);
 
+      // Filter tasks to only include those with week plans for this week
+      const tasksWithWeekPlans = tasksData.filter(task => 
+        weekPlansData?.some(wp => wp.task_id === task.id)
+      );
+      console.log('Tasks with week plans for this week:', tasksWithWeekPlans.length);
+      console.log('Tasks with week plans details:', tasksWithWeekPlans.map(t => ({ id: t.id, title: t.title })));
+
       // Fetch completed occurrence tasks for this week's date range
       const { data: occurrenceData, error: occurrenceError } = await supabase
         .from('0008-ap-tasks')
         .select('*')
-        .in('parent_task_id', taskIds)
+        .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
         .eq('status', 'completed')
         .gte('due_date', weekStartDate)
         .lte('due_date', weekEndDate);
@@ -762,10 +777,13 @@ const { data: overallLogs } = await overallQuery;
       // Group tasks by goal_id and attach logs
       const groupedActions: Record<string, TaskWithLogs[]> = {};
       
-      for (const task of tasksData) {
+      for (const task of tasksWithWeekPlans) {
         // Find which goal this task belongs to
         const goalJoin = goalJoins?.find(gj => gj.parent_id === task.id);
-        if (!goalJoin) continue;
+        if (!goalJoin) {
+          console.log('No goal join found for task:', task.id, task.title);
+          continue;
+        }
 
         // Check if this task has a week plan for the current week
         const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id);
@@ -773,6 +791,9 @@ const { data: overallLogs } = await overallQuery;
           console.log('No week plan found for task:', task.id, task.title);
           continue; // Skip tasks not planned for this week
         }
+
+        console.log(`Processing task: ${task.title} (${task.id}) for goal: ${goalJoin.goal_id}`);
+        console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
         const goalId = goalJoin.goal_id;
         
@@ -797,12 +818,13 @@ const { data: overallLogs } = await overallQuery;
         const weeklyActual = taskLogs.length; // All are completed
         const weeklyTarget = weekPlan.target_days;
 
-        console.log(`Task ${task.title}: ${weeklyActual}/${weeklyTarget} completed (${weeklyTarget > 0 ? Math.round((weeklyActual / weeklyTarget) * 100) : 0}%)`);
+        const cappedWeeklyActual = Math.min(weeklyActual, weeklyTarget);
+        console.log(`Task ${task.title}: ${weeklyActual} actual, ${cappedWeeklyActual} capped, ${weeklyTarget} target (${weeklyTarget > 0 ? Math.round((cappedWeeklyActual / weeklyTarget) * 100) : 0}%)`);
 
         const taskWithLogs: TaskWithLogs = {
           ...task,
           logs: taskLogs,
-          weeklyActual,
+          weeklyActual: cappedWeeklyActual, // Store the capped value
           weeklyTarget,
         };
 

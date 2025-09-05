@@ -58,14 +58,22 @@ export default function Goals() {
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
+    console.log('=== FETCH WEEK ACTIONS USEEFFECT TRIGGERED ===');
     console.log('useEffect triggered for fetchWeekActions:', { 
       selectedWeekIndex, 
       goalsCount: twelveWeekGoals.length, 
       cycleWeeksCount: cycleWeeks.length 
     });
+    console.log('loadingWeekActions state:', loadingWeekActions);
+    console.log('Dependencies that triggered this effect:', {
+      selectedWeekIndex,
+      twelveWeekGoalsLength: twelveWeekGoals.length,
+      cycleWeeksLength: cycleWeeks.length
+    });
     if (twelveWeekGoals.length > 0 && cycleWeeks.length > 0) {
       fetchWeekActions();
     }
+    console.log('=== END FETCH WEEK ACTIONS USEEFFECT ===');
   }, [selectedWeekIndex, twelveWeekGoals, cycleWeeks]);
 
   const fetchWeekActions = async () => {
@@ -368,11 +376,14 @@ export default function Goals() {
               <View style={styles.weekNavigator}>
                 <View style={styles.weekNavContainer}>
                   <TouchableOpacity 
-                    style={[styles.weekNavButton, selectedWeekIndex === 0 && styles.weekNavButtonDisabled]}
+                    style={[
+                      styles.weekNavButton, 
+                      (selectedWeekIndex === 0 || loadingWeekActions) && styles.weekNavButtonDisabled
+                    ]}
                     onPress={goPrevWeek}
-                    disabled={selectedWeekIndex === 0}
+                    disabled={selectedWeekIndex === 0 || loadingWeekActions}
                   >
-                    <ChevronLeft size={16} color={selectedWeekIndex === 0 ? '#9ca3af' : '#0078d4'} />
+                    <ChevronLeft size={16} color={(selectedWeekIndex === 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
                   </TouchableOpacity>
                   
                   <View style={styles.weekDisplay}>
@@ -392,11 +403,14 @@ export default function Goals() {
                   </View>
                   
                   <TouchableOpacity 
-                    style={[styles.weekNavButton, selectedWeekIndex >= (cycleWeeks.length - 1) && styles.weekNavButtonDisabled]}
+                    style={[
+                      styles.weekNavButton, 
+                      (selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) && styles.weekNavButtonDisabled
+                    ]}
                     onPress={goNextWeek}
-                    disabled={selectedWeekIndex >= (cycleWeeks.length - 1)}
+                    disabled={selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions}
                   >
-                    <ChevronRight size={16} color={selectedWeekIndex >= (cycleWeeks.length - 1) ? '#9ca3af' : '#0078d4'} />
+                    <ChevronRight size={16} color={(selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
                   </TouchableOpacity>
                 </View>
               </View>
