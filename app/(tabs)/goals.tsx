@@ -70,23 +70,26 @@ export default function Goals() {
 
   const fetchWeekActions = async () => {
   try {
-    console.log('fetchWeekActions starting for week index:', selectedWeekIndex);
+    console.log('=== FETCH WEEK ACTIONS START ===');
+    console.log('Selected week index:', selectedWeekIndex);
+    console.log('Cycle weeks available:', cycleWeeks.length);
     setLoadingWeekActions(true);
     
     const weekData = getWeekData(selectedWeekIndex);
-    console.log('Week data for index', selectedWeekIndex, ':', weekData);
+    console.log('Week data calculated:', weekData);
     if (!weekData || twelveWeekGoals.length === 0) {
-      console.log('No week data or goals, clearing actions');
+      console.log('No week data or goals - clearing actions');
       setWeekGoalActions({});
       return;
     }
 
     const goalIds = twelveWeekGoals.map(g => g.id);
-    console.log('Fetching actions for goals:', goalIds);
+    console.log('Goal IDs to fetch actions for:', goalIds);
     const actions = await fetchGoalActionsForWeek(goalIds, weekData.startDate, weekData.endDate);
-    console.log('Received actions:', actions);
+    console.log('Actions received from fetchGoalActionsForWeek:', actions);
     setWeekGoalActions(actions);
-
+    console.log('setWeekGoalActions called with:', actions);
+    console.log('=== FETCH WEEK ACTIONS END ===');
 
   } catch (err: any) {
     // Ignore transient preview/network/auth refresh errors (status 0)
@@ -99,22 +102,31 @@ export default function Goals() {
 };
 
   const handleToggleToday = async (actionId: string, date: string, completed: boolean) => {
-    console.log('handleToggleToday called:', { actionId, date, completed });
+    console.log('=== HANDLE TOGGLE TODAY START ===');
+    console.log('Input params:', { actionId, date, completed });
+    console.log('Current cycle:', currentCycle?.id);
+    console.log('Selected week index:', selectedWeekIndex);
 
     try {
       if (completed) {
         // UNDO: delete the completed occurrence for this date
-        console.log('Undoing completion for:', actionId);
+        console.log('UNDO PATH: Calling undoActionOccurrence...');
         await undoActionOccurrence({ parentTaskId: actionId, whenISO: date });
+        console.log('UNDO PATH: undoActionOccurrence completed');
       } else {
         // COMPLETE: insert completed occurrence for this date (+ copy joins via RPCs)
-        console.log('Completing action for:', actionId);
+        console.log('COMPLETE PATH: Calling completeActionSuggestion...');
         await completeActionSuggestion({ parentTaskId: actionId, whenISO: date });
+        console.log('COMPLETE PATH: completeActionSuggestion completed');
       }
       
       // Refresh the week actions to show updated completion status
+      console.log('Refreshing data after toggle...');
       await fetchWeekActions();
+      console.log('fetchWeekActions completed');
       await refreshGoals();
+      console.log('refreshGoals completed');
+      console.log('=== HANDLE TOGGLE TODAY END ===');
     } catch (error) {
       console.error('Error toggling action completion:', error);
       Alert.alert('Error', 'Failed to update completion status');
