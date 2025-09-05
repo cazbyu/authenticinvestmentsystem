@@ -112,35 +112,101 @@ useEffect(() => {
   }
 };
 
-  const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
-    console.log('=== HANDLE TOGGLE COMPLETION START ===');
-    console.log('Input params:', { actionId, date, completed });
-    console.log('Current cycle:', currentCycle?.id);
-    console.log('Selected week index:', selectedWeekIndex);
+    const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
+    console.log('=== HANDLE TOGGLE COMPLETION START (optimistic) ===');
+    console.log('Params:', { actionId, date, completed });
 
+    // 1) Optimistic local update
+    let touchedGoalId: string | null = null;
+    let optimisticDidChange = false;
+
+    setWeekGoalActions(prev => {
+      const next: Record<string, any[]> = {};
+      for (const [goalId, actions] of Object.entries(prev)) {
+        const arr = [...actions];
+        const idx = arr.findIndex(a => a.id === actionId);
+        if (idx !== -1) {
+          touchedGoalId = goalId;
+
+          const action = arr[idx];
+          const logs = action.logs ?? [];
+          const hadLog = logs.some((l: any) => (l.measured_on ?? l.log_date) === date);
+          let nextLogs = logs;
+          let nextActual = action.weeklyActual ?? 0;
+
+          if (!completed && !hadLog) {
+            nextLogs = [...logs, { measured_on: date, completed: true }];
+            nextActual += 1;
+            optimisticDidChange = true;
+            console.log('[OPTIMISTIC] added log', { actionId, date });
+          } else if (completed && hadLog) {
+            nextLogs = logs.filter((l: any) => (l.measured_on ?? l.log_date) !== date);
+            nextActual = Math.max(0, nextActual - 1);
+            optimisticDidChange = true;
+            console.log('[OPTIMISTIC] removed log', { actionId, date });
+          }
+
+          arr[idx] = { ...action, logs: nextLogs, weeklyActual: nextActual };
+        }
+        next[goalId] = arr;
+      }
+      return next;
+    });
+
+    if (!touchedGoalId) {
+      console.warn('[TOGGLE] action not found in state');
+      return;
+    }
+
+    // 2) Server write in background
     try {
       if (completed) {
-        // UNDO: delete the completed occurrence for this date
-        console.log('UNDO PATH: Calling undoActionOccurrence...');
+        console.log('[SERVER] undoActionOccurrence...', { actionId, date });
         await undoActionOccurrence({ parentTaskId: actionId, whenISO: date });
-        console.log('UNDO PATH: undoActionOccurrence completed');
+        console.log('[SERVER] undoActionOccurrence done');
       } else {
-        // COMPLETE: insert completed occurrence for this date (+ copy joins via RPCs)
-        console.log('COMPLETE PATH: Calling completeActionSuggestion...');
+        console.log('[SERVER] completeActionSuggestion...', { actionId, date });
         await completeActionSuggestion({ parentTaskId: actionId, whenISO: date });
-        console.log('COMPLETE PATH: completeActionSuggestion completed');
+        console.log('[SERVER] completeActionSuggestion done');
       }
-      
-      // Refresh the week actions to show updated completion status
-      console.log('Refreshing data after toggle...');
-      await fetchWeekActions();
-      console.log('fetchWeekActions completed');
-      await refreshGoals();
-      console.log('refreshGoals completed');
-      console.log('=== HANDLE TOGGLE COMPLETION END ===');
+
+      console.log('=== HANDLE TOGGLE COMPLETION END (success) ===');
     } catch (error) {
-      console.error('Error toggling action completion:', error);
+      console.error('[SERVER] error:', error);
+
+      // 3) Revert optimistic change on failure
+      if (optimisticDidChange) {
+        console.log('[REVERT] reverting optimistic change...');
+        setWeekGoalActions(prev => {
+          const next: Record<string, any[]> = {};
+          for (const [goalId, actions] of Object.entries(prev)) {
+            const arr = [...actions];
+            const idx = arr.findIndex(a => a.id === actionId);
+            if (idx !== -1) {
+              const action = arr[idx];
+              const logs = action.logs ?? [];
+              const hadLog = logs.some((l: any) => (l.measured_on ?? l.log_date) === date);
+              let nextLogs = logs;
+              let nextActual = action.weeklyActual ?? 0;
+
+              if (!completed && hadLog) {
+                nextLogs = logs.filter((l: any) => (l.measured_on ?? l.log_date) !== date);
+                nextActual = Math.max(0, nextActual - 1);
+              } else if (completed && !hadLog) {
+                nextLogs = [...logs, { measured_on: date, completed: true }];
+                nextActual += 1;
+              }
+
+              arr[idx] = { ...action, logs: nextLogs, weeklyActual: nextActual };
+            }
+            next[goalId] = arr;
+          }
+          return next;
+        });
+      }
+
       Alert.alert('Error', 'Failed to update completion status');
+      console.log('=== HANDLE TOGGLE COMPLETION END (reverted) ===');
     }
   };
 
