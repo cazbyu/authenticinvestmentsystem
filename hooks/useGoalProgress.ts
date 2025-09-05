@@ -904,7 +904,6 @@ if (logsError) throw logsError;
           user_id: user.id,
           user_cycle_id: currentCycle.id,
           title: taskData.title,
-          description: taskData.description,
           type: 'task',
           input_kind: 'count',
           unit: 'days',
@@ -915,6 +914,33 @@ if (logsError) throw logsError;
         .single();
 
       if (taskError) throw taskError;
+
+      // Handle notes/description via the notes join table
+      if (taskData.description && taskData.description.trim()) {
+        // Insert the note into the notes table
+        const { data: insertedNote, error: noteError } = await supabase
+          .from('0008-ap-notes')
+          .insert({
+            user_id: user.id,
+            content: taskData.description.trim(),
+          })
+          .select()
+          .single();
+
+        if (noteError) throw noteError;
+
+        // Link the note to the task
+        const { error: noteJoinError } = await supabase
+          .from('0008-ap-universal-notes-join')
+          .insert({
+            parent_id: insertedTask.id,
+            parent_type: 'task',
+            note_id: insertedNote.id,
+            user_id: user.id,
+          });
+
+        if (noteJoinError) throw noteJoinError;
+      }
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
