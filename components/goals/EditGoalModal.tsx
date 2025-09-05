@@ -1,0 +1,617 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { X, Trash2 } from 'lucide-react-native';
+import { getSupabaseClient } from '@/lib/supabase';
+import { TwelveWeekGoal } from '@/hooks/useGoalProgress'; // Assuming this interface is available
+
+interface Role { id: string; label: string; color?: string; }
+interface Domain { id: string; name: string; }
+interface KeyRelationship { id: string; name: string; role_id: string; }
+interface Note { id: string; content: string; created_at: string; }
+
+interface EditGoalModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onUpdate: () => void; // Callback to refresh data in parent
+  goal: TwelveWeekGoal | null;
+}
+
+export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModalProps) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [noteText, setNoteText] = useState(''); // For adding new notes
+  
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
+  const [selectedKeyRelationshipIds, setSelectedKeyRelationshipIds] = useState<string[]>([]);
+  const [existingNoteIds, setExistingNoteIds] = useState<string[]>([]); // IDs of notes already linked to goal
+
+  const [allRoles, setAllRoles] = useState<Role[]>([]);
+  const [allDomains, setAllDomains] = useState<Domain[]>([]);
+  const [allKeyRelationships, setAllKeyRelationships] = useState<KeyRelationship[]>([]);
+  const [allNotes, setAllNotes] = useState<Note[]>([]); // All user notes, for selection
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible && goal) {
+      loadGoalData();
+      fetchOptions();
+    } else if (!visible) {
+      // Reset state when modal closes
+      setTitle('');
+      setDescription('');
+      setNoteText('');
+      setSelectedRoleIds([]);
+      setSelectedDomainIds([]);
+      setSelectedKeyRelationshipIds([]);
+      setExistingNoteIds([]);
+      setAllRoles([]);
+      setAllDomains([]);
+      setAllKeyRelationships([]);
+      setAllNotes([]);
+      setLoading(true);
+      setSaving(false);
+    }
+  }, [visible, goal]);
+
+  const loadGoalData = async () => {
+    if (!goal) return;
+    setTitle(goal.title);
+    setDescription(goal.description || '');
+    
+    // Load existing associations
+    setSelectedRoleIds(goal.roles?.map(r => r.id) || []);
+    setSelectedDomainIds(goal.domains?.map(d => d.id) || []);
+    setSelectedKeyRelationshipIds(goal.keyRelationships?.map(kr => kr.id) || []);
+    
+    // Fetch and set existing notes linked to this goal
+    try {
+      const supabase = getSupabaseClient();
+      const { data: notesJoinData, error: notesJoinError } = await supabase
+        .from('0008-ap-universal-notes-join')
+        .select('note_id')
+        .eq('parent_id', goal.id)
+        .eq('parent_type', 'goal');
+      
+      if (notesJoinError) throw notesJoinError;
+      setExistingNoteIds(notesJoinData?.map(nj => nj.note_id) || []);
+    } catch (error) {
+      console.error('Error loading existing notes for goal:', error);
+      Alert.alert('Error', 'Failed to load existing notes.');
+    }
+  };
+
+  const fetchOptions = async () => {
+    setLoading(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not found');
+
+      const [
+        { data: rolesData },
+        { data: domainsData },
+        { data: krData },
+        { data: notesData }
+      ] = await Promise.all([
+        supabase.from('0008-ap-roles').select('id, label, color').eq('user_id', user.id).eq('is_active', true),
+        supabase.from('0008-ap-domains').select('id, name'),
+        supabase.from('0008-ap-key-relationships').select('id, name, role_id').eq('user_id', user.id),
+        supabase.from('0008-ap-notes').select('id, content, created_at').eq('user_id', user.id).order('created_at', { ascending: false })
+      ]);
+
+      setAllRoles(rolesData || []);
+      setAllDomains(domainsData || []);
+      setAllKeyRelationships(krData || []);
+      setAllNotes(notesData || []);
+    } catch (error) {
+      console.error('Error fetching options:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to load options.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMultiSelect = (field: 'roles' | 'domains' | 'keyRelationships' | 'notes', id: string) => {
+    let setter: React.Dispatch<React.SetStateAction<string[]>>;
+    let currentSelection: string[];
+
+    switch (field) {
+      case 'roles': setter = setSelectedRoleIds; currentSelection = selectedRoleIds; break;
+      case 'domains': setter = setSelectedDomainIds; currentSelection = selectedDomainIds; break;
+      case 'keyRelationships': setter = setSelectedKeyRelationshipIds; currentSelection = selectedKeyRelationshipIds; break;
+      case 'notes': setter = setExistingNoteIds; currentSelection = existingNoteIds; break;
+      default: return;
+    }
+
+    const newSelection = currentSelection.includes(id)
+      ? currentSelection.filter(itemId => itemId !== id)
+      : [...currentSelection, id];
+    setter(newSelection);
+  };
+
+  const handleSave = async () => {
+    if (!goal || !title.trim()) {
+      Alert.alert('Error', 'Goal title cannot be empty.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not found');
+
+      // 1. Update main goal data
+      const { error: goalUpdateError } = await supabase
+        .from('0008-ap-goals-12wk')
+        .update({
+          title: title.trim(),
+          description: description.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', goal.id);
+
+      if (goalUpdateError) throw goalUpdateError;
+
+      // 2. Handle Joins (Roles, Domains, Key Relationships)
+      const updateJoins = async (
+        tableName: string, 
+        parentIdField: string, 
+        childIdField: string, 
+        currentLinkedIds: string[], 
+        newLinkedIds: string[]
+      ) => {
+        const toAdd = newLinkedIds.filter(id => !currentLinkedIds.includes(id));
+        const toRemove = currentLinkedIds.filter(id => !newLinkedIds.includes(id));
+
+        if (toRemove.length > 0) {
+          const { error } = await supabase
+            .from(tableName)
+            .delete()
+            .eq(parentIdField, goal.id)
+            .in(childIdField, toRemove);
+          if (error) throw error;
+        }
+
+        if (toAdd.length > 0) {
+          const inserts = toAdd.map(id => ({
+            parent_id: goal.id,
+            parent_type: 'goal',
+            [childIdField]: id,
+            user_id: user.id,
+          }));
+          const { error } = await supabase
+            .from(tableName)
+            .insert(inserts);
+          if (error) throw error;
+        }
+      };
+
+      // Fetch current joins for comparison
+      const [{ data: currentRolesJoins }, { data: currentDomainsJoins }, { data: currentKRsJoins }] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('role_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
+        supabase.from('0008-ap-universal-domains-join').select('domain_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
+        supabase.from('0008-ap-universal-key-relationships-join').select('key_relationship_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
+      ]);
+
+      const currentRoleIds = currentRolesJoins?.map(j => j.role_id) || [];
+      const currentDomainIds = currentDomainsJoins?.map(j => j.domain_id) || [];
+      const currentKRIds = currentKRsJoins?.map(j => j.key_relationship_id) || [];
+
+      await Promise.all([
+        updateJoins('0008-ap-universal-roles-join', 'parent_id', 'role_id', currentRoleIds, selectedRoleIds),
+        updateJoins('0008-ap-universal-domains-join', 'parent_id', 'domain_id', currentDomainIds, selectedDomainIds),
+        updateJoins('0008-ap-universal-key-relationships-join', 'parent_id', 'key_relationship_id', currentKRIds, selectedKeyRelationshipIds),
+      ]);
+
+      // 3. Handle Notes
+      // Add new note if noteText is provided
+      if (noteText.trim()) {
+        const { data: newNote, error: newNoteError } = await supabase
+          .from('0008-ap-notes')
+          .insert({ user_id: user.id, content: noteText.trim() })
+          .select('id')
+          .single();
+        if (newNoteError) throw newNoteError;
+
+        const { error: noteJoinError } = await supabase
+          .from('0008-ap-universal-notes-join')
+          .insert({ parent_id: goal.id, parent_type: 'goal', note_id: newNote.id, user_id: user.id });
+        if (noteJoinError) throw noteJoinError;
+      }
+
+      // Handle removal/addition of existing notes linked to the goal
+      const [{ data: currentGoalNotesJoins }] = await Promise.all([
+        supabase.from('0008-ap-universal-notes-join').select('note_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
+      ]);
+      const currentGoalNoteIds = currentGoalNotesJoins?.map(j => j.note_id) || [];
+      await updateJoins('0008-ap-universal-notes-join', 'parent_id', 'note_id', currentGoalNoteIds, existingNoteIds);
+
+
+      Alert.alert('Success', 'Goal updated successfully!');
+      onUpdate();
+      onClose();
+    } catch (error) {
+      console.error('Error saving goal:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to save goal.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!goal) return;
+
+    Alert.alert(
+      'Delete Goal',
+      `Are you sure you want to delete "${goal.title}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const supabase = getSupabaseClient();
+              const { error } = await supabase
+                .from('0008-ap-goals-12wk')
+                .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+                .eq('id', goal.id);
+
+              if (error) throw error;
+
+              Alert.alert('Success', 'Goal deleted successfully!');
+              onUpdate();
+              onClose();
+            } catch (error) {
+              console.error('Error deleting goal:', error);
+              Alert.alert('Error', (error as Error).message || 'Failed to delete goal.');
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const filteredKeyRelationships = allKeyRelationships.filter(kr =>
+    selectedRoleIds.includes(kr.role_id)
+  );
+
+  if (!goal) return null;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Edit 12-Week Goal</Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <X size={24} color="#1f2937" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.content}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#0078d4" />
+              <Text style={styles.loadingText}>Loading data...</Text>
+            </View>
+          ) : (
+            <View style={styles.form}>
+              {/* Goal Title */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Goal Title *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="Enter goal title"
+                  placeholderTextColor="#9ca3af"
+                  maxLength={100}
+                />
+              </View>
+
+              {/* Goal Description */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="Describe your goal and why it matters..."
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                />
+              </View>
+
+              {/* Wellness Domains */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Wellness Domains</Text>
+                <View style={styles.checkboxGrid}>
+                  {allDomains.map(domain => {
+                    const isSelected = selectedDomainIds.includes(domain.id);
+                    return (
+                      <TouchableOpacity
+                        key={domain.id}
+                        style={styles.checkItem}
+                        onPress={() => handleMultiSelect('domains', domain.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkLabel}>{domain.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Active Roles */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Active Roles</Text>
+                <View style={styles.checkboxGrid}>
+                  {allRoles.map(role => {
+                    const isSelected = selectedRoleIds.includes(role.id);
+                    return (
+                      <TouchableOpacity
+                        key={role.id}
+                        style={styles.checkItem}
+                        onPress={() => handleMultiSelect('roles', role.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkLabel}>{role.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Key Relationships (filtered by selected Roles) */}
+              {filteredKeyRelationships.length > 0 && (
+                <View style={styles.field}>
+                  <Text style={styles.label}>Key Relationships</Text>
+                  <View style={styles.checkboxGrid}>
+                    {filteredKeyRelationships.map(kr => {
+                      const isSelected = selectedKeyRelationshipIds.includes(kr.id);
+                      return (
+                        <TouchableOpacity
+                          key={kr.id}
+                          style={styles.checkItem}
+                          onPress={() => handleMultiSelect('keyRelationships', kr.id)}
+                        >
+                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                          <Text style={styles.checkLabel}>{kr.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+              
+              {/* Existing Notes */}
+              {allNotes.length > 0 && (
+                <View style={styles.field}>
+                  <Text style={styles.label}>Existing Notes</Text>
+                  <View style={styles.checkboxGrid}>
+                    {allNotes.map(note => {
+                      const isSelected = existingNoteIds.includes(note.id);
+                      return (
+                        <TouchableOpacity
+                          key={note.id}
+                          style={styles.checkItem}
+                          onPress={() => handleMultiSelect('notes', note.id)}
+                        >
+                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                          <Text style={styles.checkLabel} numberOfLines={1}>{note.content}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Add New Note */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Add New Note</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={noteText}
+                  onChangeText={setNoteText}
+                  placeholder="Write a new note for this goal..."
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                />
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={styles.actions}>
+          <TouchableOpacity 
+            style={styles.deleteButton}
+            onPress={handleDelete}
+            disabled={saving}
+          >
+            <Trash2 size={16} color="#ffffff" />
+            <Text style={styles.deleteButtonText}>Delete Goal</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.saveButton, (!title.trim() || saving) && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={!title.trim() || saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  content: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  form: {
+    padding: 16,
+  },
+  field: {
+    marginBottom: 24,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  checkboxGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  checkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 8,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 3,
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkedBox: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  checkmark: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checkLabel: {
+    fontSize: 14,
+    color: '#374151',
+    flex: 1,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  deleteButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: '#0078d4',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
