@@ -887,6 +887,10 @@ if (logsError) throw logsError;
     title: string;
     description?: string;
     goal_id?: string;
+    inherited_role_ids?: string[];
+    inherited_domain_ids?: string[];
+    add_role_ids?: string[];
+    add_domain_ids?: string[];
     selectedWeeks: Array<{ weekNumber: number; targetDays: number }>;
   }): Promise<any> => {
     try {
@@ -911,6 +915,7 @@ if (logsError) throw logsError;
         .select()
         .single();
 
+      if (taskError) throw taskError;
 
       // Create week plans
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
@@ -938,6 +943,50 @@ if (logsError) throw logsError;
           });
 
         if (goalJoinError) throw goalJoinError;
+      }
+
+      // Combine inherited and additional role IDs
+      const allRoleIds = [
+        ...(taskData.inherited_role_ids || []),
+        ...(taskData.add_role_ids || [])
+      ].filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
+
+      // Combine inherited and additional domain IDs
+      const allDomainIds = [
+        ...(taskData.inherited_domain_ids || []),
+        ...(taskData.add_domain_ids || [])
+      ].filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
+
+      // Link roles to task
+      if (allRoleIds.length > 0) {
+        const roleJoins = allRoleIds.map(roleId => ({
+          parent_id: insertedTask.id,
+          parent_type: 'task',
+          role_id: roleId,
+          user_id: user.id,
+        }));
+
+        const { error: roleJoinError } = await supabase
+          .from('0008-ap-universal-roles-join')
+          .insert(roleJoins);
+
+        if (roleJoinError) throw roleJoinError;
+      }
+
+      // Link domains to task
+      if (allDomainIds.length > 0) {
+        const domainJoins = allDomainIds.map(domainId => ({
+          parent_id: insertedTask.id,
+          parent_type: 'task',
+          domain_id: domainId,
+          user_id: user.id,
+        }));
+
+        const { error: domainJoinError } = await supabase
+          .from('0008-ap-universal-domains-join')
+          .insert(domainJoins);
+
+        if (domainJoinError) throw domainJoinError;
       }
 
       return { id: insertedTask.id };
