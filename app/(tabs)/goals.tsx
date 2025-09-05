@@ -132,7 +132,7 @@ export default function Goals() {
 
   const goNextWeek = () => {
     setSelectedWeekIndex(prev => {
-      const newIndex = Math.min(11, prev + 1);
+      const newIndex = Math.min(cycleWeeks.length - 1, prev + 1);
       console.log('goNextWeek: changing from', prev, 'to', newIndex);
       return newIndex;
     });
@@ -381,11 +381,11 @@ export default function Goals() {
                   </View>
                   
                   <TouchableOpacity 
-                    style={[styles.weekNavButton, selectedWeekIndex === 11 && styles.weekNavButtonDisabled]}
+                    style={[styles.weekNavButton, selectedWeekIndex >= (cycleWeeks.length - 1) && styles.weekNavButtonDisabled]}
                     onPress={goNextWeek}
-                    disabled={selectedWeekIndex === 11}
+                    disabled={selectedWeekIndex >= (cycleWeeks.length - 1)}
                   >
-                    <ChevronRight size={16} color={selectedWeekIndex === 11 ? '#9ca3af' : '#0078d4'} />
+                    <ChevronRight size={16} color={selectedWeekIndex >= (cycleWeeks.length - 1) ? '#9ca3af' : '#0078d4'} />
                   </TouchableOpacity>
                 </View>
               </View>
