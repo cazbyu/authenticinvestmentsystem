@@ -267,9 +267,20 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             setSaving(true);
             try {
               const supabase = getSupabaseClient();
+              
+              // Delete all related join table entries first
+              await Promise.all([
+                supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+                supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+                supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+                supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
+                supabase.from('0008-ap-universal-goals-join').delete().eq('goal_id', goal.id)
+              ]);
+              
+              // Now delete the goal itself
               const { error } = await supabase
                 .from('0008-ap-goals-12wk')
-                .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+                .delete()
                 .eq('id', goal.id);
 
               if (error) throw error;
