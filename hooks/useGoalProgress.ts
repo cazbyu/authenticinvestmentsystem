@@ -165,6 +165,15 @@ const hydrated = data
     }
   : null;
 
+console.log('=== FETCH USER CYCLE DEBUG ===');
+console.log('Raw cycle data:', data);
+console.log('Hydrated cycle:', hydrated);
+console.log('Start date:', effectiveStart);
+console.log('End date:', effectiveEnd);
+console.log('Week start day:', hydrated?.week_start_day);
+console.log('Current client time:', new Date().toISOString());
+console.log('Current client date (local):', formatLocalDate(new Date()));
+console.log('=== END FETCH USER CYCLE DEBUG ===');
 setCurrentCycle(hydrated as any);
 return hydrated;
 
@@ -199,6 +208,9 @@ return hydrated;
             end_date: week.end_date,
             user_cycle_id: userCycleId,
           }));
+          console.log('=== CLIENT-SIDE WEEKS FALLBACK ===');
+          console.log('Generated weeks:', clientWeeks);
+          console.log('=== END CLIENT-SIDE WEEKS FALLBACK ===');
           setCycleWeeks(clientWeeks);
           return clientWeeks;
         }
@@ -206,6 +218,14 @@ return hydrated;
         return [];
       }
 
+      console.log('=== FETCH CYCLE WEEKS DEBUG ===');
+      console.log('Database weeks data:', dbWeeks);
+      if (dbWeeks && dbWeeks.length > 0) {
+        console.log('Week 1:', dbWeeks[0]);
+        console.log('Week 10:', dbWeeks[9]);
+        console.log('Week 12:', dbWeeks[11]);
+      }
+      console.log('=== END FETCH CYCLE WEEKS DEBUG ===');
       // Validate that Week 1 aligns with the cycle's stored anchor
       if (dbWeeks && dbWeeks.length > 0 && currentCycle) {
         const week1 = dbWeeks[0];
@@ -213,6 +233,12 @@ return hydrated;
           currentCycle.start_date!, 
           currentCycle.week_start_day || 'monday'
         )[0];
+        
+        console.log('=== WEEK ALIGNMENT CHECK ===');
+        console.log('DB Week 1 start:', week1.start_date);
+        console.log('Expected Week 1 start:', expectedWeek1Start.start_date);
+        console.log('Alignment match:', week1.start_date === expectedWeek1Start.start_date);
+        console.log('=== END WEEK ALIGNMENT CHECK ===');
         
         if (week1.start_date !== expectedWeek1Start.start_date) {
           console.warn('Week alignment mismatch, using client-side calculation');
@@ -518,10 +544,24 @@ const { data: overallLogs } = await overallQuery;
     const now = new Date();
     const currentDateString = formatLocalDate(now);
     
+    console.log('=== GET CURRENT WEEK NUMBER DEBUG ===');
+    console.log('Current date (client):', now.toISOString());
+    console.log('Current date string (local):', currentDateString);
+    console.log('Available cycle weeks:', cycleWeeks.length);
+    console.log('Cycle weeks data:', cycleWeeks.map(w => ({ 
+      week: w.week_number, 
+      start: w.start_date, 
+      end: w.end_date 
+    })));
+    
     // Find which week we're currently in
     const currentWeekData = cycleWeeks.find(week => 
       currentDateString >= week.start_date && currentDateString <= week.end_date
     );
+    
+    console.log('Found current week data:', currentWeekData);
+    console.log('Returning week number:', currentWeekData?.week_number || 1);
+    console.log('=== END GET CURRENT WEEK NUMBER DEBUG ===');
     
     return currentWeekData?.week_number || 1;
   };

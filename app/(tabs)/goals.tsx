@@ -101,8 +101,8 @@ export default function Goals() {
   }
 };
 
-  const handleToggleToday = async (actionId: string, date: string, completed: boolean) => {
-    console.log('=== HANDLE TOGGLE TODAY START ===');
+  const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
+    console.log('=== HANDLE TOGGLE COMPLETION START ===');
     console.log('Input params:', { actionId, date, completed });
     console.log('Current cycle:', currentCycle?.id);
     console.log('Selected week index:', selectedWeekIndex);
@@ -126,7 +126,7 @@ export default function Goals() {
       console.log('fetchWeekActions completed');
       await refreshGoals();
       console.log('refreshGoals completed');
-      console.log('=== HANDLE TOGGLE TODAY END ===');
+      console.log('=== HANDLE TOGGLE COMPLETION END ===');
     } catch (error) {
       console.error('Error toggling action completion:', error);
       Alert.alert('Error', 'Failed to update completion status');
@@ -442,7 +442,7 @@ export default function Goals() {
                         setSelectedGoalForAction(goal);
                         setIsActionEffortModalVisible(true);
                       }}
-          onToggleToday={handleToggleToday}   // <-- add this prop
+          onToggleCompletion={handleToggleCompletion}
           onEdit={() => {
                         setSelectedGoalToEdit(goal);
                         setEditGoalModalVisible(true);

@@ -31,7 +31,7 @@ interface GoalProgressCardProps {
   weekActions?: TaskWithLogs[];
   loadingWeekActions?: boolean;
   onAddAction?: () => void; // Renamed from onAddTask
-  onToggleToday?: (actionId: string, date: string, completed: boolean) => Promise<void>;
+  onToggleCompletion?: (actionId: string, date: string, completed: boolean) => Promise<void>;
   onEdit?: () => void; // New onEdit prop
   onPress?: () => void;
   compact?: boolean;
@@ -44,7 +44,7 @@ export function GoalProgressCard({
   weekActions = [],
   loadingWeekActions = false,
   onAddAction,
-  onToggleToday,  // <-- add this
+  onToggleCompletion,
   onEdit, // New prop
   onPress, 
   compact = false 
@@ -68,27 +68,29 @@ export function GoalProgressCard({
   const primaryRole = goal.roles?.[0]; // Used for card color
   const cardColor = primaryRole?.color || '#0078d4';
 
-  const generateWeekDays = (startDate: string, endDate: string, weekStartDay: 'sunday' | 'monday' = 'sunday') => {
+  const generateWeekDays = (startDateString: string) => {
     const days = [];
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = new Date(startDateString); // This is already the correct start of the week
     
-    // Generate 7 days starting from Sunday (0) to Saturday (6)
+    console.log('=== GENERATE WEEK DAYS DEBUG ===');
+    console.log('Input start date string:', startDateString);
+    console.log('Parsed start date:', start.toISOString());
+    console.log('Start day of week:', start.getDay()); // 0=Sunday, 1=Monday, etc.
+    
+    // Generate 7 consecutive days starting from the provided start date
     for (let i = 0; i < 7; i++) {
       const day = new Date(start);
-      // Calculate the Sunday of this week
-      const dayOfWeek = start.getDay();
-      const daysFromSunday = dayOfWeek; // Sunday = 0, Monday = 1, etc.
-      day.setDate(start.getDate() - daysFromSunday + i);
+      day.setDate(start.getDate() + i); // Add i days to get each day of the week
 
-      if (day <= end) {
-        days.push({
-          date: day.toISOString().split('T')[0],
-          dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()],
-          dayOfWeek: day.getDay(),
-        });
-      }
+      days.push({
+        date: day.toISOString().split('T')[0],
+        dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()],
+        dayOfWeek: day.getDay(),
+      });
     }
+    
+    console.log('Generated days:', days);
+    console.log('=== END GENERATE WEEK DAYS DEBUG ===');
     
     return days;
   };
@@ -258,7 +260,7 @@ export function GoalProgressCard({
               <View style={styles.actionsList}>
                 {/* Day labels above circles */}
                 <View style={styles.dayLabelsRow}>
-                  {generateWeekDays(week.startDate, week.endDate, 'sunday').map(day => (
+                  {generateWeekDays(week.startDate).map(day => (
                     <Text key={day.date} style={styles.dayLabelText}>
                       {day.dayName}
                     </Text>
@@ -266,7 +268,7 @@ export function GoalProgressCard({
                 </View>
 
                 {weekActions.map(action => {
-                  const weekDays = generateWeekDays(week.startDate, week.endDate, 'sunday');
+                  const weekDays = generateWeekDays(week.startDate);
 
                   return (
                     <View key={action.id} style={styles.actionItem}>
@@ -293,20 +295,20 @@ export function GoalProgressCard({
                              <TouchableOpacity
                                key={day.date}
                                style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
-                               onPress={onToggleToday ? async () => {
+                               onPress={onToggleCompletion ? async () => {
                                  console.log('=== DAY DOT CLICKED ===');
                                  console.log('Action ID:', action.id);
                                  console.log('Date:', day.date);
                                  console.log('Current hasLog status:', hasLog);
                                  console.log('Action logs:', action.logs);
                                  try {
-                                   await onToggleToday(action.id, day.date, hasLog);
-                                   console.log('onToggleToday completed successfully');
+                                   await onToggleCompletion(action.id, day.date, hasLog);
+                                   console.log('onToggleCompletion completed successfully');
                                  } catch (error) {
-                                   console.error('Error toggling today:', error);
+                                   console.error('Error toggling completion:', error);
                                  }
                                } : undefined}
-                               activeOpacity={onToggleToday ? 0.7 : 1}
+                               activeOpacity={onToggleCompletion ? 0.7 : 1}
                              >
                                {hasLog && <Check size={12} color="#ffffff" />}
                              </TouchableOpacity>
