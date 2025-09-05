@@ -295,18 +295,13 @@ export function GoalProgressCard({
                              <TouchableOpacity
                                key={day.date}
                                style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
-                               onPress={onToggleCompletion ? async () => {
+                               onPress={onToggleCompletion ? () => {
                                  console.log('=== DAY DOT CLICKED ===');
                                  console.log('Action ID:', action.id);
                                  console.log('Date:', day.date);
                                  console.log('Current hasLog status:', hasLog);
                                  console.log('Action logs:', action.logs);
-                                 try {
-                                   await onToggleCompletion(action.id, day.date, hasLog);
-                                   console.log('onToggleCompletion completed successfully');
-                                 } catch (error) {
-                                   console.error('Error toggling completion:', error);
-                                 }
+                                 onToggleCompletion(action.id, day.date, hasLog);
                                } : undefined}
                                activeOpacity={onToggleCompletion ? 0.7 : 1}
                              >

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Check, FileText, Paperclip, Users } from 'lucide-react-native';
-import Svg, { Circle } from 'react-native-svg';
 
 // Interface for a Task
 export interface Task {
@@ -44,11 +43,6 @@ interface TaskCardProps {
 export const TaskCard = React.forwardRef<View, TaskCardProps>(
   ({ task, onComplete, onLongPress, onDoublePress, isDragging }, ref) => {
     const [lastTap, setLastTap] = useState(0);
-    const [isCompleting, setIsCompleting] = useState(false);
-    const celebrationAnim = React.useRef(new Animated.Value(0)).current;
-    const pointsAnim = React.useRef(new Animated.Value(0)).current;
-    const circleAnim = React.useRef(new Animated.Value(0)).current;
-    const checkmarkScale = React.useRef(new Animated.Value(1)).current;
 
   // Determines the border color based on task priority
   const getBorderColor = () => {
@@ -103,66 +97,10 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
     }
   };
 
-  // Triggers celebration animation on task completion
-  const triggerCelebration = () => {
-    // Reset all animations
-    celebrationAnim.setValue(0);
-    pointsAnim.setValue(0);
-    
-    // Enhanced celebration with larger explosion effect (2x size)
-    Animated.parallel([
-      Animated.timing(celebrationAnim, { 
-        toValue: 1, 
-        duration: 1500, 
-        useNativeDriver: true 
-      }),
-      Animated.sequence([
-        Animated.timing(pointsAnim, { 
-          toValue: 1, 
-          duration: 750, 
-          useNativeDriver: true 
-        }),
-        Animated.timing(pointsAnim, { 
-          toValue: 0, 
-          duration: 750, 
-          useNativeDriver: true 
-        }),
-      ]),
-    ]).start();
-  };
 
   // Handles the completion of a task
   const handleComplete = () => {
-    if (isCompleting) return; // Prevent double-tap
-    
-    setIsCompleting(true);
-    
-    // Reset animations
-    circleAnim.setValue(0);
-    checkmarkScale.setValue(1);
-    
-    // Animate the circular outline (countdown ring)
-    Animated.sequence([
-      // Scale up checkmark slightly when pressed
-      Animated.timing(checkmarkScale, {
-        toValue: 1.1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      // Animate the circle outline
-      Animated.timing(circleAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: false, // Can't use native driver for SVG animations
-      }),
-    ]).start(() => {
-      // After circle completes, trigger celebration and complete task
-      triggerCelebration();
-      setTimeout(() => {
-        onComplete(task.id);
-        setIsCompleting(false);
-      }, 1500); // Match celebration duration
-    });
+    onComplete(task.id);
   };
 
   const points = calculatePoints();
@@ -253,62 +191,12 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
           <View style={styles.taskActions}>
             <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
               <View style={styles.checkmarkContainer}>
-                <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
-                  <Check size={20} color="#16a34a" strokeWidth={3} />
-                </Animated.View>
-                
-                {/* Animated circular outline */}
-                {isCompleting && (
-                  <Svg 
-                    style={styles.circleOverlay} 
-                    width="32" 
-                    height="32" 
-                    viewBox="0 0 32 32"
-                  >
-                    <Circle
-                      cx="16"
-                      cy="16"
-                      r="14"
-                      stroke="#16a34a"
-                      strokeWidth="3"
-                      fill="none"
-                      strokeDasharray="87.96" // 2 * π * 14 ≈ 87.96
-                      strokeDashoffset={circleAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [87.96, 0], // Start fully hidden, end fully visible
-                      })}
-                      strokeLinecap="round"
-                      transform="rotate(-90 16 16)" // Start from top
-                    />
-                  </Svg>
-                )}
+                <Check size={20} color="#16a34a" strokeWidth={3} />
               </View>
             </TouchableOpacity>
             <Text style={styles.scoreText}>+{points}</Text>
           </View>
         </View>
-        <Animated.View style={[styles.pointsAnimation, { opacity: pointsAnim, transform: [{ translateY: pointsAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -50] }) }] }]} pointerEvents="none"><Text style={styles.pointsAnimationText}>+{points}</Text></Animated.View>
-        
-        {/* Enhanced celebration overlay with 2x larger effect */}
-        <Animated.View 
-          style={[
-            styles.celebrationOverlay,
-            {
-              opacity: celebrationAnim,
-              transform: [
-                {
-                  scale: celebrationAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0.8, 1.4, 1.0], // 2x larger peak scale
-                  })
-                }
-              ]
-            }
-          ]}
-          pointerEvents="none"
-        >
-          <Text style={styles.celebrationText}>🎉✨🎊</Text>
-        </Animated.View>
     </TouchableOpacity>
   );
   });
@@ -448,37 +336,6 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         position: 'relative',
         justifyContent: 'center',
         alignItems: 'center',
-      },
-      circleOverlay: {
-        position: 'absolute',
-        top: -6,
-        left: -6,
-      },
-      celebrationOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: 8,
-      },
-      celebrationText: {
-        fontSize: 32,
-      },
-      pointsAnimation: {
-        position: 'absolute',
-        top: '50%',
-        right: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-      },
-      pointsAnimationText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#16a34a',
       },
       draggingItem: {
         opacity: 0.8,

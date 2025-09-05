@@ -24,16 +24,24 @@ export function parseLocalDate(dateString: string): Date {
  * Gets the start of the week for a given date and week start preference
  */
 export function getWeekStart(date: Date, weekStartDay: 'sunday' | 'monday' = 'sunday'): Date {
+  console.log('=== GET WEEK START DEBUG ===');
+  console.log('Input date:', date.toISOString());
+  console.log('Week start day preference:', weekStartDay);
   const d = new Date(date);
   const currentDay = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  console.log('Current day of week (0=Sun, 6=Sat):', currentDay);
   const targetDay = weekStartDay === 'sunday' ? 0 : 1;
+  console.log('Target day of week:', targetDay);
   
   let daysToSubtract = currentDay - targetDay;
   if (daysToSubtract < 0) {
     daysToSubtract += 7;
   }
+  console.log('Days to subtract:', daysToSubtract);
   
   d.setDate(d.getDate() - daysToSubtract);
+  console.log('Calculated week start:', d.toISOString());
+  console.log('=== END GET WEEK START DEBUG ===');
   return d;
 }
 

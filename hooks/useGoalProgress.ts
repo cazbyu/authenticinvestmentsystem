@@ -173,6 +173,9 @@ console.log('End date:', effectiveEnd);
 console.log('Week start day:', hydrated?.week_start_day);
 console.log('Current client time:', new Date().toISOString());
 console.log('Current client date (local):', formatLocalDate(new Date()));
+console.log('Client timezone offset (minutes):', new Date().getTimezoneOffset());
+console.log('Client timezone name:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+console.log('Hydrated cycle full object:', JSON.stringify(hydrated, null, 2));
 console.log('=== END FETCH USER CYCLE DEBUG ===');
 setCurrentCycle(hydrated as any);
 return hydrated;
@@ -222,8 +225,14 @@ return hydrated;
       console.log('Database weeks data:', dbWeeks);
       if (dbWeeks && dbWeeks.length > 0) {
         console.log('Week 1:', dbWeeks[0]);
+        console.log('Week 2:', dbWeeks[1]);
         console.log('Week 10:', dbWeeks[9]);
         console.log('Week 12:', dbWeeks[11]);
+        console.log('All weeks summary:', dbWeeks.map(w => ({
+          week: w.week_number,
+          start: w.start_date,
+          end: w.end_date
+        })));
       }
       console.log('=== END FETCH CYCLE WEEKS DEBUG ===');
       // Validate that Week 1 aligns with the cycle's stored anchor
@@ -547,6 +556,14 @@ const { data: overallLogs } = await overallQuery;
     console.log('=== GET CURRENT WEEK NUMBER DEBUG ===');
     console.log('Current date (client):', now.toISOString());
     console.log('Current date string (local):', currentDateString);
+    console.log('Client day of week (0=Sun, 6=Sat):', now.getDay());
+    console.log('Client date parts:', {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      date: now.getDate(),
+      hours: now.getHours(),
+      minutes: now.getMinutes()
+    });
     console.log('Available cycle weeks:', cycleWeeks.length);
     console.log('Cycle weeks data:', cycleWeeks.map(w => ({ 
       week: w.week_number, 
