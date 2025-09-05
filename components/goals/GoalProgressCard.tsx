@@ -225,9 +225,6 @@ export function GoalProgressCard({
         {week && (
           <View style={styles.weekActionsSection}>
             <View style={styles.weekActionsHeader}>
-              <Text style={styles.weekActionsTitle}>
-                Week {week.weekNumber} Actions
-              </Text>
               {onAddAction && (
                 <TouchableOpacity
                   style={[styles.addActionButton, { borderColor: cardColor }]}
@@ -275,7 +272,7 @@ export function GoalProgressCard({
                     <View key={action.id} style={styles.actionItem}>
                       <View style={styles.actionHeader}>
                         <Text style={styles.actionTitle} numberOfLines={1}>
-                          {action.title}
+                          {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
                         </Text>
                         {action.input_kind === 'count' && (
                           <Text style={styles.actionCount}>
@@ -527,14 +524,9 @@ const styles = StyleSheet.create({
   },
   weekActionsHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: 8,
-  },
-  weekActionsTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
   },
   addActionButton: {
     flexDirection: 'row',

@@ -527,7 +527,7 @@ if (currentCycle?.end_date) {
 const { data: overallLogs } = await overallQuery;
 
         overallActual = overallLogs?.length || 0;
-        const overallProgress = goal.total_target > 0 ? Math.round((overallActual / goal.total_target) * 100) : 0;
+        const overallProgress = goal.total_target > 0 ? Math.round((Math.min(overallActual, goal.total_target) / goal.total_target) * 100) : 0;
 
         progressData[goal.id] = {
           goalId: goal.id,
@@ -535,7 +535,7 @@ const { data: overallLogs } = await overallQuery;
           daysRemaining,
           weeklyActual,
           weeklyTarget: goal.weekly_target,
-          overallActual,
+          overallActual: Math.min(overallActual, goal.total_target),
           overallTarget: goal.total_target,
           overallProgress,
         };
