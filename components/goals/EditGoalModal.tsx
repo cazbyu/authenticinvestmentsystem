@@ -268,6 +268,44 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             try {
               const supabase = getSupabaseClient();
               
+              // First, delete any tasks linked to this goal
+              const { data: goalTaskJoins } = await supabase
+                .from('0008-ap-universal-goals-join')
+                .select('parent_id')
+                .eq('goal_id', goal.id)
+                .eq('parent_type', 'task');
+
+              const taskIds = goalTaskJoins?.map(gtj => gtj.parent_id) || [];
+              
+              if (taskIds.length > 0) {
+                // Delete task week plans first
+                await supabase
+                  .from('0008-ap-task-week-plan')
+                  .delete()
+                  .in('task_id', taskIds);
+
+                // Delete task logs
+                await supabase
+                  .from('0008-ap-task-log')
+                  .delete()
+                  .in('task_id', taskIds);
+
+                // Delete all join table entries for these tasks
+                await Promise.all([
+                  supabase.from('0008-ap-universal-roles-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+                  supabase.from('0008-ap-universal-domains-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+                  supabase.from('0008-ap-universal-key-relationships-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+                  supabase.from('0008-ap-universal-notes-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
+                  supabase.from('0008-ap-universal-goals-join').delete().in('parent_id', taskIds).eq('parent_type', 'task')
+                ]);
+
+                // Finally delete the tasks themselves
+                await supabase
+                  .from('0008-ap-tasks')
+                  .delete()
+                  .in('id', taskIds);
+              }
+              
               // Delete all related join table entries first
               await Promise.all([
                 supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
