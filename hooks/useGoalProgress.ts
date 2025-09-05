@@ -669,8 +669,8 @@ const { data: overallLogs } = await overallQuery;
         .from('0008-ap-task-log')
         .select('*')
         .in('task_id', taskIds)
-        .gte('log_date', weekStartDate)
-        .lte('log_date', weekEndDate);
+        .gte('measured_on', weekStartDate)
+        .lte('measured_on', weekEndDate);
 
       if (logsError) throw logsError;
 
