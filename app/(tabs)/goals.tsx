@@ -383,8 +383,8 @@ export default function Goals() {
                       {(() => {
                         const weekData = getWeekData(selectedWeekIndex);
                         if (!weekData) return '';
-                        const startDate = new Date(weekData.startDate);
-                        const endDate = new Date(weekData.endDate);
+                        const startDate = parseLocalDate(weekData.startDate);
+                        const endDate = parseLocalDate(weekData.endDate);
                         const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                         return `${formatDate(startDate)} – ${formatDate(endDate)}`;
                       })()}
