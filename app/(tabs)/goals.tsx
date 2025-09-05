@@ -8,6 +8,8 @@ import { useGoalProgress } from '@/hooks/useGoalProgress';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
+import { EditGoalModal } from '@/components/goals/EditGoalModal';
+import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { formatDateRange } from '@/lib/dateUtils';
 
@@ -17,6 +19,10 @@ export default function Goals() {
   const [editingTask, setEditingTask] = useState<any>(null);
   const [cycleSetupVisible, setCycleSetupVisible] = useState(false);
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
+  const [editGoalModalVisible, setEditGoalModalVisible] = useState(false);
+  const [selectedGoalToEdit, setSelectedGoalToEdit] = useState<any>(null);
+  const [isActionEffortModalVisible, setIsActionEffortModalVisible] = useState(false);
+  const [selectedGoalForAction, setSelectedGoalForAction] = useState<any>(null);
   const [editingCycle, setEditingCycle] = useState<any>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
@@ -33,6 +39,8 @@ export default function Goals() {
     refreshGoals,
     refreshAllData,
     createGoal,
+    createOrUpdateParentTask,
+    upsertWeekPlans,
     fetchGoalActionsForWeek,
     getCurrentWeekIndex,
     getWeekData,
@@ -227,6 +235,13 @@ export default function Goals() {
     setCreateGoalModalVisible(false);
     refreshAllData();
   };
+
+  const handleEditGoalSuccess = () => {
+    setEditGoalModalVisible(false);
+    setSelectedGoalToEdit(null);
+    refreshAllData();
+  };
+
   const formatCycleDateRange = () => {
     if (!currentCycle?.start_date || !currentCycle?.end_date) return '';
     return formatDateRange(currentCycle.start_date, currentCycle.end_date);
@@ -378,30 +393,14 @@ export default function Goals() {
           weekActions={goalActions}
           loadingWeekActions={loadingWeekActions}
           onAddAction={() => {
-         const weekData = getWeekData(selectedWeekIndex);
-            setEditingTask({
-  title: '',
-  type: 'task',
-  // make it visibly a 12-week action
-  is_twelve_week_goal: true,
-
-  // 👇 TaskEventForm reads these:
-  goal_12wk_id: goal.id,
-  goals: [{ id: goal.id, title: goal.title }],
-
-  // 👇 pass objects with id keys (not arrays of ids)
-  roles: (goal.roles || []).map(r => ({ id: r.id, label: r.label })),
-  domains: (goal.domains || []).map(d => ({ id: d.id, name: d.name })),
-  keyRelationships: (goal.keyRelationships || []).map(kr => ({ id: kr.id, name: kr.name })),
-
-  // optional sensible defaults the form already supports
-  is_all_day: true,
-  due_date: new Date().toISOString().slice(0,10), // will be shown; user can adjust
-});
-
-            setTaskFormVisible(true);
-          }}
+                        setSelectedGoalForAction(goal);
+                        setIsActionEffortModalVisible(true);
+                      }}
           onToggleToday={handleToggleToday}   // <-- add this prop
+          onEdit={() => {
+                        setSelectedGoalToEdit(goal);
+                        setEditGoalModalVisible(true);
+                      }}
         />
       );
     })}
@@ -460,6 +459,28 @@ export default function Goals() {
         onClose={() => setCreateGoalModalVisible(false)}
         onSubmitSuccess={handleCreateGoalSuccess}
         createGoal={createGoal}
+      />
+
+      {/* Edit Goal Modal */}
+      <EditGoalModal
+        visible={editGoalModalVisible}
+        onClose={() => setEditGoalModalVisible(false)}
+        onUpdate={handleEditGoalSuccess}
+        goal={selectedGoalToEdit}
+      />
+
+      {/* Action Effort Modal */}
+      <ActionEffortModal
+        visible={isActionEffortModalVisible}
+        onClose={() => {
+          setIsActionEffortModalVisible(false);
+          setSelectedGoalForAction(null);
+          refreshAllData();
+        }}
+        goal={selectedGoalForAction}
+        cycleWeeks={cycleWeeks}
+        createOrUpdateParentTask={createOrUpdateParentTask}
+        upsertWeekPlans={upsertWeekPlans}
       />
     </SafeAreaView>
   );

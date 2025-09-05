@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { Target, Calendar, Plus, TrendingUp, Check } from 'lucide-react-native';
+import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit } from 'lucide-react-native';
 import { TwelveWeekGoal, GoalProgress } from '@/hooks/useGoalProgress';
 
 interface WeekData {
@@ -26,6 +26,7 @@ interface GoalProgressCardProps {
   loadingWeekActions?: boolean;
   onAddAction?: () => void; // Renamed from onAddTask
   onToggleToday?: (actionId: string, completed: boolean) => Promise<void>;
+  onEdit?: () => void; // New onEdit prop
   onPress?: () => void;
   compact?: boolean;
 }
@@ -38,6 +39,7 @@ export function GoalProgressCard({
   loadingWeekActions = false,
   onAddAction,
   onToggleToday,  // <-- add this
+  onEdit, // New prop
   onPress, 
   compact = false 
 }: GoalProgressCardProps) {
@@ -163,6 +165,12 @@ export function GoalProgressCard({
               </Text>
             </View>
           </View>
+          
+          {onEdit && (
+            <TouchableOpacity style={styles.editButton} onPress={onEdit}>
+              <Edit size={16} color="#6b7280" />
+            </TouchableOpacity>
+          )}
           
           {/* Removed the large "Task" button as per new requirements */}
           {/* onAddTask && (
@@ -638,5 +646,10 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f8fafc',
   },
 });
