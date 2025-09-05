@@ -12,8 +12,8 @@ type Props = {
   goal: {
     id: string;
     title: string;
-    default_role_ids?: string[];
-    default_domain_ids?: string[];
+    roles?: Array<{ id: string; label: string; color?: string }>;
+    domains?: Array<{ id: string; name: string }>;
     user_cycle_id: string;
     user_cycle_week_start_day?: 'sunday' | 'monday';
   } | null;
@@ -24,8 +24,10 @@ type Props = {
     goal_id: string;
     title: string;
     notes?: string;
-    add_role_ids?: string[];      // additional roles (goal defaults are implicit & locked)
-    add_domain_ids?: string[];    // additional domains
+    inherited_role_ids?: string[];   // roles from the goal
+    inherited_domain_ids?: string[]; // domains from the goal
+    add_role_ids?: string[];         // additional roles
+    add_domain_ids?: string[];       // additional domains
   }) => Promise<{ task_id: string }>;
 
   upsertWeekPlans: (input: {
@@ -101,10 +103,16 @@ export default function ActionEffortModal({
       return;
     }
 
+    // Get inherited role and domain IDs from the goal
+    const inheritedRoleIds = goal?.roles?.map(r => r.id) || [];
+    const inheritedDomainIds = goal?.domains?.map(d => d.id) || [];
+
     const { task_id } = await createOrUpdateParentTask({
       goal_id: goal.id,
       title: title.trim(),
       notes: notes?.trim() || undefined,
+      inherited_role_ids: inheritedRoleIds,
+      inherited_domain_ids: inheritedDomainIds,
       add_role_ids: addRoleIds,
       add_domain_ids: addDomainIds,
     });
@@ -142,9 +150,42 @@ export default function ActionEffortModal({
             {/* Weeks */}
             <Text style={{ fontWeight: '600', marginBottom: 4 }}>Weeks</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
-              <TouchableOpacity onPress={allSelected ? clearAll : selectAll} style={{ paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: '#ddd', borderRadius: 999, marginRight: 8, marginBottom: 8 }}>
-                <Text>{allSelected ? 'Clear All' : 'Select All'}</Text>
-              </TouchableOpacity>
+              {/* Display inherited roles */}
+              {goal?.roles?.map(role => (
+                <View key={role.id} style={{ paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#fce7f3', borderRadius: 12, marginRight: 6, marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, color: '#374151' }}>{role.label}</Text>
+                </View>
+              ))}
+              {/* Display inherited domains */}
+              {goal?.domains?.map(domain => (
+                <View key={domain.id} style={{ paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#fed7aa', borderRadius: 12, marginRight: 6, marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, color: '#374151' }}>{domain.name}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Roles section */}
+            <Text style={{ fontWeight: '600', marginBottom: 4 }}>Roles (goal defaults locked)</Text>
+            <Text style={{ color: '#666', marginBottom: 6 }}>
+              Inherited: {goal?.roles?.length || 0} ({goal?.roles?.map(r => r.label).join(', ') || 'None'}). You can add more below.
+            </Text>
+            <TextInput 
+              placeholder="Add additional role IDs (comma-separated)" 
+              value={addRoleIds.join(',')} 
+              onChangeText={(t) => setAddRoleIds(t.split(',').map(x => x.trim()).filter(Boolean))} 
+              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10, marginBottom: 12 }} 
+            />
+
+            <Text style={{ fontWeight: '600', marginBottom: 4 }}>Domains (goal defaults locked)</Text>
+            <Text style={{ color: '#666', marginBottom: 6 }}>
+              Inherited: {goal?.domains?.length || 0} ({goal?.domains?.map(d => d.name).join(', ') || 'None'}). You can add more below.
+            </Text>
+            <TextInput 
+              placeholder="Add additional domain IDs (comma-separated)" 
+              value={addDomainIds.join(',')} 
+              onChangeText={(t) => setAddDomainIds(t.split(',').map(x => x.trim()).filter(Boolean))} 
+              style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10, marginBottom: 12 }} 
+            />
               {cycleWeeks.map(w => (
                 <TouchableOpacity
                   key={w.week_number}
