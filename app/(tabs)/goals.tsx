@@ -51,9 +51,13 @@ export default function Goals() {
 
   // Initialize selected week to current week
   useEffect(() => {
-    if (cycleWeeks.length > 0) {
-      const currentWeekIndex = getCurrentWeekIndex();
-      setSelectedWeekIndex(currentWeekIndex);
+  if (!initializedWeekRef.current && cycleWeeks.length > 0) {
+    const currentWeekIndex = getCurrentWeekIndex();
+    setSelectedWeekIndex(currentWeekIndex);
+    initializedWeekRef.current = true; // initialize once
+  }
+}, [cycleWeeks]); // ← remove getCurrentWeekIndex from deps
+
     }
   }, [cycleWeeks, getCurrentWeekIndex]);
 
