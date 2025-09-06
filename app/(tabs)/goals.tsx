@@ -388,7 +388,7 @@ useEffect(() => {
   };
 
   const getProgressColor = (percentage: number) => {
-    if (percentage >= 80) return '#16a34a';
+    if (percentage >= 85) return '#16a34a';
     if (percentage >= 60) return '#eab308';
     return '#dc2626';
   };
@@ -495,7 +495,7 @@ useEffect(() => {
                     styles.cycleEffortText,
                     { color: getProgressColor(cycleEffortData.overallPercentage) }
                   ]}>
-                    {cycleEffortData.overallPercentage}/100%
+                    {cycleEffortData.overallPercentage}%
                   </Text>
                 </View>
               </View>

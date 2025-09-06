@@ -550,7 +550,7 @@ const { data: overallLogs } = await overallQuery;
       setGoalProgress(progressData);
 
       // Calculate overall cycle effort data
-      const totalActual = Object.values(progressData).reduce((sum, p) => sum + p.overallActual, 0);
+      const totalActual = Object.values(progressData).reduce((sum, p) => sum + Math.min(p.overallActual, p.overallTarget), 0);
       const totalTarget = Object.values(progressData).reduce((sum, p) => sum + p.overallTarget, 0);
       const overallPercentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
       

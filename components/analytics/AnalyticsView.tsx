@@ -454,8 +454,8 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
   }, [scope, dateRange, filter]);
 
   const getScoreColor = (score: number) => {
-    if (score >= 70) return '#16a34a'; // Green
-    if (score >= 40) return '#eab308'; // Yellow
+    if (score >= 85) return '#16a34a'; // Green
+    if (score >= 60) return '#eab308'; // Yellow
     return '#dc2626'; // Red
   };
 
