@@ -1163,7 +1163,7 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
           .insert({
             parent_id: insertedTask.id,
             parent_type: 'task',
-            goal_id: taskData.goal_id,
+            twelve_wk_goal_id: taskData.twelve_wk_goal_id,
             user_id: user.id,
           });
 
