@@ -25,6 +25,8 @@ export default function Goals() {
   const [selectedGoalForAction, setSelectedGoalForAction] = useState<any>(null);
   const [editingCycle, setEditingCycle] = useState<any>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
+  const [selectedGoalFilterId, setSelectedGoalFilterId] = useState<string | null>(null);
+  const [showGoalDropdown, setShowGoalDropdown] = useState(false);
   const initializedWeekRef = useRef(false);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
 
@@ -392,6 +394,22 @@ useEffect(() => {
     if (percentage >= 60) return '#eab308';
     return '#dc2626';
   };
+
+  const getFilteredGoals = () => {
+    if (selectedGoalFilterId) {
+      return twelveWeekGoals.filter(goal => goal.id === selectedGoalFilterId);
+    }
+    return twelveWeekGoals;
+  };
+
+  const getSelectedGoalTitle = () => {
+    if (selectedGoalFilterId) {
+      const selectedGoal = twelveWeekGoals.find(goal => goal.id === selectedGoalFilterId);
+      return selectedGoal?.title || 'Selected Goal';
+    }
+    return 'All Goals';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Header 
@@ -501,16 +519,36 @@ useEffect(() => {
               </View>
             )}
 
+            {/* Goal Filter Dropdown */}
+            {twelveWeekGoals.length > 1 && (
+              <View style={styles.goalFilterContainer}>
+                <TouchableOpacity
+                  style={styles.goalFilterButton}
+                  onPress={() => setShowGoalDropdown(true)}
+                >
+                  <Text style={styles.goalFilterButtonText}>
+                    {getSelectedGoalTitle()}
+                  </Text>
+                  <ChevronDown size={16} color="#0078d4" />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Goals List */}
             {goalsLoading ? (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
   </View>
-) : twelveWeekGoals.length === 0 ? (
+) : getFilteredGoals().length === 0 ? (
     <View style={styles.emptyContainer}>
-    <Text style={styles.emptyTitle}>No 12-Week Goals Yet</Text>
+    <Text style={styles.emptyTitle}>
+      {twelveWeekGoals.length === 0 ? 'No 12-Week Goals Yet' : 'No Goals Match Filter'}
+    </Text>
     <Text style={styles.emptyText}>
-      Create your first 12-week goal to start tracking this cycle.
+      {twelveWeekGoals.length === 0 
+        ? 'Create your first 12-week goal to start tracking this cycle.'
+        : 'Try selecting a different goal or view all goals.'
+      }
     </Text>
 
     <TouchableOpacity
@@ -523,7 +561,7 @@ useEffect(() => {
   </View>
 ) : (
   <View style={styles.goalsList}>
-    {twelveWeekGoals.map(goal => {
+    {getFilteredGoals().map(goal => {
       const progress = goalProgress[goal.id];
       const weekData = getWeekData(selectedWeekIndex);
       const goalActions = weekGoalActions[goal.id] || [];
@@ -627,6 +665,73 @@ useEffect(() => {
         cycleWeeks={cycleWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
       />
+
+      {/* Goal Filter Modal */}
+      <Modal visible={showGoalDropdown} transparent animationType="fade">
+        <View style={styles.goalDropdownOverlay}>
+          <View style={styles.goalDropdownContent}>
+            <View style={styles.goalDropdownHeader}>
+              <Text style={styles.goalDropdownTitle}>Filter by Goal</Text>
+              <TouchableOpacity onPress={() => setShowGoalDropdown(false)}>
+                <X size={20} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.goalDropdownList}>
+              {/* Show All Goals Option */}
+              <TouchableOpacity
+                style={[
+                  styles.goalDropdownItem,
+                  selectedGoalFilterId === null && styles.selectedGoalDropdownItem
+                ]}
+                onPress={() => {
+                  setSelectedGoalFilterId(null);
+                  setShowGoalDropdown(false);
+                }}
+              >
+                <Text style={[
+                  styles.goalDropdownItemText,
+                  selectedGoalFilterId === null && styles.selectedGoalDropdownItemText
+                ]}>
+                  Show All Goals
+                </Text>
+                {selectedGoalFilterId === null && (
+                  <View style={styles.selectedIndicator}>
+                    <Text style={styles.selectedIndicatorText}>✓</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              
+              {/* Individual Goals */}
+              {twelveWeekGoals.map(goal => (
+                <TouchableOpacity
+                  key={goal.id}
+                  style={[
+                    styles.goalDropdownItem,
+                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItem
+                  ]}
+                  onPress={() => {
+                    setSelectedGoalFilterId(goal.id);
+                    setShowGoalDropdown(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.goalDropdownItemText,
+                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItemText
+                  ]} numberOfLines={2}>
+                    {goal.title}
+                  </Text>
+                  {selectedGoalFilterId === goal.id && (
+                    <View style={styles.selectedIndicator}>
+                      <Text style={styles.selectedIndicatorText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -736,6 +841,30 @@ const styles = StyleSheet.create({
   cycleEffortText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  goalFilterContainer: {
+    marginTop: 12,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  goalFilterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    minWidth: 150,
+    justifyContent: 'center',
+  },
+  goalFilterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0078d4',
+    textAlign: 'center',
   },
   weekNavButton: {
     padding: 6,
@@ -872,5 +1001,74 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  goalDropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  goalDropdownContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    minWidth: 300,
+    maxWidth: 400,
+    maxHeight: 500,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  goalDropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  goalDropdownTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  goalDropdownList: {
+    maxHeight: 400,
+  },
+  goalDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  selectedGoalDropdownItem: {
+    backgroundColor: '#f0f9ff',
+  },
+  goalDropdownItemText: {
+    fontSize: 14,
+    color: '#374151',
+    flex: 1,
+    marginRight: 8,
+  },
+  selectedGoalDropdownItemText: {
+    color: '#0078d4',
+    fontWeight: '600',
+  },
+  selectedIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#0078d4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedIndicatorText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
