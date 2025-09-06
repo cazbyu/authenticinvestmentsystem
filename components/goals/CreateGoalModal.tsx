@@ -10,9 +10,10 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { X, Target, Calendar, Users, Plus, FileText, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { X, Target, Calendar, Users, Plus, FileText, ChevronDown, ChevronUp, Clock } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
+import { Calendar as RNCalendar } from 'react-native-calendars';
 
 interface Role {
   id: string;
@@ -35,11 +36,17 @@ interface CreateGoalModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmitSuccess: () => void;
-  createGoal: (goalData: {
+  createTwelveWeekGoal: (goalData: {
     title: string;
     description?: string;
     weekly_target?: number;
     total_target?: number;
+  }) => Promise<any>;
+  createCustomGoal: (goalData: {
+    title: string;
+    description?: string;
+    start_date: string;
+    end_date: string;
   }) => Promise<any>;
 }
 
@@ -57,17 +64,25 @@ export function CreateGoalModal({
   visible, 
   onClose, 
   onSubmitSuccess, 
-  createGoal 
+  createTwelveWeekGoal,
+  createCustomGoal
 }: CreateGoalModalProps) {
+  const [goalType, setGoalType] = useState<'12week' | 'custom'>('12week');
   const [formData, setFormData] = useState({
   title: '',
   description: '',
+  startDate: formatLocalDate(new Date()),
+  endDate: formatLocalDate(new Date(Date.now() + 84 * 24 * 60 * 60 * 1000)), // 12 weeks from now
   selectedRoleIds: [] as string[],
   selectedDomainIds: [] as string[],
   selectedNoteIds: [] as string[],   
   selectedKeyRelationshipIds: [] as string[], 
   noteText: '',  
 });
+
+  // Calendar states
+  const [showStartCalendar, setShowStartCalendar] = useState(false);
+  const [showEndCalendar, setShowEndCalendar] = useState(false);
 
   // Data fetching states
   const [allRoles, setAllRoles] = useState<Role[]>([]);
@@ -185,19 +200,27 @@ setAllNotes(notesData || []);   // ✅ NEW
   };
 
   const resetForm = () => {
+  const today = new Date();
+  const twelveWeeksLater = new Date(today.getTime() + 84 * 24 * 60 * 60 * 1000);
+  
   setFormData({
     title: '',
     description: '',
+    startDate: formatLocalDate(today),
+    endDate: formatLocalDate(twelveWeeksLater),
     selectedRoleIds: [],
     selectedDomainIds: [],
-    selectedNoteIds: [],            // ✅ added so notes don’t go undefined
-    selectedKeyRelationshipIds: [], // ✅ added so KR’s don’t go undefined
+    selectedNoteIds: [],            // ✅ added so notes don't go undefined
+    selectedKeyRelationshipIds: [], // ✅ added so KR's don't go undefined
     noteText: '',
   });
+  setGoalType('12week');
   setActiveSubForm('none');
   setCreatedGoalId(null);
   resetActionForm();
   resetIdeaForm();
+  setShowStartCalendar(false);
+  setShowEndCalendar(false);
 };
 
   const resetActionForm = () => {
@@ -269,21 +292,24 @@ setAllNotes(notesData || []);   // ✅ NEW
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not found');
 
-    // Insert the new goal
-    const { data: goalData, error: goalError } = await supabase
-      .from('0008-ap-goals-12wk')
-      .insert([
-        {
-          title: formData.title,
-          description: formData.description,
-          user_cycle_id: currentCycle?.id,
-          user_id: user.id,
-        },
-      ])
-      .select()
-      .single();
+    let goalData;
+    
+    if (goalType === '12week') {
+      // Create 12-week goal
+      goalData = await createTwelveWeekGoal({
+        title: formData.title,
+        description: formData.description,
+      });
+    } else {
+      // Create custom goal
+      goalData = await createCustomGoal({
+        title: formData.title,
+        description: formData.description,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+      });
+    }
 
-    if (goalError) throw goalError;
     if (!goalData) throw new Error('Failed to create goal');
 
     setCreatedGoalId(goalData.id);
@@ -292,7 +318,7 @@ setAllNotes(notesData || []);   // ✅ NEW
     if (formData.selectedRoleIds?.length) {
       const roleJoins = formData.selectedRoleIds.map(roleId => ({
         parent_id: goalData.id,
-        parent_type: 'goal',
+        parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
         role_id: roleId,
         user_id: user.id,
       }));
@@ -306,7 +332,7 @@ setAllNotes(notesData || []);   // ✅ NEW
     if (formData.selectedDomainIds?.length) {
       const domainJoins = formData.selectedDomainIds.map(domainId => ({
         parent_id: goalData.id,
-        parent_type: 'goal',
+        parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
         domain_id: domainId,
         user_id: user.id,
       }));
@@ -332,7 +358,7 @@ setAllNotes(notesData || []);   // ✅ NEW
         .from('0008-ap-universal-notes-join')
         .insert({
           parent_id: goalData.id,
-          parent_type: 'goal',
+          parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
           note_id: newNote.id,
           user_id: user.id,
         });
@@ -355,7 +381,7 @@ if (formData.noteText && formData.noteText.trim()) {
     .from('0008-ap-universal-notes-join')
     .insert({
       parent_id: goalData.id,
-      parent_type: 'goal',
+      parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
       note_id: newNote2.id,
       user_id: user.id,
     });
@@ -366,7 +392,7 @@ if (formData.noteText && formData.noteText.trim()) {
 if (formData.selectedKeyRelationshipIds?.length) {
   const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
     parent_id: goalData.id,
-    parent_type: 'goal',
+    parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
     key_relationship_id: krId,
     user_id: user.id,
   }));
@@ -507,6 +533,44 @@ if (formData.selectedKeyRelationshipIds?.length) {
   const renderMainForm = () => (
     <ScrollView style={styles.content}>
       <View style={styles.form}>
+        {/* Goal Type Selector */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Goal Type *</Text>
+          <View style={styles.goalTypeSelector}>
+            <TouchableOpacity
+              style={[
+                styles.goalTypeButton,
+                goalType === '12week' && styles.activeGoalTypeButton
+              ]}
+              onPress={() => setGoalType('12week')}
+            >
+              <Target size={16} color={goalType === '12week' ? '#ffffff' : '#6b7280'} />
+              <Text style={[
+                styles.goalTypeButtonText,
+                goalType === '12week' && styles.activeGoalTypeButtonText
+              ]}>
+                12-Week Goal
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.goalTypeButton,
+                goalType === 'custom' && styles.activeGoalTypeButton
+              ]}
+              onPress={() => setGoalType('custom')}
+            >
+              <Clock size={16} color={goalType === 'custom' ? '#ffffff' : '#6b7280'} />
+              <Text style={[
+                styles.goalTypeButtonText,
+                goalType === 'custom' && styles.activeGoalTypeButtonText
+              ]}>
+                Custom Goal
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Goal Title */}
         <View style={styles.field}>
           <Text style={styles.label}>Goal Title *</Text>
@@ -514,11 +578,53 @@ if (formData.selectedKeyRelationshipIds?.length) {
             style={styles.input}
             value={formData.title}
             onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
-            placeholder="This should be a Lagging Indicator, or something you aspire for within your timeline"
+            placeholder={goalType === '12week' 
+              ? "This should be a Lagging Indicator, or something you aspire for within your timeline"
+              : "Enter your custom goal title"
+            }
             placeholderTextColor="#9ca3af"
             maxLength={100}
           />
         </View>
+
+        {/* Custom Goal Date Fields */}
+        {goalType === 'custom' && (
+          <>
+            <View style={styles.field}>
+              <Text style={styles.label}>Start Date *</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowStartCalendar(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {parseLocalDate(formData.startDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>End Date *</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowEndCalendar(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {parseLocalDate(formData.endDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {/* Goal Description */}
         <View style={styles.field}>
@@ -527,7 +633,10 @@ if (formData.selectedKeyRelationshipIds?.length) {
             style={[styles.input, styles.textArea]}
             value={formData.description}
             onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-            placeholder="Describe your goal and why it matters to you..."
+            placeholder={goalType === '12week'
+              ? "Describe your goal and why it matters to you..."
+              : "Describe your custom goal and timeline..."
+            }
             placeholderTextColor="#9ca3af"
             multiline
             numberOfLines={3}
@@ -642,7 +751,9 @@ if (formData.selectedKeyRelationshipIds?.length) {
             ) : (
               <>
                 <Target size={20} color="#ffffff" />
-                <Text style={styles.createButtonText}>Create Goal</Text>
+                <Text style={styles.createButtonText}>
+                  Create {goalType === '12week' ? '12-Week' : 'Custom'} Goal
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -668,6 +779,91 @@ if (formData.selectedKeyRelationshipIds?.length) {
           )}
         </View>
       </View>
+
+      {/* Start Date Calendar Modal */}
+      <Modal visible={showStartCalendar} transparent animationType="fade">
+        <View style={styles.calendarOverlay}>
+          <View style={styles.calendarContainer}>
+            <View style={styles.calendarHeader}>
+              <Text style={styles.calendarTitle}>Select Start Date</Text>
+              <TouchableOpacity onPress={() => setShowStartCalendar(false)}>
+                <X size={20} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            <RNCalendar
+              onDayPress={(day) => {
+                setFormData(prev => ({ ...prev, startDate: day.dateString }));
+                setShowStartCalendar(false);
+                
+                // Auto-adjust end date if it's before the new start date
+                const newStartDate = parseLocalDate(day.dateString);
+                const currentEndDate = parseLocalDate(formData.endDate);
+                if (currentEndDate <= newStartDate) {
+                  const newEndDate = new Date(newStartDate);
+                  newEndDate.setDate(newEndDate.getDate() + 84); // 12 weeks
+                  setFormData(prev => ({ ...prev, endDate: formatLocalDate(newEndDate) }));
+                }
+              }}
+              markedDates={{
+                [formData.startDate]: {
+                  selected: true,
+                  selectedColor: '#0078d4'
+                }
+              }}
+              theme={{
+                selectedDayBackgroundColor: '#0078d4',
+                todayTextColor: '#0078d4',
+                arrowColor: '#0078d4',
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* End Date Calendar Modal */}
+      <Modal visible={showEndCalendar} transparent animationType="fade">
+        <View style={styles.calendarOverlay}>
+          <View style={styles.calendarContainer}>
+            <View style={styles.calendarHeader}>
+              <Text style={styles.calendarTitle}>Select End Date</Text>
+              <TouchableOpacity onPress={() => setShowEndCalendar(false)}>
+                <X size={20} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            <RNCalendar
+              onDayPress={(day) => {
+                // Validate that end date is after start date
+                const selectedEndDate = parseLocalDate(day.dateString);
+                const currentStartDate = parseLocalDate(formData.startDate);
+                
+                if (selectedEndDate <= currentStartDate) {
+                  Alert.alert('Invalid Date', 'End date must be after start date');
+                  return;
+                }
+                
+                setFormData(prev => ({ ...prev, endDate: day.dateString }));
+                setShowEndCalendar(false);
+              }}
+              markedDates={{
+                [formData.endDate]: {
+                  selected: true,
+                  selectedColor: '#0078d4'
+                },
+                [formData.startDate]: {
+                  marked: true,
+                  dotColor: '#16a34a'
+                }
+              }}
+              minDate={formData.startDate}
+              theme={{
+                selectedDayBackgroundColor: '#0078d4',
+                todayTextColor: '#0078d4',
+                arrowColor: '#0078d4',
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 
@@ -1218,5 +1414,73 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  goalTypeSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 2,
+  },
+  goalTypeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    gap: 8,
+  },
+  activeGoalTypeButton: {
+    backgroundColor: '#0078d4',
+  },
+  goalTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeGoalTypeButtonText: {
+    color: '#ffffff',
+  },
+  dateButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  calendarOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  calendarContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  calendarTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
   },
 });

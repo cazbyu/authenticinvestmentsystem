@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
 import { getSupabaseClient } from '@/lib/supabase';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
-import { useGoalProgress } from '@/hooks/useGoalProgress';
+import { useGoals } from '@/hooks/useGoals';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
@@ -32,7 +32,9 @@ export default function Goals() {
 
   // 12-Week Goals
   const { 
-    goals: twelveWeekGoals, 
+    twelveWeekGoals,
+    customGoals,
+    allGoals,
     currentCycle, 
     daysLeftData, 
     goalProgress, 
@@ -43,14 +45,15 @@ export default function Goals() {
     setLoadingWeekActions,
     refreshGoals,
     refreshAllData,
-    createGoal,
+    createTwelveWeekGoal,
+    createCustomGoal,
     createTaskWithWeekPlan,
     fetchGoalActionsForWeek,
     getCurrentWeekIndex,
     getWeekData,
     completeActionSuggestion,
   undoActionOccurrence,
-  } = useGoalProgress();
+  } = useGoals();
 
   // Initialize selected week to current week
   // Initialize selected week to current week (run once when cycleWeeks arrive)
@@ -67,20 +70,20 @@ useEffect(() => {
     console.log('=== FETCH WEEK ACTIONS USEEFFECT TRIGGERED ===');
     console.log('useEffect triggered for fetchWeekActions:', { 
       selectedWeekIndex, 
-      goalsCount: twelveWeekGoals.length, 
+      goalsCount: allGoals.length, 
       cycleWeeksCount: cycleWeeks.length 
     });
     console.log('loadingWeekActions state:', loadingWeekActions);
     console.log('Dependencies that triggered this effect:', {
       selectedWeekIndex,
-      twelveWeekGoalsLength: twelveWeekGoals.length,
+      allGoalsLength: allGoals.length,
       cycleWeeksLength: cycleWeeks.length
     });
-    if (twelveWeekGoals.length > 0 && cycleWeeks.length > 0) {
+    if (allGoals.length > 0 && cycleWeeks.length > 0) {
       fetchWeekActions();
     }
     console.log('=== END FETCH WEEK ACTIONS USEEFFECT ===');
-  }, [selectedWeekIndex, twelveWeekGoals, cycleWeeks]);
+  }, [selectedWeekIndex, allGoals, cycleWeeks]);
 
   const fetchWeekActions = async () => {
   try {
@@ -91,13 +94,13 @@ useEffect(() => {
     
     const weekData = getWeekData(selectedWeekIndex);
     console.log('Week data calculated:', weekData);
-    if (!weekData || twelveWeekGoals.length === 0) {
+    if (!weekData || allGoals.length === 0) {
       console.log('No week data or goals - clearing actions');
       setWeekGoalActions({});
       return;
     }
 
-    const goalIds = twelveWeekGoals.map(g => g.id);
+    const goalIds = allGoals.map(g => g.id);
     console.log('Goal IDs to fetch actions for:', goalIds);
     const actions = await fetchGoalActionsForWeek(goalIds, weekData.startDate, weekData.endDate);
     console.log('Actions received from fetchGoalActionsForWeek:', actions);
@@ -397,14 +400,14 @@ useEffect(() => {
 
   const getFilteredGoals = () => {
     if (selectedGoalFilterId) {
-      return twelveWeekGoals.filter(goal => goal.id === selectedGoalFilterId);
+      return allGoals.filter(goal => goal.id === selectedGoalFilterId);
     }
-    return twelveWeekGoals;
+    return allGoals;
   };
 
   const getSelectedGoalTitle = () => {
     if (selectedGoalFilterId) {
-      const selectedGoal = twelveWeekGoals.find(goal => goal.id === selectedGoalFilterId);
+      const selectedGoal = allGoals.find(goal => goal.id === selectedGoalFilterId);
       return selectedGoal?.title || 'Selected Goal';
     }
     return 'All Goals';
@@ -520,7 +523,7 @@ useEffect(() => {
             )}
 
             {/* Goal Filter Dropdown */}
-            {twelveWeekGoals.length > 1 && (
+            {allGoals.length > 1 && (
               <View style={styles.goalFilterContainer}>
                 <TouchableOpacity
                   style={styles.goalFilterButton}
@@ -542,11 +545,11 @@ useEffect(() => {
 ) : getFilteredGoals().length === 0 ? (
     <View style={styles.emptyContainer}>
     <Text style={styles.emptyTitle}>
-      {twelveWeekGoals.length === 0 ? 'No 12-Week Goals Yet' : 'No Goals Match Filter'}
+      {allGoals.length === 0 ? 'No Goals Yet' : 'No Goals Match Filter'}
     </Text>
     <Text style={styles.emptyText}>
-      {twelveWeekGoals.length === 0 
-        ? 'Create your first 12-week goal to start tracking this cycle.'
+      {allGoals.length === 0 
+        ? 'Create your first goal to start tracking progress.'
         : 'Try selecting a different goal or view all goals.'
       }
     </Text>
@@ -565,13 +568,24 @@ useEffect(() => {
       const progress = goalProgress[goal.id];
       const weekData = getWeekData(selectedWeekIndex);
       const goalActions = weekGoalActions[goal.id] || [];
-      if (!progress) return null;
+      
+      // For 12-week goals, require progress data. For custom goals, show without progress
+      if (goal.goal_type === '12week' && !progress) return null;
 
       return (
         <GoalProgressCard
           key={goal.id}
           goal={goal}
-          progress={progress}
+          progress={progress || {
+            goalId: goal.id,
+            currentWeek: 1,
+            daysRemaining: 0,
+            weeklyActual: 0,
+            weeklyTarget: 0,
+            overallActual: 0,
+            overallTarget: 0,
+            overallProgress: 0,
+          }}
           week={weekData}
           selectedWeekNumber={weekData?.weekNumber}
           weekActions={goalActions}
@@ -642,7 +656,8 @@ useEffect(() => {
         visible={createGoalModalVisible}
         onClose={() => setCreateGoalModalVisible(false)}
         onSubmitSuccess={handleCreateGoalSuccess}
-        createGoal={createGoal}
+        createTwelveWeekGoal={createTwelveWeekGoal}
+        createCustomGoal={createCustomGoal}
       />
 
       {/* Edit Goal Modal */}
@@ -703,7 +718,7 @@ useEffect(() => {
               </TouchableOpacity>
               
               {/* Individual Goals */}
-              {twelveWeekGoals.map(goal => (
+              {allGoals.map(goal => (
                 <TouchableOpacity
                   key={goal.id}
                   style={[
@@ -719,7 +734,7 @@ useEffect(() => {
                     styles.goalDropdownItemText,
                     selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItemText
                   ]} numberOfLines={2}>
-                    {goal.title}
+                    {goal.title} {goal.goal_type === 'custom' && '(Custom)'}
                   </Text>
                   {selectedGoalFilterId === goal.id && (
                     <View style={styles.selectedIndicator}>

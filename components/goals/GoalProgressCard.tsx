@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit } from 'lucide-react-native';
-import { TwelveWeekGoal, GoalProgress } from '@/hooks/useGoalProgress';
+import { Goal, GoalProgress } from '@/hooks/useGoals';
 import { parseLocalDate } from '@/lib/dateUtils';
 
 interface WeekData {
@@ -26,7 +26,7 @@ interface TaskWithLogs {
 }
 
 interface GoalProgressCardProps {
-  goal: TwelveWeekGoal;
+  goal: Goal;
   progress: GoalProgress;
   week?: WeekData | null;
   weekActions?: TaskWithLogs[];
@@ -80,6 +80,16 @@ export function GoalProgressCard({
     return `${monthName} ${dayNumber} (${dayName})`;
   };
 
+  const getGoalTypeLabel = () => {
+    if (goal.goal_type === 'custom') {
+      const startDate = parseLocalDate(goal.start_date);
+      const endDate = parseLocalDate(goal.end_date);
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const totalWeeks = Math.ceil(totalDays / 7);
+      return `${totalWeeks}-Week Custom Goal`;
+    }
+    return `Week ${selectedWeekNumber || progress.currentWeek} - today is ${formatTodayInfo()}`;
+  };
   const primaryRole = goal.roles?.[0]; // Used for card color
   const cardColor = primaryRole?.color || '#0078d4';
 
@@ -188,7 +198,7 @@ export function GoalProgressCard({
                 {goal.title}
               </Text>
               <Text style={styles.subtitle}>
-                Week {selectedWeekNumber || progress.currentWeek} - today is {formatTodayInfo()}
+                {getGoalTypeLabel()}
               </Text>
             </View>
           </View>
@@ -221,7 +231,8 @@ export function GoalProgressCard({
         </View>
 
         {/* Leading Indicator: Weekly Progress */}
-        <View style={styles.progressSection}>
+        {goal.goal_type === '12week' && (
+          <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressLabel}>This Week (Leading)</Text>
             <Text style={[
@@ -243,10 +254,49 @@ export function GoalProgressCard({
               ]}
             />
           </View>
-        </View>
+          </View>
+        )}
+
+        {/* Custom Goal Date Range */}
+        {goal.goal_type === 'custom' && (
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>Timeline</Text>
+              <Text style={styles.progressValue}>
+                {(() => {
+                  const startDate = parseLocalDate(goal.start_date);
+                  const endDate = parseLocalDate(goal.end_date);
+                  const now = new Date();
+                  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                  const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+                  return `${daysRemaining}/${totalDays} days`;
+                })()}
+              </Text>
+            </View>
+            
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${(() => {
+                      const startDate = parseLocalDate(goal.start_date);
+                      const endDate = parseLocalDate(goal.end_date);
+                      const now = new Date();
+                      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                      const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+                      return Math.min(100, (daysPassed / totalDays) * 100);
+                    })()}%`,
+                    backgroundColor: '#0078d4',
+                  }
+                ]}
+              />
+            </View>
+          </View>
+        )}
 
         {/* Week-specific Actions (when week prop is provided) */}
-        {week && (
+        {week && goal.goal_type === '12week' && (
           <View style={styles.weekActionsSection}>
             <View style={styles.weekActionsHeader}>
               {onAddAction && (
