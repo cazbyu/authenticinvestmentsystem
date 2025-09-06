@@ -36,6 +36,7 @@ interface GoalProgressCardProps {
   onEdit?: () => void; // New onEdit prop
   onPress?: () => void;
   compact?: boolean;
+  selectedWeekNumber?: number;
 }
 
 export function GoalProgressCard({ 
@@ -48,7 +49,8 @@ export function GoalProgressCard({
   onToggleCompletion,
   onEdit, // New prop
   onPress, 
-  compact = false 
+  compact = false,
+  selectedWeekNumber
 }: GoalProgressCardProps) {
   const getProgressColor = (percentage: number) => {
     if (percentage >= 80) return '#16a34a';
