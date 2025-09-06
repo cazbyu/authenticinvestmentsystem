@@ -449,7 +449,8 @@ if (formData.selectedKeyRelationshipIds?.length) {
       .insert({
         parent_id: createdIdea.id,
         parent_type: 'depositIdea',
-        goal_id: createdGoalId,
+        twelve_wk_goal_id: createdGoalId,
+        goal_type: 'twelve_wk_goal',
         user_id: user.id,
       });
 

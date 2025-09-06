@@ -313,7 +313,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       
       // Delete any remaining goal joins (deposit ideas, etc.)
       console.log('Deleting remaining goal joins...');
-      await supabase.from('0008-ap-universal-goals-join').delete().eq('goal_id', goal.id);
+      await supabase.from('0008-ap-universal-goals-join').delete().eq('twelve_wk_goal_id', goal.id);
       console.log('Remaining goal joins deleted');
       
       // Now delete the goal itself
