@@ -666,7 +666,7 @@ if (formData.schedulingType === 'task') {
             const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
             const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
             const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
-            const goalJoins = formData.selectedGoalIds.map(goal_id => ({ parent_id: taskId, parent_type: 'task', goal_id, user_id: user.id }));
+            const goalJoins = formData.selectedGoalIds.map(twelve_wk_goal_id => ({ parent_id: taskId, parent_type: 'task', twelve_wk_goal_id, user_id: user.id }));
 
             // Only add a new note if there's content in the notes field
             if (formData.notes && formData.notes.trim()) {
