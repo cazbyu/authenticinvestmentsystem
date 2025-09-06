@@ -131,7 +131,7 @@ export function GoalProgressCard({
           
           <View style={styles.compactMetrics}>
             <View style={styles.compactMetric}>
-              <Text style={styles.compactMetricLabel}>Week {progress.currentWeek}</Text>
+             <Text style={styles.compactMetricLabel}>Week {selectedWeekNumber || progress.currentWeek}</Text>
               <Text style={[
                 styles.compactMetricValue,
                 { color: getWeeklyProgressColor(progress.weeklyActual, progress.weeklyTarget) }

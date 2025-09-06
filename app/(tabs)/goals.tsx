@@ -519,6 +519,7 @@ useEffect(() => {
           goal={goal}
           progress={progress}
           week={weekData}
+          selectedWeekNumber={weekData?.weekNumber}
           weekActions={goalActions}
           loadingWeekActions={loadingWeekActions}
           onAddAction={() => {
