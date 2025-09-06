@@ -722,8 +722,8 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
       // Fetch tasks linked to these goals
       const { data: goalJoins } = await supabase
         .from('0008-ap-universal-goals-join')
-        .select('parent_id')
-        .eq('twelve_wk_goal_id', goal.id)
+        .select('parent_id, twelve_wk_goal_id')
+        .in('twelve_wk_goal_id', goalIds)
         .eq('parent_type', 'task');
 
       const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
@@ -816,7 +816,7 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
         console.log(`Processing task: ${task.title} (${task.id}) for goal: ${goalJoin.goal_id}`);
         console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
-        const goalId = goalJoin.goal_id;
+        const goalId = goalJoin.twelve_wk_goal_id;
         
         // Convert completed occurrences to TaskLog format
         const relevantOccurrences = occurrenceData?.filter(occ => occ.parent_task_id === task.id) || [];
