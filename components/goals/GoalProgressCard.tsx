@@ -66,6 +66,18 @@ export function GoalProgressCard({
     return `${percentage}%`;
   };
 
+  const formatTodayInfo = () => {
+    const today = new Date();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const dayName = dayNames[today.getDay()];
+    const monthName = monthNames[today.getMonth()];
+    const dayNumber = today.getDate();
+    
+    return `${monthName} ${dayNumber} (${dayName})`;
+  };
+
   const primaryRole = goal.roles?.[0]; // Used for card color
   const cardColor = primaryRole?.color || '#0078d4';
 
@@ -131,7 +143,7 @@ export function GoalProgressCard({
           
           <View style={styles.compactMetrics}>
             <View style={styles.compactMetric}>
-             <Text style={styles.compactMetricLabel}>Week {selectedWeekNumber || progress.currentWeek}</Text>
+              <Text style={styles.compactMetricLabel}>Week {selectedWeekNumber || progress.currentWeek}</Text>
               <Text style={[
                 styles.compactMetricValue,
                 { color: getWeeklyProgressColor(progress.weeklyActual, progress.weeklyTarget) }
@@ -174,7 +186,7 @@ export function GoalProgressCard({
                 {goal.title}
               </Text>
               <Text style={styles.subtitle}>
-                Week {progress.currentWeek} • {progress.daysRemaining} days left
+                Week {selectedWeekNumber || progress.currentWeek} - today is {formatTodayInfo()}
               </Text>
             </View>
           </View>
