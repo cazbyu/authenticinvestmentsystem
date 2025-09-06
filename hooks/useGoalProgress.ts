@@ -1157,13 +1157,14 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
       if (weekPlanError) throw weekPlanError;
 
       // Link to goal if specified
-      if (taskData.goal_id) {
+     if (taskData.twelve_wk_goal_id) {
         const { error: goalJoinError } = await supabase
           .from('0008-ap-universal-goals-join')
           .insert({
             parent_id: insertedTask.id,
             parent_type: 'task',
             twelve_wk_goal_id: taskData.twelve_wk_goal_id,
+           goal_type: 'twelve_wk_goal',
             user_id: user.id,
           });
 
