@@ -475,7 +475,7 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
       const daysRemaining = daysLeftData?.days_left || 0;
 
       for (const goal of goals) {
-        // Fetch tasks associated with this goal
+        // Fetch action tasks (parent tasks) associated with this goal
         const { data: goalJoins } = await supabase
           .from('0008-ap-universal-goals-join')
           .select('parent_id')
@@ -502,38 +502,42 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
         const currentWeekData = cycleWeeks.find(w => w.week_number === currentWeek);
         
         let weeklyActual = 0;
-        let overallActual = 0;
 
         if (currentWeekData) {
-          // Fetch completed task logs for current week
-          const { data: weeklyLogs } = await supabase
-            .from('0008-ap-task-log')
-.select('*')
-.in('task_id', taskIds)
-.gte('measured_on', currentCycle?.start_date)
-.lte('measured_on', currentCycle?.end_date);
+          // Fetch completed occurrences for current week
+          const { data: weeklyOccurrences } = await supabase
+            .from('0008-ap-tasks')
+            .select('*')
+            .in('parent_task_id', taskIds)
+            .eq('status', 'completed')
+            .gte('due_date', currentWeekData.start_date)
+            .lte('due_date', currentWeekData.end_date);
 
-          weeklyActual = weeklyLogs?.length || 0;
+          weeklyActual = weeklyOccurrences?.length || 0;
         }
 
-        // Fetch completed task logs for entire cycle
-        // Fetch task logs for entire cycle
-let overallQuery = supabase
-  .from('0008-ap-task-log')
-  .select('*')
-  .in('task_id', taskIds);
+        // Fetch completed occurrences for entire cycle
+        const { data: overallOccurrences } = await supabase
+          .from('0008-ap-tasks')
+          .select('*')
+          .in('parent_task_id', taskIds)
+          .eq('status', 'completed')
+          .gte('due_date', currentCycle?.start_date || '1900-01-01')
+          .lte('due_date', currentCycle?.end_date || '2100-12-31');
 
-if (currentCycle?.start_date) {
-  overallQuery = overallQuery.gte('measured_on', currentCycle.start_date);
-}
-if (currentCycle?.end_date) {
-  overallQuery = overallQuery.lte('measured_on', currentCycle.end_date);
-}
+        // Fetch total target from week plans for all weeks
+        const { data: weekPlansData } = await supabase
+          .from('0008-ap-task-week-plan')
+          .select('target_days')
+          .in('task_id', taskIds)
+          .eq('user_cycle_id', userCycleId);
 
-const { data: overallLogs } = await overallQuery;
+        const overallActual = overallOccurrences?.length || 0;
+        const overallTarget = weekPlansData?.reduce((sum, wp) => sum + (wp.target_days || 0), 0) || 0;
 
-        overallActual = overallLogs?.length || 0;
-        const overallProgress = goal.total_target > 0 ? Math.round((Math.min(overallActual, goal.total_target) / goal.total_target) * 100) : 0;
+        // Cap actual at target to handle overages, then calculate percentage
+        const cappedOverallActual = Math.min(overallActual, overallTarget);
+        const overallProgress = overallTarget > 0 ? Math.round((cappedOverallActual / overallTarget) * 100) : 0;
 
         progressData[goal.id] = {
           goalId: goal.id,
@@ -541,8 +545,8 @@ const { data: overallLogs } = await overallQuery;
           daysRemaining,
           weeklyActual,
           weeklyTarget: goal.weekly_target,
-          overallActual: Math.min(overallActual, goal.total_target),
-          overallTarget: goal.total_target,
+          overallActual: cappedOverallActual,
+          overallTarget,
           overallProgress,
         };
       }

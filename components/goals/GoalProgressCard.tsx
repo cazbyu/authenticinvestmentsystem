@@ -53,7 +53,7 @@ export function GoalProgressCard({
   selectedWeekNumber
 }: GoalProgressCardProps) {
   const getProgressColor = (percentage: number) => {
-    if (percentage >= 85) return '#16a34a';
+    if (percentage >= 85) return '#16a34a'; // Green for 85% and above
     if (percentage >= 60) return '#eab308';
     return '#dc2626';
   };
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
   },
   goalTotalScore: {
     position: 'absolute',
-    top: 50,
+    top: 32,
     right: 16,
     backgroundColor: '#f8fafc',
     paddingHorizontal: 8,
