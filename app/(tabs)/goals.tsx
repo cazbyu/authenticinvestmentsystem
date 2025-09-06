@@ -5,7 +5,7 @@ import { Header } from '@/components/Header';
 import { getSupabaseClient } from '@/lib/supabase';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoals } from '@/hooks/useGoals';
-import TaskEventForm from '@/components/tasks/TaskEventForm';
+import TaskEventForm from '@/components/tasks/TaskEventForm'; // Keep this import
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
@@ -13,7 +13,7 @@ import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
-export default function Goals() {
+export default function Goals() { // Ensure this is the default export
   const [authenticScore, setAuthenticScore] = useState(0);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
