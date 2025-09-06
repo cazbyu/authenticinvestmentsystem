@@ -35,6 +35,7 @@ export default function Goals() {
     daysLeftData, 
     goalProgress, 
     cycleWeeks,
+    cycleEffortData,
     loading: goalsLoading, 
     loadingWeekActions,
     setLoadingWeekActions,
@@ -386,6 +387,11 @@ useEffect(() => {
     return { percentage, daysRemaining };
   };
 
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 80) return '#16a34a';
+    if (percentage >= 60) return '#eab308';
+    return '#dc2626';
+  };
   return (
     <SafeAreaView style={styles.container}>
       <Header 
@@ -442,7 +448,7 @@ useEffect(() => {
             
             {/* Week Navigator */}
             {cycleWeeks.length > 0 && (
-              <View style={styles.weekNavigator}>
+              <View style={styles.weekNavigatorContainer}>
                 <View style={styles.weekNavContainer}>
                   <TouchableOpacity 
                     style={[
@@ -481,6 +487,16 @@ useEffect(() => {
                   >
                     <ChevronRight size={16} color={(selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
                   </TouchableOpacity>
+                </View>
+                
+                {/* Overall Cycle Effort Score */}
+                <View style={styles.cycleEffortScore}>
+                  <Text style={[
+                    styles.cycleEffortText,
+                    { color: getProgressColor(cycleEffortData.overallPercentage) }
+                  ]}>
+                    {cycleEffortData.overallPercentage}/100%
+                  </Text>
                 </View>
               </View>
             )}
@@ -695,20 +711,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#0078d4',
     borderRadius: 4,
   },
-  weekNavigator: {
+  weekNavigatorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 16,
     marginBottom: 12,
   },
   weekNavContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: '#f8fafc',
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
     maxWidth: 200,
+  },
+  cycleEffortScore: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+  },
+  cycleEffortText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   weekNavButton: {
     padding: 6,

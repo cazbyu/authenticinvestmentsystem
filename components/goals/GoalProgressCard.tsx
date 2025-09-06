@@ -199,6 +199,16 @@ export function GoalProgressCard({
             </TouchableOpacity>
           )}
           
+          {/* Individual Goal Total Score */}
+          <View style={styles.goalTotalScore}>
+            <Text style={[
+              styles.goalTotalScoreText,
+              { color: getProgressColor(progress.overallProgress) }
+            ]}>
+              Total {progress.overallProgress}%
+            </Text>
+          </View>
+          
           {/* Removed the large "Task" button as per new requirements */}
           {/* onAddTask && (
             <TouchableOpacity
@@ -645,5 +655,18 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     backgroundColor: '#f8fafc',
+  },
+  goalTotalScore: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  goalTotalScoreText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

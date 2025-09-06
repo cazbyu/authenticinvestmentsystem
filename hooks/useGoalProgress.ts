@@ -100,6 +100,11 @@ export interface GoalProgress {
   overallProgress: number;
 }
 
+export interface CycleEffortData {
+  totalActual: number;
+  totalTarget: number;
+  overallPercentage: number;
+}
 interface UseGoalProgressOptions {
   scope?: {
     type: 'user' | 'role' | 'domain' | 'key_relationship';
@@ -113,6 +118,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [daysLeftData, setDaysLeftData] = useState<DaysLeftData | null>(null);
   const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgress>>({});
+  const [cycleEffortData, setCycleEffortData] = useState<CycleEffortData>({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, TaskWithLogs[]>>({});
   const [loading, setLoading] = useState(false);
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
@@ -542,6 +548,17 @@ const { data: overallLogs } = await overallQuery;
       }
 
       setGoalProgress(progressData);
+
+      // Calculate overall cycle effort data
+      const totalActual = Object.values(progressData).reduce((sum, p) => sum + p.overallActual, 0);
+      const totalTarget = Object.values(progressData).reduce((sum, p) => sum + p.overallTarget, 0);
+      const overallPercentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+      
+      setCycleEffortData({
+        totalActual,
+        totalTarget,
+        overallPercentage
+      });
     } catch (error) {
       console.error('Error calculating goal progress:', error);
     }
@@ -1248,6 +1265,7 @@ const { data: overallLogs } = await overallQuery;
     cycleWeeks,
     daysLeftData,
     goalProgress,
+    cycleEffortData,
     loading,
     loadingWeekActions,
     setLoadingWeekActions,
