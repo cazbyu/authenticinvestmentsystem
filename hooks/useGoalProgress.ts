@@ -1084,7 +1084,7 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
   const createTaskWithWeekPlan = async (taskData: {
     title: string;
     description?: string;
-    goal_id?: string;
+    twelve_wk_goal_id?: string;
     recurrenceRule?: string;
     selectedRoleIds?: string[];
     selectedDomainIds?: string[];
