@@ -288,7 +288,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       const { data: goalTaskJoins, error: goalTaskJoinsError } = await supabase
         .from('0008-ap-universal-goals-join')
         .select('parent_id')
-        .eq('goal_id', goal.id)
+        .eq('twelve_wk_goal_id', goal.id)
         .eq('parent_type', 'task');
 
       if (goalTaskJoinsError) throw goalTaskJoinsError;
