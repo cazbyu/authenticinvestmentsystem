@@ -10,7 +10,7 @@ import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
-import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
 export default function Goals() {
