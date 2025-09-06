@@ -64,7 +64,8 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
-  const [frequency, setFrequency] = useState(7); // Daily by default
+  const [recurrenceType, setRecurrenceType] = useState('daily');
+  const [selectedCustomDays, setSelectedCustomDays] = useState<number[]>([]); // 0=Sunday, 1=Monday, etc.
   const [saving, setSaving] = useState(false);
 
   // Multi-select states
@@ -130,7 +131,8 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
     setTitle('');
     setNotes('');
     setSelectedWeeks([]);
-    setFrequency(7);
+    setRecurrenceType('daily');
+    setSelectedCustomDays([]);
 
     // Pre-select inherited items from goal
     if (goal) {
@@ -187,8 +189,47 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
     }
   };
 
-  const handleFrequencySelect = (freq: number) => {
-    setFrequency(freq);
+  const handleRecurrenceSelect = (type: string) => {
+    setRecurrenceType(type);
+    if (type !== 'custom') {
+      setSelectedCustomDays([]); // Clear custom days when switching away from custom
+    }
+  };
+
+  const handleCustomDayToggle = (dayIndex: number) => {
+    setSelectedCustomDays(prev => 
+      prev.includes(dayIndex)
+        ? prev.filter(d => d !== dayIndex)
+        : [...prev, dayIndex]
+    );
+  };
+
+  const getTargetDays = () => {
+    if (recurrenceType === 'custom') {
+      return selectedCustomDays.length;
+    }
+    return recurrenceType === 'daily' ? 7 : parseInt(recurrenceType.replace('days', '').replace('day', ''));
+  };
+
+  const generateRecurrenceRule = () => {
+    if (recurrenceType === 'custom' && selectedCustomDays.length > 0) {
+      const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+      const byDays = selectedCustomDays.map(dayIndex => dayNames[dayIndex]).join(',');
+      return `RRULE:FREQ=WEEKLY;BYDAY=${byDays}`;
+    } else if (recurrenceType === 'daily') {
+      return 'RRULE:FREQ=DAILY';
+    } else {
+      // For other frequencies (6days, 5days, etc.), we'll use daily with interval
+      const days = parseInt(recurrenceType.replace('days', '').replace('day', ''));
+      if (days === 7) {
+        return 'RRULE:FREQ=DAILY';
+      } else {
+        // For now, treat as weekly with specific days (Mon-Fri for 5days, etc.)
+        const weekdays = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+        const byDays = weekdays.slice(0, days).join(',');
+        return `RRULE:FREQ=WEEKLY;BYDAY=${byDays}`;
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -202,19 +243,28 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
       return;
     }
 
+    if (recurrenceType === 'custom' && selectedCustomDays.length === 0) {
+      Alert.alert('Error', 'Please select at least one day for custom frequency.');
+      return;
+    }
+
     setSaving(true);
     try {
+      const targetDays = getTargetDays();
+      const recurrenceRule = generateRecurrenceRule();
+
       // Create the task with week plan
       const taskData = {
         title: title.trim(),
         description: notes.trim() || undefined,
         goal_id: goal?.id,
+        recurrenceRule,
         selectedRoleIds,
         selectedDomainIds,
         selectedKeyRelationshipIds,
         selectedWeeks: selectedWeeks.map(weekNumber => ({
           weekNumber,
-          targetDays: frequency,
+          targetDays,
         })),
       };
 
@@ -230,15 +280,16 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
     }
   };
 
-  const getFrequencyLabel = (freq: number) => {
-    switch (freq) {
-      case 7: return 'Daily';
-      case 6: return '6 days a week';
-      case 5: return '5 days a week';
-      case 4: return '4 days a week';
-      case 3: return '3 days a week';
-      case 2: return 'Twice a week';
-      case 1: return 'Once a week';
+  const getRecurrenceLabel = (type: string) => {
+    switch (type) {
+      case 'daily': return 'Daily';
+      case '6days': return '6 days a week';
+      case '5days': return '5 days a week';
+      case '4days': return '4 days a week';
+      case '3days': return '3 days a week';
+      case '2days': return 'Twice a week';
+      case '1day': return 'Once a week';
+      case 'custom': return 'Custom';
       default: return 'Custom';
     }
   };
@@ -320,19 +371,45 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
               <View style={styles.field}>
                 <Text style={styles.label}>Frequency per week *</Text>
                 <View style={styles.frequencySelector}>
-                  {[7, 6, 5, 4, 3, 2, 1].map(freq => (
+                  {['daily', '6days', '5days', '4days', '3days', '2days', '1day', 'custom'].map(type => (
                     <TouchableOpacity
-                      key={freq}
-                      style={[styles.frequencyButton, frequency === freq && styles.frequencyButtonSelected]}
-                      onPress={() => handleFrequencySelect(freq)}
+                      key={type}
+                      style={[styles.frequencyButton, recurrenceType === type && styles.frequencyButtonSelected]}
+                      onPress={() => handleRecurrenceSelect(type)}
                     >
-                      <Text style={[styles.frequencyButtonText, frequency === freq && styles.frequencyButtonTextSelected]}>
-                        {getFrequencyLabel(freq)}
+                      <Text style={[styles.frequencyButtonText, recurrenceType === type && styles.frequencyButtonTextSelected]}>
+                        {getRecurrenceLabel(type)}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
+
+              {/* Custom Days Selection (only show when custom is selected) */}
+              {recurrenceType === 'custom' && (
+                <View style={styles.field}>
+                  <Text style={styles.label}>Select Days *</Text>
+                  <View style={styles.customDaysSelector}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.customDayButton,
+                          selectedCustomDays.includes(index) && styles.customDayButtonSelected
+                        ]}
+                        onPress={() => handleCustomDayToggle(index)}
+                      >
+                        <Text style={[
+                          styles.customDayButtonText,
+                          selectedCustomDays.includes(index) && styles.customDayButtonTextSelected
+                        ]}>
+                          {dayName}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               {/* Roles */}
               <View style={styles.field}>
@@ -453,7 +530,7 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
           <TouchableOpacity
             style={[styles.saveButton, (!title.trim() || selectedWeeks.length === 0 || saving) && styles.saveButtonDisabled]}
             onPress={handleSave}
-            disabled={!title.trim() || selectedWeeks.length === 0 || saving}
+            disabled={!title.trim() || selectedWeeks.length === 0 || (recurrenceType === 'custom' && selectedCustomDays.length === 0) || saving}
           >
             {saving ? (
               <ActivityIndicator size="small" color="#ffffff" />
@@ -590,6 +667,33 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   frequencyButtonTextSelected: {
+    color: '#ffffff',
+  },
+  customDaysSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  customDayButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  customDayButtonSelected: {
+    backgroundColor: '#1f2937',
+    borderColor: '#1f2937',
+  },
+  customDayButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  customDayButtonTextSelected: {
     color: '#ffffff',
   },
   checkboxGrid: {

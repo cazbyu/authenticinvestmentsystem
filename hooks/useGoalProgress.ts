@@ -1085,6 +1085,7 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
     title: string;
     description?: string;
     goal_id?: string;
+    recurrenceRule?: string;
     selectedRoleIds?: string[];
     selectedDomainIds?: string[];
     selectedKeyRelationshipIds?: string[];
@@ -1107,6 +1108,7 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
           unit: 'days',
           status: 'pending',
           is_twelve_week_goal: true,
+          recurrence_rule: taskData.recurrenceRule,
         })
         .select()
         .single();

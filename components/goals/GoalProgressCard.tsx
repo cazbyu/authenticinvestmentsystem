@@ -658,8 +658,8 @@ const styles = StyleSheet.create({
   },
   goalTotalScore: {
     position: 'absolute',
-    top: 32,
-    right: 16,
+    top: 16,
+    right: 0,
     backgroundColor: '#f8fafc',
     paddingHorizontal: 8,
     paddingVertical: 4,
