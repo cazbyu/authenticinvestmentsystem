@@ -17,7 +17,6 @@ import { TwelveWeekGoal } from '@/hooks/useGoalProgress'; // Assuming this inter
 interface Role { id: string; label: string; color?: string; }
 interface Domain { id: string; name: string; }
 interface KeyRelationship { id: string; name: string; role_id: string; }
-interface Note { id: string; content: string; created_at: string; }
 
 interface EditGoalModalProps {
   visible: boolean;
@@ -30,9 +29,6 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [newNoteText, setNewNoteText] = useState(''); // For adding new notes
-  const [noteText, setNoteText] = useState('');
-  const [allNotes, setAllNotes] = useState<Note[]>([]);
-  const [existingNoteIds, setExistingNoteIds] = useState<string[]>([]);
   
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
@@ -105,7 +101,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
     }
   };
 
-  const handleMultiSelect = (field: 'roles' | 'domains' | 'keyRelationships' | 'notes', id: string) => {
+  const handleMultiSelect = (field: 'roles' | 'domains' | 'keyRelationships', id: string) => {
     let setter: React.Dispatch<React.SetStateAction<string[]>>;
     let currentSelection: string[];
 
@@ -316,228 +312,222 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
   if (!goal) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Edit 12-Week Goal</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <X size={24} color="#1f2937" />
-          </TouchableOpacity>
-        </View>
+    <>
+      <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Edit 12-Week Goal</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <X size={24} color="#1f2937" />
+            </TouchableOpacity>
+          </View>
 
-        <ScrollView style={styles.content}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#0078d4" />
-              <Text style={styles.loadingText}>Loading data...</Text>
-            </View>
-          ) : (
-            <View style={styles.form}>
-              {/* Goal Title */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Goal Title *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Enter goal title"
-                  placeholderTextColor="#9ca3af"
-                  maxLength={100}
-                />
+          <ScrollView style={styles.content}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0078d4" />
+                <Text style={styles.loadingText}>Loading data...</Text>
               </View>
-
-              {/* Goal Description */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Description</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="Describe your goal and why it matters..."
-                  placeholderTextColor="#9ca3af"
-                  multiline
-                  numberOfLines={3}
-                  maxLength={500}
-                />
-              </View>
-
-              {/* Wellness Domains */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Wellness Domains</Text>
-                <View style={styles.checkboxGrid}>
-                  {allDomains.map(domain => {
-                    const isSelected = selectedDomainIds.includes(domain.id);
-                    return (
-                      <TouchableOpacity
-                        key={domain.id}
-                        style={styles.checkItem}
-                        onPress={() => handleMultiSelect('domains', domain.id)}
-                      >
-                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                        </View>
-                        <Text style={styles.checkLabel}>{domain.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Active Roles */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Active Roles</Text>
-                <View style={styles.checkboxGrid}>
-                  {allRoles.map(role => {
-                    const isSelected = selectedRoleIds.includes(role.id);
-                    return (
-                      <TouchableOpacity
-                        key={role.id}
-                        style={styles.checkItem}
-                        onPress={() => handleMultiSelect('roles', role.id)}
-                      >
-                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                        </View>
-                        <Text style={styles.checkLabel}>{role.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Key Relationships (filtered by selected Roles) */}
-              {filteredKeyRelationships.length > 0 && (
-                <View style={styles.field}>
-                  <Text style={styles.label}>Key Relationships</Text>
-                  <View style={styles.checkboxGrid}>
-                    {filteredKeyRelationships.map(kr => {
-                      const isSelected = selectedKeyRelationshipIds.includes(kr.id);
-                      return (
-                        <TouchableOpacity
-                          key={kr.id}
-                          style={styles.checkItem}
-                          onPress={() => handleMultiSelect('keyRelationships', kr.id)}
-                        >
-                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                          </View>
-                          <Text style={styles.checkLabel}>{kr.name}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-              
-              {/* Existing Notes */}
-              {allNotes.length > 0 && (
-                <View style={styles.field}>
-                  <Text style={styles.label}>Existing Notes</Text>
-                  <View style={styles.checkboxGrid}>
-                    {allNotes.map(note => {
-                      const isSelected = existingNoteIds.includes(note.id);
-                      return (
-                        <TouchableOpacity
-                          key={note.id}
-                          style={styles.checkItem}
-                          onPress={() => handleMultiSelect('notes', note.id)}
-                        >
-                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                          </View>
-                          <Text style={styles.checkLabel} numberOfLines={1}>{note.content}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-
-              {/* Add New Note */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Add New Note</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={noteText}
-                  onChangeText={setNoteText}
-                  placeholder="Write a new note for this goal..."
-                  placeholderTextColor="#9ca3af"
-                  multiline
-                  numberOfLines={3}
-                  maxLength={500}
-                />
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        <View style={styles.actions}>
-          <TouchableOpacity 
-            style={styles.deleteButton}
-            onPress={handleDelete}
-            disabled={saving}
-          >
-            <Trash2 size={16} color="#ffffff" />
-            <Text style={styles.deleteButtonText}>Delete Goal</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.saveButton, (!title.trim() || saving) && styles.saveButtonDisabled]}
-            onPress={handleSave}
-            disabled={!title.trim() || saving}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+              <View style={styles.form}>
+                {/* Goal Title */}
+                <View style={styles.field}>
+                  <Text style={styles.label}>Goal Title *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={title}
+                    onChangeText={setTitle}
+                    placeholder="Enter goal title"
+                    placeholderTextColor="#9ca3af"
+                    maxLength={100}
+                  />
+                </View>
 
-        {/* Custom Delete Confirmation Modal */}
-        {showConfirmDeleteModal && (
-          <Modal
-            visible={showConfirmDeleteModal}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowConfirmDeleteModal(false)}
-          >
-            <View style={styles.confirmOverlay}>
-              <View style={styles.confirmContainer}>
-                <Text style={styles.confirmTitle}>Delete Goal</Text>
-                <Text style={styles.confirmMessage}>
-                  Are you sure you want to delete this goal? This action cannot be undone.
-                </Text>
-                <View style={styles.confirmActions}>
-                  <TouchableOpacity
-                    style={styles.confirmCancelButton}
-                    onPress={() => setShowConfirmDeleteModal(false)}
-                    disabled={saving}
-                  >
-                    <Text style={styles.confirmCancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.confirmDeleteButton,
-                      saving && styles.confirmDeleteButtonDisabled,
-                    ]}
-                    onPress={confirmDelete}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <Text style={styles.confirmDeleteButtonText}>Delete</Text>
-                    )}
-                  </TouchableOpacity>
+                {/* Goal Description */}
+                <View style={styles.field}>
+                  <Text style={styles.label}>Description</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder="Describe your goal and why it matters..."
+                    placeholderTextColor="#9ca3af"
+                    multiline
+                    numberOfLines={3}
+                    maxLength={500}
+                  />
+                </View>
+
+                {/* Wellness Domains */}
+                <View style={styles.field}>
+                  <Text style={styles.label}>Wellness Domains</Text>
+                  <View style={styles.checkboxGrid}>
+                    {allDomains.map(domain => {
+                      const isSelected = selectedDomainIds.includes(domain.id);
+                      return (
+                        <TouchableOpacity
+                          key={domain.id}
+                          style={styles.checkItem}
+                          onPress={() => handleMultiSelect('domains', domain.id)}
+                        >
+                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                          <Text style={styles.checkLabel}>{domain.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Active Roles */}
+                <View style={styles.field}>
+                  <Text style={styles.label}>Active Roles</Text>
+                  <View style={styles.checkboxGrid}>
+                    {allRoles.map(role => {
+                      const isSelected = selectedRoleIds.includes(role.id);
+                      return (
+                        <TouchableOpacity
+                          key={role.id}
+                          style={styles.checkItem}
+                          onPress={() => handleMultiSelect('roles', role.id)}
+                        >
+                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                          <Text style={styles.checkLabel}>{role.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Key Relationships (filtered by selected Roles) */}
+                {filteredKeyRelationships.length > 0 && (
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Key Relationships</Text>
+                    <View style={styles.checkboxGrid}>
+                      {filteredKeyRelationships.map(kr => {
+                        const isSelected = selectedKeyRelationshipIds.includes(kr.id);
+                        return (
+                          <TouchableOpacity
+                            key={kr.id}
+                            style={styles.checkItem}
+                            onPress={() => handleMultiSelect('keyRelationships', kr.id)}
+                          >
+                            <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                              {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                            </View>
+                            <Text style={styles.checkLabel}>{kr.name}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Existing Notes - Read Only Display */}
+                {goal.notes && goal.notes.length > 0 && (
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Previous Notes</Text>
+                    <View style={styles.existingNotesContainer}>
+                      {goal.notes.map((note, index) => (
+                        <View key={index} style={styles.existingNoteItem}>
+                          <Text style={styles.existingNoteContent}>{note.content}</Text>
+                          <Text style={styles.existingNoteDate}>
+                            {new Date(note.created_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Add New Note */}
+                <View style={styles.field}>
+                  <Text style={styles.label}>Add New Note</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={newNoteText}
+                    onChangeText={setNewNoteText}
+                    placeholder="Write a new note for this goal..."
+                    placeholderTextColor="#9ca3af"
+                    multiline
+                    numberOfLines={3}
+                    maxLength={500}
+                  />
                 </View>
               </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.actions}>
+            <TouchableOpacity 
+              style={styles.deleteButton}
+              onPress={handleDelete}
+              disabled={saving}
+            >
+              <Trash2 size={16} color="#ffffff" />
+              <Text style={styles.deleteButtonText}>Delete Goal</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.saveButton, (!title.trim() || saving) && styles.saveButtonDisabled]}
+              onPress={handleSave}
+              disabled={!title.trim() || saving}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Delete Confirmation Modal */}
+      {showConfirmDeleteModal && (
+        <Modal
+          visible={showConfirmDeleteModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowConfirmDeleteModal(false)}
+        >
+          <View style={styles.confirmOverlay}>
+            <View style={styles.confirmContainer}>
+              <Text style={styles.confirmTitle}>Delete Goal</Text>
+              <Text style={styles.confirmMessage}>
+                Are you sure you want to delete this goal? This action cannot be undone.
+              </Text>
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={styles.confirmCancelButton}
+                  onPress={() => setShowConfirmDeleteModal(false)}
+                  disabled={saving}
+                >
+                  <Text style={styles.confirmCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.confirmDeleteButton,
+                    saving && styles.confirmDeleteButtonDisabled,
+                  ]}
+                  onPress={confirmDelete}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.confirmDeleteButtonText}>Delete</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </Modal>
-        )}
-          </TouchableOpacity>
-      </View>
-    </Modal>
+          </View>
+        </Modal>
+      )}
+    </>
   );
 }
 
