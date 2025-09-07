@@ -320,87 +320,53 @@ return hydrated;
   };
 
   const fetchGoals = async (userCycleId: string) => {
-    setLoading(true);
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  setLoading(true);
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      // Fetch 12-week goals for the user cycle
-      const { data: goalsData, error: goalsError } = await supabase
-  .from('0008-ap-goals-12wk')
-  .select('*')
-  .eq('user_id', user.id)
-  .eq('user_cycle_id', userCycleId)
-  .eq('status', 'active')      
-  .order('created_at', { ascending: false });
+    // Fetch 12-week goals
+    const { data: goals12, error: error12 } = await supabase
+      .from('0008-ap-goals-12wk')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('user_cycle_id', userCycleId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
 
-      if (goalsError) throw goalsError;
+    if (error12) throw error12;
 
-      if (!goalsData || goalsData.length === 0) {
-        setGoals([]);
-        setGoalProgress({});
-        return;
-      }
+    // Fetch custom goals
+    const { data: goalsCustom, error: errorCustom } = await supabase
+      .from('0008-ap-goals-custom')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
 
-      const goalIds = goalsData.map(g => g.id);
+    if (errorCustom) throw errorCustom;
 
-      // Fetch related data for goals
-      const [
-        { data: rolesData, error: rolesError },
-        { data: domainsData, error: domainsError },
-        { data: krData, error: krError }
-      ] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', goalIds).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', goalIds).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).eq('parent_type', 'goal')
-      ]);
+    // Normalize & merge
+    const normalized12 = (goals12 ?? []).map(g => ({ ...g, goal_type: 'twelve_wk_goal' as GoalType }));
+    const normalizedCustom = (goalsCustom ?? []).map(g => ({ ...g, goal_type: 'custom_goal' as GoalType }));
 
-      if (rolesError) throw rolesError;
-      if (domainsError) throw domainsError;
-      if (krError) throw krError;
+    const mergedGoals = [...normalized12, ...normalizedCustom];
 
-      // Apply scope filtering if specified
-      let filteredGoalIds = goalIds;
-      if (options.scope && options.scope.type !== 'user' && options.scope.id) {
-        switch (options.scope.type) {
-          case 'role':
-            filteredGoalIds = rolesData?.filter(r => r.role?.id === options.scope!.id).map(r => r.parent_id) || [];
-            break;
-          case 'domain':
-            filteredGoalIds = domainsData?.filter(d => d.domain?.id === options.scope!.id).map(d => d.parent_id) || [];
-            break;
-          case 'key_relationship':
-            filteredGoalIds = krData?.filter(kr => kr.key_relationship?.id === options.scope!.id).map(kr => kr.parent_id) || [];
-            break;
-        }
-      }
+    console.log('Fetched merged goals:', mergedGoals);
 
-      // Transform goals with related data
-      const baseSet =
-  (options.scope && options.scope.type !== 'user' && options.scope.id)
-    ? goalsData.filter(goal => filteredGoalIds.includes(goal.id))
-    : goalsData;
+    setGoals(mergedGoals);
 
-const transformedGoals = baseSet.map(goal => ({
-  ...goal,
-          domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
-          roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
-          keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
-        }));
+    // Progress calculation only for 12-week goals (custom handled later)
+    await calculateGoalProgress(normalized12, userCycleId);
 
-      setGoals(transformedGoals);
-
-      // Calculate progress for each goal
-      await calculateGoalProgress(transformedGoals, userCycleId);
-
-    } catch (error) {
-      console.error('Error fetching goals:', error);
-      Alert.alert('Error', (error as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error('Error fetching goals:', error);
+    Alert.alert('Error', (error as Error).message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchTasksAndPlansForWeek = async (userCycleId: string, weekNumber: number): Promise<WeeklyTaskData[]> => {
     try {
