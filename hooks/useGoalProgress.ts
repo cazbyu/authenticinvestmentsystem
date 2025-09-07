@@ -797,10 +797,12 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
           continue; // Skip tasks not planned for this week
         }
 
-        console.log(`Processing task: ${task.title} (${task.id}) for goal: ${goalJoin.goal_id}`);
-        console.log(`Week plan: target_days=${weekPlan.target_days}`);
+        // Determine which type of goal this task belongs to
+const goalId = goalJoin.twelve_wk_goal_id ?? goalJoin.custom_goal_id;
+const goalType = goalJoin.twelve_wk_goal_id ? 'twelve_wk_goal' : 'custom_goal';
 
-        const goalId = goalJoin.twelve_wk_goal_id;
+console.log(`Processing task: ${task.title} (${task.id}) for goal: ${goalId} (${goalType})`);
+console.log(`Week plan: target_days=${weekPlan.target_days}`);
         
         // Convert completed occurrences to TaskLog format
         const relevantOccurrences = occurrenceData?.filter(occ => occ.parent_task_id === task.id) || [];
