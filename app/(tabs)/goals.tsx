@@ -695,63 +695,61 @@ useEffect(() => {
             <ScrollView style={styles.goalDropdownList}>
               {/* Show All Goals Option */}
               <TouchableOpacity
-  );
-            
-            {/* Week Navigator - moved to right side */}
-            {cycleWeeks.length > 0 && (
-              <View style={styles.weekNavigatorContainer}>
-                <View style={styles.weekNavContainer}>
-                  <TouchableOpacity 
-                    style={[
-                      styles.weekNavButton, 
-                      (selectedWeekIndex === 0 || loadingWeekActions) && styles.weekNavButtonDisabled
-                    ]}
-                    onPress={goPrevWeek}
-                    disabled={selectedWeekIndex === 0 || loadingWeekActions}
-                  >
-                    <ChevronLeft size={16} color={(selectedWeekIndex === 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
-                  </TouchableOpacity>
-                  
-                  <View style={styles.weekDisplay}>
-                    <Text style={styles.weekNumber}>
-                      Week {getWeekData(selectedWeekIndex)?.weekNumber || 1}
-                    </Text>
-                    <Text style={styles.weekDates}>
-                      {(() => {
-                        const weekData = getWeekData(selectedWeekIndex);
-                        if (!weekData) return '';
-                        const startDate = parseLocalDate(weekData.startDate);
-                        const endDate = parseLocalDate(weekData.endDate);
-                        const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                        return `${formatDate(startDate)} – ${formatDate(endDate)}`;
-                      })()}
-                    </Text>
+                style={[
+                  styles.goalDropdownItem,
+                  !selectedGoalFilterId && styles.selectedGoalDropdownItem
+                ]}
+                onPress={() => {
+                  setSelectedGoalFilterId(null);
+                  setShowGoalDropdown(false);
+                }}
+              >
+                <Text style={[
+                  styles.goalDropdownItemText,
+                  !selectedGoalFilterId && styles.selectedGoalDropdownItemText
+                ]}>
+                  All Goals
+                </Text>
+                {!selectedGoalFilterId && (
+                  <View style={styles.selectedIndicator}>
+                    <Text style={styles.selectedIndicatorText}>✓</Text>
                   </View>
-                  
-                  <TouchableOpacity 
-                    style={[
-                      styles.weekNavButton, 
-                      (selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) && styles.weekNavButtonDisabled
-                    ]}
-                    onPress={goNextWeek}
-                    disabled={selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions}
-                  >
-                    <ChevronRight size={16} color={(selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
-                  </TouchableOpacity>
-                </View>
-                
-                {/* Overall Cycle Effort Score */}
-                <View style={styles.cycleEffortScore}>
+                )}
+              </TouchableOpacity>
+              
+              {/* Individual Goals */}
+              {allGoals.map(goal => (
+                <TouchableOpacity
+                  key={goal.id}
+                  style={[
+                    styles.goalDropdownItem,
+                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItem
+                  ]}
+                  onPress={() => {
+                    setSelectedGoalFilterId(goal.id);
+                    setShowGoalDropdown(false);
+                  }}
+                >
                   <Text style={[
-                    styles.cycleEffortText,
-                    { color: getProgressColor(cycleEffortData.overallPercentage) }
+                    styles.goalDropdownItemText,
+                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItemText
                   ]}>
-                    {cycleEffortData.overallPercentage}%
+                    {goal.title}
                   </Text>
-                </View>
-              </View>
-            )}
+                  {selectedGoalFilterId === goal.id && (
+                    <View style={styles.selectedIndicator}>
+                      <Text style={styles.selectedIndicatorText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
