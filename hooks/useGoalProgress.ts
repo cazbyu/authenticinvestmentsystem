@@ -3,6 +3,24 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { Alert } from 'react-native';
 import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 
+export type GoalType = 'twelve_wk_goal' | 'custom_goal';
+
+export interface UnifiedGoal {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  status: string;
+  progress: number;
+  weekly_target: number;
+  total_target: number;
+  start_date?: string;
+  end_date?: string;
+  created_at?: string;
+  updated_at?: string;
+  goal_type: GoalType; // NEW — so UI can distinguish
+}
+
 export interface TwelveWeekGoal {
   id: string;
   title: string;
@@ -113,7 +131,7 @@ interface UseGoalProgressOptions {
 }
 
 export function useGoalProgress(options: UseGoalProgressOptions = {}) {
-  const [goals, setGoals] = useState<TwelveWeekGoal[]>([]);
+  const [goals, setGoals] = useState<UnifiedGoal[]>([]);
   const [currentCycle, setCurrentCycle] = useState<UserCycle | null>(null);
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [daysLeftData, setDaysLeftData] = useState<DaysLeftData | null>(null);
