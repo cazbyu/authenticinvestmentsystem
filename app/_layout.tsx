@@ -26,7 +26,6 @@ export default function RootLayout() {
           }}
         >
           <Drawer.Screen name="(tabs)" />
-          <Drawer.Screen name="landing" />
           <Drawer.Screen name="calendar" />
           <Drawer.Screen name="reflections" />
           <Drawer.Screen name="settings" />

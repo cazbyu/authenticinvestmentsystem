@@ -7,7 +7,6 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const menuItems = [
-  { id: 'landing', title: 'Landing Page', icon: BookOpen, route: '/landing' },
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
   { id: 'reflections', title: 'Reflections', icon: BookOpen, route: '/reflections' },
   { id: 'coach', title: 'Coach Chat', icon: MessageCircle, route: '/coach' },
