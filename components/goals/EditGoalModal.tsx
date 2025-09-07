@@ -30,6 +30,9 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [newNoteText, setNewNoteText] = useState(''); // For adding new notes
+  const [noteText, setNoteText] = useState('');
+  const [allNotes, setAllNotes] = useState<Note[]>([]);
+  const [existingNoteIds, setExistingNoteIds] = useState<string[]>([]);
   
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
@@ -491,67 +494,49 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
           </TouchableOpacity>
         </View>
 
-      {/* Custom Delete Confirmation Modal */}
-{showConfirmDeleteModal && (
-  <Modal
-    visible={showConfirmDeleteModal}
-    transparent
-    animationType="fade"
-    onRequestClose={() => setShowConfirmDeleteModal(false)}
-  >
-    <View style={styles.confirmOverlay}>
-      <View style={styles.confirmContainer}>
-        <Text style={styles.confirmTitle}>Delete Goal</Text>
-        <Text style={styles.confirmMessage}>
-          Are you sure you want to delete this goal? This action cannot be undone.
-        </Text>
-        <View style={styles.confirmActions}>
-          <TouchableOpacity
-            style={styles.confirmCancelButton}
-            onPress={() => setShowConfirmDeleteModal(false)}
-            disabled={saving}
+        {/* Custom Delete Confirmation Modal */}
+        {showConfirmDeleteModal && (
+          <Modal
+            visible={showConfirmDeleteModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowConfirmDeleteModal(false)}
           >
-            <Text style={styles.confirmCancelButtonText}>Cancel</Text>
-      </View>
-
-      {/* Custom Delete Confirmation Modal */}
-      {showConfirmDeleteModal && (
-        <Modal
-          visible={showConfirmDeleteModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowConfirmDeleteModal(false)}
-        >
-          <View style={styles.confirmOverlay}>
-            <View style={styles.confirmContainer}>
-              <Text style={styles.confirmTitle}>Delete Goal</Text>
-              <Text style={styles.confirmMessage}>
-                Are you sure you want to delete this goal? This action cannot be undone.
-              </Text>
-              <View style={styles.confirmActions}>
-                <TouchableOpacity
-                  style={styles.confirmCancelButton}
-                  onPress={() => setShowConfirmDeleteModal(false)}
-                  disabled={saving}
-                >
-                  <Text style={styles.confirmCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.confirmDeleteButton,
-                    saving && styles.confirmDeleteButtonDisabled,
-                  ]}
-                  onPress={confirmDelete}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
-                  ) : (
-                    <Text style={styles.confirmDeleteButtonText}>Delete</Text>
-                  )}
-                </TouchableOpacity>
+            <View style={styles.confirmOverlay}>
+              <View style={styles.confirmContainer}>
+                <Text style={styles.confirmTitle}>Delete Goal</Text>
+                <Text style={styles.confirmMessage}>
+                  Are you sure you want to delete this goal? This action cannot be undone.
+                </Text>
+                <View style={styles.confirmActions}>
+                  <TouchableOpacity
+                    style={styles.confirmCancelButton}
+                    onPress={() => setShowConfirmDeleteModal(false)}
+                    disabled={saving}
+                  >
+                    <Text style={styles.confirmCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.confirmDeleteButton,
+                      saving && styles.confirmDeleteButtonDisabled,
+                    ]}
+                    onPress={confirmDelete}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Text style={styles.confirmDeleteButtonText}>Delete</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-      )}
+            </View>
+          </Modal>
+        )}
+      </View>
+    </Modal>
   );
 }
 
