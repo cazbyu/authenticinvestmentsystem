@@ -606,10 +606,6 @@ useEffect(() => {
       );
     })}
   </View>
-)}
-          </View>
-
-                </ScrollView>
       ) : (
         <View style={styles.noCycleContainer}>
           <Target size={64} color="#6b7280" />
