@@ -75,7 +75,6 @@ export function CreateGoalModal({
   endDate: formatLocalDate(new Date(Date.now() + 84 * 24 * 60 * 60 * 1000)), // 12 weeks from now
   selectedRoleIds: [] as string[],
   selectedDomainIds: [] as string[],
-  selectedNoteIds: [] as string[],   
   selectedKeyRelationshipIds: [] as string[], 
   noteText: '',  
 });
@@ -87,7 +86,6 @@ export function CreateGoalModal({
   // Data fetching states
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [allDomains, setAllDomains] = useState<Domain[]>([]);
-  const [allNotes, setAllNotes] = useState<{ id: string; content: string }[]>([]);  // ✅ NEW
   const [allKeyRelationships, setAllKeyRelationships] = useState<{ id: string; name: string; role_id: string }[]>([]);
   const [roleKeyRelationships, setRoleKeyRelationships] = useState<{ parent_id: string; key_relationship_id: string }[]>([]);
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
@@ -184,15 +182,6 @@ const { data: roleKRData, error: roleKRError } = await supabase
 
       setAllKeyRelationships(krData || []);
 
-      // Fetch all notes
-const { data: notesData } = await supabase
-  .from('0008-ap-notes')
-  .select('id, content')
-  .eq('user_id', user.id)
-  .order('created_at', { ascending: false });
-
-setAllNotes(notesData || []);   // ✅ NEW
-
     } catch (error) {
       console.error('Error fetching data:', error);
       Alert.alert('Error', 'Failed to load form data');
@@ -210,7 +199,6 @@ setAllNotes(notesData || []);   // ✅ NEW
     endDate: formatLocalDate(twelveWeeksLater),
     selectedRoleIds: [],
     selectedDomainIds: [],
-    selectedNoteIds: [],            // ✅ added so notes don't go undefined
     selectedKeyRelationshipIds: [], // ✅ added so KR's don't go undefined
     noteText: '',
   });
@@ -342,13 +330,13 @@ setAllNotes(notesData || []);   // ✅ NEW
       if (domainError) throw domainError;
     }
 
-    // Insert note (single text field instead of all notes list)
-    if (formData.description?.trim()) {
+    // Insert note if provided
+    if (formData.noteText && formData.noteText.trim()) {
       const { data: newNote, error: noteError } = await supabase
         .from('0008-ap-notes')
         .insert({
           user_id: user.id,
-          content: formData.description.trim(),
+          content: formData.noteText.trim(),
         })
         .select()
         .single();
@@ -364,29 +352,6 @@ setAllNotes(notesData || []);   // ✅ NEW
         });
       if (noteJoinError) throw noteJoinError;
     }
-
-// ALSO persist the Goal's Notes field (noteText) just like Task/Event forms do
-if (formData.noteText && formData.noteText.trim()) {
-  const { data: newNote2, error: note2Error } = await supabase
-    .from('0008-ap-notes')
-    .insert({
-      user_id: user.id,
-      content: formData.noteText.trim(),
-    })
-    .select()
-    .single();
-  if (note2Error) throw note2Error;
-
-  const { error: noteJoinError2 } = await supabase
-    .from('0008-ap-universal-notes-join')
-    .insert({
-      parent_id: goalData.id,
-      parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
-      note_id: newNote2.id,
-      user_id: user.id,
-    });
-  if (noteJoinError2) throw noteJoinError2;
-}
     
     // Insert key relationship joins
 if (formData.selectedKeyRelationshipIds?.length) {

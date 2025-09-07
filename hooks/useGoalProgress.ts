@@ -37,6 +37,7 @@ export interface TwelveWeekGoal {
   domains?: Array<{ id: string; name: string }>;
   roles?: Array<{ id: string; label: string; color?: string }>;
   keyRelationships?: Array<{ id: string; name: string }>;
+  notes?: Array<{ content: string; created_at: string }>;
 }
 
 export interface UserCycle {

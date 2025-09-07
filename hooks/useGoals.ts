@@ -19,6 +19,7 @@ export interface TwelveWeekGoal {
   domains?: Array<{ id: string; name: string }>;
   roles?: Array<{ id: string; label: string; color?: string }>;
   keyRelationships?: Array<{ id: string; name: string }>;
+  notes?: Array<{ content: string; created_at: string }>;
   goal_type: '12week';
 }
 
@@ -35,6 +36,7 @@ export interface CustomGoal {
   domains?: Array<{ id: string; name: string }>;
   roles?: Array<{ id: string; label: string; color?: string }>;
   keyRelationships?: Array<{ id: string; name: string }>;
+  notes?: Array<{ content: string; created_at: string }>;
   goal_type: 'custom';
 }
 

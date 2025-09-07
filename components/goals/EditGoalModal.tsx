@@ -29,17 +29,15 @@ interface EditGoalModalProps {
 export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [noteText, setNoteText] = useState(''); // For adding new notes
+  const [newNoteText, setNewNoteText] = useState(''); // For adding new notes
   
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
   const [selectedKeyRelationshipIds, setSelectedKeyRelationshipIds] = useState<string[]>([]);
-  const [existingNoteIds, setExistingNoteIds] = useState<string[]>([]); // IDs of notes already linked to goal
 
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [allDomains, setAllDomains] = useState<Domain[]>([]);
   const [allKeyRelationships, setAllKeyRelationships] = useState<KeyRelationship[]>([]);
-  const [allNotes, setAllNotes] = useState<Note[]>([]); // All user notes, for selection
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,15 +51,13 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       // Reset state when modal closes
       setTitle('');
       setDescription('');
-      setNoteText('');
+      setNewNoteText('');
       setSelectedRoleIds([]);
       setSelectedDomainIds([]);
       setSelectedKeyRelationshipIds([]);
-      setExistingNoteIds([]);
       setAllRoles([]);
       setAllDomains([]);
       setAllKeyRelationships([]);
-      setAllNotes([]);
       setLoading(true);
       setSaving(false);
     }
@@ -76,22 +72,6 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
     setSelectedRoleIds(goal.roles?.map(r => r.id) || []);
     setSelectedDomainIds(goal.domains?.map(d => d.id) || []);
     setSelectedKeyRelationshipIds(goal.keyRelationships?.map(kr => kr.id) || []);
-    
-    // Fetch and set existing notes linked to this goal
-    try {
-      const supabase = getSupabaseClient();
-      const { data: notesJoinData, error: notesJoinError } = await supabase
-        .from('0008-ap-universal-notes-join')
-        .select('note_id')
-        .eq('parent_id', goal.id)
-        .eq('parent_type', 'goal');
-      
-      if (notesJoinError) throw notesJoinError;
-      setExistingNoteIds(notesJoinData?.map(nj => nj.note_id) || []);
-    } catch (error) {
-      console.error('Error loading existing notes for goal:', error);
-      Alert.alert('Error', 'Failed to load existing notes.');
-    }
   };
 
   const fetchOptions = async () => {
@@ -104,19 +84,16 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       const [
         { data: rolesData },
         { data: domainsData },
-        { data: krData },
-        { data: notesData }
+        { data: krData }
       ] = await Promise.all([
         supabase.from('0008-ap-roles').select('id, label, color').eq('user_id', user.id).eq('is_active', true),
         supabase.from('0008-ap-domains').select('id, name'),
-        supabase.from('0008-ap-key-relationships').select('id, name, role_id').eq('user_id', user.id),
-        supabase.from('0008-ap-notes').select('id, content, created_at').eq('user_id', user.id).order('created_at', { ascending: false })
+        supabase.from('0008-ap-key-relationships').select('id, name, role_id').eq('user_id', user.id)
       ]);
 
       setAllRoles(rolesData || []);
       setAllDomains(domainsData || []);
       setAllKeyRelationships(krData || []);
-      setAllNotes(notesData || []);
     } catch (error) {
       console.error('Error fetching options:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to load options.');
@@ -133,7 +110,6 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       case 'roles': setter = setSelectedRoleIds; currentSelection = selectedRoleIds; break;
       case 'domains': setter = setSelectedDomainIds; currentSelection = selectedDomainIds; break;
       case 'keyRelationships': setter = setSelectedKeyRelationshipIds; currentSelection = selectedKeyRelationshipIds; break;
-      case 'notes': setter = setExistingNoteIds; currentSelection = existingNoteIds; break;
       default: return;
     }
 
@@ -218,12 +194,11 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
         updateJoins('0008-ap-universal-key-relationships-join', 'parent_id', 'key_relationship_id', currentKRIds, selectedKeyRelationshipIds),
       ]);
 
-      // 3. Handle Notes
-      // Add new note if noteText is provided
-      if (noteText.trim()) {
+      // 3. Add new note if provided
+      if (newNoteText.trim()) {
         const { data: newNote, error: newNoteError } = await supabase
-          .from('0008-ap-notes')
-          .insert({ user_id: user.id, content: noteText.trim() })
+          .from('0008-ap-notes') 
+          .insert({ user_id: user.id, content: newNoteText.trim() })
           .select('id')
           .single();
         if (newNoteError) throw newNoteError;
@@ -233,14 +208,6 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
           .insert({ parent_id: goal.id, parent_type: 'goal', note_id: newNote.id, user_id: user.id });
         if (noteJoinError) throw noteJoinError;
       }
-
-      // Handle removal/addition of existing notes linked to the goal
-      const [{ data: currentGoalNotesJoins }] = await Promise.all([
-        supabase.from('0008-ap-universal-notes-join').select('note_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
-      ]);
-      const currentGoalNoteIds = currentGoalNotesJoins?.map(j => j.note_id) || [];
-      await updateJoins('0008-ap-universal-notes-join', 'parent_id', 'note_id', currentGoalNoteIds, existingNoteIds);
-
 
       Alert.alert('Success', 'Goal updated successfully!');
       onUpdate();
@@ -525,44 +492,39 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
         </View>
 
         {/* Custom Delete Confirmation Modal */}
-        <Modal 
-          visible={showConfirmDeleteModal} 
-          transparent 
-          animationType="fade"
-          onRequestClose={() => setShowConfirmDeleteModal(false)}
-        >
-          <View style={styles.confirmOverlay}>
-            <View style={styles.confirmContainer}>
-              <Text style={styles.confirmTitle}>Delete Goal</Text>
-              <Text style={styles.confirmMessage}>
-                Are you sure you want to delete "{goal?.title}"? This action cannot be undone.
-              </Text>
-              
-              <View style={styles.confirmActions}>
-                <TouchableOpacity 
-                  style={styles.confirmCancelButton}
-                  onPress={() => setShowConfirmDeleteModal(false)}
-                  disabled={saving}
-                >
-                  <Text style={styles.confirmCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.confirmDeleteButton, saving && styles.confirmDeleteButtonDisabled]}
                   onPress={confirmDelete}
                   disabled={saving}
                 >
-                  {saving ? (
+            <Text style={styles.label}>Notes</Text>
                     <ActivityIndicator size="small" color="#ffffff" />
                   ) : (
-                    <>
-                      <Trash2 size={16} color="#ffffff" />
+              value={newNoteText}
+              onChangeText={setNewNoteText}
                       <Text style={styles.confirmDeleteButtonText}>Delete</Text>
                     </>
                   )}
                 </TouchableOpacity>
               </View>
             </View>
+            
+            {/* Display existing notes (read-only) */}
+            {goal.notes && goal.notes.length > 0 && (
+              <View style={styles.existingNotesContainer}>
+                <Text style={styles.existingNotesLabel}>Previous Notes:</Text>
+                {goal.notes.map((note, index) => (
+                  <View key={index} style={styles.existingNoteItem}>
+                    <Text style={styles.existingNoteContent}>{note.content}</Text>
+                    <Text style={styles.existingNoteDate}>
+                      {new Date(note.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </Modal>
       </View>
@@ -772,5 +734,36 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  existingNotesContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  existingNotesLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  existingNoteItem: {
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0078d4',
+  },
+  existingNoteContent: {
+    fontSize: 14,
+    color: '#1f2937',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  existingNoteDate: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
 });

@@ -695,61 +695,63 @@ useEffect(() => {
             <ScrollView style={styles.goalDropdownList}>
               {/* Show All Goals Option */}
               <TouchableOpacity
-                style={[
-                  styles.goalDropdownItem,
-                  selectedGoalFilterId === null && styles.selectedGoalDropdownItem
-                ]}
-                onPress={() => {
-                  setSelectedGoalFilterId(null);
-                  setShowGoalDropdown(false);
-                }}
-              >
-                <Text style={[
-                  styles.goalDropdownItemText,
-                  selectedGoalFilterId === null && styles.selectedGoalDropdownItemText
-                ]}>
-                  Show All Goals
-                </Text>
-                {selectedGoalFilterId === null && (
-                  <View style={styles.selectedIndicator}>
-                    <Text style={styles.selectedIndicatorText}>✓</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              {/* Individual Goals */}
-              {allGoals.map(goal => (
-                <TouchableOpacity
-                  key={goal.id}
-                  style={[
-                    styles.goalDropdownItem,
-                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItem
-                  ]}
-                  onPress={() => {
-                    setSelectedGoalFilterId(goal.id);
-                    setShowGoalDropdown(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.goalDropdownItemText,
-                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItemText
-                  ]} numberOfLines={2}>
-                    {goal.title} {goal.goal_type === 'custom' && '(Custom)'}
-                  </Text>
-                  {selectedGoalFilterId === goal.id && (
-                    <View style={styles.selectedIndicator}>
-                      <Text style={styles.selectedIndicatorText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
   );
-}
+            
+            {/* Week Navigator - moved to right side */}
+            {cycleWeeks.length > 0 && (
+              <View style={styles.weekNavigatorContainer}>
+                <View style={styles.weekNavContainer}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.weekNavButton, 
+                      (selectedWeekIndex === 0 || loadingWeekActions) && styles.weekNavButtonDisabled
+                    ]}
+                    onPress={goPrevWeek}
+                    disabled={selectedWeekIndex === 0 || loadingWeekActions}
+                  >
+                    <ChevronLeft size={16} color={(selectedWeekIndex === 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.weekDisplay}>
+                    <Text style={styles.weekNumber}>
+                      Week {getWeekData(selectedWeekIndex)?.weekNumber || 1}
+                    </Text>
+                    <Text style={styles.weekDates}>
+                      {(() => {
+                        const weekData = getWeekData(selectedWeekIndex);
+                        if (!weekData) return '';
+                        const startDate = parseLocalDate(weekData.startDate);
+                        const endDate = parseLocalDate(weekData.endDate);
+                        const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+                      })()}
+                    </Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={[
+                      styles.weekNavButton, 
+                      (selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) && styles.weekNavButtonDisabled
+                    ]}
+                    onPress={goNextWeek}
+                    disabled={selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions}
+                  >
+                    <ChevronRight size={16} color={(selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Overall Cycle Effort Score */}
+                <View style={styles.cycleEffortScore}>
+                  <Text style={[
+                    styles.cycleEffortText,
+                    { color: getProgressColor(cycleEffortData.overallPercentage) }
+                  ]}>
+                    {cycleEffortData.overallPercentage}%
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
 
 const styles = StyleSheet.create({
   container: {
@@ -812,7 +814,13 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   cycleProgress: {
+    flex: 1,
+    marginRight: 16,
+  },
+  cycleProgressRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   cycleProgressLabel: {
     fontSize: 12,
@@ -832,11 +840,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   weekNavigatorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 12,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 8,
   },
   weekNavContainer: {
     paddingHorizontal: 12,
@@ -845,7 +851,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    maxWidth: 200,
   },
   cycleEffortScore: {
     paddingHorizontal: 12,
