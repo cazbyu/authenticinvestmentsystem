@@ -707,13 +707,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   goalTotalScore: {
-    position: 'absolute',
-    top: 16,
-    right: 0,
+    alignItems: 'flex-end',
+    marginBottom: 8,
     backgroundColor: '#f8fafc',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+    alignSelf: 'flex-end',
   },
   goalTotalScoreText: {
     fontSize: 12,

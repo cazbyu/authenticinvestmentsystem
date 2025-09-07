@@ -467,9 +467,10 @@ useEffect(() => {
               </View>
             </View>
             
-            {/* Week Navigator */}
+            {/* Week Navigator and Goal Filter Row */}
             {cycleWeeks.length > 0 && (
-              <View style={styles.weekNavigatorContainer}>
+              <View style={styles.navigationRow}>
+                {/* Week Navigator - left side */}
                 <View style={styles.weekNavContainer}>
                   <TouchableOpacity 
                     style={[
@@ -510,8 +511,25 @@ useEffect(() => {
                   </TouchableOpacity>
                 </View>
                 
-                {/* Overall Cycle Effort Score */}
-                <View style={styles.cycleEffortScore}>
+                {/* Goal Filter Dropdown - right side */}
+                {allGoals.length > 1 && (
+                  <TouchableOpacity
+                    style={styles.goalFilterButton}
+                    onPress={() => setShowGoalDropdown(true)}
+                  >
+                    <Text style={styles.goalFilterButtonText}>
+                      {getSelectedGoalTitle()}
+                    </Text>
+                    <ChevronDown size={16} color="#0078d4" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Overall Cycle Effort Score - separate row */}
+            <View style={styles.cycleEffortContainer}>
+              <View style={styles.cycleEffortScore}>
+                <Text style={styles.cycleEffortLabel}>Overall Cycle Effort</Text>
                   <Text style={[
                     styles.cycleEffortText,
                     { color: getProgressColor(cycleEffortData.overallPercentage) }
@@ -520,22 +538,7 @@ useEffect(() => {
                   </Text>
                 </View>
               </View>
-            )}
-
-            {/* Goal Filter Dropdown */}
-            {allGoals.length > 1 && (
-              <View style={styles.goalFilterContainer}>
-                <TouchableOpacity
-                  style={styles.goalFilterButton}
-                  onPress={() => setShowGoalDropdown(true)}
-                >
-                  <Text style={styles.goalFilterButtonText}>
-                    {getSelectedGoalTitle()}
-                  </Text>
-                  <ChevronDown size={16} color="#0078d4" />
-                </TouchableOpacity>
-              </View>
-            )}
+            </View>
 
             {/* Goals List */}
             {goalsLoading ? (
@@ -815,11 +818,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 16,
   },
-  cycleProgressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   cycleProgressLabel: {
     fontSize: 12,
     color: '#6b7280',
@@ -837,33 +835,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#0078d4',
     borderRadius: 4,
   },
-  weekNavigatorContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  weekNavContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
+  navigationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  weekNavContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  cycleEffortContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginTop: 12,
   },
   cycleEffortScore: {
-    paddingHorizontal: 12,
+    alignItems: 'center',
     paddingVertical: 8,
     backgroundColor: '#f8fafc',
     borderRadius: 8,
+  },
+  cycleEffortLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
   },
   cycleEffortText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  goalFilterContainer: {
-    marginTop: 12,
-    marginBottom: 8,
-    alignItems: 'center',
   },
   goalFilterButton: {
     flexDirection: 'row',
@@ -875,14 +879,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
-    minWidth: 150,
-    justifyContent: 'center',
   },
   goalFilterButtonText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#0078d4',
-    textAlign: 'center',
   },
   weekNavButton: {
     padding: 6,
