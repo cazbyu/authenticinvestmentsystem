@@ -606,7 +606,7 @@ useEffect(() => {
       );
     })}
   </View>
-)}
+      )}
         </ScrollView>
       ) : (
         <View style={styles.noCycleContainer}>
