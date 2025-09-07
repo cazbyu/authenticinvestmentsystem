@@ -512,49 +512,46 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             disabled={saving}
           >
             <Text style={styles.confirmCancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.confirmDeleteButton,
-              saving && styles.confirmDeleteButtonDisabled,
-            ]}
-            onPress={confirmDelete}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Text style={styles.confirmDeleteButtonText}>Delete</Text>
-            )}
-          </TouchableOpacity>
-        </View>
       </View>
-    </View>
-  </Modal>
-)}
-            
-            {/* Display existing notes (read-only) */}
-            {goal.notes && goal.notes.length > 0 && (
-              <View style={styles.existingNotesContainer}>
-                <Text style={styles.existingNotesLabel}>Previous Notes:</Text>
-                {goal.notes.map((note, index) => (
-                  <View key={index} style={styles.existingNoteItem}>
-                    <Text style={styles.existingNoteContent}>{note.content}</Text>
-                    <Text style={styles.existingNoteDate}>
-                      {new Date(note.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </Text>
-                  </View>
-                ))}
+
+      {/* Custom Delete Confirmation Modal */}
+      {showConfirmDeleteModal && (
+        <Modal
+          visible={showConfirmDeleteModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowConfirmDeleteModal(false)}
+        >
+          <View style={styles.confirmOverlay}>
+            <View style={styles.confirmContainer}>
+              <Text style={styles.confirmTitle}>Delete Goal</Text>
+              <Text style={styles.confirmMessage}>
+                Are you sure you want to delete this goal? This action cannot be undone.
+              </Text>
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={styles.confirmCancelButton}
+                  onPress={() => setShowConfirmDeleteModal(false)}
+                  disabled={saving}
+                >
+                  <Text style={styles.confirmCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.confirmDeleteButton,
+                    saving && styles.confirmDeleteButtonDisabled,
+                  ]}
+                  onPress={confirmDelete}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.confirmDeleteButtonText}>Delete</Text>
+                  )}
+                </TouchableOpacity>
               </View>
-            )}
-          </View>
-        </Modal>
-      </View>
-    </Modal>
+      )}
   );
 }
 
