@@ -498,10 +498,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             <Text style={styles.label}>Notes</Text>
                     <ActivityIndicator size="small" color="#ffffff" />
                   ) : (
-              value={newNoteText}
-              onChangeText={setNewNoteText}
-                      <Text style={styles.confirmDeleteButtonText}>Delete</Text>
-                    </>
+                    <Text style={styles.confirmDeleteButtonText}>Delete</Text>
                   )}
                 </TouchableOpacity>
               </View>
