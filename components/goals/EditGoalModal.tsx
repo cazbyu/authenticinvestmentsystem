@@ -535,6 +535,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             </View>
           </Modal>
         )}
+          </TouchableOpacity>
       </View>
     </Modal>
   );
