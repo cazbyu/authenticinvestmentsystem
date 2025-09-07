@@ -463,7 +463,7 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
         const { data: goalJoins } = await supabase
           .from('0008-ap-universal-goals-join')
           .select('parent_id')
-          .eq('twelve_wk_goal_id', goal.id)
+          .eq(goal.goal_type === 'custom_goal' ? 'custom_goal_id' : 'twelve_wk_goal_id', goal.id)
           .eq('parent_type', 'task');
 
         const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
