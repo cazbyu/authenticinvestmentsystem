@@ -1133,9 +1133,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginTop: 12,
     gap: 12,
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   goalsListRow: {
     flexDirection: 'row',
