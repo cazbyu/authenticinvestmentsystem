@@ -583,7 +583,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
             <View style={styles.allDayEvents}>
               {allDayItems.map(task => (
                 <TaskCard
-  key={`${task.id}-${task.start_date || task.due_date || date}`}
+  key={`${task.id}-${task.start_date || task.due_date || selectedDate}-${task.type}`}
                   task={task}
                   onComplete={handleCompleteTask}
                   onDoublePress={handleTaskDoublePress}
