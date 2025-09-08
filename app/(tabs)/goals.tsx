@@ -1139,7 +1139,7 @@ goalItem: {
   goalItemTwoCol: {
     width: '48%',
     maxWidth: '48%',
-    marginRigh: 12,
+    marginRight: 12,
  },
 
   loadingContainer: {
