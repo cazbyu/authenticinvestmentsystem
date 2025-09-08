@@ -886,7 +886,7 @@ const dayEvents = expandedTasks.map(task => ({
                   <View style={styles.weekDayEvents}>
                     {dayEvents.slice(0, 3).map(event => (
   <View 
-    key={`${event.id}-${event.date}`}
+    key={`${event.id}-${event.date}-${event.type}`}
                         style={[styles.weekEventDot, { backgroundColor: event.color }]}
                       />
                     ))}
