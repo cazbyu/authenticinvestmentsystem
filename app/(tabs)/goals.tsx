@@ -10,9 +10,9 @@ import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
-import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
+import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
+import { ManageCustomTimelinesModal } from '@/components/goals/ManageCustomTimelinesModal';
 
 export default function Goals() { // Ensure this is the default export
   const [authenticScore, setAuthenticScore] = useState(0);
@@ -775,7 +775,6 @@ useEffect(() => {
               );
             })}
            </View>
-        </View>
         )}
         </View>
       </ScrollView>
@@ -1110,157 +1109,9 @@ useEffect(() => {
           <ScrollView style={styles.goalModalContent}>
             {selectedGoalForModal && (
               <View style={styles.goalModalBody}>
-              <GoalProgressCard
-                key={customGoal.id}
-                goal={customGoal}
-                expanded={true}
-                progress={{
-                  goalId: customGoal.id,
-                  currentWeek: 1,
-                  daysRemaining: (() => {
-                    const startDate = parseLocalDate(customGoal.start_date);
-                    const endDate = parseLocalDate(customGoal.end_date);
-                    const now = new Date();
-                    return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                  })(),
-                  weeklyActual: 0,
-                  weeklyTarget: 0,
-                  overallActual: 0,
-                  overallTarget: 0,
-                  overallProgress: 0,
-                }}
-                onEdit={() => {
-                  setSelectedGoalToEdit(customGoal);
-                  setEditGoalModalVisible(true);
-                }}
-                onPress={() => handleGoalDoublePress(customGoal)}
-              />
-            </View>
-          </View>
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <Header 
-        title="Goal Bank" 
-        authenticScore={authenticScore}
-        daysRemaining={daysLeftData?.days_left}
-        cycleProgressPercentage={daysLeftData?.pct_elapsed}
-        cycleTitle={currentCycle?.title}
-      />
-      
-      <>
-      {selectedTimelineId ? (
-        renderSelectedTimeline()
-      ) : (currentCycle || customGoals.length > 0) ? (
-        renderTimelineContainers()
-      ) : (
-        <View style={styles.noCycleContainer}>
-          <Target size={64} color="#6b7280" />
-          <Text style={styles.noCycleTitle}>Start Your Goal Journey</Text>
-          <Text style={styles.noCycleText}>
-            Create a 12-week cycle to track systematic goals, or create custom goals with your own timeline.
-          </Text>
-          
-          <View style={styles.startOptions}>
-            <TouchableOpacity 
-              style={styles.startCycleButton}
-              onPress={() => setCycleSetupVisible(true)}
-            >
-              <Calendar size={20} color="#ffffff" />
-              <Text style={styles.startCycleButtonText}>Start 12-Week Cycle</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.startCustomGoalButton}
-              onPress={() => {
-                setInitialGoalType('custom');
-                setCreateGoalModalVisible(true);
-              }}
-            >
-              <Target size={20} color="#7c3aed" />
-              <Text style={styles.startCustomGoalButtonText}>Create Custom Goal</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => {
-          setInitialGoalType('12week');
-          setCreateGoalModalVisible(true);
-        }}
-      >
-        <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
-      </>
-
-      {/* Task Form Modal */}
-      <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
-        <TaskEventForm
-          mode={editingTask?.id ? "edit" : "create"}
-          initialData={editingTask || undefined}
-          onSubmitSuccess={handleFormSubmitSuccess}
-          onClose={handleFormClose}
-        />
-      </Modal>
-
-      {/* Cycle Setup Modal */}
-      <CycleSetupModal
-        visible={cycleSetupVisible}
-        onClose={() => setCycleSetupVisible(false)}
-        onSuccess={handleCycleCreated}
-        initialData={editingCycle}
-      />
-
-      {/* Create Goal Modal */}
-      <CreateGoalModal
-        visible={createGoalModalVisible}
-        onClose={() => setCreateGoalModalVisible(false)}
-        onSubmitSuccess={handleCreateGoalSuccess}
-        createTwelveWeekGoal={createTwelveWeekGoal}
-        createCustomGoal={createCustomGoal}
-        initialGoalType={initialGoalType}
-      />
-
-      {/* Edit Goal Modal */}
-      <EditGoalModal
-        visible={editGoalModalVisible}
-        onClose={() => setEditGoalModalVisible(false)}
-        onUpdate={handleEditGoalSuccess}
-        goal={selectedGoalToEdit}
-      />
-
-      {/* Action Effort Modal */}
-      <ActionEffortModal
-        visible={isActionEffortModalVisible}
-        onClose={() => {
-          setIsActionEffortModalVisible(false);
-          setSelectedGoalForAction(null);
-          refreshAllData();
-        }}
-        goal={selectedGoalForAction}
-        cycleWeeks={cycleWeeks}
-        createTaskWithWeekPlan={createTaskWithWeekPlan}
-      />
-
-      {/* Individual Goal Modal */}
-      <Modal visible={goalModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.goalModalContainer}>
-          <View style={styles.goalModalHeader}>
-            <Text style={styles.goalModalTitle}>
-              {selectedGoalForModal?.title || 'Goal Details'}
-            </Text>
-            <TouchableOpacity onPress={handleGoalModalClose} style={styles.goalModalCloseButton}>
-              <X size={24} color="#1f2937" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.goalModalContent}>
-            {selectedGoalForModal && (
-              <View style={styles.goalModalBody}>
                 <GoalProgressCard
                   goal={selectedGoalForModal}
+                  expanded={true}
                   progress={goalProgress[selectedGoalForModal.id] || customTimelineProgress[selectedGoalForModal.id] || {
                     goalId: selectedGoalForModal.id,
                     currentWeek: 1,
@@ -1270,22 +1121,12 @@ useEffect(() => {
                     overallActual: 0,
                     overallTarget: 0,
                     overallProgress: 0,
-                  loadingWeekActions={loadingWeekActions}
+                  }}
                   week={selectedTimelineId === 'twelve-week' ? getWeekData(selectedWeekIndex) : customTimelineWeeks[selectedWeekIndex]}
                   selectedWeekNumber={selectedTimelineId === 'twelve-week' ? getWeekData(selectedWeekIndex)?.weekNumber : customTimelineWeeks[selectedWeekIndex]?.week_number}
                   weekActions={weekGoalActions[selectedGoalForModal.id] || []}
                   loadingWeekActions={loadingWeekActions}
                   onAddAction={() => {
-                    setSelectedGoalForAction(selectedGoalForModal);
-                    setGoalModalVisible(false);
-                    setIsActionEffortModalVisible(true);
-                  }}
-                  onToggleCompletion={handleToggleCompletion}
-                  onEdit={() => {
-                    setSelectedGoalToEdit(selectedGoalForModal);
-                    setGoalModalVisible(false);
-                    setEditGoalModalVisible(true);
-                  }}
                     setSelectedGoalForAction(selectedGoalForModal);
                     setGoalModalVisible(false);
                     setIsActionEffortModalVisible(true);
@@ -1311,10 +1152,9 @@ useEffect(() => {
           refreshAllData();
           if (selectedTimelineId && selectedTimelineId !== 'twelve-week') {
             loadCustomTimelineData(selectedTimelineId);
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
