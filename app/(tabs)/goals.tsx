@@ -10,6 +10,7 @@ import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
+import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
@@ -32,6 +33,10 @@ export default function Goals() { // Ensure this is the default export
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
   const [selectedTimelineId, setSelectedTimelineId] = useState<string | null>(null);
   const [initialGoalType, setInitialGoalType] = useState<'12week' | 'custom'>('12week');
+  const [customTimelineWeeks, setCustomTimelineWeeks] = useState<any[]>([]);
+  const [customTimelineGoals, setCustomTimelineGoals] = useState<any[]>([]);
+  const [customTimelineProgress, setCustomTimelineProgress] = useState<Record<string, any>>({});
+  const [isCustomTimelinesModalVisible, setIsCustomTimelinesModalVisible] = useState(false);
 
  const { width } = useWindowDimensions();
  const twoUp = Platform.OS === 'web' && width >= 768;
@@ -417,10 +422,93 @@ useEffect(() => {
 
   const handleTimelineSelect = (timelineId: string) => {
     setSelectedTimelineId(timelineId);
+    if (timelineId !== 'twelve-week') {
+      // Load custom timeline data
+      loadCustomTimelineData(timelineId);
+    }
+  };
+
+  const loadCustomTimelineData = async (timelineId: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get the custom goal (timeline)
+      const { data: customGoal, error: goalError } = await supabase
+        .from('0008-ap-goals-custom')
+        .select('*')
+        .eq('id', timelineId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (goalError) throw goalError;
+      if (!customGoal) return;
+
+      // Generate weeks for this custom timeline
+      const startDate = parseLocalDate(customGoal.start_date);
+      const endDate = parseLocalDate(customGoal.end_date);
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const totalWeeks = Math.ceil(totalDays / 7);
+
+      const weeks = [];
+      for (let i = 0; i < totalWeeks; i++) {
+        const weekStart = new Date(startDate);
+        weekStart.setDate(startDate.getDate() + (i * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        
+        // Don't let week end go past the timeline end date
+        if (weekEnd > endDate) {
+          weekEnd.setTime(endDate.getTime());
+        }
+
+        weeks.push({
+          week_number: i + 1,
+          start_date: formatLocalDate(weekStart),
+          end_date: formatLocalDate(weekEnd),
+          user_cycle_id: timelineId,
+        });
+      }
+
+      setCustomTimelineWeeks(weeks);
+
+      // Set initial week to current week or first week
+      const now = new Date();
+      const currentDateString = formatLocalDate(now);
+      const currentWeekIndex = weeks.findIndex(week => 
+        currentDateString >= week.start_date && currentDateString <= week.end_date
+      );
+      setSelectedWeekIndex(Math.max(0, currentWeekIndex));
+
+      // Load goals for this timeline (just the one custom goal)
+      const customGoalWithType = { ...customGoal, goal_type: 'custom' };
+      setCustomTimelineGoals([customGoalWithType]);
+
+      // Create mock progress for custom goal
+      const mockProgress = {
+        goalId: customGoal.id,
+        currentWeek: Math.max(1, currentWeekIndex + 1),
+        daysRemaining: Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
+        weeklyActual: 0,
+        weeklyTarget: 0,
+        overallActual: 0,
+        overallTarget: 0,
+        overallProgress: 0,
+      };
+      setCustomTimelineProgress({ [customGoal.id]: mockProgress });
+
+    } catch (error) {
+      console.error('Error loading custom timeline data:', error);
+      Alert.alert('Error', 'Failed to load timeline data');
+    }
   };
 
   const handleBackToTimelines = () => {
     setSelectedTimelineId(null);
+    setCustomTimelineWeeks([]);
+    setCustomTimelineGoals([]);
+    setCustomTimelineProgress({});
   };
 
   const renderTimelineContainers = () => {
@@ -551,7 +639,7 @@ useEffect(() => {
 
         <View style={styles.cycleProgress}>
           <Text style={styles.cycleProgressLabel}>
-            {calculateCycleProgress().daysRemaining} days left • Today is {(() => {
+            {daysLeftData?.days_left || calculateCycleProgress().daysRemaining} days left • Today is {(() => {
               const today = new Date();
               const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
               const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -572,7 +660,7 @@ useEffect(() => {
         </View>
 
         {/* Navigation Row */}
-        {cycleWeeks.length > 0 && (
+        {(cycleWeeks.length > 0 || customTimelineWeeks.length > 0) && (
           <View style={styles.navigationRow}>
             <View style={styles.weekNavContainer}>
               <TouchableOpacity
@@ -588,11 +676,19 @@ useEffect(() => {
 
               <View style={styles.weekDisplay}>
                 <Text style={styles.weekNumber}>
-                  Week {getWeekData(selectedWeekIndex)?.weekNumber || 1}
+                  Week {(() => {
+                    if (selectedTimelineId === 'twelve-week') {
+                      return getWeekData(selectedWeekIndex)?.weekNumber || 1;
+                    } else {
+                      return customTimelineWeeks[selectedWeekIndex]?.week_number || 1;
+                    }
+                  })()}
                 </Text>
                 <Text style={styles.weekDates}>
                   {(() => {
-                    const weekData = getWeekData(selectedWeekIndex);
+                    const weekData = selectedTimelineId === 'twelve-week' 
+                      ? getWeekData(selectedWeekIndex)
+                      : customTimelineWeeks[selectedWeekIndex];
                     if (!weekData) return '';
                     const startDate = parseLocalDate(weekData.startDate);
                     const endDate = parseLocalDate(weekData.endDate);
@@ -604,12 +700,12 @@ useEffect(() => {
               <TouchableOpacity
                 style={[
                   styles.weekNavButton,
-                  (selectedWeekIndex >= cycleWeeks.length - 1 || loadingWeekActions) && styles.weekNavButtonDisabled
+                  (selectedWeekIndex >= (selectedTimelineId === 'twelve-week' ? cycleWeeks.length : customTimelineWeeks.length) - 1 || loadingWeekActions) && styles.weekNavButtonDisabled
                 ]}
                 onPress={goNextWeek}
-                disabled={selectedWeekIndex >= cycleWeeks.length - 1 || loadingWeekActions}
+                disabled={selectedWeekIndex >= (selectedTimelineId === 'twelve-week' ? cycleWeeks.length : customTimelineWeeks.length) - 1 || loadingWeekActions}
               >
-                <ChevronRight size={16} color={(selectedWeekIndex >= cycleWeeks.length - 1 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+                <ChevronRight size={16} color={(selectedWeekIndex >= (selectedTimelineId === 'twelve-week' ? cycleWeeks.length : customTimelineWeeks.length) - 1 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.expandButton} onPress={() => setGoalsExpanded(!goalsExpanded)}>
@@ -621,11 +717,11 @@ useEffect(() => {
         )}
 
         {/* 12-Week Goals List */}
-        {goalsLoading ? (
+        {(goalsLoading) ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#1f6feb" />
           </View>
-        ) : twelveWeekGoals.length === 0 ? (
+        ) : (twelveWeekGoals.length === 0) ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>No 12-Week Goals Yet</Text>
             <Text style={styles.emptyText}>
@@ -644,10 +740,11 @@ useEffect(() => {
           </View>
         ) : (
           <View style={[styles.goalsList, twoUp && styles.goalsListRow]}>
-          <View style={styles.goalsList}>
             {twelveWeekGoals.map(goal => {
               const progress = goalProgress[goal.id];
-              const weekData = getWeekData(selectedWeekIndex);
+              const weekData = selectedTimelineId === 'twelve-week' 
+                ? getWeekData(selectedWeekIndex)
+                : customTimelineWeeks[selectedWeekIndex];
               const goalActions = weekGoalActions[goal.id] || [];
               if (!progress) return null;
 
@@ -677,7 +774,7 @@ useEffect(() => {
                 </View>
               );
             })}
-          </View>
+           </View>
         </View>
         )}
         </View>
@@ -687,6 +784,9 @@ useEffect(() => {
     // Custom goal view
     const customGoal = customGoals.find(g => g.id === selectedTimelineId);
     if (!customGoal) return null;
+
+    const customProgress = customTimelineProgress[customGoal.id];
+    const weekData = customTimelineWeeks[selectedWeekIndex];
 
     return (
       <ScrollView style={styles.content}>
@@ -706,8 +806,8 @@ useEffect(() => {
               <TouchableOpacity
                 style={styles.editCycleButton}
                 onPress={() => {
-                  setSelectedGoalToEdit(customGoal);
-                  setEditGoalModalVisible(true);
+                  // Open timeline management for editing
+                  setIsCustomTimelinesModalVisible(true);
                 }}
               >
                 <Text style={styles.editCycleButtonText}>Edit</Text>
@@ -717,26 +817,27 @@ useEffect(() => {
             <Text style={styles.cycleDates}>
               {formatDateRange(customGoal.start_date, customGoal.end_date)}
             </Text>
-            <Text style={styles.activeGoalsInfo}>Custom Goal Timeline</Text>
+            <Text style={styles.activeGoalsInfo}>
+              Custom Timeline • {customTimelineWeeks.length} weeks • {customTimelineGoals.length} active goal{customTimelineGoals.length !== 1 ? 's' : ''}
+            </Text>
           </View>
 
           <View style={styles.cycleProgress}>
             <Text style={styles.cycleProgressLabel}>
-              {calculateCycleProgress().daysRemaining} days left • Today is {(() => {
+              {(() => {
+                const startDate = parseLocalDate(customGoal.start_date);
+                const endDate = parseLocalDate(customGoal.end_date);
+                const now = new Date();
+                return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+              })()} days left • Today is {(() => {
                 const today = new Date();
                 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 const dayName = dayNames[today.getDay()];
                 const monthName = monthNames[today.getMonth()];
                 const dayNumber = today.getDate();
-                return `${monthName} ${dayNumber} (${dayName})`;
+                return `${dayNumber} ${monthName} (${dayName})`;
               })()}
-                const startDate = parseLocalDate(customGoal.start_date);
-                const endDate = parseLocalDate(customGoal.end_date);
-                const now = new Date();
-                const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                return daysRemaining;
-              })()} days left
             </Text>
             <View style={styles.cycleProgressBar}>
               <View
@@ -754,10 +855,261 @@ useEffect(() => {
               />
             </View>
           </View>
+        </View>
 
-          {/* Custom Goal Display */}
+        {/* Week Navigation for Custom Timeline */}
+        {customTimelineWeeks.length > 0 && (
+          <View style={styles.navigationRow}>
+            <View style={styles.weekNavContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.weekNavButton,
+                  (selectedWeekIndex === 0 || loadingWeekActions) && styles.weekNavButtonDisabled
+                ]}
+                onPress={goPrevWeek}
+                disabled={selectedWeekIndex === 0 || loadingWeekActions}
+              >
+                <ChevronLeft size={16} color={(selectedWeekIndex === 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+              </TouchableOpacity>
+
+              <View style={styles.weekDisplay}>
+                <Text style={styles.weekNumber}>
+                  Week {customTimelineWeeks[selectedWeekIndex]?.week_number || 1}
+                </Text>
+                <Text style={styles.weekDates}>
+                  {(() => {
+                    const weekData = customTimelineWeeks[selectedWeekIndex];
+                    if (!weekData) return '';
+                    const startDate = parseLocalDate(weekData.start_date);
+                    const endDate = parseLocalDate(weekData.end_date);
+                    return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+                  })()}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.weekNavButton,
+                  (selectedWeekIndex >= customTimelineWeeks.length - 1 || loadingWeekActions) && styles.weekNavButtonDisabled
+                ]}
+                onPress={goNextWeek}
+                disabled={selectedWeekIndex >= customTimelineWeeks.length - 1 || loadingWeekActions}
+              >
+                <ChevronRight size={16} color={(selectedWeekIndex >= customTimelineWeeks.length - 1 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.expandButton} onPress={() => setGoalsExpanded(!goalsExpanded)}>
+                <Text style={styles.expandButtonText}>{goalsExpanded ? 'Collapse' : 'Expand'}</Text>
+                {goalsExpanded ? <ChevronUp size={16} color="#0078d4" /> : <ChevronDown size={16} color="#0078d4" />}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Custom Timeline Goals List */}
+        {customTimelineGoals.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyTitle}>No Goals in Timeline Yet</Text>
+            <Text style={styles.emptyText}>
+              Create your first goal for this custom timeline.
+            </Text>
+            <TouchableOpacity
+              style={styles.createGoalButton}
+              onPress={() => {
+                setInitialGoalType('custom');
+                setCreateGoalModalVisible(true);
+              }}
+            >
+              <Plus color="#ffffff" />
+              <Text style={styles.createGoalButtonText}>Create Custom Goal</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
           <View style={styles.goalsList}>
-            <View style={styles.goalItem}>
+            {customTimelineGoals.map(goal => {
+              const progress = customTimelineProgress[goal.id];
+              const goalActions = weekGoalActions[goal.id] || [];
+              if (!progress) return null;
+
+              return (
+                <View key={goal.id} style={styles.goalItem}>
+                  <GoalProgressCard
+                    goal={goal}
+                    expanded={goalsExpanded}
+                    progress={progress}
+                    week={weekData}
+                    selectedWeekNumber={weekData?.week_number}
+                    weekActions={goalActions}
+                    loadingWeekActions={loadingWeekActions}
+                    onAddAction={() => {
+                      setSelectedGoalForAction(goal);
+                      setIsActionEffortModalVisible(true);
+                    }}
+                    onToggleCompletion={handleToggleCompletion}
+                    onEdit={() => {
+                      setSelectedGoalToEdit(goal);
+                      setEditGoalModalVisible(true);
+                    }}
+                    onPress={() => handleGoalDoublePress(goal)}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+    );
+  }
+};
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header 
+        title="Goal Bank" 
+        authenticScore={authenticScore}
+        daysRemaining={selectedTimelineId === 'twelve-week' ? daysLeftData?.days_left : (() => {
+          if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
+          const customGoal = customGoals.find(g => g.id === selectedTimelineId);
+          if (!customGoal) return undefined;
+          const endDate = parseLocalDate(customGoal.end_date);
+          const now = new Date();
+          return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        })()}
+        cycleProgressPercentage={selectedTimelineId === 'twelve-week' ? daysLeftData?.pct_elapsed : (() => {
+          if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
+          const customGoal = customGoals.find(g => g.id === selectedTimelineId);
+          if (!customGoal) return undefined;
+          const startDate = parseLocalDate(customGoal.start_date);
+          const endDate = parseLocalDate(customGoal.end_date);
+          const now = new Date();
+          const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+          return Math.min(100, (daysPassed / totalDays) * 100);
+        })()}
+        cycleTitle={selectedTimelineId === 'twelve-week' ? currentCycle?.title : (() => {
+          if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
+          const customGoal = customGoals.find(g => g.id === selectedTimelineId);
+          return customGoal?.title;
+        })()}
+      />
+      
+      <>
+      {selectedTimelineId ? (
+        renderSelectedTimeline()
+      ) : (currentCycle || customGoals.length > 0) ? (
+        renderTimelineContainers()
+      ) : (
+        <View style={styles.noCycleContainer}>
+          <Target size={64} color="#6b7280" />
+          <Text style={styles.noCycleTitle}>Start Your Goal Journey</Text>
+          <Text style={styles.noCycleText}>
+            Create a 12-week cycle to track systematic goals, or create custom goals with your own timeline.
+          </Text>
+          
+          <View style={styles.startOptions}>
+            <TouchableOpacity 
+              style={styles.startCycleButton}
+              onPress={() => setCycleSetupVisible(true)}
+            >
+              <Calendar size={20} color="#ffffff" />
+              <Text style={styles.startCycleButtonText}>Start 12-Week Cycle</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.startCustomGoalButton}
+              onPress={() => {
+                setInitialGoalType('custom');
+                setCreateGoalModalVisible(true);
+              }}
+            >
+              <Target size={20} color="#7c3aed" />
+              <Text style={styles.startCustomGoalButtonText}>Create Custom Goal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={() => {
+          if (selectedTimelineId === 'twelve-week') {
+            setInitialGoalType('12week');
+          } else if (selectedTimelineId) {
+            setInitialGoalType('custom');
+          } else {
+            setInitialGoalType('12week');
+          }
+          setCreateGoalModalVisible(true);
+        }}
+      >
+        <Plus size={24} color="#ffffff" />
+      </TouchableOpacity>
+      </>
+
+      {/* Task Form Modal */}
+      <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
+        <TaskEventForm
+          mode={editingTask?.id ? "edit" : "create"}
+          initialData={editingTask || undefined}
+          onSubmitSuccess={handleFormSubmitSuccess}
+          onClose={handleFormClose}
+        />
+      </Modal>
+
+      {/* Cycle Setup Modal */}
+      <CycleSetupModal
+        visible={cycleSetupVisible}
+        onClose={() => setCycleSetupVisible(false)}
+        onSuccess={handleCycleCreated}
+        initialData={editingCycle}
+      />
+
+      {/* Create Goal Modal */}
+      <CreateGoalModal
+        visible={createGoalModalVisible}
+        onClose={() => setCreateGoalModalVisible(false)}
+        onSubmitSuccess={handleCreateGoalSuccess}
+        createTwelveWeekGoal={createTwelveWeekGoal}
+        createCustomGoal={createCustomGoal}
+        initialGoalType={initialGoalType}
+      />
+
+      {/* Edit Goal Modal */}
+      <EditGoalModal
+        visible={editGoalModalVisible}
+        onClose={() => setEditGoalModalVisible(false)}
+        onUpdate={handleEditGoalSuccess}
+        goal={selectedGoalToEdit}
+      />
+
+      {/* Action Effort Modal */}
+      <ActionEffortModal
+        visible={isActionEffortModalVisible}
+        onClose={() => {
+          setIsActionEffortModalVisible(false);
+          setSelectedGoalForAction(null);
+          refreshAllData();
+        }}
+        goal={selectedGoalForAction}
+        cycleWeeks={selectedTimelineId === 'twelve-week' ? cycleWeeks : customTimelineWeeks}
+        createTaskWithWeekPlan={createTaskWithWeekPlan}
+      />
+
+      {/* Individual Goal Modal */}
+      <Modal visible={goalModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.goalModalContainer}>
+          <View style={styles.goalModalHeader}>
+            <Text style={styles.goalModalTitle}>
+              {selectedGoalForModal?.title || 'Goal Details'}
+            </Text>
+            <TouchableOpacity onPress={handleGoalModalClose} style={styles.goalModalCloseButton}>
+              <X size={24} color="#1f2937" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.goalModalContent}>
+            {selectedGoalForModal && (
+              <View style={styles.goalModalBody}>
               <GoalProgressCard
                 key={customGoal.id}
                 goal={customGoal}
@@ -785,11 +1137,6 @@ useEffect(() => {
               />
             </View>
           </View>
-        </View>
-      </ScrollView>
-    );
-  }
-};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -914,8 +1261,7 @@ useEffect(() => {
               <View style={styles.goalModalBody}>
                 <GoalProgressCard
                   goal={selectedGoalForModal}
-                  expanded={true}
-                  progress={goalProgress[selectedGoalForModal.id] || {
+                  progress={goalProgress[selectedGoalForModal.id] || customTimelineProgress[selectedGoalForModal.id] || {
                     goalId: selectedGoalForModal.id,
                     currentWeek: 1,
                     daysRemaining: 0,
@@ -924,9 +1270,9 @@ useEffect(() => {
                     overallActual: 0,
                     overallTarget: 0,
                     overallProgress: 0,
-                  }}
-                  week={getWeekData(selectedWeekIndex)}
-                  selectedWeekNumber={getWeekData(selectedWeekIndex)?.weekNumber}
+                  loadingWeekActions={loadingWeekActions}
+                  week={selectedTimelineId === 'twelve-week' ? getWeekData(selectedWeekIndex) : customTimelineWeeks[selectedWeekIndex]}
+                  selectedWeekNumber={selectedTimelineId === 'twelve-week' ? getWeekData(selectedWeekIndex)?.weekNumber : customTimelineWeeks[selectedWeekIndex]?.week_number}
                   weekActions={weekGoalActions[selectedGoalForModal.id] || []}
                   loadingWeekActions={loadingWeekActions}
                   onAddAction={() => {
@@ -940,8 +1286,31 @@ useEffect(() => {
                     setGoalModalVisible(false);
                     setEditGoalModalVisible(true);
                   }}
+                    setSelectedGoalForAction(selectedGoalForModal);
+                    setGoalModalVisible(false);
+                    setIsActionEffortModalVisible(true);
+                  }}
+                  onToggleCompletion={handleToggleCompletion}
+                  onEdit={() => {
+                    setSelectedGoalToEdit(selectedGoalForModal);
+                    setGoalModalVisible(false);
+                    setEditGoalModalVisible(true);
+                  }}
                 />
               </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Custom Timeline Management Modal */}
+      <ManageCustomTimelinesModal
+        visible={isCustomTimelinesModalVisible}
+        onClose={() => setIsCustomTimelinesModalVisible(false)}
+        onUpdate={() => {
+          refreshAllData();
+          if (selectedTimelineId && selectedTimelineId !== 'twelve-week') {
+            loadCustomTimelineData(selectedTimelineId);
             )}
           </ScrollView>
         </View>

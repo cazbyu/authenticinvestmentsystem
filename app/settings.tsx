@@ -25,7 +25,6 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isRolesModalVisible, setIsRolesModalVisible] = useState(false);
-  const [isCustomTimelinesModalVisible, setIsCustomTimelinesModalVisible] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   const [profile, setProfile] = useState({
     first_name: '',
@@ -510,9 +509,7 @@ export default function SettingsScreen() {
 
           <TouchableOpacity 
             style={styles.settingButton}
-            onPress={() => {
-              setIsCustomTimelinesModalVisible(true);
-            }}
+            onPress={() => Alert.alert('Info', 'Custom timelines can be managed from the Goal Bank screen')}
           >
             <Text style={[styles.settingButtonText, { color: colors.primary }]}>Manage Custom Timelines</Text>
           </TouchableOpacity>
@@ -596,16 +593,6 @@ export default function SettingsScreen() {
       <ManageRolesModal
         visible={isRolesModalVisible}
         onClose={() => setIsRolesModalVisible(false)}
-      />
-
-      <ManageCustomTimelinesModal
-        visible={isCustomTimelinesModalVisible}
-        onClose={() => setIsCustomTimelinesModalVisible(false)}
-        onUpdate={() => {
-          // Refresh any data if needed
-          fetchProfile();
-          calculateAuthenticScore();
-        }}
       />
     </SafeAreaView>
   );
