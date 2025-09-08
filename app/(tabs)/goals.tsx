@@ -759,33 +759,36 @@ useEffect(() => {
             </View>
             
             {/* Custom Goal Display */}
-            <View style={styles.goalsList}>
-              <GoalProgressCard
-                key={customGoal.id}
-                goal={customGoal}
-                expanded={true}
-                progress={{
-                  goalId: customGoal.id,
-                  currentWeek: 1,
-                  daysRemaining: (() => {
-                    const startDate = parseLocalDate(customGoal.start_date);
-                    const endDate = parseLocalDate(customGoal.end_date);
-                    const now = new Date();
-                    return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                  })(),
-                  weeklyActual: 0,
-                  weeklyTarget: 0,
-                  overallActual: 0,
-                  overallTarget: 0,
-                  overallProgress: 0,
-                }}
-                onEdit={() => {
-                  setSelectedGoalToEdit(customGoal);
-                  setEditGoalModalVisible(true);
-                }}
-                onPress={() => handleGoalDoublePress(customGoal)}
-              />
-            </View>
+<View style={styles.goalsList}>
+  <View style={styles.goalItem}>
+    <GoalProgressCard
+      key={customGoal.id}
+      goal={customGoal}
+      expanded={true}
+      progress={{
+        goalId: customGoal.id,
+        currentWeek: 1,
+        daysRemaining: (() => {
+          const startDate = parseLocalDate(customGoal.start_date);
+          const endDate = parseLocalDate(customGoal.end_date);
+          const now = new Date();
+          return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        })(),
+        weeklyActual: 0,
+        weeklyTarget: 0,
+        overallActual: 0,
+        overallTarget: 0,
+        overallProgress: 0,
+      }}
+      onEdit={() => {
+        setSelectedGoalToEdit(customGoal);
+        setEditGoalModalVisible(true);
+      }}
+      onPress={() => handleGoalDoublePress(customGoal)}
+    />
+  </View>
+</View>
+
           </View>
         </ScrollView>
       );
