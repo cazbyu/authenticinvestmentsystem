@@ -10,7 +10,7 @@ import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
-import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown } from 'lucide-react-native';
+import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
 export default function Goals() { // Ensure this is the default export
@@ -29,7 +29,6 @@ export default function Goals() { // Ensure this is the default export
   const [showGoalDropdown, setShowGoalDropdown] = useState(false);
   const initializedWeekRef = useRef(false);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
-  const [goalsExpanded, setGoalsExpanded] = useState(true);
   const [goalsExpanded, setGoalsExpanded] = useState(true);
 
   // 12-Week Goals
@@ -593,7 +592,6 @@ useEffect(() => {
         <GoalProgressCard
           key={goal.id}
           goal={goal}
-          expanded={goalsExpanded}
           progress={progress || {
             goalId: goal.id,
             currentWeek: 1,
@@ -621,7 +619,8 @@ useEffect(() => {
       );
     })}
   </View>
-      )}
+)}
+          </View>
         </ScrollView>
       ) : (
         <View style={styles.noCycleContainer}>
@@ -822,12 +821,12 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 4,
   },
-  weekStartInfo: {
+  activeGoalsInfo: {
     fontSize: 12,
     color: '#9ca3af',
     fontStyle: 'italic',
   },
-  activeGoalsInfo: {
+  weekStartInfo: {
     fontSize: 12,
     color: '#9ca3af',
     fontStyle: 'italic',
@@ -866,20 +865,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    flex: 1,
-    maxWidth: 200,
   },
   cycleEffortContainer: {
-    flex: 1,
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 12,
   },
   cycleEffortScore: {
     alignItems: 'center',
     paddingVertical: 8,
     backgroundColor: '#f8fafc',
     borderRadius: 8,
-    paddingHorizontal: 12,
   },
   cycleEffortLabel: {
     fontSize: 12,
@@ -891,9 +887,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   rightControls: {
-    flex: 1,
-    maxWidth: 200,
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   goalFilterButton: {
     flexDirection: 'row',
@@ -907,28 +902,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   goalFilterButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#0078d4',
-  },
-  globalControlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  globalExpandButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f9ff',
-    borderWidth: 1,
-    borderColor: '#0078d4',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  globalExpandButtonText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#0078d4',
@@ -965,6 +938,30 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 14,
+  },
+  globalControlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  globalExpandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  globalExpandButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0078d4',
   },
   goalsList: {
     flexDirection: 'row',
