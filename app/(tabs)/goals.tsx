@@ -752,7 +752,7 @@ useEffect(() => {
                       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
                       const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
                       return Math.min(100, (daysPassed / totalDays) * 100);
-                    })()}%` }
+                     })()}%` }
                   ]}
                 />
               </View>
