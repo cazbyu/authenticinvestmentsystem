@@ -763,7 +763,7 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
                 
                 return (
                   <CalendarEventDisplay
-  key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}`}
+  key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}-${idx}`}
                     task={event}
                     onDoublePress={handleTaskDoublePress}
                     style={{
