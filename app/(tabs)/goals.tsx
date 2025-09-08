@@ -9,7 +9,7 @@ import TaskEventForm from '@/components/tasks/TaskEventForm'; // Keep this impor
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
-import ActionEffortModal from '@/components/goals/ActionEffortModal';
+import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
