@@ -752,9 +752,9 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
               ))}
               
               {/* Timed events with absolute positioning */}
-              {eventsWithLayout.map(event => {
-                const top = event.startMinutes * MINUTE_HEIGHT;
-                const height = Math.max((event.endMinutes - event.startMinutes) * MINUTE_HEIGHT, 30); // Minimum 30px height
+              {eventsWithLayout.map((event, idx) => {
+  const top = event.startMinutes * MINUTE_HEIGHT;
+  const height = Math.max((event.endMinutes - event.startMinutes) * MINUTE_HEIGHT, 30); // Minimum 30px height
                 
                 // Calculate width and left position for overlapping events
                 const availableWidth = timeGridWidth > 0 ? timeGridWidth - 16 : 200; // Fallback width
@@ -763,9 +763,9 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
                 
                 return (
                   <CalendarEventDisplay
-  key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}-${idx}`}
-                    task={event}
-                    onDoublePress={handleTaskDoublePress}
+      key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}-${idx}`}
+      task={event}
+      onDoublePress={handleTaskDoublePress}
                     style={{
                       position: 'absolute',
                       top,
