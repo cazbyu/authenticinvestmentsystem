@@ -1151,6 +1151,13 @@ const styles = StyleSheet.create({
   marginTop: 12,
 },
 
+goalItem: {
+  width: Platform.OS === 'web' ? '48%' : '100%',
+  maxWidth: Platform.OS === 'web' ? '48%' : '100%',
+  marginRight: Platform.OS === 'web' ? 12 : 0,
+  marginBottom: 12,
+},
+  
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
