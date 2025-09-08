@@ -33,6 +33,9 @@ export default function Goals() { // Ensure this is the default export
   const [selectedTimelineId, setSelectedTimelineId] = useState<string | null>(null);
   const [initialGoalType, setInitialGoalType] = useState<'12week' | 'custom'>('12week');
 
+ const { width } = useWindowDimensions();
+ const twoUp = Platform.OS === 'web' && width >= 768;
+
   // 12-Week Goals
   const { 
     twelveWeekGoals,
