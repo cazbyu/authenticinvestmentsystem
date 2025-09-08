@@ -30,6 +30,7 @@ export default function Goals() { // Ensure this is the default export
   const initializedWeekRef = useRef(false);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
   const [goalsExpanded, setGoalsExpanded] = useState(true);
+  const [goalsExpanded, setGoalsExpanded] = useState(true);
 
   // 12-Week Goals
   const { 
@@ -447,11 +448,9 @@ useEffect(() => {
               <Text style={styles.cycleDates}>
                 {formatCycleDateRange()}
               </Text>
-              {currentCycle.week_start_day && (
-                <Text style={styles.weekStartInfo}>
-                  Weeks start on {currentCycle.week_start_day === 'sunday' ? 'Sunday' : 'Monday'}
-                </Text>
-              )}
+              <Text style={styles.activeGoalsInfo}>
+                You have {getFilteredGoals().length} active 12-Week Goals
+              </Text>
             </View>
             
             <View style={styles.cycleProgress}>
@@ -468,10 +467,10 @@ useEffect(() => {
               </View>
             </View>
             
-            {/* Week Navigator and Goal Filter Row */}
+            {/* Navigation Row: Week Navigator (left), Overall Cycle Effort (center), Goal Filter (right) */}
             {cycleWeeks.length > 0 && (
               <View style={styles.navigationRow}>
-                {/* Week Navigator - left side */}
+                {/* Week Navigator - left */}
                 <View style={styles.weekNavContainer}>
                   <TouchableOpacity 
                     style={[
@@ -512,33 +511,47 @@ useEffect(() => {
                   </TouchableOpacity>
                 </View>
                 
-                {/* Goal Filter Dropdown - right side */}
-                {allGoals.length > 1 && (
-                  <TouchableOpacity
-                    style={styles.goalFilterButton}
-                    onPress={() => setShowGoalDropdown(true)}
-                  >
-                    <Text style={styles.goalFilterButtonText}>
-                      {getSelectedGoalTitle()}
+                {/* Overall Cycle Effort - center */}
+                <View style={styles.cycleEffortContainer}>
+                  <View style={styles.cycleEffortScore}>
+                    <Text style={styles.cycleEffortLabel}>Overall Cycle Effort</Text>
+                    <Text style={[
+                      styles.cycleEffortText,
+                      { color: getProgressColor(cycleEffortData.overallPercentage) }
+                    ]}>
+                      {cycleEffortData.overallPercentage}%
                     </Text>
-                    <ChevronDown size={16} color="#0078d4" />
-                  </TouchableOpacity>
+                  </View>
+                </View>
+                
+                {/* Goal Filter Dropdown - right */}
+                {allGoals.length > 1 && (
+                  <View style={styles.rightControls}>
+                    <TouchableOpacity
+                      style={styles.goalFilterButton}
+                      onPress={() => setShowGoalDropdown(true)}
+                    >
+                      <Text style={styles.goalFilterButtonText}>
+                        {getSelectedGoalTitle()}
+                      </Text>
+                      <ChevronDown size={16} color="#0078d4" />
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
             )}
 
-            {/* Overall Cycle Effort Score - separate row */}
-            <View style={styles.cycleEffortContainer}>
-              <View style={styles.cycleEffortScore}>
-                <Text style={styles.cycleEffortLabel}>Overall Cycle Effort</Text>
-                  <Text style={[
-                    styles.cycleEffortText,
-                    { color: getProgressColor(cycleEffortData.overallPercentage) }
-                  ]}>
-                    {cycleEffortData.overallPercentage}%
-                  </Text>
-                </View>
-              </View>
+            {/* Global Collapse/Expand Control */}
+            <View style={styles.globalControlsRow}>
+              <TouchableOpacity
+                style={styles.globalExpandButton}
+                onPress={() => setGoalsExpanded(!goalsExpanded)}
+              >
+                <Text style={styles.globalExpandButtonText}>
+                  {goalsExpanded ? 'Collapse All Goals' : 'Expand All Goals'}
+                </Text>
+                {goalsExpanded ? <ChevronUp size={16} color="#0078d4" /> : <ChevronDown size={16} color="#0078d4" />}
+              </TouchableOpacity>
             </View>
 
             {/* Goals List */}
@@ -580,6 +593,7 @@ useEffect(() => {
         <GoalProgressCard
           key={goal.id}
           goal={goal}
+          expanded={goalsExpanded}
           progress={progress || {
             goalId: goal.id,
             currentWeek: 1,
@@ -813,6 +827,11 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontStyle: 'italic',
   },
+  activeGoalsInfo: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
   cycleProgress: {
     flex: 1,
     marginRight: 16,
@@ -847,17 +866,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    flex: 1,
+    maxWidth: 200,
   },
   cycleEffortContainer: {
-    flexDirection: 'column',
+    flex: 1,
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'center',
   },
   cycleEffortScore: {
     alignItems: 'center',
     paddingVertical: 8,
     backgroundColor: '#f8fafc',
     borderRadius: 8,
+    paddingHorizontal: 12,
   },
   cycleEffortLabel: {
     fontSize: 12,
@@ -867,6 +889,11 @@ const styles = StyleSheet.create({
   cycleEffortText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  rightControls: {
+    flex: 1,
+    maxWidth: 200,
+    alignItems: 'flex-end',
   },
   goalFilterButton: {
     flexDirection: 'row',
@@ -880,6 +907,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   goalFilterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0078d4',
+  },
+  globalControlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  globalExpandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  globalExpandButtonText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#0078d4',

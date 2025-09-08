@@ -28,6 +28,7 @@ interface TaskWithLogs {
 interface GoalProgressCardProps {
   goal: Goal;
   progress: GoalProgress;
+  expanded?: boolean;
   week?: WeekData | null;
   weekActions?: TaskWithLogs[];
   loadingWeekActions?: boolean;
@@ -42,6 +43,7 @@ interface GoalProgressCardProps {
 export function GoalProgressCard({ 
   goal, 
   progress, 
+  expanded = true,
   week,
   weekActions = [],
   loadingWeekActions = false,
@@ -296,7 +298,7 @@ export function GoalProgressCard({
         )}
 
         {/* Week-specific Actions (when week prop is provided) */}
-        {week && goal.goal_type === '12week' && (
+        {expanded && week && goal.goal_type === '12week' && (
           <View style={styles.weekActionsSection}>
             <View style={styles.weekActionsHeader}>
               {onAddAction && (
@@ -393,7 +395,7 @@ export function GoalProgressCard({
         )}
 
         {/* Tags */}
-        {(goal.roles?.length > 0 || goal.domains?.length > 0) && (
+        {expanded && (goal.roles?.length > 0 || goal.domains?.length > 0) && (
           <View style={styles.tagsSection}>
             {goal.roles?.slice(0, 2).map(role => (
               <View key={role.id} style={[styles.tag, styles.roleTag]}>
