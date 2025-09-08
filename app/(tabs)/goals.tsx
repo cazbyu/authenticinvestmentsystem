@@ -656,39 +656,39 @@ useEffect(() => {
               </View>
             ) : (
               <View style={styles.goalsList}>
-                {twelveWeekGoals.map(goal => {
-                  const progress = goalProgress[goal.id];
-                  const weekData = getWeekData(selectedWeekIndex);
-                  const goalActions = weekGoalActions[goal.id] || [];
-                  
-                  if (!progress) return null;
+  {twelveWeekGoals.map(goal => {
+    const progress = goalProgress[goal.id];
+    const weekData = getWeekData(selectedWeekIndex);
+    const goalActions = weekGoalActions[goal.id] || [];
 
-                  return (
-                    <GoalProgressCard
-                      key={goal.id}
-                      goal={goal}
-                      expanded={goalsExpanded}
-                      progress={progress}
-                      week={weekData}
-                      selectedWeekNumber={weekData?.weekNumber}
-                      weekActions={goalActions}
-                      loadingWeekActions={loadingWeekActions}
-                      onAddAction={() => {
-                        setSelectedGoalForAction(goal);
-                        setIsActionEffortModalVisible(true);
-                      }}
-                      onToggleCompletion={handleToggleCompletion}
-                      onEdit={() => {
-                        setSelectedGoalToEdit(goal);
-                        setEditGoalModalVisible(true);
-                      }}
-                      onPress={() => handleGoalDoublePress(goal)}
-                    />
-                  );
-                })}
-              </View>
-            )}
-          </View>
+    if (!progress) return null;
+
+    return (
+      <View key={goal.id} style={styles.goalItem}>
+        <GoalProgressCard
+          goal={goal}
+          expanded={goalsExpanded}
+          progress={progress}
+          week={weekData}
+          selectedWeekNumber={weekData?.weekNumber}
+          weekActions={goalActions}
+          loadingWeekActions={loadingWeekActions}
+          onAddAction={() => {
+            setSelectedGoalForAction(goal);
+            setIsActionEffortModalVisible(true);
+          }}
+          onToggleCompletion={handleToggleCompletion}
+          onEdit={() => {
+            setSelectedGoalToEdit(goal);
+            setEditGoalModalVisible(true);
+          }}
+          onPress={() => handleGoalDoublePress(goal)}
+        />
+      </View>
+    );
+  })}
+</View>
+
         </ScrollView>
       );
     } else {
