@@ -665,7 +665,6 @@ useEffect(() => {
             })}
           </View>
         )}
-        </View>
       </ScrollView>
     );
   } else {
@@ -762,7 +761,6 @@ useEffect(() => {
               />
             </View>
           </View>
-        </View>
       </ScrollView>
     );
   }
