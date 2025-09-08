@@ -752,7 +752,7 @@ useEffect(() => {
                       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
                       const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
                       return Math.min(100, (daysPassed / totalDays) * 100);
-                    })()}%`}
+                    })()}%` }
                   ]}
                 />
               </View>
@@ -872,6 +872,7 @@ useEffect(() => {
         onSubmitSuccess={handleCreateGoalSuccess}
         createTwelveWeekGoal={createTwelveWeekGoal}
         createCustomGoal={createCustomGoal}
+        initialGoalType={initialGoalType}
       />
 
       {/* Edit Goal Modal */}
@@ -1210,9 +1211,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 24,
   },
-  startOptions: {
-    gap: 12,
-  },
   startCycleButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1229,27 +1227,6 @@ const styles = StyleSheet.create({
   },
   startCycleButtonText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  startCustomGoalButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#7c3aed',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  startCustomGoalButtonText: {
-    color: '#7c3aed',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1297,7 +1274,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   timelinesContainer: {
-    flex: 1,
     padding: 16,
   },
   timelinesTitle: {
@@ -1305,15 +1281,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: 16,
+    textAlign: 'center',
   },
   timelinesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
   },
   timelineCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
     borderLeftWidth: 4,
+    padding: 16,
+    width: '48%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1324,27 +1305,25 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   timelineTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 4,
   },
   timelineDates: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6b7280',
   },
   timelineStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 4,
   },
   timelineGoalCount: {
     fontSize: 14,
-    color: '#374151',
     fontWeight: '500',
+    color: '#1f2937',
   },
   timelineDaysLeft: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6b7280',
   },
   emptyTimelines: {
@@ -1354,7 +1333,8 @@ const styles = StyleSheet.create({
   emptyTimelinesText: {
     fontSize: 16,
     color: '#6b7280',
-    marginBottom: 16,
+    textAlign: 'center',
+    marginBottom: 24,
   },
   createTimelineButton: {
     flexDirection: 'row',
@@ -1374,8 +1354,33 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backToTimelinesText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#0078d4',
     fontWeight: '500',
+  },
+  startOptions: {
+    gap: 16,
+    alignItems: 'center',
+  },
+  startCustomGoalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#7c3aed',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  startCustomGoalButtonText: {
+    color: '#7c3aed',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
