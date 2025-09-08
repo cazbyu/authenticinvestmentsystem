@@ -11,6 +11,7 @@ import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
+import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
@@ -774,8 +775,6 @@ useEffect(() => {
                 </View>
               );
             })}
-           </View>
-        )}
         </View>
       </ScrollView>
     );
