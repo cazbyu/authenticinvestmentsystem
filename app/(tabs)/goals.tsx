@@ -27,6 +27,7 @@ export default function Goals() { // Ensure this is the default export
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [selectedGoalFilterId, setSelectedGoalFilterId] = useState<string | null>(null);
   const [showGoalDropdown, setShowGoalDropdown] = useState(false);
+  const [goalsExpanded, setGoalsExpanded] = useState(true);
   const initializedWeekRef = useRef(false);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
 
