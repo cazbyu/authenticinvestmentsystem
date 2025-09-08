@@ -509,291 +509,264 @@ useEffect(() => {
   };
 
   const renderSelectedTimeline = () => {
-    if (!selectedTimelineId) return null;
-    
-    if (selectedTimelineId === 'twelve-week') {
-      // Render 12-week cycle view (existing logic)
-      return (
-        <ScrollView style={styles.content}>
-          <View style={styles.cycleHeader}>
-            <TouchableOpacity 
-              style={styles.backToTimelinesButton}
-              onPress={handleBackToTimelines}
+  if (!selectedTimelineId) return null;
+
+  if (selectedTimelineId === 'twelve-week') {
+    // 12-Week cycle view
+    return (
+      <ScrollView style={styles.content}>
+        <View style={styles.cycleHeader}>
+          <TouchableOpacity
+            style={styles.backToTimelinesButton}
+            onPress={handleBackToTimelines}
+          >
+            <Text style={styles.backToTimelinesText}>← Back to Timelines</Text>
+          </TouchableOpacity>
+
+          <View style={styles.cycleInfo}>
+            <View style={styles.cycleTitleRow}>
+              <View style={styles.cycleTitleContent}>
+                <Text style={styles.cycleTitle}>
+                  {currentCycle.title || '12-Week Cycle'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.editCycleButton}
+                onPress={() => {
+                  setCycleSetupVisible(true);
+                }}
+              >
+                <Text style={styles.editCycleButtonText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.cycleDates}>{formatCycleDateRange()}</Text>
+            <Text style={styles.activeGoalsInfo}>
+              You have {twelveWeekGoals.length} active 12-Week Goals
+            </Text>
+          </View>
+
+        <View style={styles.cycleProgress}>
+          <Text style={styles.cycleProgressLabel}>
+            {calculateCycleProgress().daysRemaining} days left
+          </Text>
+          <View style={styles.cycleProgressBar}>
+            <View
+              style={[
+                styles.cycleProgressFill,
+                { width: `${calculateCycleProgress().percentage}%` }
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* Navigation Row */}
+        {cycleWeeks.length > 0 && (
+          <View style={styles.navigationRow}>
+            <View style={styles.weekNavContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.weekNavButton,
+                  (selectedWeekIndex === 0 || loadingWeekActions) && styles.weekNavButtonDisabled
+                ]}
+                onPress={goPrevWeek}
+                disabled={selectedWeekIndex === 0 || loadingWeekActions}
+              >
+                <ChevronLeft size={16} color={(selectedWeekIndex === 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+              </TouchableOpacity>
+
+              <View style={styles.weekDisplay}>
+                <Text style={styles.weekNumber}>
+                  Week {getWeekData(selectedWeekIndex)?.weekNumber || 1}
+                </Text>
+                <Text style={styles.weekDates}>
+                  {(() => {
+                    const weekData = getWeekData(selectedWeekIndex);
+                    if (!weekData) return '';
+                    const startDate = parseLocalDate(weekData.startDate);
+                    const endDate = parseLocalDate(weekData.endDate);
+                    return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+                  })()}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.weekNavButton,
+                  (selectedWeekIndex >= cycleWeeks.length - 1 || loadingWeekActions) && styles.weekNavButtonDisabled
+                ]}
+                onPress={goNextWeek}
+                disabled={selectedWeekIndex >= cycleWeeks.length - 1 || loadingWeekActions}
+              >
+                <ChevronRight size={16} color={(selectedWeekIndex >= cycleWeeks.length - 1 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.expandButton} onPress={() => setGoalsExpanded(!goalsExpanded)}>
+                <Text style={styles.expandButtonText}>{goalsExpanded ? 'Collapse' : 'Expand'}</Text>
+                {goalsExpanded ? <ChevronUp size={16} color="#0078d4" /> : <ChevronDown size={16} color="#0078d4" />}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* 12-Week Goals List */}
+        {goalsLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#1f6feb" />
+          </View>
+        ) : twelveWeekGoals.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyTitle}>No 12-Week Goals Yet</Text>
+            <Text style={styles.emptyText}>
+              Create your first 12-week goal to start tracking progress.
+            </Text>
+            <TouchableOpacity
+              style={styles.createGoalButton}
+              onPress={() => {
+                setInitialGoalType('12week');
+                setCreateGoalModalVisible(true);
+              }}
             >
-              <Text style={styles.backToTimelinesText}>← Back to Timelines</Text>
+              <Plus color="#ffffff" />
+              <Text style={styles.createGoalButtonText}>Create 12-Week Goal</Text>
             </TouchableOpacity>
-            
-            <View style={styles.cycleInfo}>
-              <View style={styles.cycleTitleRow}>
-                <View style={styles.cycleTitleContent}>
-                  <Text style={styles.cycleTitle}>
-                    {currentCycle.title || '12-Week Cycle'}
-                  </Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.editCycleButton}
-                  onPress={() => {
-                    setCycleSetupVisible(true);
-                  }}
-                >
-                  <Text style={styles.editCycleButtonText}>Edit</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.cycleDates}>
-                {formatCycleDateRange()}
-              </Text>
-              <Text style={styles.activeGoalsInfo}>
-                You have {twelveWeekGoals.length} active 12-Week Goals
-              </Text>
-            </View>
-            
-            <View style={styles.cycleProgress}>
-              <Text style={styles.cycleProgressLabel}>
-                {calculateCycleProgress().daysRemaining} days left
-              </Text>
-              <View style={styles.cycleProgressBar}>
-                <View
-                  style={[
-                    styles.cycleProgressFill,
-                    { width: `${calculateCycleProgress().percentage}%` }
-                  ]}
-                />
-              </View>
-            </View>
-            
-            {/* Navigation Row for 12-week cycle */}
-            {cycleWeeks.length > 0 && (
-              <View style={styles.navigationRow}>
-                <View style={styles.weekNavContainer}>
-                  <TouchableOpacity 
-                    style={[
-                      styles.weekNavButton, 
-                      (selectedWeekIndex === 0 || loadingWeekActions) && styles.weekNavButtonDisabled
-                    ]}
-                    onPress={goPrevWeek}
-                    disabled={selectedWeekIndex === 0 || loadingWeekActions}
-                  >
-                    <ChevronLeft size={16} color={(selectedWeekIndex === 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
-                  </TouchableOpacity>
-                  
-                  <View style={styles.weekDisplay}>
-                    <Text style={styles.weekNumber}>
-                      Week {getWeekData(selectedWeekIndex)?.weekNumber || 1}
-                    </Text>
-                    <Text style={styles.weekDates}>
-                      {(() => {
-                        const weekData = getWeekData(selectedWeekIndex);
-                        if (!weekData) return '';
-                        const startDate = parseLocalDate(weekData.startDate);
-                        const endDate = parseLocalDate(weekData.endDate);
-                        const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                        return `${formatDate(startDate)} – ${formatDate(endDate)}`;
-                      })()}
-                    </Text>
-                  </View>
-                  
-                  <TouchableOpacity 
-                    style={[
-                      styles.weekNavButton, 
-                      (selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) && styles.weekNavButtonDisabled
-                    ]}
-                    onPress={goNextWeek}
-                    disabled={selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions}
-                  >
-                    <ChevronRight size={16} color={(selectedWeekIndex >= (cycleWeeks.length - 1) || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.cycleEffortContainer}>
-                  <View style={styles.cycleEffortScore}>
-                    <Text style={styles.cycleEffortLabel}>Overall Cycle Effort</Text>
-                    <Text style={[
-                      styles.cycleEffortText,
-                      { color: getProgressColor(cycleEffortData.overallPercentage) }
-                    ]}>
-                      {cycleEffortData.overallPercentage}%
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.rightControls}>
-                  <TouchableOpacity
-                    style={styles.expandCollapseButton}
-                    onPress={() => setGoalsExpanded(!goalsExpanded)}
-                  >
-                    <Text style={styles.expandCollapseButtonText}>
-                      {goalsExpanded ? 'Collapse' : 'Expand'}
-                    </Text>
-                    {goalsExpanded ? <ChevronUp size={16} color="#0078d4" /> : <ChevronDown size={16} color="#0078d4" />}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+          </View>
+        ) : (
+          <View style={styles.goalsList}>
+            {twelveWeekGoals.map(goal => {
+              const progress = goalProgress[goal.id];
+              const weekData = getWeekData(selectedWeekIndex);
+              const goalActions = weekGoalActions[goal.id] || [];
+              if (!progress) return null;
 
-            {/* 12-Week Goals List */}
-            {goalsLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#1f6feb" />
-              </View>
-            ) : twelveWeekGoals.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>
-                  No 12-Week Goals Yet
-                </Text>
-                <Text style={styles.emptyText}>
-                  Create your first 12-week goal to start tracking progress.
-                </Text>
-                <TouchableOpacity
-                  style={styles.createGoalButton}
-                  onPress={() => {
-                    setInitialGoalType('12week');
-                    setCreateGoalModalVisible(true);
-                  }}
-                >
-                  <Plus color="#ffffff" />
-                  <Text style={styles.createGoalButtonText}>Create 12-Week Goal</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.goalsList}>
-  {twelveWeekGoals.map(goal => {
-    const progress = goalProgress[goal.id];
-    const weekData = getWeekData(selectedWeekIndex);
-    const goalActions = weekGoalActions[goal.id] || [];
-
-    if (!progress) return null;
+              return (
+                <View key={goal.id} style={styles.goalItem}>
+                  <GoalProgressCard
+                    goal={goal}
+                    expanded={goalsExpanded}
+                    progress={progress}
+                    week={weekData}
+                    selectedWeekNumber={weekData?.weekNumber}
+                    weekActions={goalActions}
+                    loadingWeekActions={loadingWeekActions}
+                    onAddAction={() => {
+                      setSelectedGoalForAction(goal);
+                      setIsActionEffortModalVisible(true);
+                    }}
+                    onToggleCompletion={handleToggleCompletion}
+                    onEdit={() => {
+                      setSelectedGoalToEdit(goal);
+                      setEditGoalModalVisible(true);
+                    }}
+                    onPress={() => handleGoalDoublePress(goal)}
+                  />
+                </View>
+              );
+            })}
+          </View>
+        )}
+        </View>
+      </ScrollView>
+    );
+  } else {
+    // Custom goal view
+    const customGoal = customGoals.find(g => g.id === selectedTimelineId);
+    if (!customGoal) return null;
 
     return (
-      <View key={goal.id} style={styles.goalItem}>
-        <GoalProgressCard
-          goal={goal}
-          expanded={goalsExpanded}
-          progress={progress}
-          week={weekData}
-          selectedWeekNumber={weekData?.weekNumber}
-          weekActions={goalActions}
-          loadingWeekActions={loadingWeekActions}
-          onAddAction={() => {
-            setSelectedGoalForAction(goal);
-            setIsActionEffortModalVisible(true);
-          }}
-          onToggleCompletion={handleToggleCompletion}
-          onEdit={() => {
-            setSelectedGoalToEdit(goal);
-            setEditGoalModalVisible(true);
-          }}
-          onPress={() => handleGoalDoublePress(goal)}
-        />
-      </View>
-    );
-  })}
-</View>
+      <ScrollView style={styles.content}>
+        <View style={styles.cycleHeader}>
+          <TouchableOpacity
+            style={styles.backToTimelinesButton}
+            onPress={handleBackToTimelines}
+          >
+            <Text style={styles.backToTimelinesText}>← Back to Timelines</Text>
+          </TouchableOpacity>
 
-        </ScrollView>
-      );
-    } else {
-      // Render custom goal view
-      const customGoal = customGoals.find(g => g.id === selectedTimelineId);
-      if (!customGoal) return null;
-      
-      return (
-        <ScrollView style={styles.content}>
-          <View style={styles.cycleHeader}>
-            <TouchableOpacity 
-              style={styles.backToTimelinesButton}
-              onPress={handleBackToTimelines}
-            >
-              <Text style={styles.backToTimelinesText}>← Back to Timelines</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.cycleInfo}>
-              <View style={styles.cycleTitleRow}>
-                <View style={styles.cycleTitleContent}>
-                  <Text style={styles.cycleTitle}>
-                    {customGoal.title}
-                  </Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.editCycleButton}
-                  onPress={() => {
-                    setSelectedGoalToEdit(customGoal);
-                    setEditGoalModalVisible(true);
-                  }}
-                >
-                  <Text style={styles.editCycleButtonText}>Edit</Text>
-                </TouchableOpacity>
+          <View style={styles.cycleInfo}>
+            <View style={styles.cycleTitleRow}>
+              <View style={styles.cycleTitleContent}>
+                <Text style={styles.cycleTitle}>{customGoal.title}</Text>
               </View>
-              <Text style={styles.cycleDates}>
-                {formatDateRange(customGoal.start_date, customGoal.end_date)}
-              </Text>
-              <Text style={styles.activeGoalsInfo}>
-                Custom Goal Timeline
-              </Text>
+              <TouchableOpacity
+                style={styles.editCycleButton}
+                onPress={() => {
+                  setSelectedGoalToEdit(customGoal);
+                  setEditGoalModalVisible(true);
+                }}
+              >
+                <Text style={styles.editCycleButtonText}>Edit</Text>
+              </TouchableOpacity>
             </View>
-            
-            <View style={styles.cycleProgress}>
-              <Text style={styles.cycleProgressLabel}>
-                {(() => {
-                  const startDate = parseLocalDate(customGoal.start_date);
-                  const endDate = parseLocalDate(customGoal.end_date);
-                  const now = new Date();
-                  const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                  return daysRemaining;
-                })()} days left
-              </Text>
-              <View style={styles.cycleProgressBar}>
-                <View
-                  style={[
-                    styles.cycleProgressFill,
-                    { width: `${(() => {
+
+            <Text style={styles.cycleDates}>
+              {formatDateRange(customGoal.start_date, customGoal.end_date)}
+            </Text>
+            <Text style={styles.activeGoalsInfo}>Custom Goal Timeline</Text>
+          </View>
+
+          <View style={styles.cycleProgress}>
+            <Text style={styles.cycleProgressLabel}>
+              {(() => {
+                const startDate = parseLocalDate(customGoal.start_date);
+                const endDate = parseLocalDate(customGoal.end_date);
+                const now = new Date();
+                const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+                return daysRemaining;
+              })()} days left
+            </Text>
+            <View style={styles.cycleProgressBar}>
+              <View
+                style={[
+                  styles.cycleProgressFill,
+                  { width: `${(() => {
                       const startDate = parseLocalDate(customGoal.start_date);
                       const endDate = parseLocalDate(customGoal.end_date);
                       const now = new Date();
                       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
                       const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
                       return Math.min(100, (daysPassed / totalDays) * 100);
-                     })()}%` }
-                  ]}
-                />
-              </View>
+                    })()}%` }
+                ]}
+              />
             </View>
-            
-            {/* Custom Goal Display */}
-<View style={styles.goalsList}>
-  <View style={styles.goalItem}>
-    <GoalProgressCard
-      key={customGoal.id}
-      goal={customGoal}
-      expanded={true}
-      progress={{
-        goalId: customGoal.id,
-        currentWeek: 1,
-        daysRemaining: (() => {
-          const startDate = parseLocalDate(customGoal.start_date);
-          const endDate = parseLocalDate(customGoal.end_date);
-          const now = new Date();
-          return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-        })(),
-        weeklyActual: 0,
-        weeklyTarget: 0,
-        overallActual: 0,
-        overallTarget: 0,
-        overallProgress: 0,
-      }}
-      onEdit={() => {
-        setSelectedGoalToEdit(customGoal);
-        setEditGoalModalVisible(true);
-      }}
-      onPress={() => handleGoalDoublePress(customGoal)}
-    />
-  </View>
-</View>
-
           </View>
-        </ScrollView>
-      );
-    }
-  };
+
+          {/* Custom Goal Display */}
+          <View style={styles.goalsList}>
+            <View style={styles.goalItem}>
+              <GoalProgressCard
+                key={customGoal.id}
+                goal={customGoal}
+                expanded={true}
+                progress={{
+                  goalId: customGoal.id,
+                  currentWeek: 1,
+                  daysRemaining: (() => {
+                    const startDate = parseLocalDate(customGoal.start_date);
+                    const endDate = parseLocalDate(customGoal.end_date);
+                    const now = new Date();
+                    return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+                  })(),
+                  weeklyActual: 0,
+                  weeklyTarget: 0,
+                  overallActual: 0,
+                  overallTarget: 0,
+                  overallProgress: 0,
+                }}
+                onEdit={() => {
+                  setSelectedGoalToEdit(customGoal);
+                  setEditGoalModalVisible(true);
+                }}
+                onPress={() => handleGoalDoublePress(customGoal)}
+              />
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
