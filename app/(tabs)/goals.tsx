@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -1286,7 +1286,7 @@ const styles = StyleSheet.create({
   timelinesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: Platform.OS === 'web' ? 'space-between' : 'center',
     gap: 12,
   },
   timelineCard: {
@@ -1294,7 +1294,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderLeftWidth: 4,
     padding: 16,
-    width: '48%',
+    width: Platform.OS === 'web' ? '48%' : '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
