@@ -551,7 +551,15 @@ useEffect(() => {
 
         <View style={styles.cycleProgress}>
           <Text style={styles.cycleProgressLabel}>
-            {calculateCycleProgress().daysRemaining} days left
+            {calculateCycleProgress().daysRemaining} days left • Today is {(() => {
+              const today = new Date();
+              const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              const dayName = dayNames[today.getDay()];
+              const monthName = monthNames[today.getMonth()];
+              const dayNumber = today.getDate();
+              return `${dayNumber} ${monthName} (${dayName})`;
+            })()}
           </Text>
           <View style={styles.cycleProgressBar}>
             <View

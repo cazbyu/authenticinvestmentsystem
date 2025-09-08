@@ -341,6 +341,15 @@ export function GoalProgressCard({
                   ))}
                 </View>
 
+                {/* Day labels above circles */}
+                <View style={styles.dayLabelsRow}>
+                  {generateWeekDays(week.startDate).map(day => (
+                    <Text key={day.date} style={styles.dayLabelText}>
+                      {day.dayName}
+                    </Text>
+                  ))}
+                </View>
+
                 {weekActions.map(action => {
                   const weekDays = generateWeekDays(week.startDate);
 
@@ -383,7 +392,6 @@ export function GoalProgressCard({
                              </TouchableOpacity>
                            );
                          })}
-
                       </View>
 
                     </View>
