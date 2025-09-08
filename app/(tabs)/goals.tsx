@@ -11,8 +11,7 @@ import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
-import { ManageCustomTimelinesModal } from '@/components/goals/ManageCustomTimelinesModal';
+import { formatDateRange, parseLocalDate } from '@/lib/dateUtils';
 
 export default function Goals() { // Ensure this is the default export
   const [authenticScore, setAuthenticScore] = useState(0);
@@ -1143,18 +1142,6 @@ useEffect(() => {
           </ScrollView>
         </View>
       </Modal>
-
-      {/* Custom Timeline Management Modal */}
-      <ManageCustomTimelinesModal
-        visible={isCustomTimelinesModalVisible}
-        onClose={() => setIsCustomTimelinesModalVisible(false)}
-        onUpdate={() => {
-          refreshAllData();
-          if (selectedTimelineId && selectedTimelineId !== 'twelve-week') {
-            loadCustomTimelineData(selectedTimelineId);
-          }
-        }}
-      />
     </SafeAreaView>
   );
 }
