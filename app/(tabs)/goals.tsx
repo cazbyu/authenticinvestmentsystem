@@ -813,6 +813,7 @@ useEffect(() => {
         cycleTitle={currentCycle?.title}
       />
       
+      <>
       {selectedTimelineId ? (
         renderSelectedTimeline()
       ) : (currentCycle || customGoals.length > 0) ? (
@@ -857,6 +858,7 @@ useEffect(() => {
       >
         <Plus size={24} color="#ffffff" />
       </TouchableOpacity>
+      </>
 
       {/* Task Form Modal */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
