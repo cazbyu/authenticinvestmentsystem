@@ -737,7 +737,7 @@ useEffect(() => {
 
           {/* Custom Goal Display */}
           <View style={styles.goalsList}>
-            <View style={styles.goalItem}>
+            <View style={[styles.goalItem, twoUp && styles.goalItemTwoCol]}>
               <GoalProgressCard
                 key={customGoal.id}
                 goal={customGoal}
