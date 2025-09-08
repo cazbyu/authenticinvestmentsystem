@@ -769,6 +769,12 @@ useEffect(() => {
       </ScrollView>
     );
   }
+  // This closing tag was misplaced and caused the JSX error.
+  // It is removed as part of the fix.
+  // </View>
+  // This closing tag was also misplaced and caused the JSX error.
+  // It is removed as part of the fix.
+  // </View>
 };
 
   return (
@@ -1123,31 +1129,22 @@ const styles = StyleSheet.create({
     color: '#0078d4',
   },
   goalsList: {
-  flexDirection: 'column',
-  padding: 16,
-  marginTop: 12,
-  gap: 12,  
-},
-
-  goalsListRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginTop: 12,
     gap: 12,
- },
-  
-goalItem: {
-  width: '100%',
-  maxWidth: '100%',
-  alignSelf: 'stretch',
-  marginBottom: 12,
-},
-
-  goalItemTwoCol: {
-    width: '48%',
-    maxWidth: '48%',
-    marginRight: 12,
- },
+    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
+    flexWrap: Platform.OS === 'web' ? 'wrap' : 'nowrap',
+    justifyContent: Platform.OS === 'web' ? 'flex-start' : 'center',
+    alignItems: Platform.OS === 'web' ? 'flex-start' : 'center',
+  },
+  goalItem: {
+    width: Platform.OS === 'web' ? '48%' : '100%',
+    maxWidth: Platform.OS === 'web' ? '48%' : '100%',
+    alignSelf: 'stretch',
+    marginBottom: 12,
+    marginRight: Platform.OS === 'web' ? 12 : 0, // Add margin for web two-column layout
+  },
 
   loadingContainer: {
     padding: 40,
