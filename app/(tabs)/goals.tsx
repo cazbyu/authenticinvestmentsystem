@@ -657,7 +657,6 @@ useEffect(() => {
                   twoUp && {
                     width: '48%',
                     maxWidth: '48%',
-                    marginRight: 12,
                   }
                 ]}>
                   <GoalProgressCard
@@ -767,7 +766,6 @@ useEffect(() => {
               twoUp && {
                 width: '48%',
                 maxWidth: '48%',
-                marginRight: 12,
               }
             ]}>
               <GoalProgressCard
@@ -1175,8 +1173,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: '100%',
     alignSelf: 'stretch',
-    marginBottom: 12,
-    marginRight: 0,
   },
 
   loadingContainer: {
