@@ -90,7 +90,7 @@ export function GoalProgressCard({
       const totalWeeks = Math.ceil(totalDays / 7);
       return `${totalWeeks}-Week Custom Goal`;
     }
-    return `Week ${selectedWeekNumber || progress.currentWeek} - today is ${formatTodayInfo()}`;
+    return `Week ${selectedWeekNumber || progress.currentWeek}`;
   };
   const primaryRole = goal.roles?.[0]; // Used for card color
   const cardColor = primaryRole?.color || '#0078d4';
