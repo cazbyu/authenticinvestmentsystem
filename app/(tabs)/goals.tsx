@@ -636,6 +636,15 @@ useEffect(() => {
           </View>
         ) : (
           <View style={[styles.goalsList, twoUp && styles.goalsListRow]}>
+          <View style={[
+            styles.goalsList,
+            twoUp && {
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'flex-start',
+              alignItems: 'flex-start',
+            }
+          ]}>
             {twelveWeekGoals.map(goal => {
               const progress = goalProgress[goal.id];
               const weekData = getWeekData(selectedWeekIndex);
@@ -643,7 +652,14 @@ useEffect(() => {
               if (!progress) return null;
 
               return (
-                <View key={goal.id} style={[styles.goalItem, twoUp && styles.goalItemTwoCol]}>
+                <View key={goal.id} style={[
+                  styles.goalItem,
+                  twoUp && {
+                    width: '48%',
+                    maxWidth: '48%',
+                    marginRight: 12,
+                  }
+                ]}>
                   <GoalProgressCard
                     goal={goal}
                     expanded={goalsExpanded}
@@ -736,8 +752,23 @@ useEffect(() => {
           </View>
 
           {/* Custom Goal Display */}
-          <View style={[styles.goalsList, twoUp && styles.goalsListRow]}>
-  <View style={[styles.goalItem, twoUp && styles.goalItemTwoCol]}>
+          <View style={[
+            styles.goalsList,
+            twoUp && {
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'flex-start',
+              alignItems: 'flex-start',
+            }
+          ]}>
+            <View style={[
+              styles.goalItem,
+              twoUp && {
+                width: '48%',
+                maxWidth: '48%',
+                marginRight: 12,
+              }
+            ]}>
               <GoalProgressCard
                 key={customGoal.id}
                 goal={customGoal}
@@ -1133,17 +1164,16 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginTop: 12,
     gap: 12,
-    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
-    flexWrap: Platform.OS === 'web' ? 'wrap' : 'nowrap',
-    justifyContent: Platform.OS === 'web' ? 'flex-start' : 'center',
-    alignItems: Platform.OS === 'web' ? 'flex-start' : 'center',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   goalItem: {
-    width: Platform.OS === 'web' ? '48%' : '100%',
-    maxWidth: Platform.OS === 'web' ? '48%' : '100%',
+    width: '100%',
+    maxWidth: '100%',
     alignSelf: 'stretch',
     marginBottom: 12,
-    marginRight: Platform.OS === 'web' ? 12 : 0, // Add margin for web two-column layout
+    marginRight: 0,
   },
 
   loadingContainer: {
