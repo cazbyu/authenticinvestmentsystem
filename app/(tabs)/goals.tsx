@@ -635,7 +635,7 @@ useEffect(() => {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.goalsList}>
+          <View style={[styles.goalsList, twoUp && styles.goalsListRow]}>
             {twelveWeekGoals.map(goal => {
               const progress = goalProgress[goal.id];
               const weekData = getWeekData(selectedWeekIndex);
@@ -736,8 +736,8 @@ useEffect(() => {
           </View>
 
           {/* Custom Goal Display */}
-          <View style={styles.goalsList}>
-            <View style={[styles.goalItem, twoUp && styles.goalItemTwoCol]}>
+          <View style={[styles.goalsList, twoUp && styles.goalsListRow]}>
+  <View style={[styles.goalItem, twoUp && styles.goalItemTwoCol]}>
               <GoalProgressCard
                 key={customGoal.id}
                 goal={customGoal}
@@ -1123,16 +1123,23 @@ const styles = StyleSheet.create({
     color: '#0078d4',
   },
   goalsList: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'flex-start',
+  flexDirection: 'column',
   padding: 16,
   marginTop: 12,
+  gap: 12,  
 },
 
+  goalsListRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: 12,
+ },
+  
 goalItem: {
   width: '100%',
   maxWidth: '100%',
+  alignSelf: 'stretch',
   marginBottom: 12,
 },
 
