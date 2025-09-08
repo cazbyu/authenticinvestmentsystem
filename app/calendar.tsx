@@ -620,7 +620,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
               return (
                 <CalendarEventDisplay
-  key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}-${event.type}`}
+  key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}-${event.type}-${idx}`}
                   task={event}
                   onDoublePress={handleTaskDoublePress}
                   style={{
