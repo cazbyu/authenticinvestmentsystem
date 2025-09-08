@@ -290,22 +290,18 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch 12-week goals
-      let twelveWeekQuery = supabase
+      // Fetch 12-week goals (only if we have an active cycle)
+      const { data: twelveWeekData, error: twelveWeekError } = userCycleId ? await supabase
         .from('0008-ap-goals-12wk')
         .select('*')
         .eq('user_id', user.id)
+        .eq('user_cycle_id', userCycleId)
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (userCycleId) {
-        twelveWeekQuery = twelveWeekQuery.eq('user_cycle_id', userCycleId);
-      }
-
-      const { data: twelveWeekData, error: twelveWeekError } = await twelveWeekQuery;
+        .order('created_at', { ascending: false }) : { data: [], error: null };
+        
       if (twelveWeekError) throw twelveWeekError;
 
-      // Fetch custom goals
+      // Fetch custom goals (independent of cycles)
       const { data: customData, error: customError } = await supabase
         .from('0008-ap-goals-custom')
         .select('*')
@@ -798,6 +794,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
       if (error) throw error;
       
+      // Refresh all goals (both 12-week and custom)
       await fetchGoals(currentCycle?.id);
       
       return { ...data, goal_type: 'custom' };

@@ -48,6 +48,7 @@ interface CreateGoalModalProps {
     start_date: string;
     end_date: string;
   }) => Promise<any>;
+  initialGoalType?: '12week' | 'custom';
 }
 
 const recurrenceOptions = [
@@ -65,7 +66,8 @@ export function CreateGoalModal({
   onClose, 
   onSubmitSuccess, 
   createTwelveWeekGoal,
-  createCustomGoal
+  createCustomGoal,
+  initialGoalType = '12week'
 }: CreateGoalModalProps) {
   const [goalType, setGoalType] = useState<'12week' | 'custom'>('12week');
   const [formData, setFormData] = useState({
@@ -115,6 +117,8 @@ export function CreateGoalModal({
   useEffect(() => {
     if (visible) {
       fetchData();
+      // Set initial goal type based on prop
+      setGoalType(initialGoalType);
     }
   }, [visible]);
 

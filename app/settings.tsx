@@ -479,6 +479,45 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Goal Bank Settings Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Goal Bank Settings</Text>
+
+          <TouchableOpacity style={styles.settingButton}>
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Goal Timelines</Text>
+          </TouchableOpacity>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, { color: colors.text }]}>Default 12-Week Global Cycle</Text>
+              <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                Automatically sync with community cycles
+              </Text>
+            </View>
+            <Switch
+              value={true}
+              onValueChange={() => {
+                // TODO: Implement global cycle toggle
+                // This requires database schema changes for user preferences
+                Alert.alert('Coming Soon', 'Global cycle preferences will be available in a future update');
+              }}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+
+          <TouchableOpacity 
+            style={styles.settingButton}
+            onPress={() => {
+              // TODO: Implement custom timeline management
+              // This requires new database tables for custom timelines
+              Alert.alert('Coming Soon', 'Custom timeline management will be available in a future update');
+            }}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Manage Custom Timelines</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Appearance Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
