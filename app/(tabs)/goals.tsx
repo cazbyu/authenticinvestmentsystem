@@ -592,6 +592,7 @@ useEffect(() => {
         <GoalProgressCard
           key={goal.id}
           goal={goal}
+          expanded={goalsExpanded}
           progress={progress || {
             goalId: goal.id,
             currentWeek: 1,
@@ -619,7 +620,7 @@ useEffect(() => {
       );
     })}
   </View>
-)}
+      )}
           </View>
         </ScrollView>
       ) : (
@@ -821,12 +822,12 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 4,
   },
-  activeGoalsInfo: {
+  weekStartInfo: {
     fontSize: 12,
     color: '#9ca3af',
     fontStyle: 'italic',
   },
-  weekStartInfo: {
+  activeGoalsInfo: {
     fontSize: 12,
     color: '#9ca3af',
     fontStyle: 'italic',
