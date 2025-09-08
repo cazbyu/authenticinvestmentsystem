@@ -12,6 +12,17 @@ import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from
 import { expandEventsWithRecurrence, expandEventsForDate } from '@/lib/recurrenceUtils';
 import { getVisibleWindow } from '@/lib/recurrenceUtils';
 
+// Utility: remove duplicates based on id+date combo
+const uniqByIdAndDate = (events: any[]) => {
+  const seen = new Set();
+  return events.filter(event => {
+    const key = `${event.id}-${event.date}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 // Constants
 const MINUTE_HEIGHT = 1.5;
 
