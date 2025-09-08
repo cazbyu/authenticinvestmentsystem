@@ -683,6 +683,7 @@ useEffect(() => {
               );
             })}
           </View>
+        </View>
         )}
         </View>
       </ScrollView>
@@ -800,12 +801,6 @@ useEffect(() => {
       </ScrollView>
     );
   }
-  // This closing tag was misplaced and caused the JSX error.
-  // It is removed as part of the fix.
-  // </View>
-  // This closing tag was also misplaced and caused the JSX error.
-  // It is removed as part of the fix.
-  // </View>
 };
 
   return (
@@ -1167,6 +1162,12 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  goalsListRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
   },
   goalItem: {
     width: '100%',
