@@ -1286,7 +1286,7 @@ const styles = StyleSheet.create({
   timelinesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: Platform.OS === 'web' ? 'space-between' : 'center',
+    justifyContent: Platform.OS === 'web' ? 'space-between' : 'flex-start',
     gap: 12,
   },
   timelineCard: {
@@ -1295,6 +1295,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     padding: 16,
     width: Platform.OS === 'web' ? '48%' : '100%',
+    maxWidth: Platform.OS === 'web' ? '48%' : undefined,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
