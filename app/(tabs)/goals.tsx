@@ -636,15 +636,7 @@ useEffect(() => {
           </View>
         ) : (
           <View style={[styles.goalsList, twoUp && styles.goalsListRow]}>
-          <View style={[
-            styles.goalsList,
-            twoUp && {
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              justifyContent: 'flex-start',
-              alignItems: 'flex-start',
-            }
-          ]}>
+          <View style={styles.goalsList}>
             {twelveWeekGoals.map(goal => {
               const progress = goalProgress[goal.id];
               const weekData = getWeekData(selectedWeekIndex);
@@ -654,10 +646,6 @@ useEffect(() => {
               return (
                 <View key={goal.id} style={[
                   styles.goalItem,
-                  twoUp && {
-                    width: '48%',
-                    maxWidth: '48%',
-                  }
                 ]}>
                   <GoalProgressCard
                     goal={goal}
@@ -752,22 +740,8 @@ useEffect(() => {
           </View>
 
           {/* Custom Goal Display */}
-          <View style={[
-            styles.goalsList,
-            twoUp && {
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              justifyContent: 'flex-start',
-              alignItems: 'flex-start',
-            }
-          ]}>
-            <View style={[
-              styles.goalItem,
-              twoUp && {
-                width: '48%',
-                maxWidth: '48%',
-              }
-            ]}>
+          <View style={styles.goalsList}>
+            <View style={styles.goalItem}>
               <GoalProgressCard
                 key={customGoal.id}
                 goal={customGoal}
