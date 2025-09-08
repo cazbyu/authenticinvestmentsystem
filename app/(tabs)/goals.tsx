@@ -665,6 +665,7 @@ useEffect(() => {
             })}
           </View>
         )}
+        </View>
       </ScrollView>
     );
   } else {
@@ -761,6 +762,7 @@ useEffect(() => {
               />
             </View>
           </View>
+        </View>
       </ScrollView>
     );
   }
@@ -1364,5 +1366,22 @@ goalItem: {
     color: '#7c3aed',
     fontSize: 16,
     fontWeight: '600',
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginLeft: 12,
+    gap: 4,
+  },
+  expandButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078d4',
   },
 });
