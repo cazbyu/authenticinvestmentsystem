@@ -25,9 +25,9 @@ export default function Goals() { // Ensure this is the default export
   const [selectedGoalForAction, setSelectedGoalForAction] = useState<any>(null);
   const [editingCycle, setEditingCycle] = useState<any>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
-  const [selectedGoalFilterId, setSelectedGoalFilterId] = useState<string | null>(null);
-  const [showGoalDropdown, setShowGoalDropdown] = useState(false);
   const [goalsExpanded, setGoalsExpanded] = useState(true);
+  const [selectedGoalForModal, setSelectedGoalForModal] = useState<any>(null);
+  const [goalModalVisible, setGoalModalVisible] = useState(false);
   const initializedWeekRef = useRef(false);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
 
@@ -399,19 +399,14 @@ useEffect(() => {
     return '#dc2626';
   };
 
-  const getFilteredGoals = () => {
-    if (selectedGoalFilterId) {
-      return allGoals.filter(goal => goal.id === selectedGoalFilterId);
-    }
-    return allGoals;
+  const handleGoalDoublePress = (goal: any) => {
+    setSelectedGoalForModal(goal);
+    setGoalModalVisible(true);
   };
 
-  const getSelectedGoalTitle = () => {
-    if (selectedGoalFilterId) {
-      const selectedGoal = allGoals.find(goal => goal.id === selectedGoalFilterId);
-      return selectedGoal?.title || 'Selected Goal';
-    }
-    return 'All Goals';
+  const handleGoalModalClose = () => {
+    setGoalModalVisible(false);
+    setSelectedGoalForModal(null);
   };
 
   return (
@@ -448,7 +443,7 @@ useEffect(() => {
                 {formatCycleDateRange()}
               </Text>
               <Text style={styles.activeGoalsInfo}>
-                You have {getFilteredGoals().length} active 12-Week Goals
+                You have {allGoals.length} active 12-Week Goals
               </Text>
             </View>
             
@@ -523,36 +518,22 @@ useEffect(() => {
                   </View>
                 </View>
                 
-                {/* Goal Filter Dropdown - right */}
-                {allGoals.length > 1 && (
-                  <View style={styles.rightControls}>
-                    <TouchableOpacity
-                      style={styles.goalFilterButton}
-                      onPress={() => setShowGoalDropdown(true)}
-                    >
-                      <Text style={styles.goalFilterButtonText}>
-                        {getSelectedGoalTitle()}
-                      </Text>
-                      <ChevronDown size={16} color="#0078d4" />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                {/* Collapse/Expand Control - right */}
+                <View style={styles.rightControls}>
+                  <TouchableOpacity
+                    style={styles.expandCollapseButton}
+                    onPress={() => setGoalsExpanded(!goalsExpanded)}
+                  >
+                    <Text style={styles.expandCollapseButtonText}>
+                      {goalsExpanded ? 'Collapse' : 'Expand'}
+                    </Text>
+                    {goalsExpanded ? <ChevronUp size={16} color="#0078d4" /> : <ChevronDown size={16} color="#0078d4" />}
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
             {/* Global Collapse/Expand Control */}
-            <View style={styles.globalControlsRow}>
-              <TouchableOpacity
-                style={styles.globalExpandButton}
-                onPress={() => setGoalsExpanded(!goalsExpanded)}
-              >
-                <Text style={styles.globalExpandButtonText}>
-                  {goalsExpanded ? 'Collapse All Goals' : 'Expand All Goals'}
-                </Text>
-                {goalsExpanded ? <ChevronUp size={16} color="#0078d4" /> : <ChevronDown size={16} color="#0078d4" />}
-              </TouchableOpacity>
-            </View>
-
             {/* Goals List */}
             {goalsLoading ? (
   <View style={styles.loadingContainer}>
@@ -561,13 +542,10 @@ useEffect(() => {
 ) : getFilteredGoals().length === 0 ? (
     <View style={styles.emptyContainer}>
     <Text style={styles.emptyTitle}>
-      {allGoals.length === 0 ? 'No Goals Yet' : 'No Goals Match Filter'}
+      No Goals Yet
     </Text>
     <Text style={styles.emptyText}>
-      {allGoals.length === 0 
-        ? 'Create your first goal to start tracking progress.'
-        : 'Try selecting a different goal or view all goals.'
-      }
+      Create your first goal to start tracking progress.
     </Text>
 
     <TouchableOpacity
@@ -580,7 +558,7 @@ useEffect(() => {
   </View>
 ) : (
   <View style={styles.goalsList}>
-    {getFilteredGoals().map(goal => {
+    {allGoals.map(goal => {
       const progress = goalProgress[goal.id];
       const weekData = getWeekData(selectedWeekIndex);
       const goalActions = weekGoalActions[goal.id] || [];
@@ -616,6 +594,7 @@ useEffect(() => {
                         setSelectedGoalToEdit(goal);
                         setEditGoalModalVisible(true);
                       }}
+          onPress={() => handleGoalDoublePress(goal)}
         />
       );
     })}
@@ -697,70 +676,53 @@ useEffect(() => {
         createTaskWithWeekPlan={createTaskWithWeekPlan}
       />
 
-      {/* Goal Filter Modal */}
-      <Modal visible={showGoalDropdown} transparent animationType="fade">
-        <View style={styles.goalDropdownOverlay}>
-          <View style={styles.goalDropdownContent}>
-            <View style={styles.goalDropdownHeader}>
-              <Text style={styles.goalDropdownTitle}>Filter by Goal</Text>
-              <TouchableOpacity onPress={() => setShowGoalDropdown(false)}>
-                <X size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.goalDropdownList}>
-              {/* Show All Goals Option */}
-              <TouchableOpacity
-                style={[
-                  styles.goalDropdownItem,
-                  !selectedGoalFilterId && styles.selectedGoalDropdownItem
-                ]}
-                onPress={() => {
-                  setSelectedGoalFilterId(null);
-                  setShowGoalDropdown(false);
-                }}
-              >
-                <Text style={[
-                  styles.goalDropdownItemText,
-                  !selectedGoalFilterId && styles.selectedGoalDropdownItemText
-                ]}>
-                  All Goals
-                </Text>
-                {!selectedGoalFilterId && (
-                  <View style={styles.selectedIndicator}>
-                    <Text style={styles.selectedIndicatorText}>✓</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              {/* Individual Goals */}
-              {allGoals.map(goal => (
-                <TouchableOpacity
-                  key={goal.id}
-                  style={[
-                    styles.goalDropdownItem,
-                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItem
-                  ]}
-                  onPress={() => {
-                    setSelectedGoalFilterId(goal.id);
-                    setShowGoalDropdown(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.goalDropdownItemText,
-                    selectedGoalFilterId === goal.id && styles.selectedGoalDropdownItemText
-                  ]}>
-                    {goal.title}
-                  </Text>
-                  {selectedGoalFilterId === goal.id && (
-                    <View style={styles.selectedIndicator}>
-                      <Text style={styles.selectedIndicatorText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+      {/* Individual Goal Modal */}
+      <Modal visible={goalModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.goalModalContainer}>
+          <View style={styles.goalModalHeader}>
+            <Text style={styles.goalModalTitle}>
+              {selectedGoalForModal?.title || 'Goal Details'}
+            </Text>
+            <TouchableOpacity onPress={handleGoalModalClose} style={styles.goalModalCloseButton}>
+              <X size={24} color="#1f2937" />
+            </TouchableOpacity>
           </View>
+          
+          <ScrollView style={styles.goalModalContent}>
+            {selectedGoalForModal && (
+              <View style={styles.goalModalBody}>
+                <GoalProgressCard
+                  goal={selectedGoalForModal}
+                  expanded={true}
+                  progress={goalProgress[selectedGoalForModal.id] || {
+                    goalId: selectedGoalForModal.id,
+                    currentWeek: 1,
+                    daysRemaining: 0,
+                    weeklyActual: 0,
+                    weeklyTarget: 0,
+                    overallActual: 0,
+                    overallTarget: 0,
+                    overallProgress: 0,
+                  }}
+                  week={getWeekData(selectedWeekIndex)}
+                  selectedWeekNumber={getWeekData(selectedWeekIndex)?.weekNumber}
+                  weekActions={weekGoalActions[selectedGoalForModal.id] || []}
+                  loadingWeekActions={loadingWeekActions}
+                  onAddAction={() => {
+                    setSelectedGoalForAction(selectedGoalForModal);
+                    setGoalModalVisible(false);
+                    setIsActionEffortModalVisible(true);
+                  }}
+                  onToggleCompletion={handleToggleCompletion}
+                  onEdit={() => {
+                    setSelectedGoalToEdit(selectedGoalForModal);
+                    setGoalModalVisible(false);
+                    setEditGoalModalVisible(true);
+                  }}
+                />
+              </View>
+            )}
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -891,7 +853,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  goalFilterButton: {
+  expandCollapseButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
@@ -902,7 +864,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 8,
   },
-  goalFilterButtonText: {
+  expandCollapseButtonText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#0078d4',
@@ -1064,73 +1026,31 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  goalDropdownOverlay: {
+  goalModalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#f8fafc',
   },
-  goalDropdownContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    minWidth: 300,
-    maxWidth: 400,
-    maxHeight: 500,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  goalDropdownHeader: {
+  goalModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
   },
-  goalDropdownTitle: {
-    fontSize: 16,
+  goalModalTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
   },
-  goalDropdownList: {
-    maxHeight: 400,
+  goalModalCloseButton: {
+    padding: 4,
   },
-  goalDropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  selectedGoalDropdownItem: {
-    backgroundColor: '#f0f9ff',
-  },
-  goalDropdownItemText: {
-    fontSize: 14,
-    color: '#374151',
+  goalModalContent: {
     flex: 1,
-    marginRight: 8,
   },
-  selectedGoalDropdownItemText: {
-    color: '#0078d4',
-    fontWeight: '600',
-  },
-  selectedIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#0078d4',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedIndicatorText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
+  goalModalBody: {
+    padding: 16,
   },
 });
