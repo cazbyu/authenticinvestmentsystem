@@ -640,7 +640,7 @@ useEffect(() => {
               if (!progress) return null;
 
               return (
-                <View key={goal.id} style={styles.goalItem}>
+                <View key={goal.id} style={[styles.goalItem, twoUp && styles.goalItemTwoCol]}>
                   <GoalProgressCard
                     goal={goal}
                     expanded={goalsExpanded}
@@ -1128,12 +1128,17 @@ const styles = StyleSheet.create({
 },
 
 goalItem: {
-  width: Platform.OS === 'web' ? '48%' : '100%',
-  maxWidth: Platform.OS === 'web' ? '48%' : '100%',
-  marginRight: Platform.OS === 'web' ? 12 : 0,
+  width: '100%',
+  maxWidth: '100%',
   marginBottom: 12,
 },
-  
+
+  goalItemTwoCol: {
+    width: '48%',
+    maxWidth: '48%',
+    marginRigh: 12,
+ },
+
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
