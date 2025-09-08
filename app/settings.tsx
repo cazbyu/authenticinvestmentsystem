@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as ImagePicker from 'expo-image-picker';
 import { Header } from '@/components/Header';
 import { ManageRolesModal } from '@/components/settings/ManageRolesModal';
+import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Camera, Upload, User } from 'lucide-react-native';
@@ -24,6 +25,7 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isRolesModalVisible, setIsRolesModalVisible] = useState(false);
+  const [isCustomTimelinesModalVisible, setIsCustomTimelinesModalVisible] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   const [profile, setProfile] = useState({
     first_name: '',
@@ -509,9 +511,7 @@ export default function SettingsScreen() {
           <TouchableOpacity 
             style={styles.settingButton}
             onPress={() => {
-              // TODO: Implement custom timeline management
-              // This requires new database tables for custom timelines
-              Alert.alert('Coming Soon', 'Custom timeline management will be available in a future update');
+              setIsCustomTimelinesModalVisible(true);
             }}
           >
             <Text style={[styles.settingButtonText, { color: colors.primary }]}>Manage Custom Timelines</Text>
@@ -596,6 +596,16 @@ export default function SettingsScreen() {
       <ManageRolesModal
         visible={isRolesModalVisible}
         onClose={() => setIsRolesModalVisible(false)}
+      />
+
+      <ManageCustomTimelinesModal
+        visible={isCustomTimelinesModalVisible}
+        onClose={() => setIsCustomTimelinesModalVisible(false)}
+        onUpdate={() => {
+          // Refresh any data if needed
+          fetchProfile();
+          calculateAuthenticScore();
+        }}
       />
     </SafeAreaView>
   );
