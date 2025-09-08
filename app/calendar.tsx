@@ -709,9 +709,9 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
             >
               <Text style={styles.allDayLabel}>All Day</Text>
               <View style={styles.allDayEvents}>
-                {allDayItems.map(task => (
-                  <TaskCard
-  key={`${task.id}-${task.start_date || task.due_date || selectedDate}`}
+                {allDayItems.map((task, idx) => (
+  <TaskCard
+    key={`${task.id}-${task.start_date || task.due_date || selectedDate}-${idx}`}
                     task={task}
                     onComplete={handleCompleteTask}
                     onDoublePress={handleTaskDoublePress}
