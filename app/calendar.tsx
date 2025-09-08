@@ -633,7 +633,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
                   }}
                 />
               );
-            })}*
+            })}
 
             {/* Optional: show now-line only if this slice is "today" */}
             {date === ymdLocal() && (
