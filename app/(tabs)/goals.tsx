@@ -29,7 +29,6 @@ export default function Goals() { // Ensure this is the default export
   const [showGoalDropdown, setShowGoalDropdown] = useState(false);
   const initializedWeekRef = useRef(false);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
-  const [goalsExpanded, setGoalsExpanded] = useState(true);
 
   // 12-Week Goals
   const { 
