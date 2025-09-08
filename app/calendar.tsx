@@ -611,7 +611,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
             ))}
 
             {/* Timed events with overlap layout */}
-            {eventsWithLayout.map(event => {
+            {eventsWithLayout.map((event, idx) => {
               const top = event.startMinutes * MINUTE_HEIGHT;
               const heightPx = Math.max((event.endMinutes - event.startMinutes) * MINUTE_HEIGHT, 30);
               const availableWidth = timeGridWidth > 0 ? timeGridWidth - 16 : 200;
@@ -633,7 +633,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
                   }}
                 />
               );
-            })}
+            })}*
 
             {/* Optional: show now-line only if this slice is "today" */}
             {date === ymdLocal() && (
