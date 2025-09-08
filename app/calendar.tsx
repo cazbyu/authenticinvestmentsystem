@@ -874,12 +874,12 @@ const dayEvents = expandedTasks.map(task => ({
                     {date.getDate()}
                   </Text>
                   <View style={styles.weekDayEvents}>
-                    {dayEvents.slice(0, 3).map(event => (
-  <View 
-    key={`${event.id}-${event.date}-${event.type}`}
-                        style={[styles.weekEventDot, { backgroundColor: event.color }]}
-                      />
-                    ))}
+                    {uniqByIdAndDate(dayEvents).slice(0, 3).map((event, idx) => (
+  <View
+    key={`${event.id}-${event.date}-${event.type}-${idx}`}
+    style={[styles.weekEventDot, { backgroundColor: event.color }]}
+  />
+))}
                     {dayEvents.length > 3 && (
                       <Text style={styles.moreEventsText}>+{dayEvents.length - 3}</Text>
                     )}
