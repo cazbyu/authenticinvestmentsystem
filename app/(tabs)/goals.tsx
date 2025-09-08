@@ -53,7 +53,7 @@ export default function Goals() { // Ensure this is the default export
     getCurrentWeekIndex,
     getWeekData,
     completeActionSuggestion,
-    undoActionOccurrence,
+  undoActionOccurrence,
   } = useGoals();
 
   // Initialize selected week to current week
@@ -447,44 +447,33 @@ useEffect(() => {
               <Text style={styles.cycleDates}>
                 {formatCycleDateRange()}
               </Text>
-              {currentCycle.week_start_day && (
+              {currentCycle && (
                 <Text style={styles.weekStartInfo}>
-                  Weeks start on {currentCycle.week_start_day === 'sunday' ? 'Sunday' : 'Monday'}
+                  You have {allGoals.length} active 12-Week Goal{allGoals.length !== 1 ? 's' : ''}
                 </Text>
               )}
             </View>
-            
-            <View style={styles.cycleProgress}>
-              <Text style={styles.cycleProgressLabel}>
-                {calculateCycleProgress().daysRemaining} days left
-              </Text>
-              <View style={styles.cycleProgressBar}>
-                <View
+
+            {/* Navigation Row */}
+            <View style={styles.navigationRow}>
+              {/* Week Navigation - left */}
+              <View style={styles.weekNavContainer}>
+                <TouchableOpacity 
                   style={[
-                    styles.cycleProgressFill,
-                    { width: `${calculateCycleProgress().percentage}%` }
+                    styles.weekNavButton, 
+                    (selectedWeekIndex <= 0 || loadingWeekActions) && styles.weekNavButtonDisabled
                   ]}
-                />
-              </View>
-            </View>
-            
-            {/* Navigation Row: Week Navigator (left), Overall Cycle Effort (center), Goal Filter (right) */}
-            {cycleWeeks.length > 0 && (
-              <View style={styles.navigationRow}>
-                {/* Week Navigator - left */}
-                <View style={styles.weekNavContainer}>
-                  <TouchableOpacity 
-                    style={[
-                      styles.weekNavButton, 
-                      (selectedWeekIndex === 0 || loadingWeekActions) && styles.weekNavButtonDisabled
-                    ]}
-                    onPress={goPrevWeek}
-                    disabled={selectedWeekIndex === 0 || loadingWeekActions}
-                  >
-                    <ChevronLeft size={16} color={(selectedWeekIndex === 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
-                  </TouchableOpacity>
-                  
-                  <View style={styles.weekDisplay}>
+                  onPress={goPrevWeek}
+                  disabled={selectedWeekIndex <= 0 || loadingWeekActions}
+                >
+                  <ChevronLeft size={16} color={(selectedWeekIndex <= 0 || loadingWeekActions) ? '#9ca3af' : '#0078d4'} />
+                </TouchableOpacity>
+                
+                <View style={styles.weekDisplay}>
+                  {loadingWeekActions ? (
+                    <ActivityIndicator size="small" color="#0078d4" />
+                  ) : (
+                    <>
                     <Text style={styles.weekNumber}>
                       Week {getWeekData(selectedWeekIndex)?.weekNumber || 1}
                     </Text>
@@ -498,7 +487,9 @@ useEffect(() => {
                         return `${formatDate(startDate)} – ${formatDate(endDate)}`;
                       })()}
                     </Text>
-                  </View>
+                    </>
+                  )}
+                </View>
                   
                   <TouchableOpacity 
                     style={[
@@ -538,16 +529,72 @@ useEffect(() => {
                   </TouchableOpacity>
                 )}
               </View>
-            )}
-
-            {/* Goals Count */}
-            <View style={styles.goalsCountContainer}>
-              <Text style={styles.goalsCountText}>
-                You have {allGoals.length} active 12-Week Goal{allGoals.length !== 1 ? 's' : ''}
-              </Text>
             </View>
 
             {/* Goals List */}
+            {/* Global Collapse/Expand Toggle */}
+            <View style={styles.globalToggleContainer}>
+              <TouchableOpacity
+                style={styles.globalToggleButton}
+                onPress={() => setGoalsExpanded(!goalsExpanded)}
+              >
+                <Text style={styles.globalToggleText}>
+                  {goalsExpanded ? 'Collapse All Goals' : 'Expand All Goals'}
+                </Text>
+                <ChevronDown 
+                  size={16} 
+                  color="#0078d4" 
+                  style={[
+                    styles.globalToggleIcon,
+                    !goalsExpanded && styles.globalToggleIconRotated
+                  ]}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {goalsExpanded && (
+                <View style={styles.goalsList}>
+                  {getFilteredGoals().map(goal => {
+                    const progress = goalProgress[goal.id];
+                    const weekData = getWeekData(selectedWeekIndex);
+                    const goalActions = weekGoalActions[goal.id] || [];
+                    
+                    // For 12-week goals, require progress data. For custom goals, show without progress
+                    if (goal.goal_type === '12week' && !progress) return null;
+
+                    return (
+                      <GoalProgressCard
+                        key={goal.id}
+                        goal={goal}
+                        progress={progress || {
+                          goalId: goal.id,
+                          currentWeek: 1,
+                          daysRemaining: 0,
+                          weeklyActual: 0,
+                          weeklyTarget: 0,
+                          overallActual: 0,
+                          overallTarget: 0,
+                          overallProgress: 0,
+                        }}
+                        week={weekData}
+                        selectedWeekNumber={weekData?.weekNumber}
+                        weekActions={goalActions}
+                        loadingWeekActions={loadingWeekActions}
+                        onAddAction={() => {
+                          setSelectedGoalForAction(goal);
+                          setIsActionEffortModalVisible(true);
+                        }}
+                        onToggleCompletion={handleToggleCompletion}
+                        onEdit={() => {
+                          setSelectedGoalToEdit(goal);
+                          setEditGoalModalVisible(true);
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              )}
+
             {goalsLoading ? (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
@@ -614,7 +661,6 @@ useEffect(() => {
     })}
   </View>
 )}
-          </View>
         </ScrollView>
       ) : (
         <View style={styles.noCycleContainer}>
@@ -924,16 +970,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 14,
   },
-  goalsCountContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+  globalToggleContainer: {
+    marginTop: 16,
+    paddingHorizontal: 16,
   },
-  goalsCountText: {
+  globalToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  globalToggleText: {
     fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
+    fontWeight: '500',
+    color: '#0078d4',
+  },
+  globalToggleIcon: {
+    transform: [{ rotate: '0deg' }],
+  },
+  globalToggleIconRotated: {
+    transform: [{ rotate: '180deg' }],
   },
   goalsList: {
     flexDirection: 'row',
