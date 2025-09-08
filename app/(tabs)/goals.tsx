@@ -1144,13 +1144,13 @@ const styles = StyleSheet.create({
     color: '#0078d4',
   },
   goalsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    padding: 16,
-    gap: 12,
-    marginTop: 12,
-  },
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-start',
+  padding: 16,
+  marginTop: 12,
+},
+
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
