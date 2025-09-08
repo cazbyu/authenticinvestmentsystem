@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardContent: {
-    padding: 16,
+    padding: 12,
   },
   compactContent: {
     padding: 12,

@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
     color: '#0078d4',
   },
   goalsList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 16,
     marginTop: 12,
     gap: 12,
