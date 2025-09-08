@@ -539,7 +539,7 @@ useEffect(() => {
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="small" color="#1f6feb" />
   </View>
-) : getFilteredGoals().length === 0 ? (
+) : allGoals.length === 0 ? (
     <View style={styles.emptyContainer}>
     <Text style={styles.emptyTitle}>
       No Goals Yet
