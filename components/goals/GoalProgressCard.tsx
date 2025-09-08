@@ -332,24 +332,6 @@ export function GoalProgressCard({
               </View>
             ) : (
               <View style={styles.actionsList}>
-                {/* Day labels above circles */}
-                <View style={styles.dayLabelsRow}>
-                  {generateWeekDays(week.startDate).map(day => (
-                    <Text key={day.date} style={styles.dayLabelText}>
-                      {day.dayName}
-                    </Text>
-                  ))}
-                </View>
-
-                {/* Day labels above circles */}
-                <View style={styles.dayLabelsRow}>
-                  {generateWeekDays(week.startDate).map(day => (
-                    <Text key={day.date} style={styles.dayLabelText}>
-                      {day.dayName}
-                    </Text>
-                  ))}
-                </View>
-
                 {weekActions.map(action => {
                   const weekDays = generateWeekDays(week.startDate);
 
@@ -364,6 +346,15 @@ export function GoalProgressCard({
                             {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
                           </Text>
                         )}
+                      </View>
+                      
+                      {/* Day labels above circles for this action */}
+                      <View style={styles.dayLabelsRow}>
+                        {weekDays.map(day => (
+                          <Text key={day.date} style={styles.dayLabelText}>
+                            {day.dayName}
+                          </Text>
+                        ))}
                       </View>
                       
                       <View style={styles.dayDots}>
