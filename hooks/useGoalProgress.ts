@@ -533,12 +533,12 @@ if (isValidISODate(currentWeekData.end_date)) {
           .in('parent_task_id', taskIds)
           .eq('status', 'completed');
 
-        if (selectedTimeline?.start_date && selectedTimeline.start_date !== 'null') {
-          overallQuery = overallQuery.gte('due_date', selectedTimeline.start_date);
-        }
-        if (selectedTimeline?.end_date && selectedTimeline.end_date !== 'null') {
-          overallQuery = overallQuery.lte('due_date', selectedTimeline.end_date);
-        }
+        if (isValidISODate(selectedTimeline?.start_date)) {
+  overallQuery = overallQuery.gte('due_date', selectedTimeline!.start_date!);
+}
+if (isValidISODate(selectedTimeline?.end_date)) {
+  overallQuery = overallQuery.lte('due_date', selectedTimeline!.end_date!);
+}
 
         const { data: overallOccurrences } = await overallQuery;
 
