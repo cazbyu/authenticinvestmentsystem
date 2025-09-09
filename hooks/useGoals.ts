@@ -330,44 +330,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
       if (error) {
         console.warn('Database week view failed, using client-side fallback:', error);
-        if (currentCycle) {
-          const clientWeeks = generateCycleWeeks(
-            currentCycle.start_date!, 
-            currentCycle.week_start_day || 'monday'
-          ).map(week => ({
-            week_number: week.week_number,
-            start_date: week.start_date,
-            end_date: week.end_date,
-            user_cycle_id: userCycleId,
-          }));
-          setCycleWeeks(clientWeeks);
-          return clientWeeks;
-        }
         setCycleWeeks([]);
         return [];
-      }
-
-      if (dbWeeks && dbWeeks.length > 0 && currentCycle) {
-        const week1 = dbWeeks[0];
-        const expectedWeek1Start = generateCycleWeeks(
-          currentCycle.start_date!, 
-          currentCycle.week_start_day || 'monday'
-        )[0];
-        
-        if (week1.starts_on !== expectedWeek1Start.start_date) {
-          console.warn('Week alignment mismatch, using client-side calculation');
-          const clientWeeks = generateCycleWeeks(
-            currentCycle.start_date!, 
-            currentCycle.week_start_day || 'monday'
-          ).map(week => ({
-            week_number: week.week_number,
-            start_date: week.start_date,
-            end_date: week.end_date,
-            user_cycle_id: userCycleId,
-          }));
-          setCycleWeeks(clientWeeks);
-          return clientWeeks;
-        }
       }
 
       // Map database columns to expected interface
