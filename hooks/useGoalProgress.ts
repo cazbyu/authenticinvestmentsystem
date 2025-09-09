@@ -693,19 +693,40 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const getCurrentWeekNumber = (): number => {
-    if (!selectedTimeline || cycleWeeks.length === 0) return 1;
-    
-    const now = new Date();
-    const currentDateString = formatLocalDate(now);
-    
-    // Find which week we're currently in
-    const currentWeekData = cycleWeeks.find(week => 
-      currentDateString >= week.start_date && currentDateString <= week.end_date
-    );
-    
-    return currentWeekData?.week_number || 1;
-  };
+  const getCurrentWeekNumber = () => {
+  if (!cycleWeeks || cycleWeeks.length === 0) return null;
+
+  const now = new Date();
+  const currentDateString = formatLocalDate(now);
+
+  // Try to find the week that contains today
+  const currentWeekData = cycleWeeks.find(
+    week =>
+      week.start_date &&
+      week.end_date &&
+      currentDateString >= week.start_date &&
+      currentDateString <= week.end_date
+  );
+
+  if (currentWeekData) {
+    return currentWeekData.week_number;
+  }
+
+  // If today is after all weeks, return the last week
+  const lastWeek = cycleWeeks[cycleWeeks.length - 1];
+  if (currentDateString > lastWeek.end_date) {
+    return lastWeek.week_number;
+  }
+
+  // If today is before all weeks, return the first week
+  const firstWeek = cycleWeeks[0];
+  if (currentDateString < firstWeek.start_date) {
+    return firstWeek.week_number;
+  }
+
+  // Fallback
+  return 1;
+};
 
   const getCurrentWeekIndex = (): number => {
     const weekIndex = Math.max(0, getCurrentWeekNumber() - 1); // Convert to 0-based index
