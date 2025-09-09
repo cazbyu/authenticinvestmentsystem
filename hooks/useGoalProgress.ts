@@ -513,12 +513,12 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
             .in('parent_task_id', taskIds)
             .eq('status', 'completed');
 
-          if (currentWeekData.start_date && currentWeekData.start_date !== 'null') {
-            weeklyQuery = weeklyQuery.gte('due_date', currentWeekData.start_date);
-          }
-          if (currentWeekData.end_date && currentWeekData.end_date !== 'null') {
-            weeklyQuery = weeklyQuery.lte('due_date', currentWeekData.end_date);
-          }
+          if (isValidISODate(currentWeekData.start_date)) {
+  weeklyQuery = weeklyQuery.gte('due_date', currentWeekData.start_date);
+}
+if (isValidISODate(currentWeekData.end_date)) {
+  weeklyQuery = weeklyQuery.lte('due_date', currentWeekData.end_date);
+}
 
           const { data: weeklyOccurrences } = await weeklyQuery;
 
