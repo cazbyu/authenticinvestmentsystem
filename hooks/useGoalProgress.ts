@@ -568,7 +568,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       console.error('Error fetching tasks and plans for week:', error);
       return [];
     }
-  };
+    console.log('Current cycle parameter (full object):', currentCycle);
 
   const calculateGoalProgress = async (goals: UnifiedGoal[], timelineId: string) => {
     try {
@@ -835,11 +835,25 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
       if (taskIds.length === 0) return {};
 
-      console.log('Goal joins found:', goalJoins);
-      console.log('Task IDs linked to goals:', taskIds);
+      if (!currentCycle) {
+        console.log('No current cycle provided to fetchGoals');
+        setTwelveWeekGoals([]);
+        setCustomGoals([]);
+        setAllGoals([]);
+        setGoalProgress({});
+        return;
+      }
+
+      console.log('Using cycle ID for queries:', currentCycle.id);
 
       // Fetch tasks for this user cycle
-      const { data: tasksData, error: tasksError } = await supabase
+      console.log('=== 12-WEEK GOALS QUERY DEBUG START ===');
+      console.log('Query parameters:');
+      console.log('- user_id:', user.id);
+      console.log('- user_cycle_id:', currentCycle.id);
+      console.log('- status: active');
+      
+      const { data: twelveWeekData, error: twelveWeekError } = await supabase
         .from('0008-ap-tasks')
         .select('*')
         .eq('user_id', user.id)
@@ -1052,7 +1066,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       const { data: orphanedGoals, error: orphanedError } = await supabase
         .from('0008-ap-goals-12wk')
         .select('id, user_cycle_id')
-        .eq('user_id', user.id)
+        .eq('user_cycle_id', currentCycle.id)
         .eq('status', 'active')
         .neq('user_cycle_id', currentCycleId);
 
@@ -1069,7 +1083,12 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         })));
       }
       if (orphanedGoals && orphanedGoals.length > 0) {
-        console.log(`Reassociating ${orphanedGoals.length} orphaned goals with current cycle:`, currentCycleId);
+        .order('created_at', { ascending: false });
+        
+      console.log('12-WEEK GOALS QUERY DEBUG - Data:', twelveWeekData);
+      console.log('12-WEEK GOALS QUERY DEBUG - Error:', twelveWeekError);
+      console.log('12-WEEK GOALS QUERY DEBUG - Count:', twelveWeekData?.length || 0);
+      console.log('=== 12-WEEK GOALS QUERY DEBUG END ===');
         
         // Update all orphaned goals to use the current cycle
         const { error: updateError } = await supabase
@@ -1262,7 +1281,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !selectedTimeline) return null;
-
+      console.log('Fetching custom goals for timeline:', currentCycle.id);
       const { data, error } = await supabase
         .from('0008-ap-goals-custom')
         .insert({
