@@ -325,17 +325,36 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   };
 
   const fetchGoals = async (timelineId: string) => {
+  console.log('=== FETCH GOALS START ===');
+  console.log('Timeline ID parameter:', timelineId);
+  
   setLoading(true);
   try {
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      console.log('No authenticated user found in fetchGoals');
+      return;
+    }
+    
+    console.log('User ID in fetchGoals:', user.id);
 
-    if (!selectedTimeline) return;
+    if (!selectedTimeline) {
+      console.log('No selected timeline found in fetchGoals');
+      return;
+    }
+    
+    console.log('Selected timeline details:', {
+      id: selectedTimeline.id,
+      source: selectedTimeline.source,
+      timeline_type: selectedTimeline.timeline_type,
+      title: selectedTimeline.title
+    });
 
     let mergedGoals: UnifiedGoal[] = [];
 
     if (selectedTimeline.source === 'global' || selectedTimeline.timeline_type === 'cycle') {
+      console.log('Fetching 12-week goals for timeline:', timelineId);
       // Fetch 12-week goals for this timeline
       const { data: goals12, error: error12 } = await supabase
         .from('0008-ap-goals-12wk')
@@ -345,7 +364,20 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (error12) throw error12;
+      if (error12) {
+        console.error('Error fetching 12-week goals:', error12);
+        throw error12;
+      }
+      
+      console.log('12-week goals query result:', {
+        count: goals12?.length || 0,
+        goals: goals12?.map(g => ({
+          id: g.id,
+          title: g.title,
+          user_cycle_id: g.user_cycle_id,
+          status: g.status
+        })) || []
+      });
       
       const normalized12 = (goals12 ?? []).map(g => ({ 
         ...g, 
@@ -355,6 +387,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       }));
       mergedGoals = [...normalized12];
     } else {
+      console.log('Fetching custom goals for timeline:', timelineId);
       // Fetch custom goals for this custom timeline
       const { data: goalsCustom, error: errorCustom } = await supabase
         .from('0008-ap-goals-custom')
@@ -364,7 +397,20 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (errorCustom) throw errorCustom;
+      if (errorCustom) {
+        console.error('Error fetching custom goals:', errorCustom);
+        throw errorCustom;
+      }
+      
+      console.log('Custom goals query result:', {
+        count: goalsCustom?.length || 0,
+        goals: goalsCustom?.map(g => ({
+          id: g.id,
+          title: g.title,
+          custom_timeline_id: g.custom_timeline_id,
+          status: g.status
+        })) || []
+      });
       
       const normalizedCustom = (goalsCustom ?? []).map(g => ({ 
         ...g, 
@@ -375,16 +421,26 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       mergedGoals = [...normalizedCustom];
     }
 
+    console.log('Final merged goals count:', mergedGoals.length);
+    console.log('Final merged goals:', mergedGoals.map(g => ({
+      id: g.id,
+      title: g.title,
+      goal_type: g.goal_type
+    })));
+
     setGoals(mergedGoals);
 
     // Progress calculation only for 12-week goals (custom handled later)
     if (selectedTimeline.source === 'global' || selectedTimeline.timeline_type === 'cycle') {
       const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === 'twelve_wk_goal');
+      console.log('Calculating progress for', twelveWeekGoals.length, '12-week goals');
       await calculateGoalProgress(twelveWeekGoals, timelineId);
     }
 
+    console.log('=== FETCH GOALS END ===');
   } catch (error) {
     console.error('Error fetching goals:', error);
+    console.log('Fetch goals error details:', error);
     Alert.alert('Error', (error as Error).message);
   } finally {
     setLoading(false);
@@ -927,9 +983,16 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
   const reassociateActiveGoals = async (currentCycleId: string) => {
     try {
+      console.log('=== REASSOCIATE ACTIVE GOALS START ===');
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No authenticated user found');
+        return;
+      }
+      
+      console.log('User ID:', user.id);
+      console.log('Current cycle ID:', currentCycleId);
 
       // Find all active 12-week goals for this user that are not associated with the current cycle
       const { data: orphanedGoals, error: orphanedError } = await supabase
@@ -944,8 +1007,15 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         return;
       }
 
+      console.log('Orphaned goals found:', orphanedGoals?.length || 0);
       if (orphanedGoals && orphanedGoals.length > 0) {
-        console.log(`Found ${orphanedGoals.length} orphaned goals, reassociating with current cycle:`, currentCycleId);
+        console.log('Orphaned goals details:', orphanedGoals.map(g => ({
+          id: g.id,
+          current_user_cycle_id: g.user_cycle_id
+        })));
+      }
+      if (orphanedGoals && orphanedGoals.length > 0) {
+        console.log(`Reassociating ${orphanedGoals.length} orphaned goals with current cycle:`, currentCycleId);
         
         // Update all orphaned goals to use the current cycle
         const { error: updateError } = await supabase
@@ -958,12 +1028,19 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
         if (updateError) {
           console.error('Error reassociating goals:', updateError);
+          console.log('Update error details:', updateError);
         } else {
           console.log('Successfully reassociated goals with current cycle');
+          console.log('Updated goal IDs:', orphanedGoals.map(g => g.id));
         }
+      } else {
+        console.log('No orphaned goals found - all goals are already associated with current cycle');
       }
+      
+      console.log('=== REASSOCIATE ACTIVE GOALS END ===');
     } catch (error) {
       console.error('Error in reassociateActiveGoals:', error);
+      console.log('Reassociate error details:', error);
     }
   };
 
