@@ -299,8 +299,15 @@ const isValidISODate = (s?: string | null) =>
         }
       }
 
-      setCycleWeeks(dbWeeks ?? []);
-      return dbWeeks ?? [];
+      // Ensure null dates are converted to empty strings to prevent Supabase errors
+      const sanitizedWeeks = (dbWeeks ?? []).map(week => ({
+        ...week,
+        start_date: week.start_date ?? '',
+        end_date: week.end_date ?? '',
+      }));
+      
+      setCycleWeeks(sanitizedWeeks);
+      return sanitizedWeeks;
 
     } catch (error) {
       console.error('Error fetching cycle weeks:', error);
@@ -796,11 +803,11 @@ if (!tasksWithWeekPlans || tasksWithWeekPlans.length === 0) {
         .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
         .eq('status', 'completed');
 
-      // 🚦 Guard: only add filters if the dates are valid ISO strings
-      if (weekStartDate && isValidISODate(weekStartDate)) {
+      // Guard: only add filters if the dates are valid ISO strings and not empty
+      if (weekStartDate && weekStartDate !== '' && isValidISODate(weekStartDate)) {
         occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
       }
-      if (weekEndDate && isValidISODate(weekEndDate)) {
+      if (weekEndDate && weekEndDate !== '' && isValidISODate(weekEndDate)) {
         occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
       }
 
