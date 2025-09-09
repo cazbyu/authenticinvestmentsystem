@@ -159,8 +159,17 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   // Guard: ensure we never pass "null" or invalid strings as dates to Supabase filters
 const isValidISODate = (s?: string | null) =>
-  typeof s === 'string' && s !== 'null' && !isNaN(Date.parse(s));
-
+  {
+    if (s === null || typeof s === 'undefined') {
+      return false;
+    }
+    // Now we know s is a string. Check if it's the literal "null" string.
+    if (s === 'null') {
+      return false;
+    }
+    // Finally, check if it's a valid date string.
+    return !isNaN(Date.parse(s));
+  };
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
     if (roles && roles.length > 0) points += roles.length;
@@ -245,6 +254,7 @@ const isValidISODate = (s?: string | null) =>
         .order('week_number', { ascending: true })
         .returns<CycleWeek[]>();
 
+      console.log('Raw dbWeeks from Supabase:', dbWeeks);
       if (error) {
         console.warn('Database week view failed, using client-side fallback:', error);
         // Fallback to client-side calculation
@@ -785,6 +795,10 @@ if (!tasksWithWeekPlans || tasksWithWeekPlans.length === 0) {
         .select('*')
         .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
         .eq('status', 'completed');
+
+      console.log('Before applying date filters to occurrenceQuery:');
+      console.log('weekStartDate:', weekStartDate, 'isValidISODate(weekStartDate):', isValidISODate(weekStartDate));
+      console.log('weekEndDate:', weekEndDate, 'isValidISODate(weekEndDate):', isValidISODate(weekEndDate));
 
       if (isValidISODate(weekStartDate)) {
   occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
