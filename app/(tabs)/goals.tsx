@@ -10,6 +10,7 @@ import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
+import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp, Check } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
@@ -31,6 +32,7 @@ export default function Goals() { // Ensure this is the default export
   const initializedWeekRef = useRef(false);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
   const [selectedTimelineId, setSelectedTimelineId] = useState<string | null>(null);
+  const [customTimelines, setCustomTimelines] = useState<any[]>([]);
   const [initialGoalType, setInitialGoalType] = useState<'12week' | 'custom'>('12week');
   const [customTimelineWeeks, setCustomTimelineWeeks] = useState<any[]>([]);
   const [customTimelineGoals, setCustomTimelineGoals] = useState<any[]>([]);
@@ -38,12 +40,11 @@ export default function Goals() { // Ensure this is the default export
   const [isCustomTimelinesModalVisible, setIsCustomTimelinesModalVisible] = useState(false);
 
  const { width } = useWindowDimensions();
- const twoUp = Platform.OS === 'web' && width >= 768;
+  const twoUp = Platform.OS === 'web' && width >= 768;
 
   // 12-Week Goals
   const { 
     twelveWeekGoals,
-    customGoals,
     allGoals,
     currentCycle, 
     daysLeftData, 
@@ -64,6 +65,36 @@ export default function Goals() { // Ensure this is the default export
     completeActionSuggestion,
   undoActionOccurrence,
   } = useGoals();
+
+  const fetchCustomTimelines = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-custom-timelines')
+        .select('*, goals:0008-ap-goals-custom(id)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const timelines = (data || []).map(tl => ({
+        ...tl,
+        goals_count: tl.goals ? tl.goals.length : 0,
+      }));
+
+      setCustomTimelines(timelines);
+    } catch (err) {
+      console.error('Error fetching custom timelines:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomTimelines();
+  }, []);
 
   // Initialize selected week to current week
   // Initialize selected week to current week (run once when cycleWeeks arrive)
@@ -89,67 +120,54 @@ useEffect(() => {
 }, [selectedTimelineId, selectedWeekIndex, allGoals, cycleWeeks, customTimelineWeeks]);
 
   const fetchWeekActions = async () => {
-  try {
-    setLoadingWeekActions(true);
+    try {
+      setLoadingWeekActions(true);
 
-    // Use cycle weeks for 12-week timeline; use custom weeks otherwise
-    const wk = selectedTimelineId === 'twelve-week'
-      ? getWeekData(selectedWeekIndex) // { weekNumber, startDate, endDate }
-      : (() => {
-          const w = customTimelineWeeks[selectedWeekIndex];
-          if (!w) return null;
-          return {
-            weekNumber: w.week_number,
-            startDate: w.start_date,
-            endDate: w.end_date,
-          };
-        })();
+      // Use cycle weeks for 12-week timeline; use custom weeks otherwise
+      const wk = selectedTimelineId === 'twelve-week'
+        ? getWeekData(selectedWeekIndex)
+        : (() => {
+            const w = customTimelineWeeks[selectedWeekIndex];
+            if (!w) return null;
+            return {
+              weekNumber: w.week_number,
+              startDate: w.start_date,
+              endDate: w.end_date,
+            };
+          })();
 
-    if (!wk || allGoals.length === 0) {
-      setWeekGoalActions({});
-      return;
+      if (!wk) {
+        setWeekGoalActions({});
+        return;
+      }
+
+      // Determine which goals to fetch actions for
+      const goalsSource = selectedTimelineId === 'twelve-week' ? allGoals : customTimelineGoals;
+      const goalIds = goalsSource.map(g => g.id);
+      if (goalIds.length === 0) {
+        setWeekGoalActions({});
+        return;
+      }
+
+      // Guard against invalid dates
+      const validStart = typeof wk.startDate === 'string' && wk.startDate !== 'null' && !isNaN(Date.parse(wk.startDate));
+      const validEnd = typeof wk.endDate === 'string' && wk.endDate !== 'null' && !isNaN(Date.parse(wk.endDate));
+      if (!validStart || !validEnd) {
+        console.warn('Skipping fetchWeekActions due to invalid dates', { wk });
+        setWeekGoalActions({});
+        return;
+      }
+
+      const actions = await fetchGoalActionsForWeek(goalIds, wk.startDate, wk.endDate);
+      setWeekGoalActions(actions);
+    } catch (err: any) {
+      if (!(err && (err.status === 0 || err.name === 'TypeError'))) {
+        console.error('fetchWeekActions error:', err);
+      }
+    } finally {
+      setLoadingWeekActions(false);
     }
-
-    // Guard against invalid/"null" ISO dates
-    const validStart = typeof wk.startDate === 'string' && wk.startDate !== 'null' && !isNaN(Date.parse(wk.startDate));
-    const validEnd   = typeof wk.endDate   === 'string' && wk.endDate   !== 'null' && !isNaN(Date.parse(wk.endDate));
-    if (!validStart || !validEnd) {
-      console.warn('Skipping fetchWeekActions due to invalid dates', { wk });
-      setWeekGoalActions({});
-      return;
-    }
-
-    const goalIds = allGoals.map(g => g.id);
-    if (!goalIds || goalIds.length === 0) {
-      setWeekGoalActions({});
-      return;
-    }
-
-    const actions = await fetchGoalActionsForWeek(goalIds, wk.startDate, wk.endDate);
-    setWeekGoalActions(actions);
-  } catch (err: any) {
-    if (!(err && (err.status === 0 || err.name === 'TypeError'))) {
-      console.error('fetchWeekActions error:', err);
-    }
-  } finally {
-    setLoadingWeekActions(false);
-  }
-};
-
-    console.log('Actions received from fetchGoalActionsForWeek:', actions);
-    setWeekGoalActions(actions);
-    console.log('setWeekGoalActions called with:', actions);
-    console.log('=== FETCH WEEK ACTIONS END ===');
-
-  } catch (err: any) {
-    // Ignore transient preview/network/auth refresh errors (status 0)
-    if (!(err && (err.status === 0 || err.name === 'TypeError'))) {
-      console.error('fetchWeekActions error:', err);
-    }
-  } finally {
-    setLoadingWeekActions(false);
-  }
-};
+  };
 
     const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
     console.log('=== HANDLE TOGGLE COMPLETION START (optimistic) ===');
@@ -456,35 +474,35 @@ useEffect(() => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get the custom goal (timeline)
-      const { data: customGoal, error: goalError } = await supabase
-        .from('0008-ap-goals-custom')
+      // Get the custom timeline
+      const { data: timeline, error: timelineError } = await supabase
+        .from('0008-ap-custom-timelines')
         .select('*')
         .eq('id', timelineId)
         .eq('user_id', user.id)
         .single();
 
-      if (goalError) throw goalError;
-      if (!customGoal) return;
+      if (timelineError) throw timelineError;
+      if (!timeline) return;
 
       // Generate weeks for this custom timeline
       let startDate: Date | null = null;
-let endDate: Date | null = null;
+      let endDate: Date | null = null;
 
-if (customGoal?.start_date && customGoal.start_date !== 'null') {
-  startDate = parseLocalDate(customGoal.start_date);
-}
-if (customGoal?.end_date && customGoal.end_date !== 'null') {
-  endDate = parseLocalDate(customGoal.end_date);
-}
+      if (timeline?.start_date && timeline.start_date !== 'null') {
+        startDate = parseLocalDate(timeline.start_date);
+      }
+      if (timeline?.end_date && timeline.end_date !== 'null') {
+        endDate = parseLocalDate(timeline.end_date);
+      }
 
-if (!startDate || !endDate) {
-  console.warn("Skipping timeline calculation due to invalid start/end date", {
-    start_date: customGoal?.start_date,
-    end_date: customGoal?.end_date,
-  });
-  return; // or safely handle fallback (e.g., 0 days left)
-}
+      if (!startDate || !endDate) {
+        console.warn('Skipping timeline calculation due to invalid start/end date', {
+          start_date: timeline?.start_date,
+          end_date: timeline?.end_date,
+        });
+        return; // or safely handle fallback (e.g., 0 days left)
+      }
 
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const totalWeeks = Math.ceil(totalDays / 7);
@@ -519,22 +537,35 @@ if (!startDate || !endDate) {
       );
       setSelectedWeekIndex(Math.max(0, currentWeekIndex));
 
-      // Load goals for this timeline (just the one custom goal)
-      const customGoalWithType = { ...customGoal, goal_type: 'custom' };
-      setCustomTimelineGoals([customGoalWithType]);
+      // Load goals for this timeline
+      const { data: goalData, error: goalsError } = await supabase
+        .from('0008-ap-goals-custom')
+        .select('*')
+        .eq('custom_timeline_id', timelineId)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
 
-      // Create mock progress for custom goal
-      const mockProgress = {
-        goalId: customGoal.id,
-        currentWeek: Math.max(1, currentWeekIndex + 1),
-        daysRemaining: Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
-        weeklyActual: 0,
-        weeklyTarget: 0,
-        overallActual: 0,
-        overallTarget: 0,
-        overallProgress: 0,
-      };
-      setCustomTimelineProgress({ [customGoal.id]: mockProgress });
+      if (goalsError) throw goalsError;
+
+      const goalsWithType = (goalData || []).map(g => ({ ...g, goal_type: 'custom' }));
+      setCustomTimelineGoals(goalsWithType);
+
+      // Create mock progress for each goal
+      const progress: Record<string, any> = {};
+      goalsWithType.forEach(goal => {
+        progress[goal.id] = {
+          goalId: goal.id,
+          currentWeek: Math.max(1, currentWeekIndex + 1),
+          daysRemaining: Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
+          weeklyActual: 0,
+          weeklyTarget: 0,
+          overallActual: 0,
+          overallTarget: 0,
+          overallProgress: 0,
+        };
+      });
+      setCustomTimelineProgress(progress);
 
     } catch (error) {
       console.error('Error loading custom timeline data:', error);
@@ -568,22 +599,21 @@ if (!startDate || !endDate) {
       });
     }
     
-    // Add custom goals as individual timelines
-    customGoals.forEach(goal => {
-      const startDate = parseLocalDate(goal.start_date);
-      const endDate = parseLocalDate(goal.end_date);
+    // Add custom timelines
+    customTimelines.forEach(tl => {
+      const startDate = parseLocalDate(tl.start_date);
+      const endDate = parseLocalDate(tl.end_date);
       const now = new Date();
       const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      
+
       timelines.push({
-        id: goal.id,
+        id: tl.id,
         type: 'custom',
-        title: goal.title,
-        dateRange: formatDateRange(goal.start_date, goal.end_date),
-        goalCount: 1, // Each custom goal is its own timeline
+        title: tl.title,
+        dateRange: formatDateRange(tl.start_date, tl.end_date),
+        goalCount: tl.goals_count || 0,
         daysRemaining,
         color: '#7c3aed',
-        goal: goal,
       });
     });
     
@@ -624,12 +654,11 @@ if (!startDate || !endDate) {
             <TouchableOpacity
               style={styles.createTimelineButton}
               onPress={() => {
-                setInitialGoalType('custom');
-                setCreateGoalModalVisible(true);
+                setIsCustomTimelinesModalVisible(true);
               }}
             >
               <Plus size={20} color="#ffffff" />
-              <Text style={styles.createTimelineButtonText}>Create Custom Goal</Text>
+              <Text style={styles.createTimelineButtonText}>Create Custom Timeline</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -818,11 +847,10 @@ if (!startDate || !endDate) {
       </ScrollView>
     );
   } else {
-    // Custom goal view
-    const customGoal = customGoals.find(g => g.id === selectedTimelineId);
-    if (!customGoal) return null;
+    // Custom timeline view
+    const timeline = customTimelines.find(t => t.id === selectedTimelineId);
+    if (!timeline) return null;
 
-    const customProgress = customTimelineProgress[customGoal.id];
     const weekData = customTimelineWeeks[selectedWeekIndex];
 
     return (
@@ -838,7 +866,7 @@ if (!startDate || !endDate) {
           <View style={styles.cycleInfo}>
             <View style={styles.cycleTitleRow}>
               <View style={styles.cycleTitleContent}>
-                <Text style={styles.cycleTitle}>{customGoal.title}</Text>
+                <Text style={styles.cycleTitle}>{timeline.title}</Text>
               </View>
               <TouchableOpacity
                 style={styles.editCycleButton}
@@ -852,7 +880,7 @@ if (!startDate || !endDate) {
             </View>
 
             <Text style={styles.cycleDates}>
-              {formatDateRange(customGoal.start_date, customGoal.end_date)}
+              {formatDateRange(timeline.start_date, timeline.end_date)}
             </Text>
             <Text style={styles.activeGoalsInfo}>
               Custom Timeline • {customTimelineWeeks.length} weeks • {customTimelineGoals.length} active goal{customTimelineGoals.length !== 1 ? 's' : ''}
@@ -865,17 +893,17 @@ if (!startDate || !endDate) {
                 let startDate: Date | null = null;
 let endDate: Date | null = null;
 
-if (customGoal?.start_date && customGoal.start_date !== 'null') {
-  startDate = parseLocalDate(customGoal.start_date);
+if (timeline?.start_date && timeline.start_date !== 'null') {
+  startDate = parseLocalDate(timeline.start_date);
 }
-if (customGoal?.end_date && customGoal.end_date !== 'null') {
-  endDate = parseLocalDate(customGoal.end_date);
+if (timeline?.end_date && timeline.end_date !== 'null') {
+  endDate = parseLocalDate(timeline.end_date);
 }
 
 if (!startDate || !endDate) {
-  console.warn("Skipping timeline calculation due to invalid start/end date", {
-    start_date: customGoal?.start_date,
-    end_date: customGoal?.end_date,
+  console.warn('Skipping timeline calculation due to invalid start/end date', {
+    start_date: timeline?.start_date,
+    end_date: timeline?.end_date,
   });
   return; // or safely handle fallback (e.g., 0 days left)
 }
@@ -897,15 +925,15 @@ if (!startDate || !endDate) {
                 style={[
                   styles.cycleProgressFill,
                   { width: `${(() => {
-    if (!customGoal?.start_date || !customGoal?.end_date || customGoal.start_date === 'null' || customGoal.end_date === 'null') {
-      console.warn("Skipping progress bar calculation due to invalid start/end date", {
-        start_date: customGoal?.start_date,
-        end_date: customGoal?.end_date,
+    if (!timeline?.start_date || !timeline?.end_date || timeline.start_date === 'null' || timeline.end_date === 'null') {
+      console.warn('Skipping progress bar calculation due to invalid start/end date', {
+        start_date: timeline?.start_date,
+        end_date: timeline?.end_date,
       });
       return 0;
     }
-    const startDate = parseLocalDate(customGoal.start_date);
-    const endDate = parseLocalDate(customGoal.end_date);
+    const startDate = parseLocalDate(timeline.start_date);
+    const endDate = parseLocalDate(timeline.end_date);
     const now = new Date();
     const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
     const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
@@ -1030,18 +1058,18 @@ if (!startDate || !endDate) {
         authenticScore={authenticScore}
         daysRemaining={selectedTimelineId === 'twelve-week' ? daysLeftData?.days_left : (() => {
           if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
-          const customGoal = customGoals.find(g => g.id === selectedTimelineId);
-          if (!customGoal) return undefined;
-          const endDate = parseLocalDate(customGoal.end_date);
+          const timeline = customTimelines.find(t => t.id === selectedTimelineId);
+          if (!timeline) return undefined;
+          const endDate = parseLocalDate(timeline.end_date);
           const now = new Date();
           return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
         })()}
         cycleProgressPercentage={selectedTimelineId === 'twelve-week' ? daysLeftData?.pct_elapsed : (() => {
           if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
-          const customGoal = customGoals.find(g => g.id === selectedTimelineId);
-          if (!customGoal) return undefined;
-          const startDate = parseLocalDate(customGoal.start_date);
-          const endDate = parseLocalDate(customGoal.end_date);
+          const timeline = customTimelines.find(t => t.id === selectedTimelineId);
+          if (!timeline) return undefined;
+          const startDate = parseLocalDate(timeline.start_date);
+          const endDate = parseLocalDate(timeline.end_date);
           const now = new Date();
           const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
           const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
@@ -1049,15 +1077,15 @@ if (!startDate || !endDate) {
         })()}
         cycleTitle={selectedTimelineId === 'twelve-week' ? currentCycle?.title : (() => {
           if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
-          const customGoal = customGoals.find(g => g.id === selectedTimelineId);
-          return customGoal?.title;
+          const timeline = customTimelines.find(t => t.id === selectedTimelineId);
+          return timeline?.title;
         })()}
       />
       
       <>
       {selectedTimelineId ? (
         renderSelectedTimeline()
-      ) : (currentCycle || customGoals.length > 0) ? (
+      ) : (currentCycle || customTimelines.length > 0) ? (
         renderTimelineContainers()
       ) : (
         <View style={styles.noCycleContainer}>
@@ -1141,6 +1169,16 @@ if (!startDate || !endDate) {
         onClose={() => setEditGoalModalVisible(false)}
         onUpdate={handleEditGoalSuccess}
         goal={selectedGoalToEdit}
+      />
+
+      {/* Manage Custom Timelines Modal */}
+      <ManageCustomTimelinesModal
+        visible={isCustomTimelinesModalVisible}
+        onClose={() => {
+          setIsCustomTimelinesModalVisible(false);
+          fetchCustomTimelines();
+        }}
+        onUpdate={fetchCustomTimelines}
       />
 
       {/* Action Effort Modal */}
