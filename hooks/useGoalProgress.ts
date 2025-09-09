@@ -568,7 +568,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       console.error('Error fetching tasks and plans for week:', error);
       return [];
     }
-    console.log('Current cycle parameter (full object):', currentCycle);
+  };
+
+  console.log('Current cycle parameter (full object):', currentCycle);
 
   const calculateGoalProgress = async (goals: UnifiedGoal[], timelineId: string) => {
     try {
@@ -1066,7 +1068,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       const { data: orphanedGoals, error: orphanedError } = await supabase
         .from('0008-ap-goals-12wk')
         .select('id, user_cycle_id')
-        .eq('user_cycle_id', currentCycle.id)
+        .eq('user_id', user.id)
         .eq('status', 'active')
         .neq('user_cycle_id', currentCycleId);
 
@@ -1083,13 +1085,6 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         })));
       }
       if (orphanedGoals && orphanedGoals.length > 0) {
-        .order('created_at', { ascending: false });
-        
-      console.log('12-WEEK GOALS QUERY DEBUG - Data:', twelveWeekData);
-      console.log('12-WEEK GOALS QUERY DEBUG - Error:', twelveWeekError);
-      console.log('12-WEEK GOALS QUERY DEBUG - Count:', twelveWeekData?.length || 0);
-      console.log('=== 12-WEEK GOALS QUERY DEBUG END ===');
-        
         // Update all orphaned goals to use the current cycle
         const { error: updateError } = await supabase
           .from('0008-ap-goals-12wk')
@@ -1281,7 +1276,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !selectedTimeline) return null;
-      console.log('Fetching custom goals for timeline:', currentCycle.id);
+      
       const { data, error } = await supabase
         .from('0008-ap-goals-custom')
         .insert({
