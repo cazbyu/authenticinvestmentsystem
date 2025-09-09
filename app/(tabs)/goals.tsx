@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
+import { WeeklyGoalNavigator } from '@/components/goals/WeeklyGoalNavigator';
 
 export default function Goals() {
 
@@ -13,7 +14,7 @@ export default function Goals() {
       />
       
       <View style={styles.content}>
-        <Text style={styles.placeholderText}>Goal Bank feature coming soon!</Text>
+        <WeeklyGoalNavigator />
       </View>
     </SafeAreaView>
   );
@@ -26,13 +27,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 16,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
   },
 });

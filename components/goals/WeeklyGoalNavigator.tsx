@@ -1,0 +1,104 @@
+import React, { useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+
+// Helper to get Monday as the start of the week
+function startOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  // Adjust when day is Sunday (0) to get previous Monday
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Helper to add days to a date
+function addDays(date: Date, amount: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + amount);
+  return d;
+}
+
+export function WeeklyGoalNavigator() {
+  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+
+  const days = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  }, [weekStart]);
+
+  const goToPreviousWeek = () => setWeekStart(addDays(weekStart, -7));
+  const goToNextWeek = () => setWeekStart(addDays(weekStart, 7));
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.navigation}>
+        <TouchableOpacity onPress={goToPreviousWeek} style={styles.navButton}>
+          <Text style={styles.navButtonText}>{'<'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.weekLabel}>
+          {weekStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+        </Text>
+        <TouchableOpacity onPress={goToNextWeek} style={styles.navButton}>
+          <Text style={styles.navButtonText}>{'>'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.daysRow}>
+        {days.map((day) => (
+          <View key={day.toISOString()} style={styles.dayItem}>
+            <Text style={styles.dayLabel}>
+              {day.toLocaleDateString('en-US', { weekday: 'short' })}
+            </Text>
+            <Text style={styles.dayNumber}>{day.getDate()}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    paddingVertical: 16,
+    backgroundColor: '#ffffff',
+  },
+  navigation: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  navButton: {
+    padding: 8,
+  },
+  navButtonText: {
+    fontSize: 18,
+    color: '#0078d4',
+  },
+  weekLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  daysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  dayItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  dayLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  dayNumber: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+});
+
