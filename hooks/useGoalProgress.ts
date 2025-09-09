@@ -909,6 +909,9 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         return;
       }
 
+      // Reassociate any orphaned active goals with the current cycle
+      await reassociateActiveGoals(timeline.id);
+
       // Fetch cycle-dependent data in parallel
       const [weeks, daysLeft] = await Promise.all([
         fetchCycleWeeks(timeline.id),
@@ -919,6 +922,48 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       await fetchGoals(timeline.id);
     } catch (error) {
       console.error('Error refreshing all data:', error);
+    }
+  };
+
+  const reassociateActiveGoals = async (currentCycleId: string) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Find all active 12-week goals for this user that are not associated with the current cycle
+      const { data: orphanedGoals, error: orphanedError } = await supabase
+        .from('0008-ap-goals-12wk')
+        .select('id, user_cycle_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .neq('user_cycle_id', currentCycleId);
+
+      if (orphanedError) {
+        console.error('Error fetching orphaned goals:', orphanedError);
+        return;
+      }
+
+      if (orphanedGoals && orphanedGoals.length > 0) {
+        console.log(`Found ${orphanedGoals.length} orphaned goals, reassociating with current cycle:`, currentCycleId);
+        
+        // Update all orphaned goals to use the current cycle
+        const { error: updateError } = await supabase
+          .from('0008-ap-goals-12wk')
+          .update({ 
+            user_cycle_id: currentCycleId,
+            updated_at: new Date().toISOString()
+          })
+          .in('id', orphanedGoals.map(g => g.id));
+
+        if (updateError) {
+          console.error('Error reassociating goals:', updateError);
+        } else {
+          console.log('Successfully reassociated goals with current cycle');
+        }
+      }
+    } catch (error) {
+      console.error('Error in reassociateActiveGoals:', error);
     }
   };
 
