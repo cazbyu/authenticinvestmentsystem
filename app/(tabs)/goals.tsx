@@ -52,7 +52,7 @@ export default function Goals() { // Ensure this is the default export
   } = useGoals();
 
   const [editingCycle, setEditingCycle] = useState<any>(null);
-  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState(-1); // -1 indicates not yet initialized
   const [goalsExpanded, setGoalsExpanded] = useState(true);
   const [selectedGoalForModal, setSelectedGoalForModal] = useState<any>(null);
   const [goalModalVisible, setGoalModalVisible] = useState(false);
@@ -127,11 +127,15 @@ export default function Goals() { // Ensure this is the default export
   // Initialize selected week to current week (run once when cycleWeeks arrive)
 useEffect(() => {
   if (!initializedWeekRef.current && cycleWeeks.length > 0) {
-    const currentWeekIndex = getCurrentWeekIndex();
+    console.log('=== INITIALIZING WEEK SELECTION ===');
+    const currentWeekIndex = getCurrentWeekIndex(); // This returns the current week index (0-based)
+    console.log('Current week index:', currentWeekIndex);
+    console.log('Available weeks:', cycleWeeks.length);
+    
     setSelectedWeekIndex(currentWeekIndex);
     initializedWeekRef.current = true;
   }
-}, [cycleWeeks]);
+}, [cycleWeeks, getCurrentWeekIndex]);
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
@@ -296,6 +300,17 @@ useEffect(() => {
       Alert.alert('Error', 'Failed to update completion status');
       console.log('=== HANDLE TOGGLE COMPLETION END (reverted) ===');
     }
+  };
+
+  const handleWeekChange = (direction: 'prev' | 'next') => {
+    // Only allow navigation if we have a valid week selection
+    if (selectedWeekIndex === -1) return;
+    
+    const newIndex = direction === 'prev' 
+      ? Math.max(0, selectedWeekIndex - 1)
+      : Math.min(11, selectedWeekIndex + 1);
+    
+    setSelectedWeekIndex(newIndex);
   };
 
   const goPrevWeek = () => {
@@ -1074,6 +1089,26 @@ useEffect(() => {
     );
   }
 };
+
+  const currentWeek = getWeekData(selectedWeekIndex);
+  
+  // Don't render week-dependent content until we have a valid week selection
+  if (selectedWeekIndex === -1 || !currentWeek) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header 
+          title="Goal Bank" 
+          authenticScore={authenticScore}
+          daysRemaining={daysLeftData?.days_left}
+          cycleProgressPercentage={daysLeftData?.pct_elapsed}
+          cycleTitle={currentCycle?.title}
+        />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading current week...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
