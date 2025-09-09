@@ -12,7 +12,7 @@ import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp, Check } from 'lucide-react-native';
-import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
+import { formatDateRange, parseLocalDate, formatLocalDate, generateCycleWeeks } from '@/lib/dateUtils';
 
 import { useGoals } from '@/hooks/useGoals';
 export default function Goals() { // Ensure this is the default export
@@ -174,18 +174,73 @@ useEffect(() => {
     try {
       setLoadingWeekActions(true);
 
-      // Use cycle weeks for 12-week timeline; use custom weeks otherwise
-      const wk = selectedTimelineId === 'twelve-week'
-        ? getWeekData(selectedWeekIndex)
-        : (() => {
-            const w = customTimelineWeeks[selectedWeekIndex];
-            if (!w) return null;
-            return {
-              weekNumber: w.week_number,
-              startDate: w.start_date,
-              endDate: w.end_date,
-            };
-          })();
+      // Normalize week data and ensure we have valid dates
+      const normalizeWeek = (): { weekNumber: number; startDate: string; endDate: string } | null => {
+        let week = selectedTimelineId === 'twelve-week'
+          ? getWeekData(selectedWeekIndex)
+          : (() => {
+              const w = customTimelineWeeks[selectedWeekIndex];
+              if (!w) return null;
+              return {
+                weekNumber: w.week_number,
+                startDate: w.start_date,
+                endDate: w.end_date,
+              };
+            })();
+
+        if (!week) return null;
+
+        const valid = (d: any) => typeof d === 'string' && d !== 'null' && !isNaN(Date.parse(d));
+        if (!valid(week.startDate) || !valid(week.endDate)) {
+          if (selectedTimelineId === 'twelve-week') {
+            const fallback = cycleWeeks[selectedWeekIndex];
+            if (fallback && valid(fallback.start_date) && valid(fallback.end_date)) {
+              week = {
+                weekNumber: fallback.week_number,
+                startDate: fallback.start_date,
+                endDate: fallback.end_date,
+              };
+            } else if (currentCycle?.start_date) {
+              const generated = generateCycleWeeks(
+                currentCycle.start_date,
+                currentCycle.week_start_day || 'monday'
+              )[selectedWeekIndex];
+              if (generated && valid(generated.start_date) && valid(generated.end_date)) {
+                week = {
+                  weekNumber: generated.week_number,
+                  startDate: generated.start_date,
+                  endDate: generated.end_date,
+                };
+              } else {
+                return null;
+              }
+            } else {
+              return null;
+            }
+          } else {
+            const fallback = customTimelineWeeks[selectedWeekIndex];
+            if (fallback && valid(fallback.start_date) && valid(fallback.end_date)) {
+              week = {
+                weekNumber: fallback.week_number,
+                startDate: fallback.start_date,
+                endDate: fallback.end_date,
+              };
+            } else {
+              return null;
+            }
+          }
+        }
+
+        if (!valid(week.startDate) || !valid(week.endDate)) return null;
+
+        return {
+          weekNumber: week.weekNumber,
+          startDate: new Date(week.startDate).toISOString().split('T')[0],
+          endDate: new Date(week.endDate).toISOString().split('T')[0],
+        };
+      };
+
+      const wk = normalizeWeek();
 
       if (!wk) {
         setWeekGoalActions({});
@@ -196,15 +251,6 @@ useEffect(() => {
       const goalsSource = selectedTimelineId === 'twelve-week' ? allGoals : customTimelineGoals;
       const goalIds = goalsSource.map(g => g.id);
       if (goalIds.length === 0) {
-        setWeekGoalActions({});
-        return;
-      }
-
-      // Guard against invalid dates
-      const validStart = typeof wk.startDate === 'string' && wk.startDate !== 'null' && !isNaN(Date.parse(wk.startDate));
-      const validEnd = typeof wk.endDate === 'string' && wk.endDate !== 'null' && !isNaN(Date.parse(wk.endDate));
-      if (!validStart || !validEnd) {
-        console.warn('Skipping fetchWeekActions due to invalid dates', { wk });
         setWeekGoalActions({});
         return;
       }
