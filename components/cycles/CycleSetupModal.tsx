@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { X, Calendar as CalendarIcon, Users, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
-import { getAvailableWeekStarts, formatDateRange } from '@/lib/dateUtils';
+import { getAvailableWeekStarts, formatDateRange, formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 
 interface GlobalCycle {
   id: string;
