@@ -4,14 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
 import { getSupabaseClient } from '@/lib/supabase';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
-import { useGoalProgress } from '@/hooks/useGoalProgress';
 import TaskEventForm from '@/components/tasks/TaskEventForm'; // Keep this import
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
-import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp, Check } from 'lucide-react-native';
+import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
 import { useGoals } from '@/hooks/useGoals';
@@ -89,33 +88,7 @@ export default function Goals() { // Ensure this is the default export
     }
   };
 
-  // 12-Week Goals
-  const { 
-    goals: progressGoals,
-    selectedTimeline: progressCycle,
-    availableTimelines,
-    cycleWeeks,
-    daysLeftData,
-    goalProgress,
-    cycleEffortData,
-    loading: goalsLoading,
-    loadingWeekActions,
-    setLoadingWeekActions,
-    refreshGoals,
-    refreshAllData,
-    fetchGoalActionsForWeek,
-    completeActionSuggestion,
-    undoActionOccurrence,
-    createTwelveWeekGoal,
-    createCustomGoal,
-    createTaskWithWeekPlan,
-    getCurrentWeekNumber,
-    getCurrentWeekIndex,
-    getWeekData,
-  } = useGoalProgress();
-
-  // Filter goals by type for compatibility
-  const twelveWeekGoals = allGoals.filter(g => g.goal_type === 'twelve_wk_goal');
+  // 12-Week Goals handled via useGoals
 
   const fetchCustomTimelines = async () => {
     try {
@@ -838,7 +811,7 @@ useEffect(() => {
         )}
 
         {/* 12-Week Goals List */}
-        {(goalsLoading) ? (
+        {(loading) ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#1f6feb" />
           </View>
