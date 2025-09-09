@@ -90,22 +90,52 @@ useEffect(() => {
 
   const fetchWeekActions = async () => {
   try {
-    console.log('=== FETCH WEEK ACTIONS START ===');
-    console.log('Selected week index:', selectedWeekIndex);
-    console.log('Cycle weeks available:', cycleWeeks.length);
     setLoadingWeekActions(true);
-    
-    const weekData = getWeekData(selectedWeekIndex);
-    console.log('Week data calculated:', weekData);
-    if (!weekData || allGoals.length === 0) {
-      console.log('No week data or goals - clearing actions');
+
+    // Use cycle weeks for 12-week timeline; use custom weeks otherwise
+    const wk = selectedTimelineId === 'twelve-week'
+      ? getWeekData(selectedWeekIndex) // { weekNumber, startDate, endDate }
+      : (() => {
+          const w = customTimelineWeeks[selectedWeekIndex];
+          if (!w) return null;
+          return {
+            weekNumber: w.week_number,
+            startDate: w.start_date,
+            endDate: w.end_date,
+          };
+        })();
+
+    if (!wk || allGoals.length === 0) {
+      setWeekGoalActions({});
+      return;
+    }
+
+    // Guard against invalid/"null" ISO dates
+    const validStart = typeof wk.startDate === 'string' && wk.startDate !== 'null' && !isNaN(Date.parse(wk.startDate));
+    const validEnd   = typeof wk.endDate   === 'string' && wk.endDate   !== 'null' && !isNaN(Date.parse(wk.endDate));
+    if (!validStart || !validEnd) {
+      console.warn('Skipping fetchWeekActions due to invalid dates', { wk });
       setWeekGoalActions({});
       return;
     }
 
     const goalIds = allGoals.map(g => g.id);
-    console.log('Goal IDs to fetch actions for:', goalIds);
-    const actions = await fetchGoalActionsForWeek(goalIds, weekData.startDate, weekData.endDate);
+    if (!goalIds || goalIds.length === 0) {
+      setWeekGoalActions({});
+      return;
+    }
+
+    const actions = await fetchGoalActionsForWeek(goalIds, wk.startDate, wk.endDate);
+    setWeekGoalActions(actions);
+  } catch (err: any) {
+    if (!(err && (err.status === 0 || err.name === 'TypeError'))) {
+      console.error('fetchWeekActions error:', err);
+    }
+  } finally {
+    setLoadingWeekActions(false);
+  }
+};
+
     console.log('Actions received from fetchGoalActionsForWeek:', actions);
     setWeekGoalActions(actions);
     console.log('setWeekGoalActions called with:', actions);
