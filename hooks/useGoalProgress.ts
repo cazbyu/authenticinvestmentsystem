@@ -769,6 +769,12 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
       const tasksWithWeekPlans = tasksData.filter(task => 
         weekPlansData?.some(wp => wp.task_id === task.id)
       );
+// If no tasks are planned for this week, avoid .in('parent_task_id', []) → parent_task_id=in.()
+if (!tasksWithWeekPlans || tasksWithWeekPlans.length === 0) {
+  console.log('No tasks with week plans for this week; skipping occurrence fetch.');
+  return {};
+}
+
       console.log('Tasks with week plans for this week:', tasksWithWeekPlans.length);
       console.log('Tasks with week plans details:', tasksWithWeekPlans.map(t => ({ id: t.id, title: t.title })));
 
@@ -780,12 +786,12 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
         .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
         .eq('status', 'completed');
 
-      if (weekStartDate && weekStartDate !== 'null') {
-        occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
-      }
-      if (weekEndDate && weekEndDate !== 'null') {
-        occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
-      }
+      if (isValidISODate(weekStartDate)) {
+  occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
+}
+if (isValidISODate(weekEndDate)) {
+  occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
+}
 
       const { data: occurrenceData, error: occurrenceError } = await occurrenceQuery;
 
