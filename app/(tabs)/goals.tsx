@@ -77,23 +77,16 @@ useEffect(() => {
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
-    console.log('=== FETCH WEEK ACTIONS USEEFFECT TRIGGERED ===');
-    console.log('useEffect triggered for fetchWeekActions:', { 
-      selectedWeekIndex, 
-      goalsCount: allGoals.length, 
-      cycleWeeksCount: cycleWeeks.length 
-    });
-    console.log('loadingWeekActions state:', loadingWeekActions);
-    console.log('Dependencies that triggered this effect:', {
-      selectedWeekIndex,
-      allGoalsLength: allGoals.length,
-      cycleWeeksLength: cycleWeeks.length
-    });
-    if (allGoals.length > 0 && cycleWeeks.length > 0) {
-      fetchWeekActions();
-    }
-    console.log('=== END FETCH WEEK ACTIONS USEEFFECT ===');
-  }, [selectedWeekIndex, allGoals, cycleWeeks]);
+  // Use the right weeks source based on the selected timeline
+  const hasWeeks =
+    selectedTimelineId === 'twelve-week'
+      ? cycleWeeks.length > 0
+      : customTimelineWeeks.length > 0;
+
+  if (allGoals.length > 0 && hasWeeks) {
+    fetchWeekActions();
+  }
+}, [selectedTimelineId, selectedWeekIndex, allGoals, cycleWeeks, customTimelineWeeks]);
 
   const fetchWeekActions = async () => {
   try {
