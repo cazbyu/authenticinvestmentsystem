@@ -1167,9 +1167,9 @@ useEffect(() => {
             <TouchableOpacity 
               style={styles.startCycleButton}
               onPress={() => setCycleSetupVisible(true)}
-              <Text style={styles.weekDates}>
-                {currentWeek ? formatDateRange(currentWeek.startDate, currentWeek.endDate) : 'No week data'}
-              </Text>
+            >
+              <Calendar size={20} color="#ffffff" />
+              <Text style={styles.startCycleButtonText}>Start 12-Week Cycle</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
