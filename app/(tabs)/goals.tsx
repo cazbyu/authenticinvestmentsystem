@@ -874,13 +874,21 @@ if (!startDate || !endDate) {
                 style={[
                   styles.cycleProgressFill,
                   { width: `${(() => {
-                      const startDate = parseLocalDate(customGoal.start_date);
-                      const endDate = parseLocalDate(customGoal.end_date);
-                      const now = new Date();
-                      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                      const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-                      return Math.min(100, (daysPassed / totalDays) * 100);
-                    })()}%` }
+    if (!customGoal?.start_date || !customGoal?.end_date || customGoal.start_date === 'null' || customGoal.end_date === 'null') {
+      console.warn("Skipping progress bar calculation due to invalid start/end date", {
+        start_date: customGoal?.start_date,
+        end_date: customGoal?.end_date,
+      });
+      return 0;
+    }
+    const startDate = parseLocalDate(customGoal.start_date);
+    const endDate = parseLocalDate(customGoal.end_date);
+    const now = new Date();
+    const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    return Math.min(100, (daysPassed / totalDays) * 100);
+  })()}%` }
+
                 ]}
               />
             </View>
