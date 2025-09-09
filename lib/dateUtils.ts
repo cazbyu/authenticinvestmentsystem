@@ -72,6 +72,12 @@ export function generateCycleWeeks(
   startDate: string, 
   weekStartDay: 'sunday' | 'monday' = 'sunday'
 ): Array<{ week_number: number; start_date: string; end_date: string }> {
+  // Validate startDate before proceeding
+  if (!isValidISODate(startDate)) {
+    console.warn('Invalid startDate provided to generateCycleWeeks:', startDate);
+    return [];
+  }
+
   const weeks = [];
   const cycleStart = parseLocalDate(startDate);
   
