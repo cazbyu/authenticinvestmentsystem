@@ -21,6 +21,11 @@ function addDays(date: Date, amount: number): Date {
 
 export function WeeklyGoalNavigator() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekLabel = useMemo(() => {
+    const options = { month: 'long', day: 'numeric' } as const;
+    return `${weekStart.toLocaleDateString('en-US', options)} - ${weekEnd.toLocaleDateString('en-US', options)}`;
+  }, [weekStart, weekEnd]);
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -35,9 +40,7 @@ export function WeeklyGoalNavigator() {
         <TouchableOpacity onPress={goToPreviousWeek} style={styles.navButton}>
           <Text style={styles.navButtonText}>{'<'}</Text>
         </TouchableOpacity>
-        <Text style={styles.weekLabel}>
-          {weekStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-        </Text>
+        <Text style={styles.weekLabel}>{weekLabel}</Text>
         <TouchableOpacity onPress={goToNextWeek} style={styles.navButton}>
           <Text style={styles.navButtonText}>{'>'}</Text>
         </TouchableOpacity>
