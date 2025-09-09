@@ -101,11 +101,6 @@ useEffect(() => {
     console.log('Selected week index:', selectedWeekIndex);
     console.log('Cycle weeks available:', cycleWeeks.length);
     setLoadingWeekActions(true);
-    console.log('Calling fetchGoalActionsForWeek with:', {
-      selectedGoalId: selectedGoal.id,
-      selectedWeekStartDate: selectedWeek.startDate,
-      selectedWeekEndDate: selectedWeek.endDate
-    });
     
     const weekData = getWeekData(selectedWeekIndex);
     console.log('Week data calculated:', weekData);
