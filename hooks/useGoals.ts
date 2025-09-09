@@ -373,7 +373,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       // Map database columns to expected interface
       const mappedWeeks = (dbWeeks ?? []).map(week => ({
         week_number: week.week_number,
-        start_date: week.starts_on,
+        start_date: week.start_date,
         end_date: week.ends_on,
         user_cycle_id: week.user_cycle_id,
       }));
