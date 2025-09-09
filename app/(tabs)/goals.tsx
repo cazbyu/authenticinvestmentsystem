@@ -76,26 +76,39 @@ useEffect(() => {
 }, [cycleWeeks]);
 
   // Fetch week-specific actions when week or goals change
-  useEffect(() => {
-    console.log('=== FETCH WEEK ACTIONS USEEFFECT TRIGGERED ===');
-    console.log('useEffect triggered for fetchWeekActions:', { 
-      selectedWeekIndex, 
-      goalsCount: allGoals.length, 
-      cycleWeeksCount: cycleWeeks.length 
-    });
-    console.log('loadingWeekActions state:', loadingWeekActions);
-    console.log('Dependencies that triggered this effect:', {
-      selectedWeekIndex,
-      allGoalsLength: allGoals.length,
-      cycleWeeksLength: cycleWeeks.length
-    });
-    if (allGoals.length > 0 && cycleWeeks.length > 0) {
-      fetchWeekActions();
-    }
-    console.log('=== END FETCH WEEK ACTIONS USEEFFECT ===');
-  }, [selectedWeekIndex, allGoals, cycleWeeks]);
+useEffect(() => {
+  console.log('=== FETCH WEEK ACTIONS USEEFFECT TRIGGERED ===');
+  console.log('useEffect triggered for fetchWeekActions:', { 
+    selectedWeekIndex, 
+    goalsCount: allGoals.length, 
+    cycleWeeksCount: cycleWeeks.length 
+  });
+  console.log('loadingWeekActions state:', loadingWeekActions);
+  console.log('Dependencies that triggered this effect:', {
+    selectedWeekIndex,
+    allGoalsLength: allGoals.length,
+    cycleWeeksLength: cycleWeeks.length
+  });
 
-  const fetchWeekActions = async () => {
+  // 🚦 Guard against null/invalid dates BEFORE calling fetchWeekActions
+  if (!isValidISODate(weekStartDate) || !isValidISODate(weekEndDate)) {
+    console.warn("Skipping fetchWeekActions due to invalid dates", {
+      weekStartDate,
+      weekEndDate,
+    });
+    return;
+  }
+
+  if (allGoals.length > 0 && cycleWeeks.length > 0) {
+    fetchWeekActions();
+  }
+
+  console.log('=== END FETCH WEEK ACTIONS USEEFFECT ===', { weekStartDate, weekEndDate });
+}, [selectedWeekIndex, allGoals, cycleWeeks]);
+
+// ------------------------------------------------------------
+
+const fetchWeekActions = async () => {
   try {
     console.log('=== FETCH WEEK ACTIONS START ===');
     console.log('Selected week index:', selectedWeekIndex);
@@ -111,22 +124,7 @@ useEffect(() => {
     }
 
     const goalIds = allGoals.map(g => g.id);
-    console.log('Goal IDs to fetch actions for:', goalIds);
-    const actions = await fetchGoalActionsForWeek(goalIds, weekData.startDate, weekData.endDate);
-    console.log('Actions received from fetchGoalActionsForWeek:', actions);
-    setWeekGoalActions(actions);
-    console.log('setWeekGoalActions called with:', actions);
-    console.log('=== FETCH WEEK ACTIONS END ===');
-
-  } catch (err: any) {
-    // Ignore transient preview/network/auth refresh errors (status 0)
-    if (!(err && (err.status === 0 || err.name === 'TypeError'))) {
-      console.error('fetchWeekActions error:', err);
-    }
-  } finally {
-    setLoadingWeekActions(false);
-  }
-};
+    co
 
     const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
     console.log('=== HANDLE TOGGLE COMPLETION START (optimistic) ===');
