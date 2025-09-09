@@ -259,80 +259,71 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   }
 };
 
-  const fetchCycleWeeks = async (timelineId: string) => {
+  const fetchCycleWeeks = async (currentCycle: UserCycle) => {
     try {
+      console.log('=== FETCH CYCLE WEEKS START ===');
+      console.log('Current cycle passed to fetchCycleWeeks:', currentCycle);
+      
       const supabase = getSupabaseClient();
       
-      // Validate that selectedTimeline has a valid start_date before proceeding
-      if (!selectedTimeline || !selectedTimeline.start_date || selectedTimeline.start_date === 'null') {
-        console.warn('Invalid timeline or start_date for fetchCycleWeeks:', selectedTimeline);
-        setCycleWeeks([]);
-        return [];
-      }
-
-      // First try to get weeks from the database view
       const { data: dbWeeks, error } = await supabase
         .from('v_user_cycle_weeks')
         .select('week_number, start_date, end_date, user_cycle_id')
-        .eq('user_cycle_id', timelineId)
+        .eq('user_cycle_id', currentCycle.id)
         .order('week_number', { ascending: true })
         .returns<CycleWeek[]>();
 
-      console.log('Raw dbWeeks from Supabase:', dbWeeks);
+      console.log('Database weeks query result:', { data: dbWeeks, error });
+      
       if (error) {
         console.warn('Database week view failed, using client-side fallback:', error);
-        // Fallback to client-side calculation
-        if (selectedTimeline) {
+        if (currentCycle.start_date) {
           const clientWeeks = generateCycleWeeks(
-            selectedTimeline.start_date!, 
-            selectedTimeline.week_start_day || 'monday'
+            currentCycle.start_date!, 
+            currentCycle.week_start_day || 'monday'
           ).map(week => ({
             week_number: week.week_number,
             start_date: week.start_date,
             end_date: week.end_date,
-            user_cycle_id: timelineId,
+            user_cycle_id: currentCycle.id,
           }));
+          console.log('Using client-side fallback weeks:', clientWeeks);
           setCycleWeeks(clientWeeks);
           return clientWeeks;
         }
+        console.log('No valid start_date for client-side fallback');
         setCycleWeeks([]);
         return [];
       }
 
-      // Validate that Week 1 aligns with the cycle's stored anchor
-      if (dbWeeks && dbWeeks.length > 0 && selectedTimeline) {
+      if (dbWeeks && dbWeeks.length > 0 && currentCycle.start_date) {
         const week1 = dbWeeks[0];
         const expectedWeek1Start = generateCycleWeeks(
-          selectedTimeline.start_date!, 
-          selectedTimeline.week_start_day || 'monday'
+          currentCycle.start_date!, 
+          currentCycle.week_start_day || 'monday'
         )[0];
         
         if (week1.start_date !== expectedWeek1Start.start_date) {
           console.warn('Week alignment mismatch, using client-side calculation');
           const clientWeeks = generateCycleWeeks(
-            selectedTimeline.start_date!, 
-            selectedTimeline.week_start_day || 'monday'
+            currentCycle.start_date!, 
+            currentCycle.week_start_day || 'monday'
           ).map(week => ({
             week_number: week.week_number,
             start_date: week.start_date,
             end_date: week.end_date,
-            user_cycle_id: timelineId,
+            user_cycle_id: currentCycle.id,
           }));
+          console.log('Using client-side calculation due to alignment mismatch:', clientWeeks);
           setCycleWeeks(clientWeeks);
           return clientWeeks;
         }
       }
 
-      // Ensure null dates are converted to empty strings to prevent Supabase errors
-      const sanitizedWeeks = (dbWeeks ?? []).map(week => ({
-        ...week,
-        start_date: week.start_date ?? '',
-        end_date: week.end_date ?? '',
-      }));
-      
-      setCycleWeeks(sanitizedWeeks);
-      return sanitizedWeeks;
-
+      console.log('Using database weeks:', dbWeeks);
+      setCycleWeeks(dbWeeks ?? []);
+      console.log('=== FETCH CYCLE WEEKS END ===');
+      return dbWeeks ?? [];
     } catch (error) {
       console.error('Error fetching cycle weeks:', error);
       setCycleWeeks([]);
@@ -340,18 +331,23 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const fetchDaysLeftData = async (timelineId: string) => {
+  const fetchDaysLeftData = async (currentCycle: UserCycle) => {
     try {
+      console.log('=== FETCH DAYS LEFT START ===');
+      console.log('Current cycle passed to fetchDaysLeftData:', currentCycle);
+      
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from('v_user_cycle_days_left')
         .select('*')
-        .eq('user_cycle_id', timelineId)
+        .eq('user_cycle_id', currentCycle.id)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
       
+      console.log('Days left data result:', data);
       setDaysLeftData(data);
+      console.log('=== FETCH DAYS LEFT END ===');
       return data;
     } catch (error) {
       console.error('Error fetching days left data:', error);
@@ -360,9 +356,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const fetchGoals = async (timelineId: string) => {
+  const fetchGoals = async (currentCycle?: UserCycle) => {
   console.log('=== FETCH GOALS START ===');
-  console.log('Timeline ID parameter:', timelineId);
+  console.log('Current cycle parameter:', currentCycle);
   
   setLoading(true);
   try {
@@ -374,29 +370,30 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
     
     console.log('User ID in fetchGoals:', user.id);
+    console.log('Current cycle in fetchGoals:', currentCycle);
 
-    if (!selectedTimeline) {
-      console.log('No selected timeline found in fetchGoals');
+    if (!currentCycle) {
+      console.log('No current cycle found in fetchGoals');
       return;
     }
     
     console.log('Selected timeline details:', {
-      id: selectedTimeline.id,
-      source: selectedTimeline.source,
-      timeline_type: selectedTimeline.timeline_type,
-      title: selectedTimeline.title
+      id: selectedTimeline?.id,
+      source: selectedTimeline?.source,
+      timeline_type: selectedTimeline?.timeline_type,
+      title: selectedTimeline?.title
     });
 
     let mergedGoals: UnifiedGoal[] = [];
 
-    if (selectedTimeline.source === 'global' || selectedTimeline.timeline_type === 'cycle') {
-      console.log('Fetching 12-week goals for timeline:', timelineId);
+    if (selectedTimeline?.source === 'global' || selectedTimeline?.timeline_type === 'cycle') {
+      console.log('Fetching 12-week goals for timeline:', currentCycle.id);
       // Fetch 12-week goals for this timeline
       const { data: goals12, error: error12 } = await supabase
         .from('0008-ap-goals-12wk')
         .select('*')
         .eq('user_id', user.id)
-        .eq('user_cycle_id', timelineId)
+        .eq('user_cycle_id', currentCycle.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
@@ -423,13 +420,13 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       }));
       mergedGoals = [...normalized12];
     } else {
-      console.log('Fetching custom goals for timeline:', timelineId);
+      console.log('Fetching custom goals for timeline:', currentCycle.id);
       // Fetch custom goals for this custom timeline
       const { data: goalsCustom, error: errorCustom } = await supabase
         .from('0008-ap-goals-custom')
         .select('*')
         .eq('user_id', user.id)
-        .eq('custom_timeline_id', timelineId)
+        .eq('custom_timeline_id', currentCycle.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
@@ -467,10 +464,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     setGoals(mergedGoals);
 
     // Progress calculation only for 12-week goals (custom handled later)
-    if (selectedTimeline.source === 'global' || selectedTimeline.timeline_type === 'cycle') {
+    if (selectedTimeline?.source === 'global' || selectedTimeline?.timeline_type === 'cycle') {
       const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === 'twelve_wk_goal');
       console.log('Calculating progress for', twelveWeekGoals.length, '12-week goals');
-      await calculateGoalProgress(twelveWeekGoals, timelineId);
+      await calculateGoalProgress(twelveWeekGoals, currentCycle.id);
     }
 
     console.log('=== FETCH GOALS END ===');
@@ -1012,15 +1009,15 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
       // Fetch timeline-dependent data in parallel using the timeline ID directly
       const [weeks, daysLeft] = await Promise.all([
-        fetchCycleWeeks(timeline.id),
-        fetchDaysLeftData(timeline.id)
+        fetchCycleWeeks(timeline),
+        fetchDaysLeftData(timeline)
       ]);
 
       console.log('Fetched weeks:', weeks?.length || 0);
       console.log('Fetched days left data:', daysLeft);
       
       // Fetch goals after we have timeline data, using the timeline ID directly
-      await fetchGoals(timeline.id);
+      await fetchGoals(timeline);
     } catch (error) {
       console.error('Error refreshing all data:', error);
     }
@@ -1236,7 +1233,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       if (error) throw error;
       
       // Refresh goals to include the new one
-      await fetchGoals(selectedTimeline.id);
+      await fetchGoals(selectedTimeline);
       
       return { ...data, goal_type: 'twelve_wk_goal' };
     } catch (error) {
@@ -1272,7 +1269,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       if (error) throw error;
       
       // Refresh goals to include the new one
-      await fetchGoals(selectedTimeline.id);
+      await fetchGoals(selectedTimeline);
       
       return { ...data, goal_type: 'custom_goal', weekly_target: 3, total_target: 36 };
     } catch (error) {
@@ -1446,7 +1443,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
   const refreshGoals = async () => {
     if (selectedTimeline) {
-      await fetchGoals(selectedTimeline.id);
+      await fetchGoals(selectedTimeline);
     }
   };
 
@@ -1459,7 +1456,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
     if (!selectedTimeline) return;
 
     const updateDaysLeft = () => {
-      fetchDaysLeftData(selectedTimeline.id);
+      fetchDaysLeftData(selectedTimeline);
     };
 
     // Calculate milliseconds until next midnight
