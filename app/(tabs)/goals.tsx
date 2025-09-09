@@ -91,8 +91,8 @@ export default function Goals() { // Ensure this is the default export
 
   // 12-Week Goals
   const { 
-    goals: allGoals,
-    selectedTimeline: currentCycle,
+    goals: progressGoals,
+    selectedTimeline: progressCycle,
     availableTimelines,
     cycleWeeks,
     daysLeftData,
