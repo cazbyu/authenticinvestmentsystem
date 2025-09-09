@@ -29,7 +29,7 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
-  const [dateRange, setDateRange] = useState<'week' | 'month' | 'all'>('month');
+  const [dateRange, setDateRange] = useState<'week' | 'month' | 'all'>('week');
 
   const calculateTaskPoints = (task: any) => {
     let points = 0;
@@ -52,14 +52,21 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
       if (!user) return;
 
       // Calculate date filter
-      let dateFilter = '';
+      let startDateFilter = '';
+      let endDateFilter = '';
       const now = new Date();
       if (dateRange === 'week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        dateFilter = weekAgo.toISOString().split('T')[0];
+        const startOfWeek = new Date(now);
+        const day = startOfWeek.getDay();
+        startOfWeek.setDate(startOfWeek.getDate() - day);
+        startOfWeek.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 7);
+        startDateFilter = startOfWeek.toISOString().split('T')[0];
+        endDateFilter = endOfWeek.toISOString().split('T')[0];
       } else if (dateRange === 'month') {
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        dateFilter = monthAgo.toISOString().split('T')[0];
+        startDateFilter = monthAgo.toISOString().split('T')[0];
       }
 
       const journalEntries: JournalEntry[] = [];
@@ -73,8 +80,11 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
           .eq('status', 'completed')
           .not('completed_at', 'is', null);
 
-        if (dateFilter) {
-          tasksQuery = tasksQuery.gte('completed_at', dateFilter);
+        if (startDateFilter) {
+          tasksQuery = tasksQuery.gte('completed_at', startDateFilter);
+        }
+        if (endDateFilter) {
+          tasksQuery = tasksQuery.lt('completed_at', endDateFilter);
         }
 
         const { data: tasksData, error: tasksError } = await tasksQuery;
@@ -158,8 +168,11 @@ export function JournalView({ scope, onEntryPress }: JournalViewProps) {
           .select('*')
           .eq('user_id', user.id);
 
-        if (dateFilter) {
-          withdrawalsQuery = withdrawalsQuery.gte('withdrawal_date', dateFilter);
+        if (startDateFilter) {
+          withdrawalsQuery = withdrawalsQuery.gte('withdrawal_date', startDateFilter);
+        }
+        if (endDateFilter) {
+          withdrawalsQuery = withdrawalsQuery.lt('withdrawal_date', endDateFilter);
         }
 
         const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
