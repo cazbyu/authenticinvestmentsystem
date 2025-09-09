@@ -436,10 +436,10 @@ const isValidISODate = (s?: string | null) =>
   .select('*')
   .in('task_id', taskIds);
 
-if (isValidISODate(weekData.start_date)) {
+if (weekData.start_date && weekData.start_date !== 'null' && isValidISODate(weekData.start_date)) {
   weeklyQuery = weeklyQuery.gte('measured_on', weekData.start_date);
 }
-if (isValidISODate(weekData.end_date)) {
+if (weekData.end_date && weekData.end_date !== 'null' && isValidISODate(weekData.end_date)) {
   weeklyQuery = weeklyQuery.lte('measured_on', weekData.end_date);
 }
 
@@ -523,12 +523,12 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
             .in('parent_task_id', taskIds)
             .eq('status', 'completed');
 
-          if (isValidISODate(currentWeekData.start_date)) {
-  weeklyQuery = weeklyQuery.gte('due_date', currentWeekData.start_date);
-}
-if (isValidISODate(currentWeekData.end_date)) {
-  weeklyQuery = weeklyQuery.lte('due_date', currentWeekData.end_date);
-}
+          if (currentWeekData.start_date && currentWeekData.start_date !== 'null' && isValidISODate(currentWeekData.start_date)) {
+            weeklyQuery = weeklyQuery.gte('due_date', currentWeekData.start_date);
+          }
+          if (currentWeekData.end_date && currentWeekData.end_date !== 'null' && isValidISODate(currentWeekData.end_date)) {
+            weeklyQuery = weeklyQuery.lte('due_date', currentWeekData.end_date);
+          }
 
           const { data: weeklyOccurrences } = await weeklyQuery;
 
@@ -543,12 +543,12 @@ if (isValidISODate(currentWeekData.end_date)) {
           .in('parent_task_id', taskIds)
           .eq('status', 'completed');
 
-        if (isValidISODate(selectedTimeline?.start_date)) {
-  overallQuery = overallQuery.gte('due_date', selectedTimeline!.start_date!);
-}
-if (isValidISODate(selectedTimeline?.end_date)) {
-  overallQuery = overallQuery.lte('due_date', selectedTimeline!.end_date!);
-}
+        if (selectedTimeline?.start_date && selectedTimeline.start_date !== 'null' && isValidISODate(selectedTimeline.start_date)) {
+          overallQuery = overallQuery.gte('due_date', selectedTimeline!.start_date!);
+        }
+        if (selectedTimeline?.end_date && selectedTimeline.end_date !== 'null' && isValidISODate(selectedTimeline.end_date)) {
+          overallQuery = overallQuery.lte('due_date', selectedTimeline!.end_date!);
+        }
 
         const { data: overallOccurrences } = await overallQuery;
 
@@ -800,12 +800,12 @@ if (!tasksWithWeekPlans || tasksWithWeekPlans.length === 0) {
       console.log('weekStartDate:', weekStartDate, 'isValidISODate(weekStartDate):', isValidISODate(weekStartDate));
       console.log('weekEndDate:', weekEndDate, 'isValidISODate(weekEndDate):', isValidISODate(weekEndDate));
 
-      if (isValidISODate(weekStartDate)) {
-  occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
-}
-if (isValidISODate(weekEndDate)) {
-  occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
-}
+      if (weekStartDate && weekStartDate !== 'null' && isValidISODate(weekStartDate)) {
+        occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
+      }
+      if (weekEndDate && weekEndDate !== 'null' && isValidISODate(weekEndDate)) {
+        occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
+      }
 
       const { data: occurrenceData, error: occurrenceError } = await occurrenceQuery;
 
