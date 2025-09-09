@@ -28,20 +28,48 @@ interface CycleSetupModalProps {
   onClose: () => void;
   onSuccess: () => void;
   initialData?: any; // UserCycle data for editing
+  createCustomTimeline?: (timelineData: {
+    title: string;
+    description?: string;
+    start_date: string;
+    end_date: string;
+    timeline_type?: string;
+  }) => Promise<any>;
+  mode?: 'cycle' | 'timeline';
 }
 
-export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: CycleSetupModalProps) {
+export function CycleSetupModal({ 
+  visible, 
+  onClose, 
+  onSuccess, 
+  initialData, 
+  createCustomTimeline,
+  mode = 'cycle' 
+}: CycleSetupModalProps) {
   const [activeTab, setActiveTab] = useState<'custom' | 'global'>('custom');
   const [customTitle, setCustomTitle] = useState('');
+  const [customDescription, setCustomDescription] = useState('');
+  const [timelineType, setTimelineType] = useState<'cycle' | 'project' | 'challenge' | 'custom'>('custom');
   const [weekStartDay, setWeekStartDay] = useState<'sunday' | 'monday'>('sunday');
   const [selectedWeekStart, setSelectedWeekStart] = useState('');
+  const [customStartDate, setCustomStartDate] = useState(formatLocalDate(new Date()));
+  const [customEndDate, setCustomEndDate] = useState(formatLocalDate(new Date(Date.now() + 84 * 24 * 60 * 60 * 1000)));
   const [showWeekDropdown, setShowWeekDropdown] = useState(false);
+  const [showStartCalendar, setShowStartCalendar] = useState(false);
+  const [showEndCalendar, setShowEndCalendar] = useState(false);
   const [globalCycles, setGlobalCycles] = useState<GlobalCycle[]>([]);
   const [selectedGlobalCycle, setSelectedGlobalCycle] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingGlobal, setFetchingGlobal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [originalCycleSource, setOriginalCycleSource] = useState<'custom' | 'global'>('custom');
+
+  const timelineTypeOptions = [
+    { value: 'custom', label: 'Custom Timeline', description: 'Flexible timeline for any purpose' },
+    { value: 'project', label: 'Project Timeline', description: 'Focused timeline for specific projects' },
+    { value: 'challenge', label: 'Challenge Timeline', description: 'Timeline for personal challenges' },
+    { value: 'cycle', label: 'Custom Cycle', description: 'Structured cycle with regular patterns' },
+  ];
 
   // Generate available weeks based on current settings
   const availableWeeks = getAvailableWeekStarts(weekStartDay);
@@ -57,8 +85,12 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
         setOriginalCycleSource(initialData.source);
         setActiveTab(initialData.source);
         setCustomTitle(initialData.title || '');
+        setCustomDescription(initialData.description || '');
+        setTimelineType(initialData.timeline_type || 'custom');
         setWeekStartDay(initialData.week_start_day || 'sunday');
         setSelectedWeekStart(initialData.start_date || '');
+        setCustomStartDate(initialData.start_date || formatLocalDate(new Date()));
+        setCustomEndDate(initialData.end_date || formatLocalDate(new Date(Date.now() + 84 * 24 * 60 * 60 * 1000)));
         setSelectedGlobalCycle(initialData.global_cycle_id || null);
       } else {
         console.log('=== Create mode detected ===');
@@ -66,8 +98,12 @@ export function CycleSetupModal({ visible, onClose, onSuccess, initialData }: Cy
         setOriginalCycleSource('custom');
         setActiveTab('custom');
         setCustomTitle('');
+        setCustomDescription('');
+        setTimelineType('custom');
         setWeekStartDay('sunday');
         setSelectedWeekStart('');
+        setCustomStartDate(formatLocalDate(new Date()));
+        setCustomEndDate(formatLocalDate(new Date(Date.now() + 84 * 24 * 60 * 60 * 1000)));
         setSelectedGlobalCycle(null);
       }
     }
@@ -112,61 +148,55 @@ if ((data && data.length > 0) && !selectedGlobalCycle) {
   };
 
     const handleSaveCustomCycle = async () => {
-  // In create mode, we must have a selected week start
-  if (!isEditMode && !selectedWeekStart) {
+  // Validation based on mode
+  if (mode === 'timeline') {
+    if (!customTitle.trim()) {
+      Alert.alert('Error', 'Please enter a timeline title');
+      return;
+    }
+  } else if (!isEditMode && !selectedWeekStart) {
     Alert.alert('Error', 'Please select a start date');
     return;
   }
 
   setLoading(true);
   try {
-    const supabase = getSupabaseClient();
-
-    // Are we switching source or start date while editing?
-    const sourceChanged = isEditMode && initialData && originalCycleSource !== 'custom';
-    const startChanged  = isEditMode && initialData && !!selectedWeekStart && selectedWeekStart !== initialData.start_date;
-
-    if (!isEditMode) {
-      // CREATE new custom cycle via RPC
-      const { error } = await supabase.rpc('ap_create_user_cycle', {
-        p_source: 'custom',
-        p_start_date: selectedWeekStart,
-        p_title: (customTitle || '').trim() || null,
-        p_week_start_day: weekStartDay,
+    if (mode === 'timeline' && createCustomTimeline) {
+      // Create custom timeline using the provided function
+      await createCustomTimeline({
+        title: customTitle.trim(),
+        description: customDescription.trim() || undefined,
+        start_date: customStartDate,
+        end_date: customEndDate,
+        timeline_type: timelineType,
       });
-      if (error) throw error;
-
-// Verify which cycle is now active (debug + ensure parent sees it)
-const { data: activeCycle } = await supabase
-  .from('0008-ap-user-cycles')
-  .select('id, source, global_cycle_id, status, created_at')
-  .eq('status', 'active')
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .single();
-console.log('Active cycle after global sync:', activeCycle);
-      
-    } else if (sourceChanged || startChanged) {
-      // SWITCHING: create a fresh custom cycle (old one will auto-complete)
-      const startDateForNew = selectedWeekStart || initialData.start_date;
-      const { error } = await supabase.rpc('ap_create_user_cycle', {
-        p_source: 'custom',
-        p_start_date: startDateForNew,
-        p_title: (customTitle || '').trim() || null,
-        p_week_start_day: weekStartDay,
-      });
-      if (error) throw error;
     } else {
-      // Only metadata changed (title or week start day) → update in place
-      const { error } = await supabase
-        .from('0008-ap-user-cycles')
-        .update({
-          title: (customTitle || '').trim() || null,
-          week_start_day: weekStartDay,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', initialData.id);
-      if (error) throw error;
+      // Handle 12-week cycle creation/editing
+      const supabase = getSupabaseClient();
+
+      if (!isEditMode) {
+        // CREATE new 12-week cycle via RPC
+        const { error } = await supabase.rpc('ap_create_user_cycle', {
+          p_source: 'custom',
+          p_start_date: selectedWeekStart,
+          p_end_date: null, // Will be calculated as start_date + 83 days
+          p_title: (customTitle || '').trim() || null,
+          p_week_start_day: weekStartDay,
+          p_timeline_type: 'cycle',
+        });
+        if (error) throw error;
+      } else {
+        // Update existing cycle
+        const { error } = await supabase
+          .from('0008-ap-user-cycles')
+          .update({
+            title: (customTitle || '').trim() || null,
+            week_start_day: weekStartDay,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', initialData.id);
+        if (error) throw error;
+      }
     }
 
     onSuccess();
@@ -175,9 +205,12 @@ console.log('Active cycle after global sync:', activeCycle);
     // Reset local form state
     setSelectedWeekStart('');
     setCustomTitle('');
+    setCustomDescription('');
+    setCustomStartDate(formatLocalDate(new Date()));
+    setCustomEndDate(formatLocalDate(new Date(Date.now() + 84 * 24 * 60 * 60 * 1000)));
   } catch (err) {
-    console.error('Error saving custom cycle:', err);
-    Alert.alert('Error', (err as Error).message || 'Failed to save custom cycle');
+    console.error('Error saving:', err);
+    Alert.alert('Error', (err as Error).message || `Failed to save ${mode}`);
   } finally {
     setLoading(false);
   }
@@ -315,26 +348,136 @@ console.log('Active cycle after global sync:', activeCycle);
     <ScrollView style={styles.tabContent}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
-          {isEditMode ? 'Edit Custom Cycle' : 'Custom Cycle'}
+          {mode === 'timeline' 
+            ? (isEditMode ? 'Edit Custom Timeline' : 'Create Custom Timeline')
+            : (isEditMode ? 'Edit Custom Cycle' : 'Custom Cycle')
+          }
         </Text>
         <Text style={styles.sectionDescription}>
-          {isEditMode 
-            ? 'Update your cycle title and week start day preference'
-            : 'Choose when your 12-week cycle begins and whether weeks start on Sunday or Monday'
+          {mode === 'timeline'
+            ? 'Create a custom timeline with your own start and end dates'
+            : (isEditMode 
+                ? 'Update your cycle title and week start day preference'
+                : 'Choose when your 12-week cycle begins and whether weeks start on Sunday or Monday')
           }
         </Text>
         
-        {/* Custom Title */}
+        {/* Title */}
         <View style={styles.field}>
-          <Text style={styles.label}>Cycle Title</Text>
+          <Text style={styles.label}>
+            {mode === 'timeline' ? 'Timeline Title *' : 'Cycle Title'}
+          </Text>
           <TextInput
             style={styles.input}
             value={customTitle}
             onChangeText={setCustomTitle}
-            placeholder="Enter cycle title (optional)"
+            placeholder={mode === 'timeline' 
+              ? "e.g., Summer 2025 Project, Q2 Business Goals"
+              : "Enter cycle title (optional)"
+            }
             placeholderTextColor="#9ca3af"
           />
         </View>
+
+        {/* Description (for timelines) */}
+        {mode === 'timeline' && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={customDescription}
+              onChangeText={setCustomDescription}
+              placeholder="Describe the purpose and focus of this timeline..."
+              placeholderTextColor="#9ca3af"
+              multiline
+              numberOfLines={3}
+              maxLength={500}
+            />
+          </View>
+        )}
+
+        {/* Timeline Type (for timelines) */}
+        {mode === 'timeline' && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Timeline Type</Text>
+            <View style={styles.timelineTypeGrid}>
+              {timelineTypeOptions.map(option => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.timelineTypeOption,
+                    timelineType === option.value && styles.selectedTimelineTypeOption
+                  ]}
+                  onPress={() => setTimelineType(option.value as any)}
+                >
+                  <Text style={[
+                    styles.timelineTypeLabel,
+                    timelineType === option.value && styles.selectedTimelineTypeLabel
+                  ]}>
+                    {option.label}
+                  </Text>
+                  <Text style={[
+                    styles.timelineTypeDescription,
+                    timelineType === option.value && styles.selectedTimelineTypeDescription
+                  ]}>
+                    {option.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Date Selection (for timelines) */}
+        {mode === 'timeline' && (
+          <>
+            <View style={styles.field}>
+              <Text style={styles.label}>Start Date *</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowStartCalendar(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {parseLocalDate(customStartDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>End Date *</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowEndCalendar(true)}
+              >
+                <Text style={styles.dateButtonText}>
+                  {parseLocalDate(customEndDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.durationInfo}>
+              <Text style={styles.durationText}>
+                Duration: {(() => {
+                  const start = parseLocalDate(customStartDate);
+                  const end = parseLocalDate(customEndDate);
+                  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                  const weeks = Math.ceil(days / 7);
+                  return `${days} days (${weeks} weeks)`;
+                })()}
+              </Text>
+            </View>
+          </>
+        )}
 
         {/* Week Start Day Toggle */}
         <View style={styles.weekStartToggle}>
@@ -369,6 +512,7 @@ console.log('Active cycle after global sync:', activeCycle);
         </View>
 
         {/* Week Selection Dropdown */}
+        {mode === 'cycle' && (
 <View style={styles.field}>
   <Text style={styles.label}>Select Start Week</Text>
   <TouchableOpacity
@@ -409,8 +553,9 @@ console.log('Active cycle after global sync:', activeCycle);
     </View>
   )}
 </View>
+        )}
 
-        {selectedWeekStart && !isEditMode && (
+        {mode === 'cycle' && selectedWeekStart && !isEditMode && (
           <View style={styles.selectedWeekContainer}>
             <Text style={styles.selectedWeekText}>
               12-week cycle: {
@@ -431,10 +576,14 @@ console.log('Active cycle after global sync:', activeCycle);
       <TouchableOpacity
         style={[
           styles.createButton,
-          ((!selectedWeekStart && !isEditMode) || loading) && styles.createButtonDisabled
+          ((mode === 'cycle' && !selectedWeekStart && !isEditMode) || 
+           (mode === 'timeline' && !customTitle.trim()) || 
+           loading) && styles.createButtonDisabled
         ]}
         onPress={handleSaveCustomCycle}
-        disabled={(!selectedWeekStart && !isEditMode) || loading}
+        disabled={(mode === 'cycle' && !selectedWeekStart && !isEditMode) || 
+                 (mode === 'timeline' && !customTitle.trim()) || 
+                 loading}
       >
         {loading ? (
           <ActivityIndicator size="small" color="#ffffff" />
@@ -442,11 +591,102 @@ console.log('Active cycle after global sync:', activeCycle);
           <>
             <CalendarIcon size={20} color="#ffffff" />
             <Text style={styles.createButtonText}>
-              {isEditMode ? 'Update Cycle' : 'Create Custom Cycle'}
+              {mode === 'timeline' 
+                ? (isEditMode ? 'Update Timeline' : 'Create Timeline')
+                : (isEditMode ? 'Update Cycle' : 'Create Custom Cycle')
+              }
             </Text>
           </>
         )}
       </TouchableOpacity>
+
+      {/* Calendar Modals for Timeline Mode */}
+      {mode === 'timeline' && (
+        <>
+          <Modal visible={showStartCalendar} transparent animationType="fade">
+            <View style={styles.calendarOverlay}>
+              <View style={styles.calendarContainer}>
+                <View style={styles.calendarHeader}>
+                  <Text style={styles.calendarTitle}>Select Start Date</Text>
+                  <TouchableOpacity onPress={() => setShowStartCalendar(false)}>
+                    <X size={20} color="#6b7280" />
+                  </TouchableOpacity>
+                </View>
+                <RNCalendar
+                  onDayPress={(day) => {
+                    setCustomStartDate(day.dateString);
+                    setShowStartCalendar(false);
+                    
+                    // Auto-adjust end date if it's before the new start date
+                    const newStartDate = parseLocalDate(day.dateString);
+                    const currentEndDate = parseLocalDate(customEndDate);
+                    if (currentEndDate <= newStartDate) {
+                      const newEndDate = new Date(newStartDate);
+                      newEndDate.setDate(newEndDate.getDate() + 84); // 12 weeks default
+                      setCustomEndDate(formatLocalDate(newEndDate));
+                    }
+                  }}
+                  markedDates={{
+                    [customStartDate]: {
+                      selected: true,
+                      selectedColor: '#0078d4'
+                    }
+                  }}
+                  theme={{
+                    selectedDayBackgroundColor: '#0078d4',
+                    todayTextColor: '#0078d4',
+                    arrowColor: '#0078d4',
+                  }}
+                />
+              </View>
+            </View>
+          </Modal>
+
+          <Modal visible={showEndCalendar} transparent animationType="fade">
+            <View style={styles.calendarOverlay}>
+              <View style={styles.calendarContainer}>
+                <View style={styles.calendarHeader}>
+                  <Text style={styles.calendarTitle}>Select End Date</Text>
+                  <TouchableOpacity onPress={() => setShowEndCalendar(false)}>
+                    <X size={20} color="#6b7280" />
+                  </TouchableOpacity>
+                </View>
+                <RNCalendar
+                  onDayPress={(day) => {
+                    // Validate that end date is after start date
+                    const selectedEndDate = parseLocalDate(day.dateString);
+                    const currentStartDate = parseLocalDate(customStartDate);
+                    
+                    if (selectedEndDate <= currentStartDate) {
+                      Alert.alert('Invalid Date', 'End date must be after start date');
+                      return;
+                    }
+                    
+                    setCustomEndDate(day.dateString);
+                    setShowEndCalendar(false);
+                  }}
+                  markedDates={{
+                    [customEndDate]: {
+                      selected: true,
+                      selectedColor: '#0078d4'
+                    },
+                    [customStartDate]: {
+                      marked: true,
+                      dotColor: '#16a34a'
+                    }
+                  }}
+                  minDate={customStartDate}
+                  theme={{
+                    selectedDayBackgroundColor: '#0078d4',
+                    todayTextColor: '#0078d4',
+                    arrowColor: '#0078d4',
+                  }}
+                />
+              </View>
+            </View>
+          </Modal>
+        </>
+      )}
     </ScrollView>
   );
 
@@ -540,14 +780,18 @@ console.log('Active cycle after global sync:', activeCycle);
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
-            {isEditMode ? 'Edit 12-Week Cycle' : 'Start 12-Week Cycle'}
+            {mode === 'timeline' 
+              ? (isEditMode ? 'Edit Timeline' : 'Create Timeline')
+              : (isEditMode ? 'Edit 12-Week Cycle' : 'Start 12-Week Cycle')
+            }
           </Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#1f2937" />
           </TouchableOpacity>
         </View>
 
-        {/* Tab Selector */}
+        {/* Tab Selector (only for cycle mode) */}
+        {mode === 'cycle' && (
         <View style={styles.tabSelector}>
           <TouchableOpacity
             style={[
@@ -599,9 +843,10 @@ console.log('Active cycle after global sync:', activeCycle);
             </Text>
           </TouchableOpacity>
         </View>
+        )}
 
         {/* Tab Content */}
-        {activeTab === 'custom' ? renderCustomTab() : renderGlobalTab()}
+        {mode === 'timeline' ? renderCustomTab() : (activeTab === 'custom' ? renderCustomTab() : renderGlobalTab())}
       </View>
     </Modal>
   );
@@ -694,6 +939,65 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#1f2937',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  dateButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  durationInfo: {
+    backgroundColor: '#f0f9ff',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0078d4',
+  },
+  durationText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0078d4',
+    textAlign: 'center',
+  },
+  timelineTypeGrid: {
+    gap: 12,
+  },
+  timelineTypeOption: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+  },
+  selectedTimelineTypeOption: {
+    borderColor: '#0078d4',
+    backgroundColor: '#f0f9ff',
+  },
+  timelineTypeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  selectedTimelineTypeLabel: {
+    color: '#0078d4',
+  },
+  timelineTypeDescription: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  selectedTimelineTypeDescription: {
+    color: '#0078d4',
   },
   field: {
     marginBottom: 16,

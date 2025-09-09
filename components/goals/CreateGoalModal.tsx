@@ -15,6 +15,15 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
 import { Calendar as RNCalendar } from 'react-native-calendars';
 
+interface Timeline {
+  id: string;
+  source: 'custom' | 'global';
+  title?: string;
+  start_date: string | null;
+  end_date: string | null;
+  timeline_type?: 'cycle' | 'project' | 'challenge' | 'custom';
+}
+
 interface Role {
   id: string;
   label: string;
@@ -45,10 +54,8 @@ interface CreateGoalModalProps {
   createCustomGoal: (goalData: {
     title: string;
     description?: string;
-    start_date: string;
-    end_date: string;
   }) => Promise<any>;
-  initialGoalType?: '12week' | 'custom';
+  selectedTimeline: Timeline | null;
 }
 
 const recurrenceOptions = [
@@ -67,23 +74,19 @@ export function CreateGoalModal({
   onSubmitSuccess, 
   createTwelveWeekGoal,
   createCustomGoal,
-  initialGoalType = '12week'
+  selectedTimeline
 }: CreateGoalModalProps) {
-  const [goalType, setGoalType] = useState<'12week' | 'custom'>('12week');
+  // Determine goal type based on selected timeline
+  const goalType = selectedTimeline?.source === 'global' || selectedTimeline?.timeline_type === 'cycle' ? '12week' : 'custom';
+  
   const [formData, setFormData] = useState({
   title: '',
   description: '',
-  startDate: formatLocalDate(new Date()),
-  endDate: formatLocalDate(new Date(Date.now() + 84 * 24 * 60 * 60 * 1000)), // 12 weeks from now
   selectedRoleIds: [] as string[],
   selectedDomainIds: [] as string[],
   selectedKeyRelationshipIds: [] as string[], 
   noteText: '',  
 });
-
-  // Calendar states
-  const [showStartCalendar, setShowStartCalendar] = useState(false);
-  const [showEndCalendar, setShowEndCalendar] = useState(false);
 
   // Data fetching states
   const [allRoles, setAllRoles] = useState<Role[]>([]);
@@ -117,8 +120,6 @@ export function CreateGoalModal({
   useEffect(() => {
     if (visible) {
       fetchData();
-      // Set initial goal type based on prop
-      setGoalType(initialGoalType);
     }
   }, [visible]);
 
@@ -193,26 +194,18 @@ const { data: roleKRData, error: roleKRError } = await supabase
   };
 
   const resetForm = () => {
-  const today = new Date();
-  const twelveWeeksLater = new Date(today.getTime() + 84 * 24 * 60 * 60 * 1000);
-  
   setFormData({
     title: '',
     description: '',
-    startDate: formatLocalDate(today),
-    endDate: formatLocalDate(twelveWeeksLater),
     selectedRoleIds: [],
     selectedDomainIds: [],
     selectedKeyRelationshipIds: [], // ✅ added so KR's don't go undefined
     noteText: '',
   });
-  setGoalType('12week');
   setActiveSubForm('none');
   setCreatedGoalId(null);
   resetActionForm();
   resetIdeaForm();
-  setShowStartCalendar(false);
-  setShowEndCalendar(false);
 };
 
   const resetActionForm = () => {
@@ -297,8 +290,6 @@ const { data: roleKRData, error: roleKRError } = await supabase
       goalData = await createCustomGoal({
         title: formData.title,
         description: formData.description,
-        start_date: formData.startDate,
-        end_date: formData.endDate,
       });
     }
 
@@ -502,41 +493,25 @@ if (formData.selectedKeyRelationshipIds?.length) {
   const renderMainForm = () => (
     <ScrollView style={styles.content}>
       <View style={styles.form}>
-        {/* Goal Type Selector */}
+        {/* Timeline Context */}
         <View style={styles.field}>
-          <Text style={styles.label}>Goal Type *</Text>
-          <View style={styles.goalTypeSelector}>
-            <TouchableOpacity
-              style={[
-                styles.goalTypeButton,
-                goalType === '12week' && styles.activeGoalTypeButton
-              ]}
-              onPress={() => setGoalType('12week')}
-            >
-              <Target size={16} color={goalType === '12week' ? '#ffffff' : '#6b7280'} />
-              <Text style={[
-                styles.goalTypeButtonText,
-                goalType === '12week' && styles.activeGoalTypeButtonText
-              ]}>
-                12-Week Goal
+          <Text style={styles.label}>Timeline</Text>
+          <View style={styles.timelineInfo}>
+            <Text style={styles.timelineTitle}>
+              {selectedTimeline?.title || 'No Timeline Selected'}
+            </Text>
+            <Text style={styles.timelineSubtitle}>
+              {selectedTimeline?.source === 'global' ? '12-Week Cycle' : 
+               selectedTimeline?.timeline_type === 'cycle' ? 'Custom Cycle' :
+               selectedTimeline?.timeline_type === 'project' ? 'Project Timeline' :
+               selectedTimeline?.timeline_type === 'challenge' ? 'Challenge Timeline' :
+               'Custom Timeline'}
+            </Text>
+            {selectedTimeline?.start_date && selectedTimeline?.end_date && (
+              <Text style={styles.timelineDates}>
+                {formatDateRange(selectedTimeline.start_date, selectedTimeline.end_date)}
               </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.goalTypeButton,
-                goalType === 'custom' && styles.activeGoalTypeButton
-              ]}
-              onPress={() => setGoalType('custom')}
-            >
-              <Clock size={16} color={goalType === 'custom' ? '#ffffff' : '#6b7280'} />
-              <Text style={[
-                styles.goalTypeButtonText,
-                goalType === 'custom' && styles.activeGoalTypeButtonText
-              ]}>
-                Custom Goal
-              </Text>
-            </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -555,45 +530,6 @@ if (formData.selectedKeyRelationshipIds?.length) {
             maxLength={100}
           />
         </View>
-
-        {/* Custom Goal Date Fields */}
-        {goalType === 'custom' && (
-          <>
-            <View style={styles.field}>
-              <Text style={styles.label}>Start Date *</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowStartCalendar(true)}
-              >
-                <Text style={styles.dateButtonText}>
-                  {parseLocalDate(formData.startDate).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.label}>End Date *</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowEndCalendar(true)}
-              >
-                <Text style={styles.dateButtonText}>
-                  {parseLocalDate(formData.endDate).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
 
         {/* Goal Description */}
         <View style={styles.field}>
@@ -688,23 +624,6 @@ if (formData.selectedKeyRelationshipIds?.length) {
   </View>
 )}
         
-        {/* Notes */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Notes</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={formData.noteText || ''}
-            onChangeText={(text) =>
-              setFormData(prev => ({ ...prev, noteText: text }))
-            }
-            placeholder="Write a note for this goal..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-          />
-        </View>
-      
         {/* Action Buttons */}
         <View style={styles.actionButtonsSection}>
           <TouchableOpacity
@@ -749,90 +668,6 @@ if (formData.selectedKeyRelationshipIds?.length) {
         </View>
       </View>
 
-      {/* Start Date Calendar Modal */}
-      <Modal visible={showStartCalendar} transparent animationType="fade">
-        <View style={styles.calendarOverlay}>
-          <View style={styles.calendarContainer}>
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Select Start Date</Text>
-              <TouchableOpacity onPress={() => setShowStartCalendar(false)}>
-                <X size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-            <RNCalendar
-              onDayPress={(day) => {
-                setFormData(prev => ({ ...prev, startDate: day.dateString }));
-                setShowStartCalendar(false);
-                
-                // Auto-adjust end date if it's before the new start date
-                const newStartDate = parseLocalDate(day.dateString);
-                const currentEndDate = parseLocalDate(formData.endDate);
-                if (currentEndDate <= newStartDate) {
-                  const newEndDate = new Date(newStartDate);
-                  newEndDate.setDate(newEndDate.getDate() + 84); // 12 weeks
-                  setFormData(prev => ({ ...prev, endDate: formatLocalDate(newEndDate) }));
-                }
-              }}
-              markedDates={{
-                [formData.startDate]: {
-                  selected: true,
-                  selectedColor: '#0078d4'
-                }
-              }}
-              theme={{
-                selectedDayBackgroundColor: '#0078d4',
-                todayTextColor: '#0078d4',
-                arrowColor: '#0078d4',
-              }}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* End Date Calendar Modal */}
-      <Modal visible={showEndCalendar} transparent animationType="fade">
-        <View style={styles.calendarOverlay}>
-          <View style={styles.calendarContainer}>
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Select End Date</Text>
-              <TouchableOpacity onPress={() => setShowEndCalendar(false)}>
-                <X size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-            <RNCalendar
-              onDayPress={(day) => {
-                // Validate that end date is after start date
-                const selectedEndDate = parseLocalDate(day.dateString);
-                const currentStartDate = parseLocalDate(formData.startDate);
-                
-                if (selectedEndDate <= currentStartDate) {
-                  Alert.alert('Invalid Date', 'End date must be after start date');
-                  return;
-                }
-                
-                setFormData(prev => ({ ...prev, endDate: day.dateString }));
-                setShowEndCalendar(false);
-              }}
-              markedDates={{
-                [formData.endDate]: {
-                  selected: true,
-                  selectedColor: '#0078d4'
-                },
-                [formData.startDate]: {
-                  marked: true,
-                  dotColor: '#16a34a'
-                }
-              }}
-              minDate={formData.startDate}
-              theme={{
-                selectedDayBackgroundColor: '#0078d4',
-                todayTextColor: '#0078d4',
-                arrowColor: '#0078d4',
-              }}
-            />
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
   );
 
