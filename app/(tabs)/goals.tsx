@@ -72,7 +72,8 @@ export default function Goals() { // Ensure this is the default export
   const safeParseDate = (d: string, context: string): Date | null => {
     try {
       if (!isValidDateString(d)) throw new Error('Invalid date');
-      const parsed = parseLocalDate(d);
+      // Support ISO strings that include time components by stripping them
+      const parsed = parseLocalDate(d.split('T')[0]);
       if (isNaN(parsed.getTime())) throw new Error('Invalid date');
       return parsed;
     } catch (err) {

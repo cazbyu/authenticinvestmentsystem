@@ -29,12 +29,20 @@ export function parseLocalDate(dateString: string): Date {
   if (typeof dateString !== 'string' || dateString.trim() === '') {
     return new Date(NaN);
   }
+  // If an ISO string with time component is provided (e.g. 2025-06-01T00:00:00Z),
+  // strip everything after the date portion before parsing.
+  const datePart = dateString.split('T')[0];
 
-  const parts = dateString.split('-');
+  const parts = datePart.split('-');
   if (parts.length !== 3) {
     return new Date(NaN);
   }
+
   const [year, month, day] = parts.map(Number);
+  if ([year, month, day].some((n) => Number.isNaN(n))) {
+    return new Date(NaN);
+  }
+
   return new Date(year, month - 1, day);
 }
 
