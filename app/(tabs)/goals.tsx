@@ -14,6 +14,7 @@ import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomT
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp, Check } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
+import { useGoals } from '@/hooks/useGoals';
 export default function Goals() { // Ensure this is the default export
   const [authenticScore, setAuthenticScore] = useState(0);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
@@ -24,6 +25,33 @@ export default function Goals() { // Ensure this is the default export
   const [selectedGoalToEdit, setSelectedGoalToEdit] = useState<any>(null);
   const [isActionEffortModalVisible, setIsActionEffortModalVisible] = useState(false);
   const [selectedGoalForAction, setSelectedGoalForAction] = useState<any>(null);
+  const {
+    twelveWeekGoals,
+    customGoals,
+    allGoals,
+    currentCycle,
+    cycleWeeks,
+    daysLeftData,
+    goalProgress,
+    cycleEffortData,
+    loading,
+    loadingWeekActions,
+    setLoadingWeekActions,
+    refreshGoals,
+    refreshAllData,
+    fetchGoalActionsForWeek,
+    completeActionSuggestion,
+    undoActionOccurrence,
+    createTwelveWeekGoal,
+    createCustomGoal,
+    createTaskWithWeekPlan,
+    getCurrentWeekNumber,
+    getCurrentWeekIndex,
+    getWeekData,
+    weekGoalActions,
+    setWeekGoalActions,
+  } = useGoals();
+
   const [editingCycle, setEditingCycle] = useState<any>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [goalsExpanded, setGoalsExpanded] = useState(true);
