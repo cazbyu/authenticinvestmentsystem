@@ -374,7 +374,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const mappedWeeks = (dbWeeks ?? []).map(week => ({
         week_number: week.week_number,
         start_date: week.start_date,
-        end_date: week.ends_on,
+        end_date: week.end_date,
         user_cycle_id: week.user_cycle_id,
       }));
       
