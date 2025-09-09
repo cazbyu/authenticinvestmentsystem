@@ -90,15 +90,7 @@ useEffect(() => {
     cycleWeeksLength: cycleWeeks.length
   });
 
-  // 🚦 Guard against null/invalid dates BEFORE calling fetchWeekActions
-  if (!isValidISODate(weekStartDate) || !isValidISODate(weekEndDate)) {
-    console.warn("Skipping fetchWeekActions due to invalid dates", {
-      weekStartDate,
-      weekEndDate,
-    });
-    return;
-  }
-
+  
   if (allGoals.length > 0 && cycleWeeks.length > 0) {
     fetchWeekActions();
   }
