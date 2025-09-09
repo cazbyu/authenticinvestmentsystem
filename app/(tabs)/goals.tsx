@@ -1080,6 +1080,7 @@ if (!startDate || !endDate) {
           const timeline = customTimelines.find(t => t.id === selectedTimelineId);
           return timeline?.title;
         })()}
+        onEditPress={() => setIsCustomTimelinesModalVisible(true)}
       />
       
       <>
