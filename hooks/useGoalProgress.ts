@@ -495,6 +495,18 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .eq('input_kind', 'count')
         .not('status', 'in', '(completed,cancelled)');
 
+      // Log 12-week goals query details
+      console.log('=== 12-WEEK GOALS QUERY DEBUG ===');
+      console.log('Query parameters:');
+      console.log('- user.id:', user.id);
+      console.log('- userCycleId:', userCycleId);
+      console.log('- status filter: active');
+      console.log('Query results:');
+      console.log('- twelveWeekData:', twelveWeekData);
+      console.log('- twelveWeekError:', twelveWeekError);
+      console.log('- Number of goals found:', twelveWeekData?.length || 0);
+      console.log('=== END 12-WEEK GOALS QUERY DEBUG ===');
+      
       if (tasksError) throw tasksError;
       if (!tasksData || tasksData.length === 0) return [];
 
