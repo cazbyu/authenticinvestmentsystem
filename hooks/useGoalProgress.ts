@@ -503,26 +503,41 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
         let weeklyActual = 0;
 
         if (currentWeekData) {
-          // Fetch completed occurrences for current week
-          const { data: weeklyOccurrences } = await supabase
+          // Only apply date filters if we have valid dates
+          let weeklyQuery = supabase
             .from('0008-ap-tasks')
             .select('*')
             .in('parent_task_id', taskIds)
-            .eq('status', 'completed')
-            .gte('due_date', currentWeekData.start_date)
-            .lte('due_date', currentWeekData.end_date);
+            .eq('status', 'completed');
+
+          if (currentWeekData.start_date && currentWeekData.start_date !== 'null') {
+            weeklyQuery = weeklyQuery.gte('due_date', currentWeekData.start_date);
+          }
+          if (currentWeekData.end_date && currentWeekData.end_date !== 'null') {
+            weeklyQuery = weeklyQuery.lte('due_date', currentWeekData.end_date);
+          }
+
+          const { data: weeklyOccurrences } = await weeklyQuery;
 
           weeklyActual = weeklyOccurrences?.length || 0;
         }
 
         // Fetch completed occurrences for entire cycle
-        const { data: overallOccurrences } = await supabase
+        // Only apply date filters if we have valid timeline dates
+        let overallQuery = supabase
           .from('0008-ap-tasks')
           .select('*')
           .in('parent_task_id', taskIds)
-          .eq('status', 'completed')
-          .gte('due_date', selectedTimeline?.start_date || '1900-01-01')
-          .lte('due_date', selectedTimeline?.end_date || '2100-12-31');
+          .eq('status', 'completed');
+
+        if (selectedTimeline?.start_date && selectedTimeline.start_date !== 'null') {
+          overallQuery = overallQuery.gte('due_date', selectedTimeline.start_date);
+        }
+        if (selectedTimeline?.end_date && selectedTimeline.end_date !== 'null') {
+          overallQuery = overallQuery.lte('due_date', selectedTimeline.end_date);
+        }
+
+        const { data: overallOccurrences } = await overallQuery;
 
         // Fetch total target from week plans for all weeks
         const { data: weekPlansData } = await supabase
@@ -755,13 +770,21 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
       console.log('Tasks with week plans details:', tasksWithWeekPlans.map(t => ({ id: t.id, title: t.title })));
 
       // Fetch completed occurrence tasks for this week's date range
-      const { data: occurrenceData, error: occurrenceError } = await supabase
+      // Only apply date filters if we have valid dates
+      let occurrenceQuery = supabase
         .from('0008-ap-tasks')
         .select('*')
         .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
-        .eq('status', 'completed')
-        .gte('due_date', weekStartDate)
-        .lte('due_date', weekEndDate);
+        .eq('status', 'completed');
+
+      if (weekStartDate && weekStartDate !== 'null') {
+        occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
+      }
+      if (weekEndDate && weekEndDate !== 'null') {
+        occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
+      }
+
+      const { data: occurrenceData, error: occurrenceError } = await occurrenceQuery;
 
       if (occurrenceError) throw occurrenceError;
 
