@@ -58,7 +58,6 @@ export default function Goals() { // Ensure this is the default export
   const [selectedGoalForModal, setSelectedGoalForModal] = useState<any>(null);
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const initializedWeekRef = useRef(false);
-  const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
   const [selectedTimelineId, setSelectedTimelineId] = useState<string | null>(null);
   const [customTimelines, setCustomTimelines] = useState<any[]>([]);
   const [initialGoalType, setInitialGoalType] = useState<'12week' | 'custom'>('12week');
