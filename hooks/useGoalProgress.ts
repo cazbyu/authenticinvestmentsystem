@@ -790,16 +790,17 @@ if (!tasksWithWeekPlans || tasksWithWeekPlans.length === 0) {
 
       // Fetch completed occurrence tasks for this week's date range
       // Only apply date filters if we have valid dates
-      let occurrenceQuery = supabase
+            let occurrenceQuery = supabase
         .from('0008-ap-tasks')
         .select('*')
         .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
         .eq('status', 'completed');
 
-      if (isValidISODate(weekStartDate)) {
+      // 🚦 Guard: only add filters if the dates are valid ISO strings
+      if (weekStartDate && isValidISODate(weekStartDate)) {
         occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
       }
-      if (isValidISODate(weekEndDate)) {
+      if (weekEndDate && isValidISODate(weekEndDate)) {
         occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
       }
 
