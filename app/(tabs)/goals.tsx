@@ -126,22 +126,16 @@ export default function Goals() { // Ensure this is the default export
   // Initialize selected week to current week
   // Initialize selected week to current week (run once when cycleWeeks arrive)
 useEffect(() => {
-  if (cycleWeeks.length > 0 && selectedWeekIndex === -1) {
-    const today = formatLocalDate(new Date());
-    console.log('Setting current week, today:', today);
-    console.log('Available weeks:', cycleWeeks);
+  if (!initializedWeekRef.current && cycleWeeks.length > 0) {
+    console.log('=== INITIALIZING WEEK SELECTION ===');
+    const currentWeekIndex = getCurrentWeekIndex(); // This returns the current week index (0-based)
+    console.log('Current week index:', currentWeekIndex);
+    console.log('Available weeks:', cycleWeeks.length);
     
-    const currentWeekData = cycleWeeks.find(week => {
-      const inRange = today >= week.start_date && today <= week.end_date;
-      console.log(`Week ${week.week_number}: ${week.start_date} to ${week.end_date}, today in range: ${inRange}`);
-      return inRange;
-    });
-    
-    const weekIndex = currentWeekData ? currentWeekData.week_number - 1 : 0;
-    console.log('Setting selectedWeekIndex to:', weekIndex);
-    setSelectedWeekIndex(weekIndex);
+    setSelectedWeekIndex(currentWeekIndex);
+    initializedWeekRef.current = true;
   }
-}, [cycleWeeks, selectedWeekIndex]);
+}, [cycleWeeks, getCurrentWeekIndex]);
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
