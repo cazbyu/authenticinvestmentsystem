@@ -445,8 +445,24 @@ useEffect(() => {
       if (!customGoal) return;
 
       // Generate weeks for this custom timeline
-      const startDate = parseLocalDate(customGoal.start_date);
-      const endDate = parseLocalDate(customGoal.end_date);
+      let startDate: Date | null = null;
+let endDate: Date | null = null;
+
+if (customGoal?.start_date && customGoal.start_date !== 'null') {
+  startDate = parseLocalDate(customGoal.start_date);
+}
+if (customGoal?.end_date && customGoal.end_date !== 'null') {
+  endDate = parseLocalDate(customGoal.end_date);
+}
+
+if (!startDate || !endDate) {
+  console.warn("Skipping timeline calculation due to invalid start/end date", {
+    start_date: customGoal?.start_date,
+    end_date: customGoal?.end_date,
+  });
+  return; // or safely handle fallback (e.g., 0 days left)
+}
+
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const totalWeeks = Math.ceil(totalDays / 7);
 
@@ -823,8 +839,24 @@ useEffect(() => {
           <View style={styles.cycleProgress}>
             <Text style={styles.cycleProgressLabel}>
               {(() => {
-                const startDate = parseLocalDate(customGoal.start_date);
-                const endDate = parseLocalDate(customGoal.end_date);
+                let startDate: Date | null = null;
+let endDate: Date | null = null;
+
+if (customGoal?.start_date && customGoal.start_date !== 'null') {
+  startDate = parseLocalDate(customGoal.start_date);
+}
+if (customGoal?.end_date && customGoal.end_date !== 'null') {
+  endDate = parseLocalDate(customGoal.end_date);
+}
+
+if (!startDate || !endDate) {
+  console.warn("Skipping timeline calculation due to invalid start/end date", {
+    start_date: customGoal?.start_date,
+    end_date: customGoal?.end_date,
+  });
+  return; // or safely handle fallback (e.g., 0 days left)
+}
+
                 const now = new Date();
                 return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
               })()} days left • Today is {(() => {
