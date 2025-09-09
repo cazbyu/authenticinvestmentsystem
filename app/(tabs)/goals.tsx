@@ -185,7 +185,11 @@ useEffect(() => {
         return;
       }
 
-      const actions = await fetchGoalActionsForWeek(goalIds, wk.startDate, wk.endDate);
+      const actions = await fetchGoalActionsForWeek(
+        goalIds,
+        wk.weekNumber,
+        selectedTimelineId === 'custom' ? customTimelineWeeks : undefined
+      );
       setWeekGoalActions(actions);
     } catch (err: any) {
       if (!(err && (err.status === 0 || err.name === 'TypeError'))) {
