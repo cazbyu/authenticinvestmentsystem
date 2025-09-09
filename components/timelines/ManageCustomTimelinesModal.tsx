@@ -65,23 +65,22 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch custom goals (which serve as custom timelines)
-      const { data: customGoals, error } = await supabase
-        .from('0008-ap-goals-custom')
-        .select('*')
+      // Fetch custom timelines with goal counts
+      const { data: timelineData, error } = await supabase
+        .from('0008-ap-custom-timelines')
+        .select('*, goals:0008-ap-goals-custom(id)')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Transform custom goals into timeline format
-      const timelineData: CustomTimeline[] = (customGoals || []).map(goal => ({
-        ...goal,
-        goals_count: 1, // Each custom goal is its own timeline
+      const timelinesWithCounts: CustomTimeline[] = (timelineData || []).map(tl => ({
+        ...tl,
+        goals_count: tl.goals ? tl.goals.length : 0,
       }));
 
-      setTimelines(timelineData);
+      setTimelines(timelinesWithCounts);
     } catch (error) {
       console.error('Error fetching custom timelines:', error);
       Alert.alert('Error', (error as Error).message);
@@ -122,13 +121,12 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
         start_date: formData.startDate,
         end_date: formData.endDate,
         status: 'active',
-        progress: 0,
       };
 
       if (editingTimeline) {
         // Update existing timeline
         const { error } = await supabase
-          .from('0008-ap-goals-custom')
+          .from('0008-ap-custom-timelines')
           .update({
             ...timelineData,
             updated_at: new Date().toISOString(),
@@ -140,7 +138,7 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
       } else {
         // Create new timeline
         const { error } = await supabase
-          .from('0008-ap-goals-custom')
+          .from('0008-ap-custom-timelines')
           .insert(timelineData);
 
         if (error) throw error;
@@ -183,17 +181,9 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
             try {
               const supabase = getSupabaseClient();
               
-              // Delete all related data first
-              await Promise.all([
-                supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', timeline.id).eq('parent_type', 'custom_goal'),
-                supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', timeline.id).eq('parent_type', 'custom_goal'),
-                supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', timeline.id).eq('parent_type', 'custom_goal'),
-                supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', timeline.id).eq('parent_type', 'custom_goal'),
-              ]);
-
-              // Delete the timeline itself
+              // Delete the timeline itself (cascade removes linked goals)
               const { error } = await supabase
-                .from('0008-ap-goals-custom')
+                .from('0008-ap-custom-timelines')
                 .delete()
                 .eq('id', timeline.id);
 
