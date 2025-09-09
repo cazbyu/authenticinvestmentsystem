@@ -157,6 +157,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, TaskWithLogs[]>>({});
   const [loading, setLoading] = useState(false);
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
+  // Guard: ensure we never pass "null" or invalid strings as dates to Supabase filters
+const isValidISODate = (s?: string | null) =>
+  typeof s === 'string' && s !== 'null' && !isNaN(Date.parse(s));
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -423,10 +426,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   .select('*')
   .in('task_id', taskIds);
 
-if (weekData.start_date) {
+if (isValidISODate(weekData.start_date)) {
   weeklyQuery = weeklyQuery.gte('measured_on', weekData.start_date);
 }
-if (weekData.end_date) {
+if (isValidISODate(weekData.end_date)) {
   weeklyQuery = weeklyQuery.lte('measured_on', weekData.end_date);
 }
 
