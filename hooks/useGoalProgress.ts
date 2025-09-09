@@ -146,12 +146,6 @@ interface UseGoalProgressOptions {
   };
 }
 
-function isValidISODate(dateStr: string | null | undefined): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  return !isNaN(d.getTime());
-}
-
 export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [goals, setGoals] = useState<UnifiedGoal[]>([]);
   const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
