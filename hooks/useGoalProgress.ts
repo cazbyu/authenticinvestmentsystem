@@ -173,10 +173,16 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
   const fetchAvailableTimelines = async () => {
   try {
+    console.log('=== FETCH AVAILABLE TIMELINES START ===');
     const supabase = getSupabaseClient();
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr) throw userErr;
-    if (!user) return null;
+    if (!user) {
+      console.log('No authenticated user found');
+      return null;
+    }
+    
+    console.log('Fetching timelines for user:', user.id);
 
     // Fetch all active timelines (both global cycles and custom timelines)
     const { data: allTimelines, error } = await supabase
@@ -190,6 +196,18 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       .order('created_at', { ascending: false });
 
     if (error && error.code !== 'PGRST116') throw error;
+    
+    console.log('Raw timelines from database:', allTimelines?.length || 0);
+    if (allTimelines) {
+      console.log('Timeline details:', allTimelines.map(t => ({
+        id: t.id,
+        source: t.source,
+        title: t.title,
+        start_date: t.start_date,
+        end_date: t.end_date,
+        global: t.global
+      })));
+    }
 
     // Transform and hydrate timeline data
     const hydratedTimelines = (allTimelines || []).map(timeline => {
@@ -204,6 +222,17 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       };
     });
 
+    console.log('Hydrated timelines:', hydratedTimelines.length);
+    if (hydratedTimelines.length > 0) {
+      console.log('Hydrated timeline details:', hydratedTimelines.map(t => ({
+        id: t.id,
+        source: t.source,
+        title: t.title,
+        start_date: t.start_date,
+        end_date: t.end_date
+      })));
+    }
+    
     setAvailableTimelines(hydratedTimelines);
 
     // Auto-select the first timeline if none is selected
@@ -211,10 +240,17 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   // Prefer global cycle, then most recent custom timeline
   const globalTimeline = hydratedTimelines.find(t => t.source === 'global');
   const chosenTimeline = globalTimeline || hydratedTimelines[0];
+  console.log('Auto-selecting timeline:', {
+    id: chosenTimeline.id,
+    source: chosenTimeline.source,
+    title: chosenTimeline.title
+  });
   setSelectedTimeline(chosenTimeline);
   return chosenTimeline;
 }
 
+    console.log('Returning existing selectedTimeline:', selectedTimeline?.id || 'null');
+    console.log('=== FETCH AVAILABLE TIMELINES END ===');
     return selectedTimeline;
 
     } catch (error) {
@@ -954,27 +990,36 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
   const refreshAllData = async () => {
     try {
-      // Fetch user cycle first
+      // Fetch available timelines and capture the returned timeline directly
       const timeline = await fetchAvailableTimelines();
+      console.log('Timeline returned from fetchAvailableTimelines:', timeline);
+      
       if (!timeline) {
-        // No active cycle, clear all dependent data
+        // No active timeline found, clear all dependent data
+        console.log('No active timeline found, clearing all data');
         setCycleWeeks([]);
         setDaysLeftData(null);
         setGoals([]);
         setGoalProgress({});
+        setCycleEffortData({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
         return;
       }
 
-      // Reassociate any orphaned active goals with the current cycle
+      console.log('Using timeline ID for data fetching:', timeline.id);
+      
+      // Reassociate any orphaned active goals with the current timeline
       await reassociateActiveGoals(timeline.id);
 
-      // Fetch cycle-dependent data in parallel
+      // Fetch timeline-dependent data in parallel using the timeline ID directly
       const [weeks, daysLeft] = await Promise.all([
         fetchCycleWeeks(timeline.id),
         fetchDaysLeftData(timeline.id)
       ]);
 
-      // Fetch goals after we have cycle data
+      console.log('Fetched weeks:', weeks?.length || 0);
+      console.log('Fetched days left data:', daysLeft);
+      
+      // Fetch goals after we have timeline data, using the timeline ID directly
       await fetchGoals(timeline.id);
     } catch (error) {
       console.error('Error refreshing all data:', error);
