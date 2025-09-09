@@ -211,12 +211,12 @@ const isValidISODate = (s?: string | null) =>
 
     // Auto-select the first timeline if none is selected
     if (!selectedTimeline && hydratedTimelines.length > 0) {
-      // Prefer global cycle, then most recent custom timeline
-      const globalTimeline = hydratedTimelines.find(t => t.source === 'global');
-      const selectedTimeline = globalTimeline || hydratedTimelines[0];
-      setSelectedTimeline(selectedTimeline);
-      return selectedTimeline;
-    }
+  // Prefer global cycle, then most recent custom timeline
+  const globalTimeline = hydratedTimelines.find(t => t.source === 'global');
+  const chosenTimeline = globalTimeline || hydratedTimelines[0];
+  setSelectedTimeline(chosenTimeline);
+  return chosenTimeline;
+}
 
     return selectedTimeline;
 
