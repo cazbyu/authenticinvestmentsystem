@@ -227,6 +227,13 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     try {
       const supabase = getSupabaseClient();
       
+      // Validate that selectedTimeline has a valid start_date before proceeding
+      if (!selectedTimeline || !selectedTimeline.start_date || selectedTimeline.start_date === 'null') {
+        console.warn('Invalid timeline or start_date for fetchCycleWeeks:', selectedTimeline);
+        setCycleWeeks([]);
+        return [];
+      }
+
       // First try to get weeks from the database view
       const { data: dbWeeks, error } = await supabase
         .from('v_user_cycle_weeks')
@@ -677,6 +684,12 @@ const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
   
   const fetchGoalActionsForWeek = async (goalIds: string[], weekStartDate: string, weekEndDate: string): Promise<Record<string, TaskWithLogs[]>> => {
     try {
+      // Validate date parameters before proceeding
+      if (!weekStartDate || !weekEndDate || weekStartDate === 'null' || weekEndDate === 'null') {
+        console.warn('Invalid date parameters provided to fetchGoalActionsForWeek:', { weekStartDate, weekEndDate });
+        return {};
+      }
+
       console.log('=== fetchGoalActionsForWeek START ===');
       console.log('Input params:', { goalIds, weekStartDate, weekEndDate });
       console.log('Current cycle weeks available:', cycleWeeks.length);
