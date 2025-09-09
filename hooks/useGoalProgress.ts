@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Alert } from 'react-native';
-import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
+import { generateCycleWeeks, formatLocalDate, parseLocalDate, isValidISODate } from '@/lib/dateUtils';
 
 export type GoalType = 'twelve_wk_goal' | 'custom_goal';
 
@@ -158,18 +158,6 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [loading, setLoading] = useState(false);
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   // Guard: ensure we never pass "null" or invalid strings as dates to Supabase filters
-const isValidISODate = (s?: string | null) =>
-  {
-    if (s === null || typeof s === 'undefined') {
-      return false;
-    }
-    // Now we know s is a string. Check if it's the literal "null" string.
-    if (s === 'null') {
-      return false;
-    }
-    // Finally, check if it's a valid date string.
-    return !isNaN(Date.parse(s));
-  };
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
     if (roles && roles.length > 0) points += roles.length;

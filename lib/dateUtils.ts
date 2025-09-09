@@ -3,6 +3,16 @@
  */
 
 /**
+ * Checks if a string is a valid ISO date string
+ */
+export function isValidISODate(dateString?: string | null): boolean {
+  if (!dateString || dateString === 'null' || typeof dateString !== 'string') {
+    return false;
+  }
+  return !isNaN(Date.parse(dateString));
+}
+
+/**
  * Formats a date as YYYY-MM-DD using local time (no UTC conversion)
  */
 export function formatLocalDate(date: Date): string {
@@ -89,6 +99,11 @@ export function generateCycleWeeks(
  * Formats a date range for display
  */
 export function formatDateRange(startDate: string, endDate: string): string {
+  // Validate input dates first
+  if (!isValidISODate(startDate) || !isValidISODate(endDate)) {
+    return 'Invalid date';
+  }
+  
   const start = parseLocalDate(startDate);
   const end = parseLocalDate(endDate);
   
