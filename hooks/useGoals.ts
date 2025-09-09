@@ -323,7 +323,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       
       const { data: dbWeeks, error } = await supabase
         .from('v_user_cycle_weeks')
-        .select('week_number, start_date, end_date, user_cycle_id')
+        .select('week_number, starts_on, ends_on, user_cycle_id')
         .eq('user_cycle_id', userCycleId)
         .order('week_number', { ascending: true })
         .returns<CycleWeek[]>();
@@ -354,7 +354,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
           currentCycle.week_start_day || 'monday'
         )[0];
         
-        if (week1.start_date !== expectedWeek1Start.start_date) {
+        if (week1.starts_on !== expectedWeek1Start.start_date) {
           console.warn('Week alignment mismatch, using client-side calculation');
           const clientWeeks = generateCycleWeeks(
             currentCycle.start_date!, 
@@ -370,8 +370,16 @@ export function useGoals(options: UseGoalsOptions = {}) {
         }
       }
 
-      setCycleWeeks(dbWeeks ?? []);
-      return dbWeeks ?? [];
+      // Map database columns to expected interface
+      const mappedWeeks = (dbWeeks ?? []).map(week => ({
+        week_number: week.week_number,
+        start_date: week.starts_on,
+        end_date: week.ends_on,
+        user_cycle_id: week.user_cycle_id,
+      }));
+      
+      setCycleWeeks(mappedWeeks);
+      return mappedWeeks;
     } catch (error) {
       console.error('Error fetching cycle weeks:', error);
       setCycleWeeks([]);

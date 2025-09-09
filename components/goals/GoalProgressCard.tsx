@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit } from 'lucide-react-native';
 import { Goal, GoalProgress } from '@/hooks/useGoals';
-import { parseLocalDate } from '@/lib/dateUtils';
+import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
 interface WeekData {
   weekNumber: number;
@@ -118,7 +118,7 @@ export function GoalProgressCard({
       day.setDate(start.getDate() + i); // Add i days to get each day of the week
 
       days.push({
-        date: day.toISOString().split('T')[0],
+        date: formatLocalDate(day),
         dayName: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()],
         dayOfWeek: day.getDay(),
       });
