@@ -38,6 +38,26 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTimeline, setEditingTimeline] = useState<CustomTimeline | null>(null);
+
+  const isValidDateString = (d?: string) => typeof d === 'string' && d !== 'null' && !isNaN(Date.parse(d));
+  const safeParseDate = (d: string, context: string): Date | null => {
+    try {
+      if (!isValidDateString(d)) throw new Error('Invalid date');
+      return parseLocalDate(d);
+    } catch (err) {
+      console.warn(`Invalid date in ${context}:`, d, err);
+      return null;
+    }
+  };
+  const safeFormatDateRange = (start: string, end: string, context: string): string => {
+    try {
+      if (!isValidDateString(start) || !isValidDateString(end)) throw new Error('Invalid date');
+      return formatDateRange(start, end);
+    } catch (err) {
+      console.warn(`Invalid date range in ${context}:`, { start, end }, err);
+      return 'Invalid date';
+    }
+  };
   
   // Form state
   const [formData, setFormData] = useState({
@@ -244,12 +264,19 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
       ) : (
         <View style={styles.timelinesList}>
           {timelines.map(timeline => {
-            const startDate = parseLocalDate(timeline.start_date);
-            const endDate = parseLocalDate(timeline.end_date);
-            const now = new Date();
-            const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-            const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-            const progress = Math.min(100, Math.max(0, ((now.getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())) * 100));
+            const startDate = safeParseDate(timeline.start_date, `timeline ${timeline.id} start`);
+            const endDate = safeParseDate(timeline.end_date, `timeline ${timeline.id} end`);
+            let daysRemaining = 0;
+            let totalDays = 0;
+            let progress = 0;
+            if (startDate && endDate) {
+              const now = new Date();
+              daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+              totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+              progress = Math.min(100, Math.max(0, ((now.getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())) * 100));
+            } else {
+              console.warn('Invalid timeline dates', timeline);
+            }
 
             return (
               <View key={timeline.id} style={styles.timelineCard}>
@@ -257,10 +284,14 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
                   <View style={styles.timelineInfo}>
                     <Text style={styles.timelineTitle}>{timeline.title}</Text>
                     <Text style={styles.timelineDates}>
-                      {formatDateRange(timeline.start_date, timeline.end_date)}
+                      {startDate && endDate
+                        ? safeFormatDateRange(timeline.start_date, timeline.end_date, `timeline ${timeline.id}`)
+                        : 'Invalid date'}
                     </Text>
                     <Text style={styles.timelineStats}>
-                      {daysRemaining} days remaining • {Math.ceil(totalDays / 7)} weeks total
+                      {startDate && endDate
+                        ? `${daysRemaining} days remaining • ${Math.ceil(totalDays / 7)} weeks total`
+                        : 'Invalid date range'}
                     </Text>
                   </View>
                   

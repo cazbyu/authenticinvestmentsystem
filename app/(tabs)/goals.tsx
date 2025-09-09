@@ -42,6 +42,26 @@ export default function Goals() { // Ensure this is the default export
  const { width } = useWindowDimensions();
   const twoUp = Platform.OS === 'web' && width >= 768;
 
+  const isValidDateString = (d?: string) => typeof d === 'string' && d !== 'null' && !isNaN(Date.parse(d));
+  const safeParseDate = (d: string, context: string): Date | null => {
+    try {
+      if (!isValidDateString(d)) throw new Error('Invalid date');
+      return parseLocalDate(d);
+    } catch (err) {
+      console.warn(`Invalid date in ${context}:`, d, err);
+      return null;
+    }
+  };
+  const safeFormatDateRange = (start: string, end: string, context: string): string => {
+    try {
+      if (!isValidDateString(start) || !isValidDateString(end)) throw new Error('Invalid date');
+      return formatDateRange(start, end);
+    } catch (err) {
+      console.warn(`Invalid date range in ${context}:`, { start, end }, err);
+      return 'Invalid date';
+    }
+  };
+
   // 12-Week Goals
   const { 
     twelveWeekGoals,
@@ -288,10 +308,13 @@ useEffect(() => {
   const formatWeekHeader = () => {
     const weekData = getWeekData(selectedWeekIndex);
     if (!weekData) return 'Week 1';
-    
-    const startDate = parseLocalDate(weekData.startDate);
-    const endDate = parseLocalDate(weekData.endDate);
-    
+
+    const startDate = safeParseDate(weekData.startDate, 'formatWeekHeader start');
+    const endDate = safeParseDate(weekData.endDate, 'formatWeekHeader end');
+    if (!startDate || !endDate) {
+      return `Week ${weekData.weekNumber} — Invalid date`;
+    }
+
     const formatDate = (date: Date) => {
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
@@ -427,7 +450,7 @@ useEffect(() => {
 
   const formatCycleDateRange = () => {
     if (!currentCycle?.start_date || !currentCycle?.end_date) return '';
-    return formatDateRange(currentCycle.start_date, currentCycle.end_date);
+    return safeFormatDateRange(currentCycle.start_date, currentCycle.end_date, 'current cycle');
   };
 
   const calculateCycleProgress = () => {
@@ -486,16 +509,8 @@ useEffect(() => {
       if (!timeline) return;
 
       // Generate weeks for this custom timeline
-      let startDate: Date | null = null;
-      let endDate: Date | null = null;
-
-      if (timeline?.start_date && timeline.start_date !== 'null') {
-        startDate = parseLocalDate(timeline.start_date);
-      }
-      if (timeline?.end_date && timeline.end_date !== 'null') {
-        endDate = parseLocalDate(timeline.end_date);
-      }
-
+      const startDate = safeParseDate(timeline?.start_date, 'loadCustomTimelineData start');
+      const endDate = safeParseDate(timeline?.end_date, 'loadCustomTimelineData end');
       if (!startDate || !endDate) {
         console.warn('Skipping timeline calculation due to invalid start/end date', {
           start_date: timeline?.start_date,
@@ -601,8 +616,12 @@ useEffect(() => {
     
     // Add custom timelines
     customTimelines.forEach(tl => {
-      const startDate = parseLocalDate(tl.start_date);
-      const endDate = parseLocalDate(tl.end_date);
+      const startDate = safeParseDate(tl.start_date, `timeline ${tl.id} start`);
+      const endDate = safeParseDate(tl.end_date, `timeline ${tl.id} end`);
+      if (!startDate || !endDate) {
+        console.warn('Skipping timeline due to invalid dates', tl);
+        return;
+      }
       const now = new Date();
       const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 
@@ -610,7 +629,7 @@ useEffect(() => {
         id: tl.id,
         type: 'custom',
         title: tl.title,
-        dateRange: formatDateRange(tl.start_date, tl.end_date),
+        dateRange: safeFormatDateRange(tl.start_date, tl.end_date, `timeline ${tl.id}`),
         goalCount: tl.goals_count || 0,
         daysRemaining,
         color: '#7c3aed',
@@ -754,12 +773,15 @@ useEffect(() => {
                 </Text>
                 <Text style={styles.weekDates}>
                   {(() => {
-                    const weekData = selectedTimelineId === 'twelve-week' 
+                    const weekData = selectedTimelineId === 'twelve-week'
                       ? getWeekData(selectedWeekIndex)
                       : customTimelineWeeks[selectedWeekIndex];
                     if (!weekData) return '';
-                    const startDate = parseLocalDate(weekData.startDate);
-                    const endDate = parseLocalDate(weekData.endDate);
+                    const startStr = selectedTimelineId === 'twelve-week' ? weekData.startDate : weekData.start_date;
+                    const endStr = selectedTimelineId === 'twelve-week' ? weekData.endDate : weekData.end_date;
+                    const startDate = safeParseDate(startStr, 'week display start');
+                    const endDate = safeParseDate(endStr, 'week display end');
+                    if (!startDate || !endDate) return 'Invalid date';
                     return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
                   })()}
                 </Text>
@@ -880,7 +902,7 @@ useEffect(() => {
             </View>
 
             <Text style={styles.cycleDates}>
-              {formatDateRange(timeline.start_date, timeline.end_date)}
+              {safeFormatDateRange(timeline.start_date, timeline.end_date, `timeline ${timeline.id}`)}
             </Text>
             <Text style={styles.activeGoalsInfo}>
               Custom Timeline • {customTimelineWeeks.length} weeks • {customTimelineGoals.length} active goal{customTimelineGoals.length !== 1 ? 's' : ''}
@@ -890,24 +912,15 @@ useEffect(() => {
           <View style={styles.cycleProgress}>
             <Text style={styles.cycleProgressLabel}>
               {(() => {
-                let startDate: Date | null = null;
-let endDate: Date | null = null;
-
-if (timeline?.start_date && timeline.start_date !== 'null') {
-  startDate = parseLocalDate(timeline.start_date);
-}
-if (timeline?.end_date && timeline.end_date !== 'null') {
-  endDate = parseLocalDate(timeline.end_date);
-}
-
-if (!startDate || !endDate) {
-  console.warn('Skipping timeline calculation due to invalid start/end date', {
-    start_date: timeline?.start_date,
-    end_date: timeline?.end_date,
-  });
-  return; // or safely handle fallback (e.g., 0 days left)
-}
-
+                const startDate = safeParseDate(timeline?.start_date, 'timeline header start');
+                const endDate = safeParseDate(timeline?.end_date, 'timeline header end');
+                if (!startDate || !endDate) {
+                  console.warn('Skipping timeline calculation due to invalid start/end date', {
+                    start_date: timeline?.start_date,
+                    end_date: timeline?.end_date,
+                  });
+                  return 0;
+                }
                 const now = new Date();
                 return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
               })()} days left • Today is {(() => {
@@ -932,8 +945,9 @@ if (!startDate || !endDate) {
       });
       return 0;
     }
-    const startDate = parseLocalDate(timeline.start_date);
-    const endDate = parseLocalDate(timeline.end_date);
+    const startDate = safeParseDate(timeline.start_date, 'progress start');
+    const endDate = safeParseDate(timeline.end_date, 'progress end');
+    if (!startDate || !endDate) return 0;
     const now = new Date();
     const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
     const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
@@ -969,8 +983,9 @@ if (!startDate || !endDate) {
                   {(() => {
                     const weekData = customTimelineWeeks[selectedWeekIndex];
                     if (!weekData) return '';
-                    const startDate = parseLocalDate(weekData.start_date);
-                    const endDate = parseLocalDate(weekData.end_date);
+                    const startDate = safeParseDate(weekData.start_date, 'custom timeline week start');
+                    const endDate = safeParseDate(weekData.end_date, 'custom timeline week end');
+                    if (!startDate || !endDate) return 'Invalid date';
                     return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
                   })()}
                 </Text>
@@ -1060,7 +1075,11 @@ if (!startDate || !endDate) {
           if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
           const timeline = customTimelines.find(t => t.id === selectedTimelineId);
           if (!timeline) return undefined;
-          const endDate = parseLocalDate(timeline.end_date);
+          const endDate = safeParseDate(timeline.end_date, 'header daysRemaining end');
+          if (!endDate) {
+            console.warn('Skipping daysRemaining calculation due to invalid end date', timeline);
+            return undefined;
+          }
           const now = new Date();
           return Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
         })()}
@@ -1068,8 +1087,12 @@ if (!startDate || !endDate) {
           if (!selectedTimelineId || selectedTimelineId === 'twelve-week') return undefined;
           const timeline = customTimelines.find(t => t.id === selectedTimelineId);
           if (!timeline) return undefined;
-          const startDate = parseLocalDate(timeline.start_date);
-          const endDate = parseLocalDate(timeline.end_date);
+          const startDate = safeParseDate(timeline.start_date, 'header progress start');
+          const endDate = safeParseDate(timeline.end_date, 'header progress end');
+          if (!startDate || !endDate) {
+            console.warn('Skipping cycleProgressPercentage due to invalid dates', timeline);
+            return undefined;
+          }
           const now = new Date();
           const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
           const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
