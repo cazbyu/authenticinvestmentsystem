@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { getSupabaseClient } from '../lib/supabase';
 import { Alert } from 'react-native';
-import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
+import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '../lib/dateUtils';
 
 export interface TwelveWeekGoal {
   id: string;
@@ -125,6 +125,122 @@ export interface CycleEffortData {
   totalActual: number;
   totalTarget: number;
   overallPercentage: number;
+}
+
+export async function fetchGoalActionsForWeek(
+  goalIds: string[],
+  weekNumber: number,
+  cycleWeeks: CycleWeek[],
+  customTimelineWeeks: WeekData[] = []
+): Promise<Record<string, TaskWithLogs[]>> {
+  try {
+    const supabase = getSupabaseClient();
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+    if (!user || goalIds.length === 0) return {};
+
+    const week =
+      cycleWeeks.find(w => w.week_number === weekNumber) ||
+      customTimelineWeeks.find(
+        w => w.week_number === weekNumber || (w as any).weekNumber === weekNumber
+      );
+
+    const weekStartDate = (week as any)?.start_date ?? (week as any)?.startDate;
+    const weekEndDate = (week as any)?.end_date ?? (week as any)?.endDate;
+    if (!weekStartDate || !weekEndDate) return {};
+
+    const { data: goalJoins } = await supabase
+      .from('0008-ap-universal-goals-join')
+      .select('parent_id, twelve_wk_goal_id, custom_goal_id, goal_type')
+      .or(`twelve_wk_goal_id.in.(${goalIds.join(',')}),custom_goal_id.in.(${goalIds.join(',')})`)
+      .eq('parent_type', 'task');
+
+    const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
+    if (taskIds.length === 0) return {};
+
+    const { data: tasksData, error: tasksError } = await supabase
+      .from('0008-ap-tasks')
+      .select('*')
+      .eq('user_id', user.id)
+      .in('id', taskIds)
+      .eq('input_kind', 'count')
+      .not('status', 'in', '(completed,cancelled)');
+
+    if (tasksError) throw tasksError;
+    if (!tasksData || tasksData.length === 0) return {};
+
+    const { data: weekPlansData, error: weekPlansError } = await supabase
+      .from('0008-ap-task-week-plan')
+      .select('*')
+      .in('task_id', taskIds)
+      .eq('week_number', weekNumber);
+
+    if (weekPlansError) throw weekPlansError;
+
+    const tasksWithWeekPlans = tasksData.filter(task =>
+      weekPlansData?.some(wp => wp.task_id === task.id)
+    );
+
+    const { data: occurrenceData, error: occurrenceError } = await supabase
+      .from('0008-ap-tasks')
+      .select('*')
+      .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
+      .eq('status', 'completed')
+      .gte('due_date', weekStartDate)
+      .lte('due_date', weekEndDate);
+
+    if (occurrenceError) throw occurrenceError;
+
+    const groupedActions: Record<string, TaskWithLogs[]> = {};
+
+    for (const task of tasksWithWeekPlans) {
+      const goalJoin = goalJoins?.find(gj => gj.parent_id === task.id);
+      if (!goalJoin) continue;
+
+      const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id);
+      if (!weekPlan) continue;
+
+      const goalId = goalJoin.twelve_wk_goal_id || goalJoin.custom_goal_id;
+      if (!goalId) continue;
+
+      const relevantOccurrences =
+        occurrenceData?.filter(occ => occ.parent_task_id === task.id) || [];
+
+      const taskLogs = relevantOccurrences.map(occ => ({
+        id: occ.id,
+        task_id: task.id,
+        measured_on: occ.due_date,
+        week_number: weekNumber,
+        day_of_week: new Date(occ.due_date).getDay(),
+        value: 1,
+        completed: true,
+        created_at: occ.created_at,
+      }));
+
+      const weeklyActual = taskLogs.length;
+      const weeklyTarget = weekPlan.target_days;
+      const cappedWeeklyActual = Math.min(weeklyActual, weeklyTarget);
+
+      const taskWithLogs: TaskWithLogs = {
+        ...task,
+        goal_type: goalJoin.goal_type === 'twelve_wk_goal' ? '12week' : 'custom',
+        logs: taskLogs,
+        weeklyActual: cappedWeeklyActual,
+        weeklyTarget,
+      };
+
+      if (!groupedActions[goalId]) {
+        groupedActions[goalId] = [];
+      }
+      groupedActions[goalId].push(taskWithLogs);
+    }
+
+    return groupedActions;
+  } catch (error) {
+    console.error('Error fetching goal actions for week:', error);
+    return {};
+  }
 }
 
 interface UseGoalsOptions {
@@ -519,7 +635,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
     const weekNumber = weekIndex + 1;
     const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
     if (!weekData) return null;
-    
+
     return {
       weekNumber,
       startDate: weekData.start_date,
@@ -527,105 +643,11 @@ export function useGoals(options: UseGoalsOptions = {}) {
     };
   };
 
-  const fetchGoalActionsForWeek = async (goalIds: string[], weekStartDate: string, weekEndDate: string): Promise<Record<string, TaskWithLogs[]>> => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || goalIds.length === 0) return {};
-
-      const { data: goalJoins } = await supabase
-        .from('0008-ap-universal-goals-join')
-        .select('parent_id, twelve_wk_goal_id, custom_goal_id, goal_type')
-        .or(`twelve_wk_goal_id.in.(${goalIds.join(',')}),custom_goal_id.in.(${goalIds.join(',')})`)
-        .eq('parent_type', 'task');
-
-      const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
-      if (taskIds.length === 0) return {};
-
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .in('id', taskIds)
-        .eq('input_kind', 'count')
-        .not('status', 'in', '(completed,cancelled)');
-
-      if (tasksError) throw tasksError;
-      if (!tasksData || tasksData.length === 0) return {};
-
-      const weekNumber = cycleWeeks.findIndex(w => w.start_date === weekStartDate) + 1;
-      
-      const { data: weekPlansData, error: weekPlansError } = await supabase
-        .from('0008-ap-task-week-plan')
-        .select('*')
-        .in('task_id', taskIds)
-        .eq('week_number', weekNumber);
-
-      if (weekPlansError) throw weekPlansError;
-
-      const tasksWithWeekPlans = tasksData.filter(task => 
-        weekPlansData?.some(wp => wp.task_id === task.id)
-      );
-
-      const { data: occurrenceData, error: occurrenceError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
-        .eq('status', 'completed')
-        .gte('due_date', weekStartDate)
-        .lte('due_date', weekEndDate);
-
-      if (occurrenceError) throw occurrenceError;
-
-      const groupedActions: Record<string, TaskWithLogs[]> = {};
-      
-      for (const task of tasksWithWeekPlans) {
-        const goalJoin = goalJoins?.find(gj => gj.parent_id === task.id);
-        if (!goalJoin) continue;
-
-        const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id);
-        if (!weekPlan) continue;
-
-        const goalId = goalJoin.twelve_wk_goal_id || goalJoin.custom_goal_id;
-        if (!goalId) continue;
-        
-        const relevantOccurrences = occurrenceData?.filter(occ => occ.parent_task_id === task.id) || [];
-        
-        const taskLogs = relevantOccurrences.map(occ => ({
-          id: occ.id,
-          task_id: task.id,
-          measured_on: occ.due_date,
-          week_number: weekNumber,
-          day_of_week: new Date(occ.due_date).getDay(),
-          value: 1,
-          completed: true,
-          created_at: occ.created_at,
-        }));
-        
-        const weeklyActual = taskLogs.length;
-        const weeklyTarget = weekPlan.target_days;
-        const cappedWeeklyActual = Math.min(weeklyActual, weeklyTarget);
-
-        const taskWithLogs: TaskWithLogs = {
-          ...task,
-          goal_type: goalJoin.goal_type === 'twelve_wk_goal' ? '12week' : 'custom',
-          logs: taskLogs,
-          weeklyActual: cappedWeeklyActual,
-          weeklyTarget,
-        };
-
-        if (!groupedActions[goalId]) {
-          groupedActions[goalId] = [];
-        }
-        groupedActions[goalId].push(taskWithLogs);
-      }
-      
-      return groupedActions;
-    } catch (error) {
-      console.error('Error fetching goal actions for week:', error);
-      return {};
-    }
-  };
+  const fetchGoalActionsForWeekForState = (
+    goalIds: string[],
+    weekNumber: number,
+    customWeeks?: WeekData[]
+  ) => fetchGoalActionsForWeek(goalIds, weekNumber, cycleWeeks, customWeeks || []);
 
   const refreshAllData = async () => {
     try {
@@ -1004,7 +1026,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
     setLoadingWeekActions,
     refreshGoals,
     refreshAllData,
-    fetchGoalActionsForWeek,
+    fetchGoalActionsForWeek: fetchGoalActionsForWeekForState,
     completeActionSuggestion,
     undoActionOccurrence,
     createTwelveWeekGoal,

@@ -9,7 +9,7 @@
     "build:web": "npm run clean:web && cross-env EXPO_NO_TELEMETRY=1 npx expo export -p web --output-dir build",
     "clean:web": "shx rm -rf build",
     "lint": "expo lint",
-    "test": "node --test lib/__tests__/dateUtils.test.js"
+    "test": "node --test"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -61,7 +61,7 @@
     "eslint-config-expo": "~9.2.0",
     "metro": "^0.82.0",
     "shx": "^0.4.0",
-    "typescript": "~5.8.3",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "~5.8.3"
   }
 }
