@@ -450,7 +450,7 @@ useEffect(() => {
       if (!customGoal) return;
 
       // Generate weeks for this custom timeline
-      const startDate = parseLocalDate(customGoal.start_date);
+    if (!selectedGoal || !selectedGoal.id || selectedWeekIndex < 0 || selectedWeekIndex >= cycleWeeks.length) {
       const endDate = parseLocalDate(customGoal.end_date);
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const totalWeeks = Math.ceil(totalDays / 7);
@@ -461,6 +461,11 @@ useEffect(() => {
         weekStart.setDate(startDate.getDate() + (i * 7));
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
+        if (!selectedGoal || !selectedGoal.id) {
+          console.log('selectedGoal or selectedGoal.id is missing, skipping fetch');
+          return;
+        }
+        
         
         // Don't let week end go past the timeline end date
         if (weekEnd > endDate) {
