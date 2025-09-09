@@ -155,8 +155,8 @@ useEffect(() => {
             if (!w) return null;
             return {
               weekNumber: w.week_number,
-              startDate: w.start_date,
-              endDate: w.end_date,
+              startDate: w.startDate,
+              endDate: w.endDate,
             };
           })();
 
@@ -540,8 +540,8 @@ useEffect(() => {
 
         weeks.push({
           week_number: i + 1,
-          start_date: formatLocalDate(weekStart),
-          end_date: formatLocalDate(weekEnd),
+          startDate: formatLocalDate(weekStart),
+          endDate: formatLocalDate(weekEnd),
           user_cycle_id: timelineId,
         });
       }
@@ -551,8 +551,8 @@ useEffect(() => {
       // Set initial week to current week or first week
       const now = new Date();
       const currentDateString = formatLocalDate(now);
-      const currentWeekIndex = weeks.findIndex(week => 
-        currentDateString >= week.start_date && currentDateString <= week.end_date
+      const currentWeekIndex = weeks.findIndex(week =>
+        currentDateString >= week.startDate && currentDateString <= week.endDate
       );
       setSelectedWeekIndex(Math.max(0, currentWeekIndex));
 
@@ -781,10 +781,8 @@ useEffect(() => {
                       ? getWeekData(selectedWeekIndex)
                       : customTimelineWeeks[selectedWeekIndex];
                     if (!weekData) return '';
-                    const startStr = selectedTimelineId === 'twelve-week' ? weekData.startDate : weekData.start_date;
-                    const endStr = selectedTimelineId === 'twelve-week' ? weekData.endDate : weekData.end_date;
-                    const startDate = safeParseDate(startStr, 'week display start');
-                    const endDate = safeParseDate(endStr, 'week display end');
+                    const startDate = safeParseDate(weekData.startDate, 'week display start');
+                    const endDate = safeParseDate(weekData.endDate, 'week display end');
                     if (!startDate || !endDate) return 'Invalid date';
                     return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
                   })()}
@@ -851,7 +849,7 @@ useEffect(() => {
                     expanded={goalsExpanded}
                     progress={progress}
                     week={weekData}
-                    selectedWeekNumber={weekData?.weekNumber}
+                    selectedWeekNumber={selectedTimelineId === 'twelve-week' ? weekData?.weekNumber : weekData?.week_number}
                     weekActions={goalActions}
                     loadingWeekActions={loadingWeekActions}
                     onAddAction={() => {
@@ -987,8 +985,8 @@ useEffect(() => {
                   {(() => {
                     const weekData = customTimelineWeeks[selectedWeekIndex];
                     if (!weekData) return '';
-                    const startDate = safeParseDate(weekData.start_date, 'custom timeline week start');
-                    const endDate = safeParseDate(weekData.end_date, 'custom timeline week end');
+                    const startDate = safeParseDate(weekData.startDate, 'custom timeline week start');
+                    const endDate = safeParseDate(weekData.endDate, 'custom timeline week end');
                     if (!startDate || !endDate) return 'Invalid date';
                     return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
                   })()}
