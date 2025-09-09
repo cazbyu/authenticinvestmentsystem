@@ -252,10 +252,16 @@ const { data: roleKRData, error: roleKRError } = await supabase
     const dates: string[] = [];
     const start = parseLocalDate(startDate);
     const end = parseLocalDate(endDate);
-    
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      console.warn('Invalid dates provided to getDatesForRecurrence:', { startDate, endDate });
+      return dates;
+    }
+
     // Calculate how many days per week based on recurrence type
-    const daysPerWeek = recurrenceType === 'daily' ? 7 : parseInt(recurrenceType.replace('days', '').replace('day', ''));
-    
+    const daysPerWeek =
+      recurrenceType === 'daily' ? 7 : parseInt(recurrenceType.replace('days', '').replace('day', ''));
+
     // Generate dates for the week
     const current = new Date(start);
     let dayCount = 0;

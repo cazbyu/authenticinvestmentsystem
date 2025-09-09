@@ -72,7 +72,9 @@ export default function Goals() { // Ensure this is the default export
   const safeParseDate = (d: string, context: string): Date | null => {
     try {
       if (!isValidDateString(d)) throw new Error('Invalid date');
-      return parseLocalDate(d);
+      const parsed = parseLocalDate(d);
+      if (isNaN(parsed.getTime())) throw new Error('Invalid date');
+      return parsed;
     } catch (err) {
       console.warn(`Invalid date in ${context}:`, d, err);
       return null;

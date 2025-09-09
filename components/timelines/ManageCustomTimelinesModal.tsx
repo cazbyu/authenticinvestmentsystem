@@ -43,7 +43,9 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
   const safeParseDate = (d: string, context: string): Date | null => {
     try {
       if (!isValidDateString(d)) throw new Error('Invalid date');
-      return parseLocalDate(d);
+      const parsed = parseLocalDate(d);
+      if (isNaN(parsed.getTime())) throw new Error('Invalid date');
+      return parsed;
     } catch (err) {
       console.warn(`Invalid date in ${context}:`, d, err);
       return null;
@@ -388,12 +390,17 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
             onPress={() => setShowStartCalendar(true)}
           >
             <Text style={styles.dateButtonText}>
-              {parseLocalDate(formData.startDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {(() => {
+                const parsed = parseLocalDate(formData.startDate);
+                return isNaN(parsed.getTime())
+                  ? 'Invalid date'
+                  : parsed.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    });
+              })()}
             </Text>
           </TouchableOpacity>
         </View>
@@ -405,12 +412,17 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
             onPress={() => setShowEndCalendar(true)}
           >
             <Text style={styles.dateButtonText}>
-              {parseLocalDate(formData.endDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {(() => {
+                const parsed = parseLocalDate(formData.endDate);
+                return isNaN(parsed.getTime())
+                  ? 'Invalid date'
+                  : parsed.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    });
+              })()}
             </Text>
           </TouchableOpacity>
         </View>
@@ -420,6 +432,9 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
             Duration: {(() => {
               const start = parseLocalDate(formData.startDate);
               const end = parseLocalDate(formData.endDate);
+              if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                return 'Invalid date range';
+              }
               const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
               const weeks = Math.ceil(days / 7);
               return `${days} days (${weeks} weeks)`;
@@ -442,11 +457,15 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
               onDayPress={(day) => {
                 setFormData(prev => ({ ...prev, startDate: day.dateString }));
                 setShowStartCalendar(false);
-                
+
                 // Auto-adjust end date if it's before the new start date
                 const newStartDate = parseLocalDate(day.dateString);
                 const currentEndDate = parseLocalDate(formData.endDate);
-                if (currentEndDate <= newStartDate) {
+                if (
+                  !isNaN(newStartDate.getTime()) &&
+                  !isNaN(currentEndDate.getTime()) &&
+                  currentEndDate <= newStartDate
+                ) {
                   const newEndDate = new Date(newStartDate);
                   newEndDate.setDate(newEndDate.getDate() + 84); // 12 weeks
                   setFormData(prev => ({ ...prev, endDate: formatLocalDate(newEndDate) }));
@@ -483,12 +502,20 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
                 // Validate that end date is after start date
                 const selectedEndDate = parseLocalDate(day.dateString);
                 const currentStartDate = parseLocalDate(formData.startDate);
-                
+
+                if (
+                  isNaN(selectedEndDate.getTime()) ||
+                  isNaN(currentStartDate.getTime())
+                ) {
+                  Alert.alert('Invalid Date', 'Please select valid dates');
+                  return;
+                }
+
                 if (selectedEndDate <= currentStartDate) {
                   Alert.alert('Invalid Date', 'End date must be after start date');
                   return;
                 }
-                
+
                 setFormData(prev => ({ ...prev, endDate: day.dateString }));
                 setShowEndCalendar(false);
               }}
