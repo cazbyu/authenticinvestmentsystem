@@ -438,12 +438,17 @@ console.log('Active cycle after global sync:', activeCycle);
                 onPress={() => setShowStartCalendar(true)}
               >
                 <Text style={styles.dateButtonText}>
-                  {parseLocalDate(customStartDate).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {(() => {
+                    const parsed = parseLocalDate(customStartDate);
+                    return isNaN(parsed.getTime())
+                      ? 'Invalid date'
+                      : parsed.toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        });
+                  })()}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -455,12 +460,17 @@ console.log('Active cycle after global sync:', activeCycle);
                 onPress={() => setShowEndCalendar(true)}
               >
                 <Text style={styles.dateButtonText}>
-                  {parseLocalDate(customEndDate).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {(() => {
+                    const parsed = parseLocalDate(customEndDate);
+                    return isNaN(parsed.getTime())
+                      ? 'Invalid date'
+                      : parsed.toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        });
+                  })()}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -470,6 +480,9 @@ console.log('Active cycle after global sync:', activeCycle);
                 Duration: {(() => {
                   const start = parseLocalDate(customStartDate);
                   const end = parseLocalDate(customEndDate);
+                  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                    return 'Invalid date range';
+                  }
                   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
                   const weeks = Math.ceil(days / 7);
                   return `${days} days (${weeks} weeks)`;
@@ -620,7 +633,11 @@ console.log('Active cycle after global sync:', activeCycle);
                     // Auto-adjust end date if it's before the new start date
                     const newStartDate = parseLocalDate(day.dateString);
                     const currentEndDate = parseLocalDate(customEndDate);
-                    if (currentEndDate <= newStartDate) {
+                    if (
+                      !isNaN(newStartDate.getTime()) &&
+                      !isNaN(currentEndDate.getTime()) &&
+                      currentEndDate <= newStartDate
+                    ) {
                       const newEndDate = new Date(newStartDate);
                       newEndDate.setDate(newEndDate.getDate() + 84); // 12 weeks default
                       setCustomEndDate(formatLocalDate(newEndDate));
@@ -656,12 +673,20 @@ console.log('Active cycle after global sync:', activeCycle);
                     // Validate that end date is after start date
                     const selectedEndDate = parseLocalDate(day.dateString);
                     const currentStartDate = parseLocalDate(customStartDate);
-                    
+
+                    if (
+                      isNaN(selectedEndDate.getTime()) ||
+                      isNaN(currentStartDate.getTime())
+                    ) {
+                      Alert.alert('Invalid Date', 'Please select valid dates');
+                      return;
+                    }
+
                     if (selectedEndDate <= currentStartDate) {
                       Alert.alert('Invalid Date', 'End date must be after start date');
                       return;
                     }
-                    
+
                     setCustomEndDate(day.dateString);
                     setShowEndCalendar(false);
                   }}

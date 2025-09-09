@@ -86,6 +86,9 @@ export function GoalProgressCard({
     if (goal.goal_type === 'custom') {
       const startDate = parseLocalDate(goal.start_date);
       const endDate = parseLocalDate(goal.end_date);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return 'Invalid date range';
+      }
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const totalWeeks = Math.ceil(totalDays / 7);
       return `${totalWeeks}-Week Custom Goal`;
@@ -98,12 +101,17 @@ export function GoalProgressCard({
   const generateWeekDays = (startDateString: string) => {
     const days = [];
     const start = parseLocalDate(startDateString); // Use parseLocalDate to avoid timezone shifts
-    
+
+    if (isNaN(start.getTime())) {
+      console.warn('Invalid start date provided to generateWeekDays:', startDateString);
+      return days;
+    }
+
     console.log('=== GENERATE WEEK DAYS DEBUG ===');
     console.log('Input start date string:', startDateString);
     console.log('Parsed start date:', start.toISOString());
     console.log('Start day of week:', start.getDay()); // 0=Sunday, 1=Monday, etc.
-    
+
     // Generate 7 consecutive days starting from the provided start date
     for (let i = 0; i < 7; i++) {
       const day = new Date(start);
@@ -115,10 +123,10 @@ export function GoalProgressCard({
         dayOfWeek: day.getDay(),
       });
     }
-    
+
     console.log('Generated days:', days);
     console.log('=== END GENERATE WEEK DAYS DEBUG ===');
-    
+
     return days;
   };
 
@@ -269,6 +277,9 @@ export function GoalProgressCard({
                   const startDate = parseLocalDate(goal.start_date);
                   const endDate = parseLocalDate(goal.end_date);
                   const now = new Date();
+                  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                    return 'Invalid dates';
+                  }
                   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
                   const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
                   return `${daysRemaining}/${totalDays} days`;
@@ -285,6 +296,9 @@ export function GoalProgressCard({
                       const startDate = parseLocalDate(goal.start_date);
                       const endDate = parseLocalDate(goal.end_date);
                       const now = new Date();
+                      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                        return 0;
+                      }
                       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
                       const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
                       return Math.min(100, (daysPassed / totalDays) * 100);

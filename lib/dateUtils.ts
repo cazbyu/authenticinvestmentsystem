@@ -26,7 +26,15 @@ export function formatLocalDate(date: Date): string {
  * Parses a YYYY-MM-DD string as a local date (no timezone conversion)
  */
 export function parseLocalDate(dateString: string): Date {
-  const [year, month, day] = dateString.split('-').map(Number);
+  if (typeof dateString !== 'string' || dateString.trim() === '') {
+    return new Date(NaN);
+  }
+
+  const parts = dateString.split('-');
+  if (parts.length !== 3) {
+    return new Date(NaN);
+  }
+  const [year, month, day] = parts.map(Number);
   return new Date(year, month - 1, day);
 }
 
