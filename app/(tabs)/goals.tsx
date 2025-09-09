@@ -1168,7 +1168,6 @@ useEffect(() => {
               style={styles.startCycleButton}
               onPress={() => setCycleSetupVisible(true)}
             >
-            >
               <Calendar size={20} color="#ffffff" />
               <Text style={styles.startCycleButtonText}>Start 12-Week Cycle</Text>
             </TouchableOpacity>
