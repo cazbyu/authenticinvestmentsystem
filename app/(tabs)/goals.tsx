@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
 import { getSupabaseClient } from '@/lib/supabase';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
-import { useGoals } from '@/hooks/useGoals';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 import TaskEventForm from '@/components/tasks/TaskEventForm'; // Keep this import
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
@@ -64,27 +64,31 @@ export default function Goals() { // Ensure this is the default export
 
   // 12-Week Goals
   const { 
-    twelveWeekGoals,
-    allGoals,
-    currentCycle, 
-    daysLeftData, 
-    goalProgress, 
+    goals: allGoals,
+    selectedTimeline: currentCycle,
+    availableTimelines,
     cycleWeeks,
+    daysLeftData,
+    goalProgress,
     cycleEffortData,
-    loading: goalsLoading, 
+    loading: goalsLoading,
     loadingWeekActions,
     setLoadingWeekActions,
     refreshGoals,
     refreshAllData,
+    fetchGoalActionsForWeek,
+    completeActionSuggestion,
+    undoActionOccurrence,
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
-    fetchGoalActionsForWeek,
+    getCurrentWeekNumber,
     getCurrentWeekIndex,
     getWeekData,
-    completeActionSuggestion,
-  undoActionOccurrence,
-  } = useGoals();
+  } = useGoalProgress();
+
+  // Filter goals by type for compatibility
+  const twelveWeekGoals = allGoals.filter(g => g.goal_type === 'twelve_wk_goal');
 
   const fetchCustomTimelines = async () => {
     try {
