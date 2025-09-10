@@ -706,10 +706,11 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   // Try to find the week that contains today
   const currentWeekData = cycleWeeks.find(
     week =>
-      week.start_date &&
-      week.end_date &&
-      currentDateString >= week.start_date &&
-      currentDateString <= week.end_date
+      week.week_start &&
+      week.week_end &&
+      currentDateString >= week.week_start &&
+      currentDateString <= week.week_end
+
   );
 
   if (currentWeekData) {
