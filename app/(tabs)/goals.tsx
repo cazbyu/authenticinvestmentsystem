@@ -140,7 +140,7 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : 0);
       initializedWeekRef.current = true;
     }
   }
-}, [selectedTimelineId, cycleWeeks, customTimelineWeeks, getCurrentWeekIndex]);*
+}, [selectedTimelineId, cycleWeeks, customTimelineWeeks, getCurrentWeekIndex]);
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
