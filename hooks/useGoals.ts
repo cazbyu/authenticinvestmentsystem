@@ -610,8 +610,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
     return {
       weekNumber,
-      startDate: weekData.start_date,
-      endDate: weekData.end_date,
+      startDate: weekData.week_start,
+      endDate: weekData.week_end,
     };
   };
 
