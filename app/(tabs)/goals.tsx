@@ -136,7 +136,7 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : 0);
       const currentWeekIndex = customTimelineWeeks.findIndex(
         w => currentDateString >= w.startDate && currentDateString <= w.endDate
       );
-      setSelectedWeekIndex(Math.max(0, currentWeekIndex));
+      setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : 0);
       initializedWeekRef.current = true;
     }
   }
