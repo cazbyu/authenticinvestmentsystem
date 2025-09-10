@@ -128,7 +128,7 @@ useEffect(() => {
   if (!initializedWeekRef.current) {
     if (selectedTimelineId === 'twelve-week' && cycleWeeks.length > 0) {
       const currentWeekIndex = getCurrentWeekIndex();
-      setSelectedWeekIndex(currentWeekIndex);
+setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : 0);
       initializedWeekRef.current = true;
     } else if (selectedTimelineId && customTimelineWeeks.length > 0) {
       const now = new Date();
@@ -140,7 +140,7 @@ useEffect(() => {
       initializedWeekRef.current = true;
     }
   }
-}, [selectedTimelineId, cycleWeeks, customTimelineWeeks, getCurrentWeekIndex]);
+}, [selectedTimelineId, cycleWeeks, customTimelineWeeks, getCurrentWeekIndex]);*
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
