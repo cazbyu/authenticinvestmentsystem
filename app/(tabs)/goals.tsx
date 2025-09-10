@@ -347,7 +347,7 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
     }
 
     const formatDate = (date: Date) => {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     };
     
     return `Week ${weekData.weekNumber} — ${formatDate(startDate)} – ${formatDate(endDate)}`;
