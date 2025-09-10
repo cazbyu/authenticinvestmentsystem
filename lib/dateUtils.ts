@@ -101,7 +101,15 @@ export function generateCycleWeeks(
   // Ensure the cycle starts on the correct day of the week
   const alignedStart = getWeekStart(cycleStart, weekStartDay);
   
-  for (let i = 0; i < 12; i++) {
+  // Decide how many weeks to generate
+let totalWeeks = 12;
+if (endDate && isValidISODate(endDate)) {
+  const cycleEnd = parseLocalDate(endDate);
+  const diffDays = Math.ceil((cycleEnd.getTime() - alignedStart.getTime()) / (1000 * 60 * 60 * 24));
+  totalWeeks = Math.ceil(diffDays / 7);
+}
+for (let i = 0; i < totalWeeks; i++) {
+
     const weekStart = new Date(alignedStart);
     weekStart.setDate(alignedStart.getDate() + (i * 7));
     
