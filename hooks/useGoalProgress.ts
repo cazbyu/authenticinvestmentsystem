@@ -1490,7 +1490,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
 
   const getWeekDateRange = (weekNumber: number): { start: string; end: string } | null => {
     const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
-    return weekData ? { start: weekData.start_date, end: weekData.end_date } : null;
+    return weekData ? { start: weekData.week_start, end: weekData.week_end } : null;
   };
 
   const refreshGoals = async () => {
