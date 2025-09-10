@@ -145,7 +145,7 @@ export function CreateGoalModal({
       if (cycleData) {
         const { data: weeksData } = await supabase
           .from('v_user_cycle_weeks')
-          .select('week_number, start_date, end_date')
+          .select('week_number, week_start, end_date')
           .eq('user_cycle_id', cycleData.id)
           .order('week_number', { ascending: true });
 
