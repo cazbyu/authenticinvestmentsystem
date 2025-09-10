@@ -11,7 +11,7 @@ import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
+import { formatDateRange, parseLocalDate, formatLocalDate, safeFormatDateRange } from '@/lib/dateUtils';
 
 import { useGoals } from '@/hooks/useGoals';
 export default function Goals() { // Ensure this is the default export
