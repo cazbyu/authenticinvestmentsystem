@@ -279,9 +279,11 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         console.warn('Database week view failed, using client-side fallback:', error);
         if (currentCycle.start_date) {
           const clientWeeks = generateCycleWeeks(
-            currentCycle.start_date!, 
-            currentCycle.week_start_day || 'monday'
-          ).map(week => ({
+  currentCycle.start_date!,
+  currentCycle.week_start_day || 'monday',
+  currentCycle.end_date || undefined
+).map(week => ({
+
             week_number: week.week_number,
             start_date: week.start_date,
             end_date: week.end_date,
