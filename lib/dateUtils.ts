@@ -85,8 +85,9 @@ export function getWeekEnd(date: Date, weekStartDay: 'sunday' | 'monday' = 'sund
  * Generates week windows for a 12-week cycle
  */
 export function generateCycleWeeks(
-  startDate: string, 
-  weekStartDay: 'sunday' | 'monday' = 'sunday'
+  startDate: string,
+  weekStartDay: 'sunday' | 'monday' = 'sunday',
+  endDate?: string   // NEW optional arg for custom timelines
 ): Array<{ week_number: number; start_date: string; end_date: string }> {
   // Validate startDate before proceeding
   if (!isValidISODate(startDate)) {
