@@ -806,7 +806,7 @@ useEffect(() => {
                     const startDate = safeParseDate(weekData.startDate, 'week display start');
                     const endDate = safeParseDate(weekData.endDate, 'week display end');
                     if (!startDate || !endDate) return 'Invalid date';
-                    return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+                    return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
                   })()}
                 </Text>
               </View>
