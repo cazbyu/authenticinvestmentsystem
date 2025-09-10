@@ -123,19 +123,24 @@ export default function Goals() { // Ensure this is the default export
     fetchCustomTimelines();
   }, []);
 
-  // Initialize selected week to current week
-  // Initialize selected week to current week (run once when cycleWeeks arrive)
+  // Initialize selected week to current week (for both cycle and custom timelines)
 useEffect(() => {
-  if (!initializedWeekRef.current && cycleWeeks.length > 0) {
-    console.log('=== INITIALIZING WEEK SELECTION ===');
-    const currentWeekIndex = getCurrentWeekIndex(); // This returns the current week index (0-based)
-    console.log('Current week index:', currentWeekIndex);
-    console.log('Available weeks:', cycleWeeks.length);
-    
-    setSelectedWeekIndex(currentWeekIndex);
-    initializedWeekRef.current = true;
+  if (!initializedWeekRef.current) {
+    if (selectedTimelineId === 'twelve-week' && cycleWeeks.length > 0) {
+      const currentWeekIndex = getCurrentWeekIndex();
+      setSelectedWeekIndex(currentWeekIndex);
+      initializedWeekRef.current = true;
+    } else if (selectedTimelineId && customTimelineWeeks.length > 0) {
+      const now = new Date();
+      const currentDateString = formatLocalDate(now);
+      const currentWeekIndex = customTimelineWeeks.findIndex(
+        w => currentDateString >= w.startDate && currentDateString <= w.endDate
+      );
+      setSelectedWeekIndex(Math.max(0, currentWeekIndex));
+      initializedWeekRef.current = true;
+    }
   }
-}, [cycleWeeks, getCurrentWeekIndex]);
+}, [selectedTimelineId, cycleWeeks, customTimelineWeeks, getCurrentWeekIndex]);
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
