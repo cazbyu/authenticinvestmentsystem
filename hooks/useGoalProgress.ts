@@ -285,8 +285,8 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 ).map(week => ({
 
             week_number: week.week_number,
-            start_date: week.start_date,
-            end_date: week.end_date,
+            week_start: week.start_date,
+            week_end: week.end_date,
             user_cycle_id: currentCycle.id,
           }));
           console.log('Using client-side fallback weeks:', clientWeeks);
