@@ -811,7 +811,8 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
                     const startDate = safeParseDate(weekData.startDate, 'week display start');
                     const endDate = safeParseDate(weekData.endDate, 'week display end');
                     if (!startDate || !endDate) return 'Invalid date';
-                    return `${startDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                    return safeFormatDateRange(weekData.startDate, weekData.endDate);
+
                   })()}
                 </Text>
               </View>
