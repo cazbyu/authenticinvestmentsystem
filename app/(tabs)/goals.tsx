@@ -581,7 +581,7 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : 0);
       const currentWeekIndex = weeks.findIndex(week =>
         currentDateString >= week.startDate && currentDateString <= week.endDate
       );
-      setSelectedWeekIndex(Math.max(0, currentWeekIndex));
+      setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : 0);
 
       // Load goals for this timeline
       const { data: goalData, error: goalsError } = await supabase
