@@ -20,7 +20,9 @@ function addDays(date: Date, amount: number): Date {
 }
 
 export function WeeklyGoalNavigator() {
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const initialStart = startOfWeek(new Date());
+  const [weekStart, setWeekStart] = useState<Date>(() => initialStart);
+  const [weekEnd, setWeekEnd] = useState<Date>(() => addDays(initialStart, 6));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +33,10 @@ export function WeeklyGoalNavigator() {
         const res = await fetch('/api/current-week');
         if (!res.ok) throw new Error('Failed to fetch current week');
         const data = await res.json();
-        setWeekStart(new Date(data.start));
+        const startDate = new Date(`${data.start_date}T00:00:00Z`);
+        const endDate = new Date(`${data.end_date}T00:00:00Z`);
+        setWeekStart(startDate);
+        setWeekEnd(endDate);
         setError(null);
       } catch (err) {
         setError('Unable to load current week.');
@@ -43,7 +48,6 @@ export function WeeklyGoalNavigator() {
     fetchCurrentWeek();
   }, []);
 
-  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
   const weekLabel = useMemo(() => {
     const options = { month: 'long', day: 'numeric' } as const;
     return `${weekStart.toLocaleDateString('en-US', options)} - ${weekEnd.toLocaleDateString('en-US', options)}`;
@@ -53,8 +57,16 @@ export function WeeklyGoalNavigator() {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [weekStart]);
 
-  const goToPreviousWeek = () => setWeekStart(addDays(weekStart, -7));
-  const goToNextWeek = () => setWeekStart(addDays(weekStart, 7));
+  const goToPreviousWeek = () => {
+    const newStart = addDays(weekStart, -7);
+    setWeekStart(newStart);
+    setWeekEnd(addDays(newStart, 6));
+  };
+  const goToNextWeek = () => {
+    const newStart = addDays(weekStart, 7);
+    setWeekStart(newStart);
+    setWeekEnd(addDays(newStart, 6));
+  };
 
   if (loading) {
     return (
