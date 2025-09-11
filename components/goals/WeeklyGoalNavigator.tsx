@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { getSupabaseClient } from '@/lib/supabase';
 
 // Helper to get Monday as the start of the week
 function startOfWeek(date: Date): Date {
@@ -20,19 +22,80 @@ function addDays(date: Date, amount: number): Date {
 }
 
 export function WeeklyGoalNavigator() {
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
-  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const router = useRouter();
+  const params = useLocalSearchParams<{ weekStart?: string }>();
+
+  const [weekStart, setWeekStart] = useState<Date | null>(null);
+  const [weekEnd, setWeekEnd] = useState<Date | null>(null);
+
+  // Format a date as YYYY-MM-DD for query parameters
+  const toDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  useEffect(() => {
+    const fetchWeek = async () => {
+      // Determine which date to query
+      let baseDate: Date;
+      if (params.weekStart) {
+        baseDate = new Date(params.weekStart as string);
+      } else {
+        baseDate = startOfWeek(new Date());
+      }
+
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('v_user_cycle_weeks')
+          .select('start_date,end_date')
+          .eq('start_date', toDateString(baseDate))
+          .single();
+
+        if (error || !data) {
+          throw error || new Error('No week data');
+        }
+
+        setWeekStart(new Date(data.start_date));
+        setWeekEnd(new Date(data.end_date));
+      } catch (err) {
+        console.error('Error fetching week data:', err);
+        // Fallback to local calculation if anything goes wrong
+        const localStart = startOfWeek(baseDate);
+        setWeekStart(localStart);
+        setWeekEnd(addDays(localStart, 6));
+      }
+    };
+
+    fetchWeek();
+  }, [params.weekStart]);
+
   const weekLabel = useMemo(() => {
+    if (!weekStart || !weekEnd) return '';
     const options = { month: 'long', day: 'numeric' } as const;
     return `${weekStart.toLocaleDateString('en-US', options)} - ${weekEnd.toLocaleDateString('en-US', options)}`;
   }, [weekStart, weekEnd]);
 
   const days = useMemo(() => {
+    if (!weekStart) return [];
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [weekStart]);
 
-  const goToPreviousWeek = () => setWeekStart(addDays(weekStart, -7));
-  const goToNextWeek = () => setWeekStart(addDays(weekStart, 7));
+  const updateWeekParam = (date: Date) => {
+    router.setParams({ weekStart: toDateString(date) });
+  };
+
+  const goToPreviousWeek = () => {
+    if (!weekStart) return;
+    updateWeekParam(addDays(weekStart, -7));
+  };
+
+  const goToNextWeek = () => {
+    if (!weekStart) return;
+    updateWeekParam(addDays(weekStart, 7));
+  };
 
   return (
     <View style={styles.container}>
