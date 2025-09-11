@@ -129,13 +129,11 @@ export default function Goals() { // Ensure this is the default export
   }, []);
 
   // Initialize selected week to current week (for both cycle and custom timelines)
-useEffect(() => {
-  if (!initializedWeekRef.current) {
+  useEffect(() => {
     if (selectedTimelineId === 'twelve-week' && cycleWeeks.length > 0) {
-      const currentWeekIndex = getCurrentWeekIndex();
-setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.length - 1);
+      setSelectedWeekIndex(getCurrentWeekIndex());
       initializedWeekRef.current = true;
-    } else if (selectedTimelineId && customTimelineWeeks.length > 0) {
+    } else if (!initializedWeekRef.current && selectedTimelineId && customTimelineWeeks.length > 0) {
       const now = new Date();
       const currentDateString = formatLocalDate(now);
       const currentWeekIndex = customTimelineWeeks.findIndex(
@@ -144,8 +142,7 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
       setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : 0);
       initializedWeekRef.current = true;
     }
-  }
-}, [selectedTimelineId, cycleWeeks, customTimelineWeeks, getCurrentWeekIndex]);
+  }, [selectedTimelineId, cycleWeeks, customTimelineWeeks, getCurrentWeekIndex]);
 
   // Fetch week-specific actions when week or goals change
   useEffect(() => {
@@ -520,12 +517,15 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
   };
 
   const handleTimelineSelect = (timelineId: string) => {
-    setSelectedTimelineId(timelineId);
-    if (timelineId !== 'twelve-week') {
-      // Load custom timeline data
-      loadCustomTimelineData(timelineId);
-    }
-  };
+      setSelectedTimelineId(timelineId);
+      initializedWeekRef.current = false;
+      if (timelineId === 'twelve-week') {
+        setSelectedWeekIndex(getCurrentWeekIndex());
+      } else {
+        // Load custom timeline data
+        loadCustomTimelineData(timelineId);
+      }
+    };
 
   const loadCustomTimelineData = async (timelineId: string) => {
     try {
