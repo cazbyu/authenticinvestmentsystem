@@ -735,9 +735,9 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
 };
 
   const getCurrentWeekIndex = (): number => {
-    const weekIndex = Math.max(0, getCurrentWeekNumber() - 1); // Convert to 0-based index
-    return weekIndex;
-  };
+  const n = getCurrentWeekNumber();
+  return typeof n === 'number' && !Number.isNaN(n) ? Math.max(0, n - 1) : 0;
+};
 
   const getWeekData = (weekIndex: number): WeekData | null => {
     const weekNumber = weekIndex + 1; // Convert from 0-based index
