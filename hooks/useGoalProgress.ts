@@ -896,7 +896,7 @@ if (currentDateString < firstWeek.week_start) {
       console.log('Tasks details:', tasksData.map(t => ({ id: t.id, title: t.title, user_cycle_id: t.user_cycle_id })));
 
       // Fetch week plans for this specific week
-      const weekNumber = cycleWeeks.findIndex(w => w.start_date === weekStartDate) + 1;
+      const weekNumber = cycleWeeks.findIndex(w => w.week_start === weekStartDate) + 1;
       console.log('Calculated week number:', weekNumber, 'from start date:', weekStartDate);
       
       const { data: weekPlansData, error: weekPlansError } = await supabase
