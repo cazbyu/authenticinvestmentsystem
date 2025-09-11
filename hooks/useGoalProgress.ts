@@ -300,12 +300,13 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       if (dbWeeks && dbWeeks.length > 0 && currentCycle.start_date) {
         const week1 = dbWeeks[0];
-        const expectedWeek1Start = generateCycleWeeks(
-          currentCycle.start_date!, 
-          currentCycle.week_start_day || 'monday'
-        )[0];
-        
-        if (week1.start_date !== expectedWeek1Start.start_date) {
+const expectedWeek1Start = generateCycleWeeks(
+  currentCycle.start_date!,
+  currentCycle.week_start_day || 'monday'
+)[0];
+
+if (week1.week_start !== expectedWeek1Start.start_date) {
+
           console.warn('Week alignment mismatch, using client-side calculation');
           const clientWeeks = generateCycleWeeks(
   currentCycle.start_date!,
