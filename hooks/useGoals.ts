@@ -605,14 +605,13 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   const getWeekData = (weekIndex: number): WeekData | null => {
-    const weekNumber = weekIndex + 1;
-    const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
-    if (!weekData) return null;
+    const week = cycleWeeks[weekIndex];
+    if (!week) return null;
 
     return {
-      weekNumber,
-      startDate: weekData.week_start,
-      endDate: weekData.week_end,
+      weekNumber: week.week_number,
+      startDate: week.week_start,
+      endDate: week.week_end,
     };
   };
 
