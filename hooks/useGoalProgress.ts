@@ -720,15 +720,13 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
 
   // If today is after all weeks, return the last week
   const lastWeek = cycleWeeks[cycleWeeks.length - 1];
-  if (currentDateString > lastWeek.end_date) {
-    return lastWeek.week_number;
-  }
-
-  // If today is before all weeks, return the first week
-  const firstWeek = cycleWeeks[0];
-  if (currentDateString < firstWeek.start_date) {
-    return firstWeek.week_number;
-  }
+if (currentDateString > lastWeek.week_end) {
+  return lastWeek.week_number;
+}
+const firstWeek = cycleWeeks[0];
+if (currentDateString < firstWeek.week_start) {
+  return firstWeek.week_number;
+}
 
   // Fallback
   return 1;
