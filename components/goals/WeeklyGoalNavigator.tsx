@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 // Helper to get Monday as the start of the week
@@ -21,6 +21,28 @@ function addDays(date: Date, amount: number): Date {
 
 export function WeeklyGoalNavigator() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCurrentWeek = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/current-week');
+        if (!res.ok) throw new Error('Failed to fetch current week');
+        const data = await res.json();
+        setWeekStart(new Date(data.start));
+        setError(null);
+      } catch (err) {
+        setError('Unable to load current week.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCurrentWeek();
+  }, []);
+
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
   const weekLabel = useMemo(() => {
     const options = { month: 'long', day: 'numeric' } as const;
@@ -33,6 +55,22 @@ export function WeeklyGoalNavigator() {
 
   const goToPreviousWeek = () => setWeekStart(addDays(weekStart, -7));
   const goToNextWeek = () => setWeekStart(addDays(weekStart, 7));
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading current week…</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -102,6 +140,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+  },
+  errorText: {
+    color: '#b91c1c',
+    paddingHorizontal: 16,
   },
 });
 
