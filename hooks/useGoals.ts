@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '../lib/supabase';
 import { Alert } from 'react-native';
 import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '../lib/dateUtils';
@@ -585,9 +585,9 @@ export function useGoals(options: UseGoalsOptions = {}) {
     }
   };
 
-  const getCurrentWeekNumber = (): number => {
+  const getCurrentWeekNumber = useCallback((): number => {
     if (!currentCycle || cycleWeeks.length === 0) return 1;
-    
+
     const now = new Date();
     const currentDateString = formatLocalDate(now);
 
@@ -595,11 +595,11 @@ export function useGoals(options: UseGoalsOptions = {}) {
       week =>
         currentDateString >= week.week_start && currentDateString <= week.week_end
     );
-    
-    return currentWeekData?.week_number || 1;
-  };
 
-  const getCurrentWeekIndex = (): number => {
+    return currentWeekData?.week_number || 1;
+  }, [currentCycle, cycleWeeks]);
+
+  const getCurrentWeekIndex = useCallback((): number => {
     if (cycleWeeks.length === 0) return -1;
 
     const now = new Date();
@@ -617,9 +617,9 @@ export function useGoals(options: UseGoalsOptions = {}) {
     if (currentDateString > lastWeek.week_end) return cycleWeeks.length - 1;
 
     return -1;
-  };
+  }, [cycleWeeks]);
 
-  const getWeekData = (weekIndex: number): WeekData | null => {
+  const getWeekData = useCallback((weekIndex: number): WeekData | null => {
     const week = cycleWeeks[weekIndex];
     if (!week) return null;
 
@@ -628,7 +628,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       startDate: week.week_start,
       endDate: week.week_end,
     };
-  };
+  }, [cycleWeeks]);
 
   const fetchGoalActionsForWeekForState = (
     goalIds: string[],
