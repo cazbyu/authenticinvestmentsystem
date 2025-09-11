@@ -3,6 +3,37 @@ import { getSupabaseClient } from '../lib/supabase';
 import { Alert } from 'react-native';
 import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '../lib/dateUtils';
 
+// Deep equality check utility
+function deepEqual(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== typeof b) return false;
+  
+  if (typeof a === 'object') {
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    
+    for (const key of keysA) {
+      if (!keysB.includes(key)) return false;
+      if (!deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  
+  return false;
+}
+
 export interface TwelveWeekGoal {
   id: string;
   title: string;
@@ -473,9 +504,18 @@ export function useGoals(options: UseGoalsOptions = {}) {
           keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
         }));
 
-      setTwelveWeekGoals(transformedTwelveWeekGoals);
-      setCustomGoals(transformedCustomGoals);
-      setAllGoals([...transformedTwelveWeekGoals, ...transformedCustomGoals]);
+      // Only update state if data has actually changed
+      if (!deepEqual(twelveWeekGoals, transformedTwelveWeekGoals)) {
+        setTwelveWeekGoals(transformedTwelveWeekGoals);
+      }
+      if (!deepEqual(customGoals, transformedCustomGoals)) {
+        setCustomGoals(transformedCustomGoals);
+      }
+      
+      const newAllGoals = [...transformedTwelveWeekGoals, ...transformedCustomGoals];
+      if (!deepEqual(allGoals, newAllGoals)) {
+        setAllGoals(newAllGoals);
+      }
 
       // Calculate progress for 12-week goals only (custom goals don't use cycle-based progress)
       if (userCycleId) {
@@ -569,17 +609,25 @@ export function useGoals(options: UseGoalsOptions = {}) {
         };
       }
 
-      setGoalProgress(progressData);
+      // Only update goal progress if data has actually changed
+      if (!deepEqual(goalProgress, progressData)) {
+        setGoalProgress(progressData);
+      }
 
       const totalActual = Object.values(progressData).reduce((sum, p) => sum + Math.min(p.overallActual, p.overallTarget), 0);
       const totalTarget = Object.values(progressData).reduce((sum, p) => sum + p.overallTarget, 0);
       const overallPercentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
       
-      setCycleEffortData({
+      const newCycleEffortData = {
         totalActual,
         totalTarget,
         overallPercentage
-      });
+      };
+      
+      // Only update cycle effort data if it has actually changed
+      if (!deepEqual(cycleEffortData, newCycleEffortData)) {
+        setCycleEffortData(newCycleEffortData);
+      }
     } catch (error) {
       console.error('Error calculating goal progress:', error);
     }
