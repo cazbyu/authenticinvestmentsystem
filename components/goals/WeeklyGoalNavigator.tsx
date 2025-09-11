@@ -31,7 +31,14 @@ export function WeeklyGoalNavigator() {
         const res = await fetch('/api/current-week');
         if (!res.ok) throw new Error('Failed to fetch current week');
         const data = await res.json();
-        setWeekStart(new Date(data.start));
+        let baseDate = new Date(data.start);
+        if (isNaN(baseDate.getTime())) {
+          console.warn(
+            `Invalid date received for current week: ${data.start}. Using current date instead.`
+          );
+          baseDate = new Date();
+        }
+        setWeekStart(baseDate);
         setError(null);
       } catch (err) {
         setError('Unable to load current week.');
