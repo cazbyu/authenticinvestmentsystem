@@ -323,7 +323,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       
       const { data: dbWeeks, error } = await supabase
         .from('v_user_cycle_weeks')
-        .select('week_number, week_start, week_end, user_cycle_id')
+        .select('week_number, start_date:week_start, end_date:week_end, user_cycle_id')
         .eq('user_cycle_id', userCycleId)
         .order('week_number', { ascending: true })
         .returns<CycleWeek[]>();
