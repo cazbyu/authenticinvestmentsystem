@@ -600,8 +600,23 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   const getCurrentWeekIndex = (): number => {
-    const weekIndex = Math.max(0, getCurrentWeekNumber() - 1);
-    return weekIndex;
+    if (cycleWeeks.length === 0) return -1;
+
+    const now = new Date();
+    const currentDateString = formatLocalDate(now);
+
+    const index = cycleWeeks.findIndex(
+      w => currentDateString >= w.week_start && currentDateString <= w.week_end
+    );
+
+    if (index !== -1) return index;
+
+    const firstWeek = cycleWeeks[0];
+    const lastWeek = cycleWeeks[cycleWeeks.length - 1];
+    if (currentDateString < firstWeek.week_start) return 0;
+    if (currentDateString > lastWeek.week_end) return cycleWeeks.length - 1;
+
+    return -1;
   };
 
   const getWeekData = (weekIndex: number): WeekData | null => {
