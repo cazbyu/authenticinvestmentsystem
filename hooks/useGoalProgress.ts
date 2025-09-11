@@ -575,9 +575,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
     }
   };
 
-  console.log('Current cycle parameter (full object):', currentCycle);
-
-  const calculateGoalProgress = async (goals: UnifiedGoal[], timelineId: string) => {
+   const calculateGoalProgress = async (goals: UnifiedGoal[], timelineId: string) => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
