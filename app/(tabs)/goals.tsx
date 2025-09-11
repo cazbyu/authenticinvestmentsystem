@@ -319,17 +319,6 @@ export default function Goals() { // Ensure this is the default export
     }
   };
 
-  const handleWeekChange = (direction: 'prev' | 'next') => {
-    // Only allow navigation if we have a valid week selection
-    if (selectedWeekIndex === -1) return;
-    
-    const newIndex = direction === 'prev' 
-      ? Math.max(0, selectedWeekIndex - 1)
-      : Math.min(11, selectedWeekIndex + 1);
-    
-    setSelectedWeekIndex(newIndex);
-  };
-
   const goPrevWeek = () => {
     console.log('goPrevWeek called, current index:', selectedWeekIndex);
     setSelectedWeekIndex(prev => {
