@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
@@ -72,6 +72,16 @@ export default function Goals() { // Ensure this is the default export
   const weekIndex = selectedWeekIndex === -1
     ? (selectedTimelineId === 'twelve-week' ? getCurrentWeekIndex() : 0)
     : selectedWeekIndex;
+
+  const weekData = useMemo(() => {
+    if (selectedTimelineId === 'twelve-week') {
+      return getWeekData(weekIndex);
+    }
+    const week = customTimelineWeeks[weekIndex];
+    return week
+      ? { weekNumber: week.week_number, startDate: week.startDate, endDate: week.endDate }
+      : undefined;
+  }, [selectedTimelineId, weekIndex, getWeekData, customTimelineWeeks]);
 
   const isValidDateString = (d?: string) => typeof d === 'string' && d !== 'null' && !isNaN(Date.parse(d));
   const safeParseDate = (d: string, context: string): Date | null => {
@@ -333,9 +343,13 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
   };
 
   const goNextWeek = () => {
-    console.log('goNextWeek called, current index:', selectedWeekIndex, 'max:', cycleWeeks.length - 1);
+    const maxIndex =
+      selectedTimelineId === 'twelve-week'
+        ? cycleWeeks.length - 1
+        : customTimelineWeeks.length - 1;
+    console.log('goNextWeek called, current index:', selectedWeekIndex, 'max:', maxIndex);
     setSelectedWeekIndex(prev => {
-      const newIndex = Math.min(cycleWeeks.length - 1, prev + 1);
+      const newIndex = Math.min(maxIndex, prev + 1);
       console.log('goNextWeek: changing from', prev, 'to', newIndex);
       return newIndex;
     });
@@ -799,26 +813,12 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
 
               <View style={styles.weekDisplay}>
                 <Text style={styles.weekNumber}>
-                  Week {(() => {
-                    if (selectedTimelineId === 'twelve-week') {
-                      return getWeekData(weekIndex)?.weekNumber || 1;
-                    } else {
-                      return customTimelineWeeks[weekIndex]?.week_number || 1;
-                    }
-                  })()}
+                  Week {weekData?.weekNumber ?? 1}
                 </Text>
                 <Text style={styles.weekDates}>
-                  {(() => {
-                    const weekData = selectedTimelineId === 'twelve-week'
-                      ? getWeekData(weekIndex)
-                      : customTimelineWeeks[weekIndex];
-                    if (!weekData) return '';
-                    const startDate = safeParseDate(weekData.startDate, 'week display start');
-                    const endDate = safeParseDate(weekData.endDate, 'week display end');
-                    if (!startDate || !endDate) return 'Invalid date';
-                    return safeFormatDateRange(weekData.startDate, weekData.endDate);
-
-                  })()}
+                  {weekData
+                    ? safeFormatDateRange(weekData.startDate, weekData.endDate, 'week display')
+                    : ''}
                 </Text>
               </View>
 
