@@ -11,7 +11,7 @@ import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { formatDateRange, parseLocalDate, formatLocalDate, safeFormatDateRange } from '@/lib/dateUtils';
+import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
 import { useGoals } from '@/hooks/useGoals';
 export default function Goals() { // Ensure this is the default export
@@ -67,6 +67,11 @@ export default function Goals() { // Ensure this is the default export
 
  const { width } = useWindowDimensions();
   const twoUp = Platform.OS === 'web' && width >= 768;
+
+  // Use current week index as a fallback before selectedWeekIndex is initialized
+  const weekIndex = selectedWeekIndex === -1
+    ? (selectedTimelineId === 'twelve-week' ? getCurrentWeekIndex() : 0)
+    : selectedWeekIndex;
 
   const isValidDateString = (d?: string) => typeof d === 'string' && d !== 'null' && !isNaN(Date.parse(d));
   const safeParseDate = (d: string, context: string): Date | null => {
@@ -161,9 +166,9 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
 
       // Use cycle weeks for 12-week timeline; use custom weeks otherwise
       const wk = selectedTimelineId === 'twelve-week'
-        ? getWeekData(selectedWeekIndex)
+        ? getWeekData(weekIndex)
         : (() => {
-            const w = customTimelineWeeks[selectedWeekIndex];
+            const w = customTimelineWeeks[weekIndex];
             if (!w) return null;
             return {
               weekNumber: w.week_number,
@@ -337,7 +342,7 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
   };
 
   const formatWeekHeader = () => {
-    const weekData = getWeekData(selectedWeekIndex);
+    const weekData = getWeekData(weekIndex);
     if (!weekData) return 'Week 1';
 
     const startDate = safeParseDate(weekData.startDate, 'formatWeekHeader start');
@@ -796,17 +801,17 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
                 <Text style={styles.weekNumber}>
                   Week {(() => {
                     if (selectedTimelineId === 'twelve-week') {
-                      return getWeekData(selectedWeekIndex)?.weekNumber || 1;
+                      return getWeekData(weekIndex)?.weekNumber || 1;
                     } else {
-                      return customTimelineWeeks[selectedWeekIndex]?.week_number || 1;
+                      return customTimelineWeeks[weekIndex]?.week_number || 1;
                     }
                   })()}
                 </Text>
                 <Text style={styles.weekDates}>
                   {(() => {
                     const weekData = selectedTimelineId === 'twelve-week'
-                      ? getWeekData(selectedWeekIndex)
-                      : customTimelineWeeks[selectedWeekIndex];
+                      ? getWeekData(weekIndex)
+                      : customTimelineWeeks[weekIndex];
                     if (!weekData) return '';
                     const startDate = safeParseDate(weekData.startDate, 'week display start');
                     const endDate = safeParseDate(weekData.endDate, 'week display end');
@@ -863,8 +868,8 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
             {twelveWeekGoals.map(goal => {
               const progress = goalProgress[goal.id];
               const weekData = selectedTimelineId === 'twelve-week' 
-                ? getWeekData(selectedWeekIndex)
-                : customTimelineWeeks[selectedWeekIndex];
+                ? getWeekData(weekIndex)
+                : customTimelineWeeks[weekIndex];
               const goalActions = weekGoalActions[goal.id] || [];
               if (!progress) return null;
 
@@ -903,7 +908,7 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
     const timeline = customTimelines.find(t => t.id === selectedTimelineId);
     if (!timeline) return null;
 
-    const weekData = customTimelineWeeks[selectedWeekIndex];
+    const weekData = customTimelineWeeks[weekIndex];
 
     return (
       <ScrollView style={styles.content}>
@@ -1007,11 +1012,11 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
 
               <View style={styles.weekDisplay}>
                 <Text style={styles.weekNumber}>
-                  Week {customTimelineWeeks[selectedWeekIndex]?.week_number || 1}
+                  Week {customTimelineWeeks[weekIndex]?.week_number || 1}
                 </Text>
                 <Text style={styles.weekDates}>
                   {(() => {
-                    const weekData = customTimelineWeeks[selectedWeekIndex];
+                    const weekData = customTimelineWeeks[weekIndex];
                     if (!weekData) return '';
                     const startDate = safeParseDate(weekData.startDate, 'custom timeline week start');
                     const endDate = safeParseDate(weekData.endDate, 'custom timeline week end');
@@ -1096,14 +1101,14 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
   }
 };
 
-  const currentWeek = getWeekData(selectedWeekIndex);
-  
+  const currentWeek = getWeekData(weekIndex);
+
   // Don't render week-dependent content until we have a valid week selection
-  if (selectedWeekIndex === -1 || !currentWeek) {
+  if (!currentWeek) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header 
-          title="Goal Bank" 
+        <Header
+          title="Goal Bank"
           authenticScore={authenticScore}
           daysRemaining={daysLeftData?.days_left}
           cycleProgressPercentage={daysLeftData?.pct_elapsed}
@@ -1296,8 +1301,8 @@ setSelectedWeekIndex(currentWeekIndex >= 0 ? currentWeekIndex : cycleWeeks.lengt
                     overallTarget: 0,
                     overallProgress: 0,
                   }}
-                  week={selectedTimelineId === 'twelve-week' ? getWeekData(selectedWeekIndex) : customTimelineWeeks[selectedWeekIndex]}
-                  selectedWeekNumber={selectedTimelineId === 'twelve-week' ? getWeekData(selectedWeekIndex)?.weekNumber : customTimelineWeeks[selectedWeekIndex]?.week_number}
+                  week={selectedTimelineId === 'twelve-week' ? getWeekData(weekIndex) : customTimelineWeeks[weekIndex]}
+                  selectedWeekNumber={selectedTimelineId === 'twelve-week' ? getWeekData(weekIndex)?.weekNumber : customTimelineWeeks[weekIndex]?.week_number}
                   weekActions={weekGoalActions[selectedGoalForModal.id] || []}
                   loadingWeekActions={loadingWeekActions}
                   onAddAction={() => {

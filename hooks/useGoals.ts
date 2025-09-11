@@ -59,8 +59,8 @@ export interface UserCycle {
 
 export interface CycleWeek {
   week_number: number;
-  start_date: string;
-  end_date: string;
+  week_start: string;
+  week_end: string;
   user_cycle_id: string;
 }
 
@@ -146,8 +146,8 @@ export async function fetchGoalActionsForWeek(
         w => w.week_number === weekNumber || (w as any).weekNumber === weekNumber
       );
 
-    const weekStartDate = (week as any)?.start_date ?? (week as any)?.startDate;
-    const weekEndDate = (week as any)?.end_date ?? (week as any)?.endDate;
+    const weekStartDate = (week as any)?.week_start ?? (week as any)?.startDate;
+    const weekEndDate = (week as any)?.week_end ?? (week as any)?.endDate;
     if (!weekStartDate || !weekEndDate) return {};
 
     const { data: goalJoins } = await supabase
@@ -337,8 +337,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
       // Map database columns to expected interface
       const mappedWeeks = (dbWeeks ?? []).map(week => ({
         week_number: week.week_number,
-        start_date: week.start_date,
-        end_date: week.end_date,
+        week_start: week.week_start,
+        week_end: week.week_end,
         user_cycle_id: week.user_cycle_id,
       }));
       
@@ -531,8 +531,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
             .select('*')
             .in('parent_task_id', taskIds)
             .eq('status', 'completed')
-            .gte('due_date', currentWeekData.start_date)
-            .lte('due_date', currentWeekData.end_date);
+            .gte('due_date', currentWeekData.week_start)
+            .lte('due_date', currentWeekData.week_end);
 
           weeklyActual = weeklyOccurrences?.length || 0;
         }
@@ -590,9 +590,10 @@ export function useGoals(options: UseGoalsOptions = {}) {
     
     const now = new Date();
     const currentDateString = formatLocalDate(now);
-    
-    const currentWeekData = cycleWeeks.find(week => 
-      currentDateString >= week.start_date && currentDateString <= week.end_date
+
+    const currentWeekData = cycleWeeks.find(
+      week =>
+        currentDateString >= week.week_start && currentDateString <= week.week_end
     );
     
     return currentWeekData?.week_number || 1;
@@ -604,14 +605,13 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   const getWeekData = (weekIndex: number): WeekData | null => {
-    const weekNumber = weekIndex + 1;
-    const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
-    if (!weekData) return null;
+    const week = cycleWeeks[weekIndex];
+    if (!week) return null;
 
     return {
-      weekNumber,
-      startDate: weekData.week_start,
-      endDate: weekData.week_end,
+      weekNumber: week.week_number,
+      startDate: week.week_start,
+      endDate: week.week_end,
     };
   };
 
