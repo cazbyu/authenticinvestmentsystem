@@ -769,8 +769,8 @@ if (currentDateString < firstWeek.week_start) {
 
       const wk = cycleWeeks.find(w => w.week_number === weekNumber);
       if (!wk) return [];
-      const weekStartISO = wk.start_date;
-      const weekEndISO   = wk.end_date;
+      const weekStartISO = wk.week_start;
+      const weekEndISO   = wk.week_end;
 
       // 2) Pull week plans for THIS week (parent task ids + targets)
       const { data: planned, error: planErr } = await supabase
