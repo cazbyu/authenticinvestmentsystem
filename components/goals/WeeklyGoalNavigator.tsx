@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { getSupabaseClient } from '@/lib/supabase';
+
+// Format a date to YYYY-MM-DD for Supabase
+const toDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 // Helper to get Monday as the start of the week
 function startOfWeek(date: Date): Date {
@@ -20,7 +30,19 @@ function addDays(date: Date, amount: number): Date {
 }
 
 export function WeeklyGoalNavigator() {
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const router = useRouter();
+  const params = useLocalSearchParams<{ date?: string }>();
+
+  // Use raw date from params or today's date if none provided
+  const baseDate = useMemo(() => {
+    if (typeof params.date === 'string') {
+      const parsed = new Date(params.date);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    return new Date();
+  }, [params.date]);
+
+  const [weekStart, setWeekStart] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,12 +50,22 @@ export function WeeklyGoalNavigator() {
     const fetchCurrentWeek = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/current-week');
-        if (!res.ok) throw new Error('Failed to fetch current week');
-        const data = await res.json();
-        setWeekStart(new Date(data.start));
+        const supabase = getSupabaseClient();
+        const { data: weekData, error: weekError } = await supabase
+          .from('v_user_cycle_weeks')
+          .select('start_date, end_date')
+          .lte('start_date', toDateString(baseDate))
+          .gte('end_date', toDateString(baseDate))
+          .single();
+
+        if (weekError || !weekData) {
+          throw weekError || new Error('Week not found');
+        }
+
+        setWeekStart(new Date(weekData.start_date));
         setError(null);
-      } catch (err) {
+      } catch {
+        setWeekStart(startOfWeek(baseDate));
         setError('Unable to load current week.');
       } finally {
         setLoading(false);
@@ -41,20 +73,33 @@ export function WeeklyGoalNavigator() {
     };
 
     fetchCurrentWeek();
-  }, []);
+  }, [baseDate]);
 
-  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekEnd = useMemo(() => (weekStart ? addDays(weekStart, 6) : null), [weekStart]);
   const weekLabel = useMemo(() => {
+    if (!weekStart || !weekEnd) return '';
     const options = { month: 'long', day: 'numeric' } as const;
     return `${weekStart.toLocaleDateString('en-US', options)} - ${weekEnd.toLocaleDateString('en-US', options)}`;
   }, [weekStart, weekEnd]);
 
   const days = useMemo(() => {
+    if (!weekStart) return [] as Date[];
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [weekStart]);
 
-  const goToPreviousWeek = () => setWeekStart(addDays(weekStart, -7));
-  const goToNextWeek = () => setWeekStart(addDays(weekStart, 7));
+  const goToPreviousWeek = () => {
+    if (!weekStart) return;
+    const newStart = addDays(weekStart, -7);
+    setWeekStart(newStart);
+    router.setParams({ date: toDateString(newStart) });
+  };
+
+  const goToNextWeek = () => {
+    if (!weekStart) return;
+    const newStart = addDays(weekStart, 7);
+    setWeekStart(newStart);
+    router.setParams({ date: toDateString(newStart) });
+  };
 
   if (loading) {
     return (
