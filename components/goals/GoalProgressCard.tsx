@@ -54,18 +54,6 @@ export function GoalProgressCard({
   compact = false,
   selectedWeekNumber
 }: GoalProgressCardProps) {
-  // Provide default values for progress if undefined
-  const safeProgress = progress ?? {
-    goalId: goal.id,
-    currentWeek: 1,
-    daysRemaining: 0,
-    weeklyActual: 0,
-    weeklyTarget: 0,
-    overallActual: 0,
-    overallTarget: 0,
-    overallProgress: 0,
-  };
-
   const getProgressColor = (percentage: number) => {
     if (percentage >= 85) return '#16a34a'; // Green for 85% and above
     if (percentage >= 60) return '#eab308';
@@ -105,7 +93,7 @@ export function GoalProgressCard({
       const totalWeeks = Math.ceil(totalDays / 7);
       return `${totalWeeks}-Week Custom Goal`;
     }
-    return `Week ${selectedWeekNumber || safeProgress.currentWeek}`;
+    return `Week ${selectedWeekNumber || progress.currentWeek}`;
   };
   const primaryRole = goal.roles?.[0]; // Used for card color
   const cardColor = primaryRole?.color || '#0078d4';
@@ -144,7 +132,7 @@ export function GoalProgressCard({
 
   const calculateWeeklyProgress = () => {
     if (!week || weekActions.length === 0) {
-      return { actual: safeProgress.weeklyActual, target: safeProgress.weeklyTarget };
+      return { actual: progress.weeklyActual, target: progress.weeklyTarget };
     }
     
     const totalActual = weekActions.reduce((sum, action) => sum + Math.min(action.weeklyActual, action.weeklyTarget), 0);
@@ -177,12 +165,12 @@ export function GoalProgressCard({
           
           <View style={styles.compactMetrics}>
             <View style={styles.compactMetric}>
-              <Text style={styles.compactMetricLabel}>Week {selectedWeekNumber || safeProgress.currentWeek}</Text>
+              <Text style={styles.compactMetricLabel}>Week {selectedWeekNumber || progress.currentWeek}</Text>
               <Text style={[
                 styles.compactMetricValue,
-                { color: getWeeklyProgressColor(safeProgress.weeklyActual, safeProgress.weeklyTarget) }
+                { color: getWeeklyProgressColor(progress.weeklyActual, progress.weeklyTarget) }
               ]}>
-                {formatWeeklyProgress(safeProgress.weeklyActual, safeProgress.weeklyTarget)}
+                {formatWeeklyProgress(progress.weeklyActual, progress.weeklyTarget)}
               </Text>
             </View>
             
@@ -190,9 +178,9 @@ export function GoalProgressCard({
               <Text style={styles.compactMetricLabel}>Overall</Text>
               <Text style={[
                 styles.compactMetricValue,
-                { color: getProgressColor(safeProgress.overallProgress) }
+                { color: getProgressColor(progress.overallProgress) }
               ]}>
-                {safeProgress.overallProgress}%
+                {progress.overallProgress}%
               </Text>
             </View>
           </View>
@@ -235,9 +223,9 @@ export function GoalProgressCard({
           <View style={styles.goalTotalScore}>
             <Text style={[
               styles.goalTotalScoreText,
-              { color: getProgressColor(safeProgress.overallProgress) }
+              { color: getProgressColor(progress.overallProgress) }
             ]}>
-              Total {safeProgress.overallProgress}%
+              Total {progress.overallProgress}%
             </Text>
           </View>
           
