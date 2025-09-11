@@ -37,8 +37,8 @@ interface Domain {
 
 interface CycleWeek {
   week_number: number;
-  start_date: string;
-  end_date: string;
+  week_start: string;
+  week_end: string;
 }
 
 interface CreateGoalModalProps {

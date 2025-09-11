@@ -537,11 +537,11 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
   .select('*')
   .in('task_id', taskIds);
 
-      if (isValidISODate(weekData.start_date)) {
-        weeklyQuery = weeklyQuery.gte('measured_on', weekData.start_date);
+      if (isValidISODate(weekData.week_start)) {
+        weeklyQuery = weeklyQuery.gte('measured_on', weekData.week_start);
       }
-      if (isValidISODate(weekData.end_date)) {
-        weeklyQuery = weeklyQuery.lte('measured_on', weekData.end_date);
+      if (isValidISODate(weekData.week_end)) {
+        weeklyQuery = weeklyQuery.lte('measured_on', weekData.week_end);
       }
 
       const { data: taskLogsData, error: taskLogsError } = await weeklyQuery;
@@ -621,19 +621,19 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
           let weeklyQuery = supabase
             .from('0008-ap-tasks')
             .select('*')
-            .in('parent_task_id', taskIds)
-            .eq('status', 'completed');
+          .in('parent_task_id', taskIds)
+          .eq('status', 'completed');
 
-          if (isValidISODate(currentWeekData.start_date)) {
-            weeklyQuery = weeklyQuery.gte('due_date', currentWeekData.start_date);
-          }
-          if (isValidISODate(currentWeekData.end_date)) {
-            weeklyQuery = weeklyQuery.lte('due_date', currentWeekData.end_date);
-          }
+        if (isValidISODate(currentWeekData.week_start)) {
+          weeklyQuery = weeklyQuery.gte('due_date', currentWeekData.week_start);
+        }
+        if (isValidISODate(currentWeekData.week_end)) {
+          weeklyQuery = weeklyQuery.lte('due_date', currentWeekData.week_end);
+        }
 
-          const { data: weeklyOccurrences } = await weeklyQuery;
+        const { data: weeklyOccurrences } = await weeklyQuery;
 
-          weeklyActual = weeklyOccurrences?.length || 0;
+        weeklyActual = weeklyOccurrences?.length || 0;
         }
 
         // Fetch completed occurrences for entire cycle
