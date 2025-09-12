@@ -13,7 +13,7 @@ import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomT
 import { Plus, Target, Calendar, ChevronLeft, ChevronRight, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { formatDateRange, parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
-import { useGoals } from '@/hooks/useGoals';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 export default function Goals() { // Ensure this is the default export
   const [authenticScore, setAuthenticScore] = useState(0);
   const [taskFormVisible, setTaskFormVisible] = useState(false);
@@ -49,7 +49,7 @@ export default function Goals() { // Ensure this is the default export
     getWeekData,
     weekGoalActions,
     setWeekGoalActions,
-  } = useGoals();
+  } = useGoalProgress();
 
   const [editingCycle, setEditingCycle] = useState<any>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(-1); // -1 indicates not yet initialized
