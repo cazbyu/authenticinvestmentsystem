@@ -162,7 +162,7 @@ export default function Goals() { // Ensure this is the default export
       ? cycleWeeks.length > 0
       : customTimelineWeeks.length > 0;
 
-  if (allGoals.length > 0 && hasWeeks) {
+  if (Array.isArray(allGoals) && allGoals.length > 0 && hasWeeks) {
     fetchWeekActions();
   }
 }, [selectedTimelineId, selectedWeekIndex, allGoals, cycleWeeks, customTimelineWeeks]);
