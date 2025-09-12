@@ -600,24 +600,26 @@ export function useGoals(options: UseGoalsOptions = {}) {
   }, [currentCycle, cycleWeeks]);
 
   const getCurrentWeekIndex = useCallback((): number => {
-    if (cycleWeeks.length === 0) return -1;
+  if (!cycleWeeks || cycleWeeks.length === 0) return -1;
 
-    const now = new Date();
-    const currentDateString = formatLocalDate(now);
+  // Normalize today's date to YYYY-MM-DD (same format as DB)
+  const today = new Date().toISOString().slice(0, 10);
 
-    const index = cycleWeeks.findIndex(
-      w => currentDateString >= w.week_start && currentDateString <= w.week_end
-    );
+  // Find the week containing today
+  const index = cycleWeeks.findIndex(
+    w => today >= w.week_start && today <= w.week_end
+  );
 
-    if (index !== -1) return index;
+  if (index !== -1) return index;
 
-    const firstWeek = cycleWeeks[0];
-    const lastWeek = cycleWeeks[cycleWeeks.length - 1];
-    if (currentDateString < firstWeek.week_start) return 0;
-    if (currentDateString > lastWeek.week_end) return cycleWeeks.length - 1;
+  // Fallbacks: before first week → index 0, after last week → last index
+  const firstWeek = cycleWeeks[0];
+  const lastWeek = cycleWeeks[cycleWeeks.length - 1];
+  if (today < firstWeek.week_start) return 0;
+  if (today > lastWeek.week_end) return cycleWeeks.length - 1;
 
-    return -1;
-  }, [cycleWeeks]);
+  return -1;
+}, [cycleWeeks]);
 
   const getWeekData = useCallback((weekIndex: number): WeekData | null => {
     const week = cycleWeeks[weekIndex];
