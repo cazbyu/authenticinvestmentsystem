@@ -138,6 +138,13 @@ export default function Goals() { // Ensure this is the default export
     fetchCustomTimelines();
   }, []);
 
+// Ensure 12-week cycle is shown by default if one exists
+useEffect(() => {
+  if (currentCycle && !selectedTimelineId) {
+    setSelectedTimelineId("twelve-week");
+  }
+}, [currentCycle, selectedTimelineId]);
+  
   // Initialize selected week to current week (for both cycle and custom timelines)
   useEffect(() => {
     if (selectedTimelineId === 'twelve-week' && cycleWeeks.length > 0) {
