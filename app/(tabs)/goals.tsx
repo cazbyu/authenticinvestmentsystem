@@ -48,6 +48,7 @@ export default function Goals() {
   const [allTimelines, setAllTimelines] = useState<Timeline[]>([]);
   const [timelineWeeks, setTimelineWeeks] = useState<any[]>([]);
   const [timelineDaysLeft, setTimelineDaysLeft] = useState<any>(null);
+  const [timelinesWithGoals, setTimelinesWithGoals] = useState<any[]>([]);
   
   // Refs for initialization
   const initializedWeekRef = useRef(false);
@@ -219,18 +220,77 @@ export default function Goals() {
       }
 
       setAllTimelines(timelines);
-
-      // Auto-select current cycle if no timeline is selected
-      if (!selectedTimeline && currentCycle) {
-        const cycleTimeline = timelines.find(t => t.source === 'cycle');
-        if (cycleTimeline) {
-          setSelectedTimeline(cycleTimeline);
-        }
-      }
+      
+      // Fetch goal counts for each timeline
+      await fetchTimelinesWithGoalCounts(timelines);
 
     } catch (error) {
       console.error('Error fetching timelines:', error);
       Alert.alert('Error', (error as Error).message);
+    }
+  };
+
+  const fetchTimelinesWithGoalCounts = async (timelines: Timeline[]) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const timelinesWithCounts = await Promise.all(
+        timelines.map(async (timeline) => {
+          let goalCount = 0;
+          let daysRemaining = 0;
+
+          // Calculate days remaining
+          if (timeline.start_date && timeline.end_date) {
+            const now = new Date();
+            const endDate = new Date(timeline.end_date);
+            daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+          }
+
+          // Get goal count based on timeline source
+          if (timeline.source === 'cycle') {
+            // Count 12-week goals for this cycle
+            const { data: cycleGoals, error } = await supabase
+              .from('0008-ap-goals-12wk')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('user_cycle_id', timeline.id)
+              .eq('status', 'active');
+
+            if (!error) {
+              goalCount = cycleGoals?.length || 0;
+            }
+          } else if (timeline.source === 'custom') {
+            // Count custom goals for this timeline
+            const { data: customGoals, error } = await supabase
+              .from('0008-ap-goals-custom')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('custom_timeline_id', timeline.id)
+              .eq('status', 'active');
+
+            if (!error) {
+              goalCount = customGoals?.length || 0;
+            }
+          } else if (timeline.source === 'global') {
+            // Count goals linked to this global timeline
+            // This would require additional schema changes to link goals to global timelines
+            // For now, we'll show 0 goals for global timelines
+            goalCount = 0;
+          }
+
+          return {
+            ...timeline,
+            goalCount,
+            daysRemaining,
+          };
+        })
+      );
+
+      setTimelinesWithGoals(timelinesWithCounts);
+    } catch (error) {
+      console.error('Error fetching timeline goal counts:', error);
     }
   };
 
@@ -511,6 +571,61 @@ export default function Goals() {
     }
   };
 
+  const formatDateRange = (startDate: string, endDate: string) => {
+    try {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+      const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+      
+      if (start.getFullYear() === end.getFullYear()) {
+        if (start.getMonth() === end.getMonth()) {
+          return `${start.getDate()} - ${end.getDate()} ${startMonth} ${start.getFullYear()}`;
+        } else {
+          return `${start.getDate()} ${startMonth} - ${end.getDate()} ${endMonth} ${start.getFullYear()}`;
+        }
+      } else {
+        return `${start.getDate()} ${startMonth} ${start.getFullYear()} - ${end.getDate()} ${endMonth} ${end.getFullYear()}`;
+      }
+    } catch (error) {
+      return 'Invalid date range';
+    }
+  };
+
+  const getTimelineTypeLabel = (timeline: any) => {
+    if (timeline.source === 'cycle') {
+      return '12-Week Cycle';
+    } else if (timeline.source === 'custom') {
+      switch (timeline.timeline_type) {
+        case 'project': return 'Project Timeline';
+        case 'challenge': return 'Challenge Timeline';
+        case 'cycle': return 'Custom Cycle';
+        default: return 'Custom Timeline';
+      }
+    } else if (timeline.source === 'global') {
+      return 'Global Timeline';
+    }
+    return 'Timeline';
+  };
+
+  const getTimelineColor = (timeline: any) => {
+    if (timeline.source === 'cycle') {
+      return '#0078d4';
+    } else if (timeline.source === 'custom') {
+      return '#7c3aed';
+    } else if (timeline.source === 'global') {
+      return '#059669';
+    }
+    return '#6b7280';
+  };
+
+  const handleTimelinePress = (timeline: any) => {
+    setSelectedTimeline(timeline);
+    setCurrentWeekIndex(0);
+    initializedWeekRef.current = false;
+  };
+
   const renderTimelineSelector = () => {
     const cycleTimelines = allTimelines.filter(t => t.source === 'cycle');
     const customTimelines = allTimelines.filter(t => t.source === 'custom');
@@ -713,25 +828,150 @@ export default function Goals() {
 
       {/* Goals List */}
       <ScrollView style={styles.content}>
-        {loading ? (
+        {!selectedTimeline ? (
+          // Show timeline containers when no timeline is selected
+          <View style={styles.timelinesContainer}>
+            <View style={styles.timelinesHeader}>
+              <Text style={styles.timelinesTitle}>Active Timelines</Text>
+              <Text style={styles.timelinesSubtitle}>
+                Select a timeline to view and manage your goals
+              </Text>
+            </View>
+
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0078d4" />
+                <Text style={styles.loadingText}>Loading timelines...</Text>
+              </View>
+            ) : timelinesWithGoals.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Target size={64} color="#6b7280" />
+                <Text style={styles.emptyTitle}>No Active Timelines</Text>
+                <Text style={styles.emptyText}>
+                  Create a timeline to start tracking your goals
+                </Text>
+                <View style={styles.createTimelineButtons}>
+                  <TouchableOpacity
+                    style={styles.createCycleButton}
+                    onPress={() => setCycleSetupModalVisible(true)}
+                  >
+                    <Calendar size={20} color="#ffffff" />
+                    <Text style={styles.createCycleButtonText}>Start 12-Week Cycle</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.createCustomButton}
+                    onPress={() => setManageCustomTimelinesModalVisible(true)}
+                  >
+                    <Target size={20} color="#ffffff" />
+                    <Text style={styles.createCustomButtonText}>Create Custom Timeline</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.timelinesList}>
+                {timelinesWithGoals.map(timeline => (
+                  <TouchableOpacity
+                    key={timeline.id}
+                    style={[
+                      styles.timelineContainer,
+                      { borderLeftColor: getTimelineColor(timeline) }
+                    ]}
+                    onPress={() => handleTimelinePress(timeline)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.timelineContainerContent}>
+                      <View style={styles.timelineContainerHeader}>
+                        <View style={styles.timelineContainerInfo}>
+                          <Text style={styles.timelineContainerTitle}>
+                            {timeline.title}
+                          </Text>
+                          <Text style={styles.timelineContainerType}>
+                            {getTimelineTypeLabel(timeline)}
+                          </Text>
+                        </View>
+                        
+                        <View style={styles.timelineContainerStats}>
+                          <Text style={styles.timelineContainerGoalCount}>
+                            {timeline.goalCount} goal{timeline.goalCount !== 1 ? 's' : ''}
+                          </Text>
+                          <Text style={[
+                            styles.timelineContainerDaysRemaining,
+                            { color: timeline.daysRemaining <= 7 ? '#dc2626' : '#6b7280' }
+                          ]}>
+                            {timeline.daysRemaining} days left
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      {timeline.start_date && timeline.end_date && (
+                        <Text style={styles.timelineContainerDates}>
+                          {formatDateRange(timeline.start_date, timeline.end_date)}
+                        </Text>
+                      )}
+                      
+                      {/* Progress bar */}
+                      <View style={styles.timelineContainerProgress}>
+                        <View style={styles.timelineProgressBar}>
+                          <View
+                            style={[
+                              styles.timelineProgressFill,
+                              {
+                                width: `${(() => {
+                                  if (!timeline.start_date || !timeline.end_date) return 0;
+                                  const start = new Date(timeline.start_date);
+                                  const end = new Date(timeline.end_date);
+                                  const now = new Date();
+                                  const total = end.getTime() - start.getTime();
+                                  const elapsed = now.getTime() - start.getTime();
+                                  return Math.min(100, Math.max(0, (elapsed / total) * 100));
+                                })()}%`,
+                                backgroundColor: getTimelineColor(timeline),
+                              }
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                
+                {/* Add Timeline Buttons */}
+                <View style={styles.addTimelineSection}>
+                  <Text style={styles.addTimelineTitle}>Add Timeline</Text>
+                  <View style={styles.addTimelineButtons}>
+                    <TouchableOpacity
+                      style={styles.addCycleButton}
+                      onPress={() => setCycleSetupModalVisible(true)}
+                    >
+                      <Calendar size={16} color="#0078d4" />
+                      <Text style={styles.addCycleButtonText}>12-Week Cycle</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.addCustomTimelineButton}
+                      onPress={() => setManageCustomTimelinesModalVisible(true)}
+                    >
+                      <Target size={16} color="#7c3aed" />
+                      <Text style={styles.addCustomTimelineButtonText}>Custom Timeline</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={styles.addGlobalTimelineButton}
+                      onPress={() => setManageGlobalTimelinesModalVisible(true)}
+                    >
+                      <Users size={16} color="#059669" />
+                      <Text style={styles.addGlobalTimelineButtonText}>Global Timeline</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+        ) : loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#0078d4" />
             <Text style={styles.loadingText}>Loading goals...</Text>
-          </View>
-        ) : !selectedTimeline ? (
-          <View style={styles.emptyContainer}>
-            <Target size={64} color="#6b7280" />
-            <Text style={styles.emptyTitle}>Select a Timeline</Text>
-            <Text style={styles.emptyText}>
-              Choose a timeline to view and manage your goals
-            </Text>
-            <TouchableOpacity
-              style={styles.selectTimelineButton}
-              onPress={() => setTimelineSelectorVisible(true)}
-            >
-              <Calendar size={20} color="#ffffff" />
-              <Text style={styles.selectTimelineButtonText}>Select Timeline</Text>
-            </TouchableOpacity>
           </View>
         ) : allGoals.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -750,6 +990,15 @@ export default function Goals() {
           </View>
         ) : (
           <View style={styles.goalsList}>
+            {/* Back to Timelines Button */}
+            <TouchableOpacity
+              style={styles.backToTimelinesButton}
+              onPress={() => setSelectedTimeline(null)}
+            >
+              <ChevronLeft size={20} color="#0078d4" />
+              <Text style={styles.backToTimelinesButtonText}>Back to Timelines</Text>
+            </TouchableOpacity>
+            
             {allGoals.map(goal => {
               const progress = goalProgress[goal.id];
               const safeProgress = progress || {
@@ -1158,5 +1407,214 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0078d4',
+  },
+  timelinesContainer: {
+    flex: 1,
+  },
+  timelinesHeader: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  timelinesTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  timelinesSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  timelinesList: {
+    padding: 16,
+    gap: 16,
+  },
+  timelineContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  timelineContainerContent: {
+    flex: 1,
+  },
+  timelineContainerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  timelineContainerInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  timelineContainerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  timelineContainerType: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  timelineContainerStats: {
+    alignItems: 'flex-end',
+  },
+  timelineContainerGoalCount: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  timelineContainerDaysRemaining: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  timelineContainerDates: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  timelineContainerProgress: {
+    marginTop: 8,
+  },
+  timelineProgressBar: {
+    height: 6,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  timelineProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  addTimelineSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  addTimelineTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  addTimelineButtons: {
+    gap: 8,
+  },
+  addCycleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  addCycleButtonText: {
+    color: '#0078d4',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addCustomTimelineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#faf5ff',
+    borderWidth: 1,
+    borderColor: '#7c3aed',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  addCustomTimelineButtonText: {
+    color: '#7c3aed',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addGlobalTimelineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  addGlobalTimelineButtonText: {
+    color: '#059669',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  createTimelineButtons: {
+    gap: 12,
+    width: '100%',
+  },
+  createCycleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+    justifyContent: 'center',
+  },
+  createCycleButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  createCustomButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7c3aed',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+    justifyContent: 'center',
+  },
+  createCustomButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  backToTimelinesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
+  },
+  backToTimelinesButtonText: {
+    color: '#0078d4',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
