@@ -145,9 +145,6 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     } catch (error) {
       console.error('Error fetching available global cycles:', error);
       Alert.alert('Error', (error as Error).message);
-  };
-      console.error('Error fetching available global cycles:', error);
-      Alert.alert('Error', (error as Error).message);
     }
   };
 
