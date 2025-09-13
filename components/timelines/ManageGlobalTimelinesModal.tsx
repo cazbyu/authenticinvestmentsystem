@@ -146,7 +146,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       console.error('Error fetching available global cycles:', error);
       Alert.alert('Error', (error as Error).message);
     }
-    catch (error) {
+  };
 
   const resetForm = () => {
     setFormData({
