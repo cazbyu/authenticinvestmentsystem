@@ -437,6 +437,7 @@ useEffect(() => {
   useEffect(() => {
     calculateAuthenticScore();
     refreshAllData();
+    fetchAllTimelines();
   }, []);
 
   // Auto-refresh days left data at midnight
@@ -1317,7 +1318,7 @@ useEffect(() => {
                 />
               </View>
             )}
-          </ScrollView>
+  source: 'custom' | 'global' | 'cycle';
         </View>
       </Modal>
     </SafeAreaView>
