@@ -47,12 +47,68 @@ export interface TwelveWeekGoal {
   start_date?: string;
   end_date?: string;
   user_cycle_id?: string;
+  custom_timeline_id?: string;
+  user_global_timeline_id?: string;
   created_at: string;
   updated_at: string;
   domains?: Array<{ id: string; name: string }>;
   roles?: Array<{ id: string; label: string; color?: string }>;
   keyRelationships?: Array<{ id: string; name: string }>;
   notes?: Array<{ content: string; created_at: string }>;
+}
+
+export interface CustomGoal {
+  id: string;
+  title: string;
+  description?: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  progress: number;
+  created_at: string;
+  updated_at: string;
+  domains?: Array<{ id: string; name: string }>;
+  roles?: Array<{ id: string; label: string; color?: string }>;
+  keyRelationships?: Array<{ id: string; name: string }>;
+  notes?: Array<{ content: string; created_at: string }>;
+  custom_timeline_id?: string;
+  user_global_timeline_id?: string;
+}
+
+export interface CustomTimeline {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  timeline_type: 'custom' | 'cycle' | 'project' | 'challenge';
+}
+
+export interface UserGlobalTimeline {
+  id: string;
+  user_id: string;
+  global_cycle_id: string;
+  title?: string;
+  description?: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  week_start_day: string;
+  timezone: string;
+  created_at: string;
+  updated_at: string;
+  global_cycle?: {
+    id: string;
+    title?: string;
+    cycle_label?: string;
+    start_date: string;
+    end_date: string;
+    is_active: boolean;
+  };
 }
 
 export interface UserCycle {
@@ -150,6 +206,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [goals, setGoals] = useState<UnifiedGoal[]>([]);
   const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
   const [availableTimelines, setAvailableTimelines] = useState<Timeline[]>([]);
+  const [customTimelines, setCustomTimelines] = useState<CustomTimeline[]>([]);
+  const [globalTimelines, setGlobalTimelines] = useState<UserGlobalTimeline[]>([]);
+  const [allTimelines, setAllTimelines] = useState<(CustomTimeline | UserGlobalTimeline)[]>([]);
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [daysLeftData, setDaysLeftData] = useState<DaysLeftData | null>(null);
   const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgress>>({});
@@ -170,6 +229,68 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     if (task.is_twelve_week_goal) points += 2;
     return Math.round(points * 10) / 10;
   };
+
+  const fetchCustomTimelines = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-custom-timelines')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCustomTimelines(data || []);
+    } catch (error) {
+      console.error('Error fetching custom timelines:', error);
+    }
+  };
+
+  const fetchGlobalTimelines = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-user-global-timelines')
+        .select(`
+          *,
+          global_cycle:0008-ap-global-cycles(
+            id,
+            title,
+            cycle_label,
+            start_date,
+            end_date,
+            is_active
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setGlobalTimelines(data || []);
+    } catch (error) {
+      console.error('Error fetching global timelines:', error);
+    }
+  };
+
+  const fetchAllTimelines = async () => {
+    await Promise.all([
+      fetchCustomTimelines(),
+      fetchGlobalTimelines()
+    ]);
+  };
+
+  useEffect(() => {
+    // Update combined timelines when individual arrays change
+    setAllTimelines([...customTimelines, ...globalTimelines]);
+  }, [customTimelines, globalTimelines]);
 
   const fetchAvailableTimelines = async () => {
   try {
@@ -1040,6 +1161,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
     try {
       // Fetch available timelines and capture the returned timeline directly
       const timeline = await fetchAvailableTimelines();
+      await fetchAllTimelines();
       console.log('Timeline returned from fetchAvailableTimelines:', timeline);
       
       if (!timeline) {
@@ -1541,6 +1663,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
     refreshAllData,
     fetchTasksAndPlansForWeek,
     fetchGoalActionsForWeek,
+    fetchAllTimelines,
     toggleTaskDay,
     completeActionSuggestion,
     undoActionOccurrence,       // <-- add this export
@@ -1554,5 +1677,10 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
     getWeekData,
     weekGoalActions,
     setWeekGoalActions,
+    customTimelines,
+    globalTimelines,
+    allTimelines,
+    fetchCustomTimelines,
+    fetchGlobalTimelines,
   };
 }
