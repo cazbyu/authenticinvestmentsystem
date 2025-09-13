@@ -133,28 +133,18 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       const supabase = getSupabaseClient();
       
       // Fetch all active global cycles
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get user's existing global timeline connections
-      const { data: userTimelines } = await supabase
-        .from('0008-ap-user-global-timelines')
-        .select('global_cycle_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active');
-
-      const connectedCycleIds = userTimelines?.map(ut => ut.global_cycle_id) || [];
-
-      const { data, error } = await supabase
+      const { data: cycleData, error } = await supabase
         .from('0008-ap-global-cycles')
         .select('*')
         .eq('is_active', true)
-        .not('id', 'in', `(${connectedCycleIds.join(',') || 'null'})`)
-        .limit(4)
         .order('start_date', { ascending: false });
 
       if (error) throw error;
 
+      setAvailableGlobalCycles(cycleData || []);
+    } catch (error) {
+      console.error('Error fetching available global cycles:', error);
+      Alert.alert('Error', (error as Error).message);
     }
   };
 
@@ -943,6 +933,17 @@ const styles = StyleSheet.create({
   },
   activeWeekStartOptionText: {
     color: '#ffffff',
+  },
+  connectButton: {
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  connectButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
