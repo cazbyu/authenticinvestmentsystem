@@ -752,13 +752,21 @@ export default function Goals() {
           <View style={styles.goalsList}>
             {allGoals.map(goal => {
               const progress = goalProgress[goal.id];
+              const safeProgress = progress || {
+                weeklyActual: 0,
+                weeklyTarget: 0,
+                overallActual: 0,
+                overallTarget: 0,
+                weeklyProgress: 0,
+                overallProgress: 0
+              };
               const weekActions = weekGoalActions[goal.id] || [];
               
               return (
                 <GoalProgressCard
                   key={goal.id}
                   goal={goal}
-                  progress={progress}
+                  progress={safeProgress}
                   expanded={true}
                   week={currentWeek}
                   weekActions={weekActions}
