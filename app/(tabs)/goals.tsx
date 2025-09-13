@@ -51,6 +51,8 @@ export default function Goals() { // Ensure this is the default export
     setWeekGoalActions,
   } = useGoalProgress();
 
+  console.log("DEBUG: currentCycle from useGoalProgress", currentCycle);
+
   const [editingCycle, setEditingCycle] = useState<any>(null);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(-1); // -1 indicates not yet initialized
   const [goalsExpanded, setGoalsExpanded] = useState(true);
