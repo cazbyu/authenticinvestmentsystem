@@ -5,7 +5,7 @@ import { Header } from '@/components/Header';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
-import { ActionEffortModal } from '@/components/goals/ActionEffortModal';
+import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { ManageGlobalTimelinesModal } from '@/components/timelines/ManageGlobalTimelinesModal';
