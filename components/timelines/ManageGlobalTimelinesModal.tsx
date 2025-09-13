@@ -147,6 +147,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       Alert.alert('Error', (error as Error).message);
     }
   };
+  };
 
   const resetForm = () => {
     setFormData({
