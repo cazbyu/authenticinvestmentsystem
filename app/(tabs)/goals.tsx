@@ -136,6 +136,10 @@ export default function Goals() { // Ensure this is the default export
     }
   };
 
+  const fetchAllTimelines = async () => {
+    await fetchCustomTimelines();
+  };
+
   useEffect(() => {
     fetchCustomTimelines();
   }, []);
@@ -1318,7 +1322,7 @@ useEffect(() => {
                 />
               </View>
             )}
-  source: 'custom' | 'global' | 'cycle';
+          </ScrollView>
         </View>
       </Modal>
     </SafeAreaView>
