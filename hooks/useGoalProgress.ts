@@ -283,7 +283,6 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   currentCycle.week_start_day || 'monday',
   currentCycle.end_date || undefined
 ).map(week => ({
-
             week_number: week.week_number,
             week_start: week.start_date,
             week_end: week.end_date,
@@ -306,14 +305,12 @@ const expectedWeek1Start = generateCycleWeeks(
 )[0];
 
 if (week1.week_start !== expectedWeek1Start.start_date) {
-
           console.warn('Week alignment mismatch, using client-side calculation');
           const clientWeeks = generateCycleWeeks(
   currentCycle.start_date!,
   currentCycle.week_start_day || 'monday',
   currentCycle.end_date || undefined
 ).map(week => ({
-
             week_number: week.week_number,
             week_start: week.start_date,
             week_end: week.end_date,
@@ -709,7 +706,6 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
       week.week_end &&
       currentDateString >= week.week_start &&
       currentDateString <= week.week_end
-
   );
 
   if (currentWeekData) {
@@ -860,25 +856,14 @@ if (currentDateString < firstWeek.week_start) {
       const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
       if (taskIds.length === 0) return {};
 
-      if (!currentCycle) {
-        console.log('No current cycle provided to fetchGoals');
-        setTwelveWeekGoals([]);
-        setCustomGoals([]);
-        setAllGoals([]);
-        setGoalProgress({});
-        return;
-      }
-
-      console.log('Using cycle ID for queries:', currentCycle.id);
-
       // Fetch tasks for this user cycle
       console.log('=== 12-WEEK GOALS QUERY DEBUG START ===');
       console.log('Query parameters:');
       console.log('- user_id:', user.id);
-      console.log('- user_cycle_id:', currentCycle.id);
+      console.log('- user_cycle_id:', selectedTimeline?.id);
       console.log('- status: active');
       
-      const { data: twelveWeekData, error: twelveWeekError } = await supabase
+      const { data: tasksData, error: tasksError } = await supabase
         .from('0008-ap-tasks')
         .select('*')
         .eq('user_id', user.id)
@@ -1296,23 +1281,15 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
     description?: string;
     start_date?: string;
     end_date?: string;
+  }): Promise<UnifiedGoal | null> => {
+    try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !selectedTimeline) return null;
       
-      // Determine timeline association
-      let timelineData = {};
-      if (options.selectedTimeline) {
-        if (options.selectedTimeline.source === 'custom') {
-          timelineData = { custom_timeline_id: options.selectedTimeline.id };
-        } else if (options.selectedTimeline.source === 'global') {
-          timelineData = { user_global_timeline_id: options.selectedTimeline.id };
-        }
-      }
-
       // Use timeline dates if not provided
-      const startDate = goalData.start_date || options.selectedTimeline?.start_date;
-      const endDate = goalData.end_date || options.selectedTimeline?.end_date;
+      const startDate = goalData.start_date || selectedTimeline?.start_date;
+      const endDate = goalData.end_date || selectedTimeline?.end_date;
 
       if (!startDate || !endDate) {
         throw new Error('Start date and end date are required for custom goals');
@@ -1326,10 +1303,8 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
           title: goalData.title,
           start_date: startDate,
           end_date: endDate,
-          end_date: selectedTimeline.end_date,
           status: 'active',
           progress: 0,
-          ...timelineData,
         })
         .select()
         .single();
