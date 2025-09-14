@@ -314,7 +314,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
             week_number: week.week_number,
             week_start: week.start_date,
             week_end: week.end_date,
-            user_cycle_id: currentCycle.id,
+            user_global_timeline_id: currentCycle.id,
           }));
           console.log('Using client-side calculation due to alignment mismatch:', clientWeeks);
           setCycleWeeks(clientWeeks);
