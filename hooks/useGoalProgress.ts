@@ -1251,7 +1251,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         .from('0008-ap-goals-12wk')
         .insert({
           user_id: user.id,
-          user_cycle_id: selectedTimeline.id,
+          user_global_timeline_id: selectedTimeline.id,
           title: goalData.title,
           description: goalData.description,
           weekly_target: goalData.weekly_target || 3,
