@@ -144,7 +144,7 @@ export function CreateGoalModal({
       // Fetch cycle weeks if we have a cycle
       if (cycleData) {
         const { data: weeksData } = await supabase
-          .from('v_user_cycle_weeks')
+          .from('v_user_global_timeline_weeks')
           .select('week_number, week_start, week_end')
           .eq('user_cycle_id', cycleData.id)
           .order('week_number', { ascending: true });
