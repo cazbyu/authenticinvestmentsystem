@@ -340,7 +340,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
       
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from('v_user_cycle_days_left')
+        .from('v_user_global_timeline_days_left')
         .select('*')
         .eq('user_cycle_id', currentCycle.id)
         .single();
