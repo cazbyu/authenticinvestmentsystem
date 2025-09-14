@@ -395,7 +395,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
         .from('0008-ap-goals-12wk')
         .select('*')
         .eq('user_id', user.id)
-        .eq('user_cycle_id', currentCycle.id)
+        .eq('user_global_timeline_id', currentCycle.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
