@@ -342,10 +342,11 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                         : 'Invalid date'}
                     </Text>
                     <Text style={styles.timelineStats}>
-                      {startDate && endDate
-                        ? `${daysRemaining} days remaining • Global Community Cycle`
-                        : 'Invalid date range'}
-                    </Text>
+  {startDate && endDate
+    ? `${timeline.goals?.length || 0} active goals • ${daysRemaining} days remaining`
+    : 'Invalid date range'}
+</Text>
+
                   </View>
                   
                   <View style={styles.timelineActions}>
