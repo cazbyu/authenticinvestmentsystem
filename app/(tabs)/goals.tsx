@@ -255,7 +255,7 @@ export default function Goals() {
               .from('0008-ap-goals-12wk')
               .select('id')
               .eq('user_id', user.id)
-              .eq('user_cycle_id', timeline.id)
+              .eq('user_global_timeline_id', timeline.id)
               .eq('status', 'active');
 
             if (!error) {
