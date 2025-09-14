@@ -101,19 +101,24 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
 
       // Fetch user global timelines with their linked global cycles
       const { data: timelineData, error } = await supabase
-        .from('0008-ap-user-global-timelines')
-        .select(`
-  *,
-  global_cycle:0008-ap-global-cycles(
-    id,
-    title,
-    cycle_label,
-    start_date,
-    end_date,
-    is_active
-  ),
-  goals:0008-ap-goals-12wk(id)
-`)
+  .from('0008-ap-user-global-timelines')
+  .select(`
+    *,
+    global_cycle:0008-ap-global-cycles(
+      id,
+      title,
+      cycle_label,
+      start_date,
+      end_date,
+      is_active
+    ),
+    goals:0008-ap-goals-12wk(
+      id,
+      status
+    )
+  `)
+  .eq('user_id', user.id)
+  .eq('status', 'active')
 
         .eq('user_id', user.id)
         .eq('status', 'active')
