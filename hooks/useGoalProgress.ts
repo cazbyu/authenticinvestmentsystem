@@ -1075,10 +1075,10 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
       // Find all active 12-week goals for this user that are not associated with the current cycle
       const { data: orphanedGoals, error: orphanedError } = await supabase
         .from('0008-ap-goals-12wk')
-        .select('id, user_cycle_id')
+        .select('id, user_global_timeline_id')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .neq('user_cycle_id', currentCycleId);
+        .neq('user_global_timeline_id', currentCycleId);
 
       if (orphanedError) {
         console.error('Error fetching orphaned goals:', orphanedError);
