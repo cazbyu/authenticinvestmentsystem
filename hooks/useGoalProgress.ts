@@ -46,7 +46,7 @@ export interface TwelveWeekGoal {
   total_target: number;
   start_date?: string;
   end_date?: string;
-  user_cycle_id?: string;
+  user_global_timeline_id?: string;
   created_at: string;
   updated_at: string;
   domains?: Array<{ id: string; name: string }>;
