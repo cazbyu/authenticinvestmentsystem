@@ -74,13 +74,13 @@ export interface CycleWeek {
   week_number: number;
   week_start: string;
   week_end: string;
-  user_cycle_id: string;
+  user_global_timeline_id: string;
 }
 
 export interface DaysLeftData {
   days_left: number;
   pct_elapsed: number;
-  user_cycle_id: string;
+  user_global_timeline_id: string;
 }
 
 export interface TaskWeekPlan {
