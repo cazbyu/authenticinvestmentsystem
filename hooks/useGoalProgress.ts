@@ -343,7 +343,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
         .from('v_user_global_timeline_days_left')
         .select('*')
         .eq('user_global_timeline_id', currentCycle.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       
