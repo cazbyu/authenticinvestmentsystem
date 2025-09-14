@@ -685,7 +685,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       .from('0008-ap-tasks')
       .insert({
         user_id: user.id,
-        user_cycle_id: currentCycle.id,
+        user_global_timeline_id: currentCycle.id,
         title: parent.title,
         type: 'task',
         status: 'completed',
