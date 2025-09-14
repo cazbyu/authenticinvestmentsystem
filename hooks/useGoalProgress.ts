@@ -1097,7 +1097,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         const { error: updateError } = await supabase
           .from('0008-ap-goals-12wk')
           .update({ 
-            user_cycle_id: currentCycleId,
+            user_global_timeline_id: currentCycleId,
             updated_at: new Date().toISOString()
           })
           .in('id', orphanedGoals.map(g => g.id));
