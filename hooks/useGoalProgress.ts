@@ -286,7 +286,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
             week_number: week.week_number,
             week_start: week.start_date,
             week_end: week.end_date,
-            user_global_timeline_id: currentCycle.id,
+            timeline_id: currentCycle.id,
           }));
           console.log('Using client-side fallback weeks:', clientWeeks);
           setCycleWeeks(clientWeeks);
@@ -314,7 +314,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
             week_number: week.week_number,
             week_start: week.start_date,
             week_end: week.end_date,
-            user_global_timeline_id: currentCycle.id,
+            timeline_id: currentCycle.id,
           }));
           console.log('Using client-side calculation due to alignment mismatch:', clientWeeks);
           setCycleWeeks(clientWeeks);
@@ -409,7 +409,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
         goals: goals12?.map(g => ({
           id: g.id,
           title: g.title,
-          user_global_timeline_id: g.user_global_timeline_id,
+          timeline_id: g.user_global_timeline_id,
           status: g.status
         })) || []
       });
@@ -1097,7 +1097,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         const { error: updateError } = await supabase
           .from('0008-ap-goals-12wk')
           .update({ 
-            user_global_timeline_id: currentCycleId,
+            timeline_id: currentCycleId,
             updated_at: new Date().toISOString()
           })
           .in('id', orphanedGoals.map(g => g.id));
@@ -1251,7 +1251,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         .from('0008-ap-goals-12wk')
         .insert({
           user_id: user.id,
-          user_global_timeline_id: selectedTimeline.id,
+          timeline_id: selectedTimeline.id,
           title: goalData.title,
           description: goalData.description,
           weekly_target: goalData.weekly_target || 3,
