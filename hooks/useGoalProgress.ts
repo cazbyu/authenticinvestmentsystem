@@ -1078,7 +1078,7 @@ console.log(`Week plan: target_days=${weekPlan.target_days}`);
         .select('id, timeline_id')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .neq('user_global_timeline_id', currentCycleId);
+        .neq('timeline_id', currentCycleId);
 
       if (orphanedError) {
         console.error('Error fetching orphaned goals:', orphanedError);
