@@ -355,10 +355,10 @@ export function useGoals(options: UseGoalsOptions = {}) {
     try {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from('v_user_global_timeline_days_left')
+        .from('v_user_cycle_days_left')
         .select('*')
-        .eq('user_global_timeline_id', userCycleId)
-        .single();
+        .eq('user_cycle_id', userCycleId)
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       
@@ -379,15 +379,42 @@ export function useGoals(options: UseGoalsOptions = {}) {
       if (!user) return;
 
       // Fetch 12-week goals (only if we have an active cycle)
-      const { data: twelveWeekData, error: twelveWeekError } = userCycleId ? await supabase
-        .from('0008-ap-goals-12wk')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('user_cycle_id', userCycleId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false }) : { data: [], error: null };
-        
-      if (twelveWeekError) throw twelveWeekError;
+      let twelveWeekData: any[] = [];
+      if (userCycleId) {
+        // First get the user cycle details to determine how to query goals
+        const { data: userCycle, error: cycleError } = await supabase
+          .from('0008-ap-user-cycles')
+          .select('source, global_cycle_id')
+          .eq('id', userCycleId)
+          .single();
+
+        if (cycleError) throw cycleError;
+
+        // Query goals based on the cycle source
+        if (userCycle.source === 'global' && userCycle.global_cycle_id) {
+          const { data, error } = await supabase
+            .from('0008-ap-goals-12wk')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('global_cycle_id', userCycle.global_cycle_id)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          twelveWeekData = data || [];
+        } else if (userCycle.source === 'custom') {
+          const { data, error } = await supabase
+            .from('0008-ap-goals-12wk')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('user_global_timeline_id', userCycleId)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          twelveWeekData = data || [];
+        }
+      }
 
       // Fetch custom goals (independent of cycles)
       const { data: customData, error: customError } = await supabase
