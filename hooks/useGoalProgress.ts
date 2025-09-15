@@ -269,7 +269,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const { data: dbWeeks, error } = await supabase
         .from('v_user_global_timeline_weeks')
         .select('week_number, week_start, week_end, user_global_timeline_id')
-        .eq('user_global_timeline_id', currentCycle.id)
+        .eq('timeline_id', currentCycle.id)
         .order('week_number', { ascending: true })
         .returns<CycleWeek[]>();
 
@@ -395,7 +395,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
         .from('0008-ap-goals-12wk')
         .select('*')
         .eq('user_id', user.id)
-        .eq('user_global_timeline_id', currentCycle.id)
+        .eq('timeline_id', currentCycle.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
