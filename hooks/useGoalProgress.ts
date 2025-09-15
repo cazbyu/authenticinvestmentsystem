@@ -424,6 +424,7 @@ const mergedGoals: UnifiedGoal[] = (unified ?? []).map(g => ({
   goal_type: g.source === 'global' ? 'twelve_wk_goal' : 'custom_goal',
 }));
 
+
 console.log('Final merged goals count:', mergedGoals.length);
 setGoals(mergedGoals);
 
