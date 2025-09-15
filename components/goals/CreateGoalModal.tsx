@@ -146,7 +146,7 @@ export function CreateGoalModal({
         const { data: weeksData } = await supabase
           .from('v_user_global_timeline_weeks')
           .select('week_number, week_start, week_end')
-          .eq('user_global_timeline_id', cycleData.id)
+          .eq('timeline_id', cycleData.id)
           .order('week_number', { ascending: true });
 
         setCycleWeeks(weeksData || []);
