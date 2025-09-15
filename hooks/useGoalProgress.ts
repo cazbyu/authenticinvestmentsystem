@@ -389,89 +389,50 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
 
     let mergedGoals: UnifiedGoal[] = [];
 
-    if (selectedTimeline?.source === 'global' || selectedTimeline?.timeline_type === 'cycle') {
-      console.log('Fetching 12-week goals for timeline:', currentCycle.id);
-      // Fetch 12-week goals for this timeline
-      const { data: goals12, error: error12 } = await supabase
-        .from('0008-ap-goals-12wk')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('timeline_id', currentCycle.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+    console.log('Fetching unified goals for timeline:', currentCycle.id);
 
-      if (error12) {
-        console.error('Error fetching 12-week goals:', error12);
-        throw error12;
-      }
-      
-      console.log('12-week goals query result:', {
-        count: goals12?.length || 0,
-        goals: goals12?.map(g => ({
-          id: g.id,
-          title: g.title,
-          timeline_id: g.timeline_id,
-          status: g.status
-        })) || []
-      });
-      
-      const normalized12 = (goals12 ?? []).map(g => ({ 
-        ...g, 
-        goal_type: 'twelve_wk_goal' as GoalType,
-        weekly_target: g.weekly_target || 3,
-        total_target: g.total_target || 36
-      }));
-      mergedGoals = [...normalized12];
-    } else {
-      console.log('Fetching custom goals for timeline:', currentCycle.id);
-      // Fetch custom goals for this custom timeline
-      const { data: goalsCustom, error: errorCustom } = await supabase
-        .from('0008-ap-goals-custom')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('timeline_id', currentCycle.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+const { data: unified, error: unifiedErr } = await supabase
+  .from('v_unified_goals')
+  .select(`
+    id, user_id, title, description, status, progress,
+    weekly_target, total_target, start_date, end_date,
+    created_at, updated_at, timeline_id, custom_timeline_id, source
+  `)
+  .eq('user_id', user.id)
+  .eq('status', 'active')
+  .or(`timeline_id.eq.${currentCycle.id},custom_timeline_id.eq.${currentCycle.id}`)
+  .order('created_at', { ascending: false });
 
-      if (errorCustom) {
-        console.error('Error fetching custom goals:', errorCustom);
-        throw errorCustom;
-      }
-      
-      console.log('Custom goals query result:', {
-        count: goalsCustom?.length || 0,
-        goals: goalsCustom?.map(g => ({
-          id: g.id,
-          title: g.title,
-          custom_timeline_id: g.custom_timeline_id,
-          status: g.status
-        })) || []
-      });
-      
-      const normalizedCustom = (goalsCustom ?? []).map(g => ({ 
-        ...g, 
-        goal_type: 'custom_goal' as GoalType,
-        weekly_target: 3, // Default for custom goals
-        total_target: Math.ceil(((new Date(g.end_date).getTime() - new Date(g.start_date).getTime()) / (1000 * 60 * 60 * 24)) / 7) * 3 // 3 per week
-      }));
-      mergedGoals = [...normalizedCustom];
-    }
+if (unifiedErr) {
+  console.error('Error fetching unified goals:', unifiedErr);
+  throw unifiedErr;
+}
 
-    console.log('Final merged goals count:', mergedGoals.length);
-    console.log('Final merged goals:', mergedGoals.map(g => ({
-      id: g.id,
-      title: g.title,
-      goal_type: g.goal_type
-    })));
+const mergedGoals: UnifiedGoal[] = (unified ?? []).map(g => ({
+  id: g.id,
+  user_id: g.user_id,
+  title: g.title,
+  description: g.description,
+  status: g.status,
+  progress: g.progress ?? 0,
+  weekly_target: g.weekly_target ?? 3,
+  total_target: g.total_target ?? 36,
+  start_date: g.start_date ?? undefined,
+  end_date: g.end_date ?? undefined,
+  created_at: g.created_at ?? undefined,
+  updated_at: g.updated_at ?? undefined,
+  goal_type: g.source === 'global' ? 'twelve_wk_goal' : 'custom_goal',
+}));
 
-    setGoals(mergedGoals);
+console.log('Final merged goals count:', mergedGoals.length);
+setGoals(mergedGoals);
 
-    // Progress calculation only for 12-week goals (custom handled later)
-    if (selectedTimeline?.source === 'global' || selectedTimeline?.timeline_type === 'cycle') {
-      const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === 'twelve_wk_goal');
-      console.log('Calculating progress for', twelveWeekGoals.length, '12-week goals');
-      await calculateGoalProgress(twelveWeekGoals, currentCycle.id);
-    }
+// Progress calculation only for 12-week goals
+const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === 'twelve_wk_goal');
+if (twelveWeekGoals.length > 0) {
+  console.log('Calculating progress for', twelveWeekGoals.length, '12-week goals');
+  await calculateGoalProgress(twelveWeekGoals, currentCycle.id);
+}
 
     console.log('=== FETCH GOALS END ===');
   } catch (error) {
