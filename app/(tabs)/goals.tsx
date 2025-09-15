@@ -255,7 +255,7 @@ export default function Goals() {
               .from('0008-ap-goals-12wk')
               .select('id')
               .eq('user_id', user.id)
-              .eq('user_global_timeline_id', timeline.id)
+              .eq('timeline_id', timeline.id)
               .eq('status', 'active');
 
             if (!error) {
@@ -267,7 +267,7 @@ export default function Goals() {
               .from('0008-ap-goals-custom')
               .select('id')
               .eq('user_id', user.id)
-              .eq('custom_timeline_id', timeline.id)
+              .eq('timeline_id', timeline.id)
               .eq('status', 'active');
 
             if (!error) {
@@ -307,7 +307,7 @@ export default function Goals() {
         const { data: weeksData, error: weeksError } = await supabase
           .from('v_custom_timeline_weeks')
           .select('week_number, start_date, end_date')
-          .eq('custom_timeline_id', timeline.id)
+          .eq('timeline_id', timeline.id)
           .order('week_number', { ascending: true });
 
         if (weeksError) throw weeksError;
@@ -315,7 +315,7 @@ export default function Goals() {
         const { data: daysData, error: daysError } = await supabase
           .from('v_custom_timeline_days_left')
           .select('*')
-          .eq('custom_timeline_id', timeline.id)
+          .eq('timeline_id', timeline.id)
           .single();
 
         if (daysError && daysError.code !== 'PGRST116') throw daysError;
@@ -327,7 +327,7 @@ export default function Goals() {
         const { data: weeksData, error: weeksError } = await supabase
           .from('v_user_global_timeline_weeks')
           .select('week_number, week_start, week_end')
-          .eq('user_global_timeline_id', timeline.id)
+          .eq('timeline_id', timeline.id)
           .order('week_number', { ascending: true });
 
         if (weeksError) throw weeksError;
