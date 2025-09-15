@@ -408,7 +408,7 @@ if (unifiedErr) {
   throw unifiedErr;
 }
 
-const mergedGoals: UnifiedGoal[] = (unified ?? []).map(g => ({
+mergedGoals = (unified ?? []).map(g => ({
   id: g.id,
   user_id: g.user_id,
   title: g.title,
