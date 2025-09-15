@@ -335,7 +335,7 @@ export default function Goals() {
         const { data: daysData, error: daysError } = await supabase
           .from('v_user_global_timeline_days_left')
           .select('*')
-          .eq('user_global_timeline_id', timeline.id)
+          .eq('timeline_id', timeline.id)
           .single();
 
         if (daysError && daysError.code !== 'PGRST116') throw daysError;
