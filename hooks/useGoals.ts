@@ -355,9 +355,9 @@ export function useGoals(options: UseGoalsOptions = {}) {
     try {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from('v_user_cycle_days_left')
+        .from('v_user_global_timeline_days_left')
         .select('*')
-        .eq('user_cycle_id', userCycleId)
+        .eq('user_global_timeline_id', userCycleId)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
