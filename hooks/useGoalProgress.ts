@@ -409,7 +409,7 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
         goals: goals12?.map(g => ({
           id: g.id,
           title: g.title,
-          user_global_timeline_id: g.user_cycle_id,
+          user_global_timeline_id: g.user_global_timeline_id,
           status: g.status
         })) || []
       });
