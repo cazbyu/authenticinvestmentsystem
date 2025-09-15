@@ -712,7 +712,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       .from('0008-ap-tasks')
       .insert({
         user_id: user.id,
-        user_global_timeline_id: currentCycle.id,
+        timeline_id: currentCycle.id,
         title: parent.title,
         type: 'task',
         status: 'completed',
@@ -779,7 +779,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         .from('0008-ap-goals-12wk')
         .insert({
           user_id: user.id,
-          user_global_timeline_id: currentCycle.id,
+          timeline_id: currentCycle.id,
           title: goalData.title,
           description: goalData.description,
           weekly_target: goalData.weekly_target || 3,
