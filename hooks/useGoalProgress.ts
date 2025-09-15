@@ -267,9 +267,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const supabase = getSupabaseClient();
       
       const { data: dbWeeks, error } = await supabase
-        .from('v_user_global_timeline_weeks')
-        .select('week_number, week_start, week_end, timeline_id')
-        .eq('timeline_id', currentCycle.id)
+        .from("v_unified_timeline_weeks")
+.select("week_number, week_start, week_end, timeline_id, source")
+.eq("timeline_id", currentTimelineId)
         .order('week_number', { ascending: true })
         .returns<CycleWeek[]>();
 
@@ -340,9 +340,9 @@ if (week1.week_start !== expectedWeek1Start.start_date) {
       
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
-        .from('v_user_global_timeline_days_left')
-        .select('*')
-        .eq('timeline_id', currentCycle.id)
+        .from("v_unified_timeline_days_left")
+.select("timeline_id, days_left, pct_elapsed, source")
+.eq("timeline_id", currentTimelineId)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
