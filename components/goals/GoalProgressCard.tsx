@@ -40,20 +40,21 @@ interface GoalProgressCardProps {
   selectedWeekNumber?: number;
 }
 
-export function GoalProgressCard({ 
-  goal, 
-  progress, 
+export function GoalProgressCard({
+  goal,
+  progress,
   expanded = true,
   week,
-  weekActions = [],
+  weekActions: weekActionsProp,
   loadingWeekActions = false,
   onAddAction,
   onToggleCompletion,
   onEdit, // New prop
-  onPress, 
+  onPress,
   compact = false,
   selectedWeekNumber
 }: GoalProgressCardProps) {
+  const weekActions = weekActionsProp ?? [];
   const getProgressColor = (percentage: number) => {
     if (percentage >= 85) return '#16a34a'; // Green for 85% and above
     if (percentage >= 60) return '#eab308';
@@ -190,6 +191,17 @@ export function GoalProgressCard({
   }
 
   const weeklyProgress = calculateWeeklyProgress();
+  const hasWeekContext = !!week;
+  const hasWeekActionsProvided = weekActionsProp !== undefined;
+  const shouldShowWeeklyProgress =
+    hasWeekContext ||
+    hasWeekActionsProvided ||
+    typeof progress.weeklyTarget === 'number' ||
+    typeof progress.weeklyActual === 'number';
+  const shouldRenderWeekActions =
+    expanded &&
+    hasWeekContext &&
+    (hasWeekActionsProvided || weekActions.length > 0 || loadingWeekActions || !!onAddAction);
 
   return (
     <TouchableOpacity
@@ -241,29 +253,31 @@ export function GoalProgressCard({
         </View>
 
         {/* Leading Indicator: Weekly Progress */}
-        {goal.goal_type === '12week' && (
+        {shouldShowWeeklyProgress && (
           <View style={styles.progressSection}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>This Week (Leading)</Text>
-            <Text style={[
-              styles.progressValue,
-              { color: getWeeklyProgressColor(weeklyProgress.actual, weeklyProgress.target) }
-            ]}>
-              {formatWeeklyProgress(weeklyProgress.actual, weeklyProgress.target)}
-            </Text>
-          </View>
-          
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${Math.min(100, (weeklyProgress.actual / Math.max(1, weeklyProgress.target)) * 100)}%`,
-                  backgroundColor: getWeeklyProgressColor(weeklyProgress.actual, weeklyProgress.target),
-                }
-              ]}
-            />
-          </View>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>This Week (Leading)</Text>
+              <Text
+                style={[
+                  styles.progressValue,
+                  { color: getWeeklyProgressColor(weeklyProgress.actual, weeklyProgress.target) }
+                ]}
+              >
+                {formatWeeklyProgress(weeklyProgress.actual, weeklyProgress.target)}
+              </Text>
+            </View>
+
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.min(100, (weeklyProgress.actual / Math.max(1, weeklyProgress.target)) * 100)}%`,
+                    backgroundColor: getWeeklyProgressColor(weeklyProgress.actual, weeklyProgress.target),
+                  }
+                ]}
+              />
+            </View>
           </View>
         )}
 
@@ -312,7 +326,7 @@ export function GoalProgressCard({
         )}
 
         {/* Week-specific Actions (when week prop is provided) */}
-        {expanded && week && goal.goal_type === '12week' && (
+        {shouldRenderWeekActions && week && (
           <View style={styles.weekActionsSection}>
             <View style={styles.weekActionsHeader}>
               {onAddAction && (
