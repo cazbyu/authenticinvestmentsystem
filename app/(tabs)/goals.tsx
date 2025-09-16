@@ -1206,7 +1206,6 @@ export default function Goals() {
       />
     </SafeAreaView>
   );
-}
 
 const styles = StyleSheet.create({
   container: {
