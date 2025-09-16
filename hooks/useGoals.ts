@@ -417,7 +417,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       }
 
       // Fetch custom goals (independent of cycles)
-      const { data: customData, error: customError } = await supabase
+     const { data: customData, error: customError } = await supabase
   .from('v_unified_goals')
   .select('*')
   .eq('user_id', user.id)
