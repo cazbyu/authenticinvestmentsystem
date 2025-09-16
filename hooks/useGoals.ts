@@ -378,40 +378,15 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Determine timeline type first
-      let timelineSource: 'global' | 'custom' | null = null;
-      if (userCycleId) {
-        // Check if this is a global timeline
-        const { data: globalCheck } = await supabase
-          .from('0008-ap-user-global-timelines')
-          .select('id')
-          .eq('id', userCycleId)
-          .single();
-        
-        if (globalCheck) {
-          timelineSource = 'global';
-        } else {
-          // Check if this is a custom timeline
-          const { data: customCheck } = await supabase
-            .from('0008-ap-custom-timelines')
-            .select('id')
-            .eq('id', userCycleId)
-            .single();
-          
-          if (customCheck) {
-            timelineSource = 'custom';
-          }
-        }
-      }
-
-      // Fetch 12-week goals (only for global timelines)
+      // Fetch 12-week goals
       let twelveWeekData: any[] = [];
-      if (userCycleId && timelineSource === 'global') {
+      if (userCycleId) {
+        // Try both possible column names to see which one has data
         const { data, error } = await supabase
           .from('0008-ap-goals-12wk')
           .select('*')
           .eq('user_id', user.id)
-          .eq('user_global_timeline_id', userCycleId)
+          .or(`user_global_timeline_id.eq.${userCycleId},global_cycle_id.eq.${userCycleId}`)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
         
@@ -419,9 +394,9 @@ export function useGoals(options: UseGoalsOptions = {}) {
         twelveWeekData = data || [];
       }
 
-      // Fetch custom goals (only for custom timelines)
+      // Fetch custom goals
       let customData: any[] = [];
-      if (userCycleId && timelineSource === 'custom') {
+      if (userCycleId) {
         const { data, error: customError } = await supabase
           .from('0008-ap-goals-custom')
           .select(
