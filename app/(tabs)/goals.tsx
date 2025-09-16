@@ -1183,6 +1183,7 @@ export default function Goals() {
         goal={selectedGoalForAction}
         cycleWeeks={timelineWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
+        onSubmitSuccess={handleActionEffortSuccess}
       />
 
       <ManageCustomTimelinesModal
