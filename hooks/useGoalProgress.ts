@@ -911,28 +911,40 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       console.log('Current cycle ID:', currentCycleId);
 
       // Use the real FK column name on the raw table
-      const { data: orphanedGoals, error: orphanedError } = await supabase
-        .from('v_unified_goals')
-.select('id, timeline_id, source')
-.eq('user_id', user.id)
-.eq('status', 'active')
-.neq('timeline_id', currentCycleId);
+      // find orphaned goals (from unified view)
+const { data: orphanedGoals, error: orphanedError } = await supabase
+  .from('v_unified_goals')
+  .select('id, timeline_id, source')
+  .eq('user_id', user.id)
+  .eq('status', 'active')
+  .neq('timeline_id', currentCycleId);
 
-      if (orphanedError) {
-        console.error('Error fetching orphaned goals:', orphanedError);
-        return;
-      }
+if (orphanedError) throw orphanedError;
 
-      console.log('Orphaned goals found:', orphanedGoals?.length || 0);
+if (orphanedGoals && orphanedGoals.length > 0) {
+  const globalIds = orphanedGoals.filter(g => g.source === 'global').map(g => g.id);
+  const customIds = orphanedGoals.filter(g => g.source === 'custom').map(g => g.id);
 
-      if (orphanedGoals && orphanedGoals.length > 0) {
-        const { error: updateError } = await supabase
-          .from('0008-ap-goals-12wk')
-          .update({
-            user_global_timeline_id: currentCycleId,
-            updated_at: new Date().toISOString()
-          })
-          .in('id', orphanedGoals.map(g => g.id));
+  if (globalIds.length > 0) {
+    await supabase
+      .from('0008-ap-goals-12wk')
+      .update({
+        user_global_timeline_id: currentCycleId,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', globalIds);
+  }
+
+  if (customIds.length > 0) {
+    await supabase
+      .from('0008-ap-goals-custom')
+      .update({
+        custom_timeline_id: currentCycleId,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', customIds);
+  }
+}
 
         if (updateError) {
           console.error('Error reassociating goals:', updateError);
