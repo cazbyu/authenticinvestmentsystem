@@ -912,11 +912,11 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       // Use the real FK column name on the raw table
       const { data: orphanedGoals, error: orphanedError } = await supabase
-        .from('0008-ap-goals-12wk')
-        .select('id, user_global_timeline_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .neq('user_global_timeline_id', currentCycleId);
+        .from('v_unified_goals')
+.select('id, timeline_id, source')
+.eq('user_id', user.id)
+.eq('status', 'active')
+.neq('timeline_id', currentCycleId);
 
       if (orphanedError) {
         console.error('Error fetching orphaned goals:', orphanedError);
