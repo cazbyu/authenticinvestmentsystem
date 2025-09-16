@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Alert } from 'react-native';
 import { generateCycleWeeks, formatLocalDate, isValidISODate } from '@/lib/dateUtils';
+import { normalizeGoalType, goalJoinColumnForType } from '@/lib/goalTypes';
+import type { GoalType, DatabaseGoalType } from '@/lib/goalTypes';
 
-export type GoalType = 'twelve_wk_goal' | 'custom_goal';
+export type { GoalType };
 
 export interface Timeline {
   id: string;
@@ -53,6 +55,7 @@ type UnifiedGoalRow = {
   updated_at: string | null;
   timeline_id: string | null;
   source?: 'custom' | 'global';
+  goal_type?: DatabaseGoalType | null;
 };
 
 export interface TwelveWeekGoal {
@@ -403,32 +406,33 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       mergedGoals = (unified ?? []).map(g => {
         const inferredSource = g.source ?? currentCycle.source ?? 'custom';
-        const goalType = inferredSource === 'global' ? 'twelve_wk_goal' : 'custom_goal';
+        const fallbackGoalType: GoalType = inferredSource === 'global' ? '12week' : 'custom';
+        const goalType = normalizeGoalType(g.goal_type, fallbackGoalType);
 
         return {
-        id: g.id,
-        user_id: g.user_id,
-        title: g.title,
-        description: g.description ?? undefined,
-        status: g.status,
-        progress: g.progress ?? 0,
-        weekly_target: g.weekly_target ?? 3,
-        total_target: g.total_target ?? 36,
-        start_date: g.start_date ?? undefined,
-        end_date: g.end_date ?? undefined,
-        created_at: g.created_at ?? undefined,
-        updated_at: g.updated_at ?? undefined,
-        timeline_id: g.timeline_id ?? null,
-        source: inferredSource,
-        goal_type: goalType,
-      };
+          id: g.id,
+          user_id: g.user_id,
+          title: g.title,
+          description: g.description ?? undefined,
+          status: g.status,
+          progress: g.progress ?? 0,
+          weekly_target: g.weekly_target ?? 3,
+          total_target: g.total_target ?? 36,
+          start_date: g.start_date ?? undefined,
+          end_date: g.end_date ?? undefined,
+          created_at: g.created_at ?? undefined,
+          updated_at: g.updated_at ?? undefined,
+          timeline_id: g.timeline_id ?? null,
+          source: inferredSource,
+          goal_type: goalType,
+        };
       });
 
       console.log('Final merged goals count:', mergedGoals.length);
       setGoals(mergedGoals);
 
       // Progress calculation only for 12-week goals
-      const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === 'twelve_wk_goal');
+      const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === '12week');
       if (twelveWeekGoals.length > 0) {
         console.log('Calculating progress for', twelveWeekGoals.length, '12-week goals');
         await calculateGoalProgress(twelveWeekGoals, currentCycle.id);
@@ -550,7 +554,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         const { data: goalJoins } = await supabase
           .from('0008-ap-universal-goals-join')
           .select('parent_id')
-          .eq(goal.goal_type === 'custom_goal' ? 'custom_goal_id' : 'twelve_wk_goal_id', goal.id)
+          .eq(goalJoinColumnForType(goal.goal_type), goal.id)
           .eq('parent_type', 'task');
 
         const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
@@ -1140,7 +1144,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         updated_at: data.updated_at ?? undefined,
         timeline_id: data.user_global_timeline_id ?? selectedTimeline.id,
         source: 'global',
-        goal_type: 'twelve_wk_goal',
+        goal_type: '12week',
       };
     } catch (error) {
       console.error('Error creating 12-week goal:', error);
@@ -1195,7 +1199,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         updated_at: data.updated_at ?? undefined,
         timeline_id: data.custom_timeline_id ?? selectedTimeline.id,
         source: 'custom',
-        goal_type: 'custom_goal',
+        goal_type: 'custom',
       };
     } catch (error) {
       console.error('Error creating custom goal:', error);

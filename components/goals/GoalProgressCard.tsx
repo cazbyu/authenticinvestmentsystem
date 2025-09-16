@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit } from 'lucide-react-native';
-import { GoalProgress } from '@/hooks/useGoalProgress';
+import { GoalProgress, type UnifiedGoal as Goal } from '@/hooks/useGoalProgress';
 import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
 interface WeekData {

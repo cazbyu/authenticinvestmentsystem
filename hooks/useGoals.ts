@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '../lib/supabase';
 import { Alert } from 'react-native';
 import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '../lib/dateUtils';
+import { normalizeGoalType } from '../lib/goalTypes';
 
 export interface TwelveWeekGoal {
   id: string;
@@ -224,7 +225,7 @@ export async function fetchGoalActionsForWeek(
 
       const taskWithLogs: TaskWithLogs = {
         ...task,
-        goal_type: goalJoin.goal_type === 'twelve_wk_goal' ? '12week' : 'custom',
+        goal_type: normalizeGoalType(goalJoin.goal_type, 'custom'),
         logs: taskLogs,
         weeklyActual: cappedWeeklyActual,
         weeklyTarget,
