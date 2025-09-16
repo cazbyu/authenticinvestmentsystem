@@ -690,6 +690,9 @@ export default function Goals() {
   const handleWithdrawalSuccess = () => {
     setWithdrawalFormVisible(false);
     calculateAuthenticScore();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const getCurrentWeek = () => {
