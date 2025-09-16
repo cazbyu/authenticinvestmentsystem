@@ -632,12 +632,6 @@ export default function Goals() {
     }
   }, [selectedTimeline, timelineWeeks, timelineGoals, currentWeekIndex]);
 
-  const refreshGoals = () => {
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
-  };
-
   const handleCreateGoal = () => {
     if (!selectedTimeline) {
       Alert.alert('Select Timeline', 'Please select a timeline first');
@@ -662,19 +656,25 @@ export default function Goals() {
 
   const handleGoalFormSuccess = () => {
     setCreateGoalModalVisible(false);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleEditGoalSuccess = () => {
     setEditGoalModalVisible(false);
     setSelectedGoal(null);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleActionEffortSuccess = () => {
     setActionEffortModalVisible(false);
     setSelectedGoalForAction(null);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
     fetchWeekActions();
   };
 
@@ -777,6 +777,12 @@ export default function Goals() {
     setSelectedTimeline(timeline);
     setCurrentWeekIndex(0);
     initializedWeekRef.current = false;
+  };
+
+  const refreshGoals = () => {
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const renderTimelineSelector = () => {
@@ -1176,6 +1182,7 @@ export default function Goals() {
         goal={selectedGoalForAction}
         cycleWeeks={timelineWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
+        onSubmitSuccess={handleActionEffortSuccess}
       />
 
       <ManageCustomTimelinesModal
