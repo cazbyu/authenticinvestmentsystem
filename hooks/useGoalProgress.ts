@@ -52,7 +52,7 @@ type UnifiedGoalRow = {
   created_at: string | null;
   updated_at: string | null;
   timeline_id: string | null;
-  source: 'custom' | 'global';
+  source?: 'custom' | 'global';
 };
 
 export interface TwelveWeekGoal {
@@ -389,7 +389,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .select(`
           id, user_id, title, description, status, progress,
           weekly_target, total_target, start_date, end_date,
-          created_at, updated_at, timeline_id, source
+          created_at, updated_at, timeline_id
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
@@ -401,7 +401,11 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         throw unifiedErr;
       }
 
-      mergedGoals = (unified ?? []).map(g => ({
+      mergedGoals = (unified ?? []).map(g => {
+        const inferredSource = g.source ?? currentCycle.source ?? 'custom';
+        const goalType = inferredSource === 'global' ? 'twelve_wk_goal' : 'custom_goal';
+
+        return {
         id: g.id,
         user_id: g.user_id,
         title: g.title,
@@ -415,9 +419,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         created_at: g.created_at ?? undefined,
         updated_at: g.updated_at ?? undefined,
         timeline_id: g.timeline_id ?? null,
-        source: g.source,
-        goal_type: g.source === 'global' ? 'twelve_wk_goal' : 'custom_goal',
-      }));
+        source: inferredSource,
+        goal_type: goalType,
+      };
+      });
 
       console.log('Final merged goals count:', mergedGoals.length);
       setGoals(mergedGoals);
@@ -919,62 +924,81 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   };
 
   const reassociateActiveGoals = async (currentCycleId: string) => {
-  try {
-    console.log('=== REASSOCIATE ACTIVE GOALS START ===');
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      console.log('No authenticated user found');
-      return;
-    }
-
-    console.log('User ID:', user.id);
-    console.log('Current cycle ID:', currentCycleId);
-
-    // Find orphaned goals from unified view
-    const { data: orphanedGoals, error: orphanedError } = await supabase
-      .from('v_unified_goals')
-      .select('id, timeline_id, source')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .neq('timeline_id', currentCycleId);
-
-    if (orphanedError) throw orphanedError;
-
-    if (orphanedGoals && orphanedGoals.length > 0) {
-      const globalIds = orphanedGoals.filter(g => g.source === 'global').map(g => g.id);
-      const customIds = orphanedGoals.filter(g => g.source === 'custom').map(g => g.id);
-
-      if (globalIds.length > 0) {
-        await supabase
-          .from('0008-ap-goals-12wk')
-          .update({
-            user_global_timeline_id: currentCycleId,
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', globalIds);
+    try {
+      console.log('=== REASSOCIATE ACTIVE GOALS START ===');
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No authenticated user found');
+        return;
       }
 
-      if (customIds.length > 0) {
-        await supabase
-          .from('0008-ap-goals-custom')
-          .update({
-            custom_timeline_id: currentCycleId,
-            updated_at: new Date().toISOString(),
-          })
-          .in('id', customIds);
+      console.log('User ID:', user.id);
+      console.log('Current cycle ID:', currentCycleId);
+
+      // Find orphaned goals from unified view
+      const { data: orphanedGoals, error: orphanedError } = await supabase
+        .from('v_unified_goals')
+        .select('id, timeline_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .neq('timeline_id', currentCycleId);
+
+      if (orphanedError) throw orphanedError;
+
+      if (orphanedGoals && orphanedGoals.length > 0) {
+        const orphanedIds = orphanedGoals.map(g => g.id);
+        let globalIds: string[] = [];
+        let customIds: string[] = [];
+
+        if (orphanedIds.length > 0) {
+          const { data: globalMatches, error: globalLookupError } = await supabase
+            .from('0008-ap-goals-12wk')
+            .select('id')
+            .in('id', orphanedIds);
+
+          if (globalLookupError) throw globalLookupError;
+          globalIds = globalMatches?.map(g => g.id) ?? [];
+
+          const { data: customMatches, error: customLookupError } = await supabase
+            .from('0008-ap-goals-custom')
+            .select('id')
+            .in('id', orphanedIds);
+
+          if (customLookupError) throw customLookupError;
+          customIds = customMatches?.map(g => g.id) ?? [];
+        }
+
+        if (globalIds.length > 0) {
+          await supabase
+            .from('0008-ap-goals-12wk')
+            .update({
+              user_global_timeline_id: currentCycleId,
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', globalIds);
+        }
+
+        if (customIds.length > 0) {
+          await supabase
+            .from('0008-ap-goals-custom')
+            .update({
+              custom_timeline_id: currentCycleId,
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', customIds);
+        }
+
+        console.log('Successfully reassociated goals with current cycle');
+      } else {
+        console.log('No orphaned goals found - all goals are already associated with current cycle');
       }
 
-      console.log('Successfully reassociated goals with current cycle');
-    } else {
-      console.log('No orphaned goals found - all goals are already associated with current cycle');
+      console.log('=== REASSOCIATE ACTIVE GOALS END ===');
+    } catch (error) {
+      console.error('Error in reassociateActiveGoals:', error);
     }
-
-    console.log('=== REASSOCIATE ACTIVE GOALS END ===');
-  } catch (error) {
-    console.error('Error in reassociateActiveGoals:', error);
-  }
-};
+  };
 
   const toggleTaskDay = async (taskId: string, date: string): Promise<boolean> => {
     try {
