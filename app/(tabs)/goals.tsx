@@ -580,7 +580,9 @@ export default function Goals() {
       }
       
       // Refresh goals to update progress
-      refreshGoals();
+      if (selectedTimeline) {
+        fetchTimelineGoals(selectedTimeline);
+      }
     } catch (error) {
       console.error('Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message);
@@ -632,12 +634,6 @@ export default function Goals() {
     }
   }, [selectedTimeline, timelineWeeks, timelineGoals, currentWeekIndex]);
 
-  const refreshGoals = () => {
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
-  };
-
   const handleCreateGoal = () => {
     if (!selectedTimeline) {
       Alert.alert('Select Timeline', 'Please select a timeline first');
@@ -662,25 +658,33 @@ export default function Goals() {
 
   const handleGoalFormSuccess = () => {
     setCreateGoalModalVisible(false);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleEditGoalSuccess = () => {
     setEditGoalModalVisible(false);
     setSelectedGoal(null);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleActionEffortSuccess = () => {
     setActionEffortModalVisible(false);
     setSelectedGoalForAction(null);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
     fetchWeekActions();
   };
 
   const handleTimelinesUpdate = () => {
     fetchAllTimelines();
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleWithdrawalSuccess = () => {
