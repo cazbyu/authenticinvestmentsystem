@@ -417,12 +417,16 @@ export function useGoals(options: UseGoalsOptions = {}) {
       }
 
       // Fetch custom goals (independent of cycles)
-     const { data: customData, error: customError } = await supabase
-  .from('v_unified_goals')
-  .select('*')
-  .eq('user_id', user.id)
-  .eq('status', 'active')
-  .order('created_at', { ascending: false });
+      const {
+        data: customData,
+        error: customError
+      } = await supabase
+        .from('v_unified_goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .eq('source', 'custom')
+        .order('created_at', { ascending: false });
 
       if (customError) throw customError;
 
