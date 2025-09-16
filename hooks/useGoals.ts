@@ -378,45 +378,23 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch 12-week goals (only if we have an active cycle)
+      // Fetch 12-week goals (only for global timelines)
       let twelveWeekData: any[] = [];
       if (userCycleId) {
-        // First get the user cycle details to determine how to query goals
-        const { data: userCycle, error: cycleError } = await supabase
-          .from('0008-ap-user-cycles')
-          .select('source, global_cycle_id')
-          .eq('id', userCycleId)
-          .single();
-
-        if (cycleError) throw cycleError;
-
-        // Query goals based on the cycle source
-        if (userCycle.source === 'global' && userCycle.global_cycle_id) {
-          const { data, error } = await supabase
-            .from('0008-ap-goals-12wk')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('global_cycle_id', userCycle.global_cycle_id)
-            .eq('status', 'active')
-            .order('created_at', { ascending: false });
-          
-          if (error) throw error;
-          twelveWeekData = data || [];
-        } else if (userCycle.source === 'custom') {
-          const { data, error } = await supabase
-            .from('0008-ap-goals-12wk')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('timeline_id', userCycleId)
-            .eq('status', 'active')
-            .order('created_at', { ascending: false });
-          
-          if (error) throw error;
-          twelveWeekData = data || [];
-        }
+        // Check if this is a global timeline by looking for user_global_timeline_id
+        const { data, error } = await supabase
+          .from('0008-ap-goals-12wk')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('user_global_timeline_id', userCycleId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        twelveWeekData = data || [];
       }
 
-      // Fetch custom goals (independent of cycles)
+      // Fetch custom goals (only for custom timelines)
       const {
         data: customData,
         error: customError
@@ -429,6 +407,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
           `
         )
         .eq('user_id', user.id)
+        .eq('custom_timeline_id', userCycleId || '')
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 

@@ -227,8 +227,20 @@ export default function Goals() {
           }
 
           // Get goal count based on timeline source
-          if (timeline.source === 'custom') {
-            // Count custom goals for this timeline
+          if (timeline.source === 'global') {
+            // Count 12-week goals for global timelines
+            const { data: twelveWeekGoals, error } = await supabase
+              .from('0008-ap-goals-12wk')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('user_global_timeline_id', timeline.id)
+              .eq('status', 'active');
+
+            if (!error) {
+              goalCount = twelveWeekGoals?.length || 0;
+            }
+          } else if (timeline.source === 'custom') {
+            // Count custom goals for custom timelines
             const { data: customGoals, error } = await supabase
               .from('0008-ap-goals-custom')
               .select('id')
@@ -238,17 +250,6 @@ export default function Goals() {
 
             if (!error) {
               goalCount = customGoals?.length || 0;
-            }
-          } else if (timeline.source === 'global') {
-            const { data: globalGoals, error } = await supabase
-              .from('0008-ap-goals-12wk')
-              .select('id')
-              .eq('user_id', user.id)
-              .eq('user_global_timeline_id', timeline.id)
-              .eq('status', 'active');
-
-            if (!error) {
-              goalCount = globalGoals?.length || 0;
             }
           }
 
