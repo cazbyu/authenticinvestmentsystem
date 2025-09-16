@@ -513,10 +513,11 @@ export function useGoals(options: UseGoalsOptions = {}) {
       setCustomGoals(transformedCustomGoals);
       setAllGoals([...transformedTwelveWeekGoals, ...transformedCustomGoals]);
 
-      // Calculate progress for 12-week goals only (custom goals don't use cycle-based progress)
-      if (userCycleId) {
-        await calculateGoalProgress(transformedTwelveWeekGoals, userCycleId);
-      }
+      await calculateGoalProgress(
+        transformedTwelveWeekGoals,
+        transformedCustomGoals,
+        userCycleId
+      );
     } catch (error) {
       console.error('Error fetching goals:', error);
       Alert.alert('Error', (error as Error).message);
@@ -525,21 +526,158 @@ export function useGoals(options: UseGoalsOptions = {}) {
     }
   };
 
-  const calculateGoalProgress = async (goals: TwelveWeekGoal[], userCycleId: string) => {
+  const calculateGoalProgress = async (
+    twelveWeekGoals: TwelveWeekGoal[],
+    customGoals: CustomGoal[],
+    userCycleId?: string
+  ) => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const progressData: Record<string, GoalProgress> = {};
-      const currentWeek = getCurrentWeekNumber();
-      const daysRemaining = daysLeftData?.days_left || 0;
+      const hasTwelveWeekContext = Boolean(userCycleId && twelveWeekGoals.length > 0);
+      const hasCustomGoals = customGoals.length > 0;
 
-      for (const goal of goals) {
+      if (!hasTwelveWeekContext && !hasCustomGoals) {
+        setGoalProgress({});
+        setCycleEffortData({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
+        return;
+      }
+
+      const todayString = formatLocalDate(new Date());
+      const normalizedToday = parseLocalDate(todayString);
+
+      if (hasTwelveWeekContext) {
+        const currentWeek = getCurrentWeekNumber();
+        const daysRemaining = daysLeftData?.days_left || 0;
+
+        for (const goal of twelveWeekGoals) {
+          const { data: goalJoins } = await supabase
+            .from('0008-ap-universal-goals-join')
+            .select('parent_id')
+            .eq('twelve_wk_goal_id', goal.id)
+            .eq('parent_type', 'task');
+
+          const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
+
+          if (taskIds.length === 0) {
+            progressData[goal.id] = {
+              goalId: goal.id,
+              currentWeek,
+              daysRemaining,
+              weeklyActual: 0,
+              weeklyTarget: goal.weekly_target,
+              overallActual: 0,
+              overallTarget: goal.total_target,
+              overallProgress: 0,
+            };
+            continue;
+          }
+
+          const currentWeekData = cycleWeeks.find(w => w.week_number === currentWeek);
+          let weeklyActual = 0;
+
+          if (currentWeekData) {
+            const { data: weeklyOccurrences } = await supabase
+              .from('0008-ap-tasks')
+              .select('*')
+              .in('parent_task_id', taskIds)
+              .eq('status', 'completed')
+              .gte('due_date', currentWeekData.week_start)
+              .lte('due_date', currentWeekData.week_end);
+
+            weeklyActual = weeklyOccurrences?.length || 0;
+          }
+
+          const { data: overallOccurrences } = await supabase
+            .from('0008-ap-tasks')
+            .select('*')
+            .in('parent_task_id', taskIds)
+            .eq('status', 'completed')
+            .gte('due_date', currentCycle?.start_date || '1900-01-01')
+            .lte('due_date', currentCycle?.end_date || '2100-12-31');
+
+          const { data: weekPlansData } = await supabase
+            .from('0008-ap-task-week-plan')
+            .select('target_days')
+            .in('task_id', taskIds)
+            .eq('user_cycle_id', userCycleId);
+
+          const overallActual = overallOccurrences?.length || 0;
+          const overallTarget = weekPlansData?.reduce((sum, wp) => sum + (wp.target_days || 0), 0) || 0;
+
+          const cappedOverallActual = Math.min(overallActual, overallTarget);
+          const overallProgress = overallTarget > 0 ? Math.round((cappedOverallActual / overallTarget) * 100) : 0;
+
+          progressData[goal.id] = {
+            goalId: goal.id,
+            currentWeek,
+            daysRemaining,
+            weeklyActual,
+            weeklyTarget: goal.weekly_target,
+            overallActual: cappedOverallActual,
+            overallTarget,
+            overallProgress,
+          };
+        }
+      } else {
+        for (const goal of twelveWeekGoals) {
+          progressData[goal.id] = {
+            goalId: goal.id,
+            currentWeek: 1,
+            daysRemaining: 0,
+            weeklyActual: 0,
+            weeklyTarget: goal.weekly_target,
+            overallActual: 0,
+            overallTarget: goal.total_target,
+            overallProgress: 0,
+          };
+        }
+      }
+
+      for (const goal of customGoals) {
+        const customWeeks = goal.start_date
+          ? generateCycleWeeks(goal.start_date, currentCycle?.week_start_day || 'monday', goal.end_date)
+          : [];
+
+        const totalWeeks = customWeeks.length > 0 ? customWeeks.length : 1;
+
+        let currentWeek = 1;
+        if (customWeeks.length > 0) {
+          const matchingWeekIndex = customWeeks.findIndex(
+            week =>
+              todayString >= week.start_date &&
+              todayString <= week.end_date
+          );
+
+          if (matchingWeekIndex >= 0) {
+            currentWeek = matchingWeekIndex + 1;
+          } else if (todayString > customWeeks[customWeeks.length - 1].end_date) {
+            currentWeek = customWeeks[customWeeks.length - 1].week_number;
+          } else if (todayString < customWeeks[0].start_date) {
+            currentWeek = customWeeks[0].week_number;
+          }
+        }
+
+        const currentWeekData = customWeeks.find(w => w.week_number === currentWeek);
+        const weekStartDate = currentWeekData?.start_date;
+        const weekEndDate = currentWeekData?.end_date;
+
+        let daysRemaining = 0;
+        if (goal.end_date) {
+          const parsedEnd = parseLocalDate(goal.end_date);
+          if (!isNaN(parsedEnd.getTime())) {
+            const diffDays = Math.ceil((parsedEnd.getTime() - normalizedToday.getTime()) / (1000 * 60 * 60 * 24));
+            daysRemaining = Math.max(0, diffDays);
+          }
+        }
+
         const { data: goalJoins } = await supabase
           .from('0008-ap-universal-goals-join')
           .select('parent_id')
-          .eq('twelve_wk_goal_id', goal.id)
+          .eq('custom_goal_id', goal.id)
           .eq('parent_type', 'task');
 
         const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
@@ -550,25 +688,23 @@ export function useGoals(options: UseGoalsOptions = {}) {
             currentWeek,
             daysRemaining,
             weeklyActual: 0,
-            weeklyTarget: goal.weekly_target,
+            weeklyTarget: 0,
             overallActual: 0,
-            overallTarget: goal.total_target,
+            overallTarget: 0,
             overallProgress: 0,
           };
           continue;
         }
 
-        const currentWeekData = cycleWeeks.find(w => w.week_number === currentWeek);
         let weeklyActual = 0;
-
-        if (currentWeekData) {
+        if (weekStartDate && weekEndDate) {
           const { data: weeklyOccurrences } = await supabase
             .from('0008-ap-tasks')
             .select('*')
             .in('parent_task_id', taskIds)
             .eq('status', 'completed')
-            .gte('due_date', currentWeekData.week_start)
-            .lte('due_date', currentWeekData.week_end);
+            .gte('due_date', weekStartDate)
+            .lte('due_date', weekEndDate);
 
           weeklyActual = weeklyOccurrences?.length || 0;
         }
@@ -578,18 +714,14 @@ export function useGoals(options: UseGoalsOptions = {}) {
           .select('*')
           .in('parent_task_id', taskIds)
           .eq('status', 'completed')
-          .gte('due_date', currentCycle?.start_date || '1900-01-01')
-          .lte('due_date', currentCycle?.end_date || '2100-12-31');
+          .gte('due_date', goal.start_date || '1900-01-01')
+          .lte('due_date', goal.end_date || '2100-12-31');
 
-        const { data: weekPlansData } = await supabase
-          .from('0008-ap-task-week-plan')
-          .select('target_days')
-          .in('task_id', taskIds)
-          .eq('user_cycle_id', userCycleId);
+        const weeklyTarget = taskIds.length;
+        const cappedWeeklyActual = Math.min(weeklyActual, weeklyTarget);
 
         const overallActual = overallOccurrences?.length || 0;
-        const overallTarget = weekPlansData?.reduce((sum, wp) => sum + (wp.target_days || 0), 0) || 0;
-
+        const overallTarget = weeklyTarget * totalWeeks;
         const cappedOverallActual = Math.min(overallActual, overallTarget);
         const overallProgress = overallTarget > 0 ? Math.round((cappedOverallActual / overallTarget) * 100) : 0;
 
@@ -597,8 +729,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
           goalId: goal.id,
           currentWeek,
           daysRemaining,
-          weeklyActual,
-          weeklyTarget: goal.weekly_target,
+          weeklyActual: cappedWeeklyActual,
+          weeklyTarget,
           overallActual: cappedOverallActual,
           overallTarget,
           overallProgress,
@@ -610,7 +742,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const totalActual = Object.values(progressData).reduce((sum, p) => sum + Math.min(p.overallActual, p.overallTarget), 0);
       const totalTarget = Object.values(progressData).reduce((sum, p) => sum + p.overallTarget, 0);
       const overallPercentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
-      
+
       setCycleEffortData({
         totalActual,
         totalTarget,
