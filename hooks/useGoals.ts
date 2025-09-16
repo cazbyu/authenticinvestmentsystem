@@ -378,10 +378,35 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Determine timeline type first
+      let timelineSource: 'global' | 'custom' | null = null;
+      if (userCycleId) {
+        // Check if this is a global timeline
+        const { data: globalCheck } = await supabase
+          .from('0008-ap-user-global-timelines')
+          .select('id')
+          .eq('id', userCycleId)
+          .single();
+        
+        if (globalCheck) {
+          timelineSource = 'global';
+        } else {
+          // Check if this is a custom timeline
+          const { data: customCheck } = await supabase
+            .from('0008-ap-custom-timelines')
+            .select('id')
+            .eq('id', userCycleId)
+            .single();
+          
+          if (customCheck) {
+            timelineSource = 'custom';
+          }
+        }
+      }
+
       // Fetch 12-week goals (only for global timelines)
       let twelveWeekData: any[] = [];
-      if (userCycleId) {
-        // Check if this is a global timeline by looking for user_global_timeline_id
+      if (userCycleId && timelineSource === 'global') {
         const { data, error } = await supabase
           .from('0008-ap-goals-12wk')
           .select('*')
@@ -395,23 +420,24 @@ export function useGoals(options: UseGoalsOptions = {}) {
       }
 
       // Fetch custom goals (only for custom timelines)
-      const {
-        data: customData,
-        error: customError
-      } = await supabase
-        .from('0008-ap-goals-custom')
-        .select(
-          `
-            id, user_id, title, description, status, progress,
-            start_date, end_date, created_at, updated_at
-          `
-        )
-        .eq('user_id', user.id)
-        .eq('custom_timeline_id', userCycleId || '')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+      let customData: any[] = [];
+      if (userCycleId && timelineSource === 'custom') {
+        const { data, error: customError } = await supabase
+          .from('0008-ap-goals-custom')
+          .select(
+            `
+              id, user_id, title, description, status, progress,
+              start_date, end_date, created_at, updated_at
+            `
+          )
+          .eq('user_id', user.id)
+          .eq('custom_timeline_id', userCycleId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
 
-      if (customError) throw customError;
+        if (customError) throw customError;
+        customData = data || [];
+      }
 
       const allGoalIds = [
         ...(twelveWeekData || []).map(g => g.id),
