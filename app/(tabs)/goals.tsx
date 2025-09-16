@@ -280,7 +280,7 @@ export default function Goals() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let goalsData: any[] = [];
+        const { data, error: queryError } = await supabase
 
       if (timeline.source === 'global') {
         // Fetch only 12-week goals for global timelines
@@ -288,7 +288,7 @@ export default function Goals() {
           .from('0008-ap-goals-12wk')
           .select('*')
           .eq('user_id', user.id)
-          .eq('user_global_timeline_id', timeline.id)
+          .eq('global_cycle_id', timeline.id)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
         
