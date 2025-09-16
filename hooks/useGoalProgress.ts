@@ -134,6 +134,22 @@ export interface WeekData {
   endDate: string;
 }
 
+type TimelineWeekInput =
+  | CycleWeek
+  | WeekData
+  | {
+      week_number?: number;
+      weekNumber?: number;
+      week_start?: string;
+      weekStart?: string;
+      start_date?: string;
+      startDate?: string;
+      week_end?: string;
+      weekEnd?: string;
+      end_date?: string;
+      endDate?: string;
+    };
+
 export interface WeeklyTaskData {
   task: any;
   weekPlan: TaskWeekPlan | null;
@@ -767,7 +783,12 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const fetchGoalActionsForWeek = async (goalIds: string[], weekStartDate: string, weekEndDate: string): Promise<Record<string, TaskWithLogs[]>> => {
+  const fetchGoalActionsForWeek = async (
+    goalIds: string[],
+    weekStartDate: string,
+    weekEndDate: string,
+    weeks: TimelineWeekInput[] = [],
+  ): Promise<Record<string, TaskWithLogs[]>> => {
     try {
       if (!weekStartDate || !weekEndDate || weekStartDate === 'null' || weekEndDate === 'null') {
         console.warn('Invalid date parameters provided to fetchGoalActionsForWeek:', { weekStartDate, weekEndDate });
@@ -776,7 +797,132 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       console.log('=== fetchGoalActionsForWeek START ===');
       console.log('Input params:', { goalIds, weekStartDate, weekEndDate });
-      console.log('Current cycle weeks available:', cycleWeeks.length);
+
+      const timelineType = selectedTimeline?.timeline_type ?? 'cycle';
+      const shouldRequireProvidedWeeks = ['project', 'challenge', 'custom'].includes(timelineType);
+
+      const resolvedWeekInputs = weeks.length > 0
+        ? weeks
+        : shouldRequireProvidedWeeks
+          ? []
+          : cycleWeeks;
+
+      if (!resolvedWeekInputs || resolvedWeekInputs.length === 0) {
+        console.warn('No week data available for fetchGoalActionsForWeek', {
+          timelineType,
+          providedWeeks: weeks.length,
+          cycleWeeks: cycleWeeks.length,
+        });
+        return {};
+      }
+
+      const normalizeWeek = (week: TimelineWeekInput) => {
+        const source = week as Record<string, any>;
+
+        const numberValue =
+          typeof source.week_number === 'number'
+            ? source.week_number
+            : typeof source.weekNumber === 'number'
+              ? source.weekNumber
+              : undefined;
+
+        const startValueRaw =
+          typeof source.week_start === 'string'
+            ? source.week_start
+            : typeof source.startDate === 'string'
+              ? source.startDate
+              : typeof source.start_date === 'string'
+                ? source.start_date
+                : typeof source.weekStart === 'string'
+                  ? source.weekStart
+                  : undefined;
+
+        const endValueRaw =
+          typeof source.week_end === 'string'
+            ? source.week_end
+            : typeof source.endDate === 'string'
+              ? source.endDate
+              : typeof source.end_date === 'string'
+                ? source.end_date
+                : typeof source.weekEnd === 'string'
+                  ? source.weekEnd
+                  : undefined;
+
+        return {
+          weekNumber: numberValue,
+          startDate: startValueRaw,
+          endDate: endValueRaw,
+        };
+      };
+
+      const normalizedWeeks = resolvedWeekInputs.map(normalizeWeek);
+
+      let matchedWeek = normalizedWeeks.find(week =>
+        (week.startDate && week.startDate === weekStartDate) ||
+        (week.endDate && week.endDate === weekEndDate)
+      );
+
+      if (!matchedWeek && isValidISODate(weekStartDate)) {
+        const weekStart = new Date(weekStartDate);
+        matchedWeek = normalizedWeeks.find(week => {
+          if (!week.startDate || !week.endDate) return false;
+          if (!isValidISODate(week.startDate) || !isValidISODate(week.endDate)) return false;
+
+          const candidateStart = new Date(week.startDate);
+          const candidateEnd = new Date(week.endDate);
+          return weekStart >= candidateStart && weekStart <= candidateEnd;
+        });
+      }
+
+      let resolvedWeekNumber = matchedWeek?.weekNumber;
+
+      if (typeof resolvedWeekNumber !== 'number') {
+        const indexByStart = normalizedWeeks.findIndex(week => week.startDate === weekStartDate);
+        if (indexByStart !== -1) {
+          const candidate = normalizedWeeks[indexByStart];
+          resolvedWeekNumber =
+            typeof candidate.weekNumber === 'number' ? candidate.weekNumber : indexByStart + 1;
+          matchedWeek = candidate;
+        }
+      }
+
+      if (typeof resolvedWeekNumber !== 'number' && isValidISODate(weekStartDate)) {
+        const startDate = new Date(weekStartDate);
+        const rangeIndex = normalizedWeeks.findIndex(week => {
+          if (!week.startDate || !week.endDate) return false;
+          if (!isValidISODate(week.startDate) || !isValidISODate(week.endDate)) return false;
+          const candidateStart = new Date(week.startDate);
+          const candidateEnd = new Date(week.endDate);
+          return startDate >= candidateStart && startDate <= candidateEnd;
+        });
+
+        if (rangeIndex !== -1) {
+          const candidate = normalizedWeeks[rangeIndex];
+          resolvedWeekNumber =
+            typeof candidate.weekNumber === 'number' ? candidate.weekNumber : rangeIndex + 1;
+          matchedWeek = candidate;
+        }
+      }
+
+      if (typeof resolvedWeekNumber !== 'number') {
+        console.warn('Unable to resolve week number for fetchGoalActionsForWeek', {
+          timelineType,
+          weekStartDate,
+          weekEndDate,
+        });
+        return {};
+      }
+
+      const resolvedWeekStart = matchedWeek?.startDate ?? weekStartDate;
+      const resolvedWeekEnd = matchedWeek?.endDate ?? weekEndDate;
+
+      console.log('Resolved week context for fetchGoalActionsForWeek:', {
+        timelineType,
+        resolvedWeekNumber,
+        resolvedWeekStart,
+        resolvedWeekEnd,
+        availableWeeks: normalizedWeeks.length,
+      });
       console.log('Current loading state at start:', loadingWeekActions);
 
       const supabase = getSupabaseClient();
@@ -809,13 +955,11 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         return {};
       }
 
-      const weekNumber = cycleWeeks.findIndex(w => w.week_start === weekStartDate) + 1;
-
       const { data: weekPlansData, error: weekPlansError } = await supabase
         .from('0008-ap-task-week-plan')
         .select('*')
         .in('task_id', taskIds)
-        .eq('week_number', weekNumber);
+        .eq('week_number', resolvedWeekNumber);
 
       if (weekPlansError) throw weekPlansError;
 
@@ -833,11 +977,11 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
         .eq('status', 'completed');
 
-      if (weekStartDate && isValidISODate(weekStartDate)) {
-        occurrenceQuery = occurrenceQuery.gte('due_date', weekStartDate);
+      if (resolvedWeekStart && isValidISODate(resolvedWeekStart)) {
+        occurrenceQuery = occurrenceQuery.gte('due_date', resolvedWeekStart);
       }
-      if (weekEndDate && isValidISODate(weekEndDate)) {
-        occurrenceQuery = occurrenceQuery.lte('due_date', weekEndDate);
+      if (resolvedWeekEnd && isValidISODate(resolvedWeekEnd)) {
+        occurrenceQuery = occurrenceQuery.lte('due_date', resolvedWeekEnd);
       }
 
       const { data: occurrenceData, error: occurrenceError } = await occurrenceQuery;
@@ -859,7 +1003,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           id: occ.id,
           task_id: task.id,
           measured_on: occ.due_date,
-          week_number: weekNumber,
+          week_number: resolvedWeekNumber,
           day_of_week: new Date(occ.due_date).getDay(),
           value: 1,
           created_at: occ.created_at,
