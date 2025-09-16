@@ -480,7 +480,7 @@ export default function Goals() {
         // Fetch custom timeline weeks
         const { data: weeksData, error: weeksError } = await supabase
           .from('v_custom_timeline_weeks')
-          .select('week_number, start_date, end_date')
+          .select('week_number, week_start, week_end')
           .eq('custom_timeline_id', timeline.id)
           .order('week_number', { ascending: true });
 
