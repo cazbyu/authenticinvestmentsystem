@@ -680,7 +680,9 @@ export default function Goals() {
 
   const handleTimelinesUpdate = () => {
     fetchAllTimelines();
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleWithdrawalSuccess = () => {
@@ -1182,7 +1184,7 @@ export default function Goals() {
         goal={selectedGoalForAction}
         cycleWeeks={timelineWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
-        onSubmitSuccess={handleActionEffortSuccess}
+        onSuccess={handleActionEffortSuccess}
       />
 
       <ManageCustomTimelinesModal
