@@ -580,9 +580,7 @@ export default function Goals() {
       }
       
       // Refresh goals to update progress
-      if (selectedTimeline) {
-        fetchTimelineGoals(selectedTimeline);
-      }
+      refreshGoals();
     } catch (error) {
       console.error('Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message);
@@ -632,6 +630,13 @@ export default function Goals() {
     if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
       fetchWeekActions();
     }
+  }, [selectedTimeline, timelineWeeks, timelineGoals, currentWeekIndex]);
+
+  const refreshGoals = () => {
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
+  };
 
   const handleCreateGoal = () => {
     if (!selectedTimeline) {
@@ -657,41 +662,30 @@ export default function Goals() {
 
   const handleGoalFormSuccess = () => {
     setCreateGoalModalVisible(false);
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
   };
 
   const handleEditGoalSuccess = () => {
     setEditGoalModalVisible(false);
     setSelectedGoal(null);
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
   };
 
   const handleActionEffortSuccess = () => {
     setActionEffortModalVisible(false);
     setSelectedGoalForAction(null);
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
     fetchWeekActions();
   };
 
   const handleTimelinesUpdate = () => {
     fetchAllTimelines();
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
   };
 
   const handleWithdrawalSuccess = () => {
     setWithdrawalFormVisible(false);
     calculateAuthenticScore();
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
   };
 
   const getCurrentWeek = () => {
@@ -1079,7 +1073,7 @@ export default function Goals() {
             <ActivityIndicator size="large" color="#0078d4" />
             <Text style={styles.loadingText}>Loading goals...</Text>
           </View>
-        ) : allGoals.length === 0 ? (
+        ) : timelineGoals.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Target size={64} color="#6b7280" />
             <Text style={styles.emptyTitle}>No Goals Yet</Text>
