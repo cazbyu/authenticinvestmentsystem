@@ -280,7 +280,7 @@ export default function Goals() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-        const { data, error: queryError } = await supabase
+      let goalsData: any[] = [];
 
       if (timeline.source === 'global') {
         // Fetch only 12-week goals for global timelines
