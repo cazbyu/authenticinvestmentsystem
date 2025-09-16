@@ -226,9 +226,9 @@ export default function Goals() {
             daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
           }
 
-          // Get goal count based on timeline source
+          // Get goal count based on timeline source - STRICT TABLE SEPARATION
           if (timeline.source === 'custom') {
-            // Count custom goals for this timeline
+            // Count ONLY custom goals for custom timelines
             const { data: customGoals, error } = await supabase
               .from('0008-ap-goals-custom')
               .select('id')
@@ -240,6 +240,7 @@ export default function Goals() {
               goalCount = customGoals?.length || 0;
             }
           } else if (timeline.source === 'global') {
+            // Count ONLY 12-week goals for global timelines
             const { data: globalGoals, error } = await supabase
               .from('0008-ap-goals-12wk')
               .select('id')

@@ -378,7 +378,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch 12-week goals (only if we have an active cycle)
+      // Fetch 12-week goals (only if we have an active cycle) - ONLY from 0008-ap-goals-12wk
       let twelveWeekData: any[] = [];
       if (userCycleId) {
         // First get the user cycle details to determine how to query goals
@@ -398,6 +398,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
             .eq('user_id', user.id)
             .eq('global_cycle_id', userCycle.global_cycle_id)
             .eq('status', 'active')
+            .eq('status', 'active')
             .order('created_at', { ascending: false });
           
           if (error) throw error;
@@ -409,6 +410,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
             .eq('user_id', user.id)
             .eq('timeline_id', userCycleId)
             .eq('status', 'active')
+            .eq('status', 'active')
             .order('created_at', { ascending: false });
           
           if (error) throw error;
@@ -416,7 +418,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         }
       }
 
-      // Fetch custom goals (independent of cycles)
+      // Fetch custom goals (independent of cycles) - ONLY from 0008-ap-goals-custom
       const {
         data: customData,
         error: customError
@@ -916,6 +918,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !currentCycle) return null;
 
+      // Ensure we're creating in the correct table for 12-week goals
       const { data, error } = await supabase
         .from('0008-ap-goals-12wk')
         .insert({
@@ -957,6 +960,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
+      // Ensure we're creating in the correct table for custom goals
       const { data, error } = await supabase
         .from('0008-ap-goals-custom')
         .insert({

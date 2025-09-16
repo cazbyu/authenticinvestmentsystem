@@ -286,13 +286,13 @@ const { data: roleKRData, error: roleKRError } = await supabase
     let goalData;
     
     if (goalType === '12week') {
-      // Create 12-week goal
+      // Create 12-week goal - ONLY in 0008-ap-goals-12wk table
       goalData = await createTwelveWeekGoal({
         title: formData.title,
         description: formData.description,
       });
     } else {
-      // Create custom goal
+      // Create custom goal - ONLY in 0008-ap-goals-custom table
       goalData = await createCustomGoal({
         title: formData.title,
         description: formData.description,
