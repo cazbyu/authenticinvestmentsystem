@@ -378,40 +378,37 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch 12-week goals
       let twelveWeekData: any[] = [];
-      if (userCycleId) {
-        // Try both possible column names to see which one has data
-        const { data, error } = await supabase
-          .from('0008-ap-goals-12wk')
-          .select('*')
-          .eq('user_id', user.id)
-          .or(`user_global_timeline_id.eq.${userCycleId},global_cycle_id.eq.${userCycleId}`)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        twelveWeekData = data || [];
-      }
-
-      // Fetch custom goals
       let customData: any[] = [];
-      if (userCycleId) {
-        const { data, error: customError } = await supabase
-          .from('0008-ap-goals-custom')
-          .select(
-            `
-              id, user_id, title, description, status, progress,
-              start_date, end_date, created_at, updated_at
-            `
-          )
-          .eq('user_id', user.id)
-          .eq('custom_timeline_id', userCycleId)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
 
-        if (customError) throw customError;
-        customData = data || [];
+      if (userCycleId && currentCycle) {
+        if (currentCycle.source === 'global') {
+          // For global timelines, only fetch 12-week goals
+          const { data, error } = await supabase
+            .from('0008-ap-goals-12wk')
+            .select('*')
+            .eq('user_id', user.id)
+            .or(`user_global_timeline_id.eq.${userCycleId},global_cycle_id.eq.${userCycleId}`)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          twelveWeekData = data || [];
+          customData = []; // No custom goals for global timelines
+        } else if (currentCycle.source === 'custom') {
+          // For custom timelines, only fetch custom goals
+          const { data, error } = await supabase
+            .from('0008-ap-goals-custom')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('custom_timeline_id', userCycleId)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+          customData = data || [];
+          twelveWeekData = []; // No 12-week goals for custom timelines
+        }
       }
 
       const allGoalIds = [
