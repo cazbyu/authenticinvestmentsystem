@@ -33,8 +33,27 @@ export interface UnifiedGoal {
   end_date?: string;
   created_at?: string;
   updated_at?: string;
+  timeline_id: string | null;
+  source: 'custom' | 'global';
   goal_type: GoalType;
 }
+
+type UnifiedGoalRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  progress: number | null;
+  weekly_target: number | null;
+  total_target: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  timeline_id: string | null;
+  source: 'custom' | 'global';
+};
 
 export interface TwelveWeekGoal {
   id: string;
@@ -366,15 +385,15 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       console.log('Fetching unified goals for timeline:', currentCycle.id);
 
       const { data: unified, error: unifiedErr } = await supabase
-        .from('v_unified_goals')
+        .from<UnifiedGoalRow>('v_unified_goals')
         .select(`
           id, user_id, title, description, status, progress,
           weekly_target, total_target, start_date, end_date,
-          created_at, updated_at, timeline_id, custom_timeline_id, source
+          created_at, updated_at, timeline_id, source
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .or(`timeline_id.eq.${currentCycle.id},custom_timeline_id.eq.${currentCycle.id}`)
+        .eq('timeline_id', currentCycle.id)
         .order('created_at', { ascending: false });
 
       if (unifiedErr) {
@@ -386,7 +405,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         id: g.id,
         user_id: g.user_id,
         title: g.title,
-        description: g.description,
+        description: g.description ?? undefined,
         status: g.status,
         progress: g.progress ?? 0,
         weekly_target: g.weekly_target ?? 3,
@@ -395,6 +414,8 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         end_date: g.end_date ?? undefined,
         created_at: g.created_at ?? undefined,
         updated_at: g.updated_at ?? undefined,
+        timeline_id: g.timeline_id ?? null,
+        source: g.source,
         goal_type: g.source === 'global' ? 'twelve_wk_goal' : 'custom_goal',
       }));
 
@@ -1080,7 +1101,23 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       if (error) throw error;
 
       await fetchGoals(selectedTimeline);
-      return { ...data, goal_type: 'twelve_wk_goal' };
+      return {
+        id: data.id,
+        user_id: data.user_id,
+        title: data.title,
+        description: data.description ?? undefined,
+        status: data.status,
+        progress: data.progress ?? 0,
+        weekly_target: data.weekly_target ?? (goalData.weekly_target ?? 3),
+        total_target: data.total_target ?? (goalData.total_target ?? 36),
+        start_date: data.start_date ?? undefined,
+        end_date: data.end_date ?? undefined,
+        created_at: data.created_at ?? undefined,
+        updated_at: data.updated_at ?? undefined,
+        timeline_id: data.user_global_timeline_id ?? selectedTimeline.id,
+        source: 'global',
+        goal_type: 'twelve_wk_goal',
+      };
     } catch (error) {
       console.error('Error creating 12-week goal:', error);
       throw error;
@@ -1119,7 +1156,23 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       if (error) throw error;
 
       await fetchGoals(selectedTimeline);
-      return { ...data, goal_type: 'custom_goal', weekly_target: 3, total_target: 36 };
+      return {
+        id: data.id,
+        user_id: data.user_id,
+        title: data.title,
+        description: data.description ?? undefined,
+        status: data.status,
+        progress: data.progress ?? 0,
+        weekly_target: data.weekly_target ?? 3,
+        total_target: data.total_target ?? 36,
+        start_date: data.start_date ?? undefined,
+        end_date: data.end_date ?? undefined,
+        created_at: data.created_at ?? undefined,
+        updated_at: data.updated_at ?? undefined,
+        timeline_id: data.custom_timeline_id ?? selectedTimeline.id,
+        source: 'custom',
+        goal_type: 'custom_goal',
+      };
     } catch (error) {
       console.error('Error creating custom goal:', error);
       throw error;
