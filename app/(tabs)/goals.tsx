@@ -580,9 +580,7 @@ export default function Goals() {
       }
       
       // Refresh goals to update progress
-      if (selectedTimeline) {
-        fetchTimelineGoals(selectedTimeline);
-      }
+      refreshGoals();
     } catch (error) {
       console.error('Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message);
@@ -634,6 +632,12 @@ export default function Goals() {
     }
   }, [selectedTimeline, timelineWeeks, timelineGoals, currentWeekIndex]);
 
+  const refreshGoals = () => {
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
+  };
+
   const handleCreateGoal = () => {
     if (!selectedTimeline) {
       Alert.alert('Select Timeline', 'Please select a timeline first');
@@ -658,41 +662,30 @@ export default function Goals() {
 
   const handleGoalFormSuccess = () => {
     setCreateGoalModalVisible(false);
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
   };
 
   const handleEditGoalSuccess = () => {
     setEditGoalModalVisible(false);
     setSelectedGoal(null);
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
   };
 
   const handleActionEffortSuccess = () => {
     setActionEffortModalVisible(false);
     setSelectedGoalForAction(null);
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
     fetchWeekActions();
   };
 
   const handleTimelinesUpdate = () => {
     fetchAllTimelines();
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
+    refreshGoals();
   };
 
   const handleWithdrawalSuccess = () => {
     setWithdrawalFormVisible(false);
     calculateAuthenticScore();
-    if (selectedTimeline) {
-      fetchTimelineGoals(selectedTimeline);
-    }
   };
 
   const getCurrentWeek = () => {
@@ -1183,7 +1176,6 @@ export default function Goals() {
         goal={selectedGoalForAction}
         cycleWeeks={timelineWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
-        onSubmitSuccess={handleActionEffortSuccess}
       />
 
       <ManageCustomTimelinesModal
