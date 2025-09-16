@@ -421,11 +421,15 @@ export function useGoals(options: UseGoalsOptions = {}) {
         data: customData,
         error: customError
       } = await supabase
-        .from('v_unified_goals')
-        .select('*')
+        .from('0008-ap-goals-custom')
+        .select(
+          `
+            id, user_id, title, description, status, progress,
+            start_date, end_date, created_at, updated_at
+          `
+        )
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .eq('source', 'custom')
         .order('created_at', { ascending: false });
 
       if (customError) throw customError;
@@ -498,6 +502,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         .filter(goal => filteredCustomIds.includes(goal.id))
         .map(goal => ({
           ...goal,
+          progress: goal.progress ?? 0,
           goal_type: 'custom' as const,
           domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
           roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
