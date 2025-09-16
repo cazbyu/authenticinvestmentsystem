@@ -377,7 +377,11 @@ const toDateString = (date: Date) => {
             const roleJoins = formData.selectedRoleIds.map(role_id => ({ parent_id: taskId, parent_type: 'task', role_id, user_id: user.id }));
             const domainJoins = formData.selectedDomainIds.map(domain_id => ({ parent_id: taskId, parent_type: 'task', domain_id, user_id: user.id }));
             const krJoins = formData.selectedKeyRelationshipIds.map(key_relationship_id => ({ parent_id: taskId, parent_type: 'task', key_relationship_id, user_id: user.id }));
-            const goalJoins = formData.selectedGoalIds.map(goal_id => ({ parent_id: taskId, parent_type: 'task', goal_id, user_id: user.id }));
+            const goalIds = new Set<string>(formData.selectedGoalIds);
+            if (formData.selectedGoalId) {
+                goalIds.add(formData.selectedGoalId);
+            }
+            const goalJoins = Array.from(goalIds).map(goal_id => ({ parent_id: taskId, parent_type: 'task', goal_id, user_id: user.id }));
 
             // Only add a new note if there's content in the notes field
             if (formData.notes && formData.notes.trim()) {
