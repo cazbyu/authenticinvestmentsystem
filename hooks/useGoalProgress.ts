@@ -352,7 +352,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const fetchGoals = async (currentCycle?: UserCycle) => {
+  const fetchGoals = async (currentCycle?: UserCycle | Timeline | null) => {
     console.log('=== FETCH GOALS START ===');
     console.log('Current cycle parameter:', currentCycle);
 
@@ -362,27 +362,42 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.log('No authenticated user found in fetchGoals');
+        setGoals([]);
         return;
       }
 
       console.log('User ID in fetchGoals:', user.id);
       console.log('Current cycle in fetchGoals:', currentCycle);
-
-      if (!currentCycle) {
-        console.log('No current cycle found in fetchGoals');
-        return;
-      }
-
-      console.log('Selected timeline details:', {
+      console.log('Selected timeline state in fetchGoals:', {
         id: selectedTimeline?.id,
         source: selectedTimeline?.source,
         timeline_type: selectedTimeline?.timeline_type,
-        title: selectedTimeline?.title
+        title: selectedTimeline?.title,
+      });
+
+      const resolvedTimeline = currentCycle ?? selectedTimeline;
+
+      if (!resolvedTimeline) {
+        console.log('No timeline found in fetchGoals');
+        setGoals([]);
+        return;
+      }
+
+      const resolvedTimelineType =
+        'timeline_type' in resolvedTimeline && resolvedTimeline.timeline_type
+          ? resolvedTimeline.timeline_type
+          : 'cycle';
+
+      console.log('Resolved timeline details for fetchGoals:', {
+        id: resolvedTimeline.id,
+        source: resolvedTimeline.source,
+        timeline_type: resolvedTimelineType,
+        title: resolvedTimeline.title,
       });
 
       let mergedGoals: UnifiedGoal[] = [];
 
-      console.log('Fetching unified goals for timeline:', currentCycle.id);
+      console.log('Fetching unified goals for timeline:', resolvedTimeline.id);
 
       const { data: unified, error: unifiedErr } = await supabase
         .from<UnifiedGoalRow>('v_unified_goals')
@@ -393,7 +408,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .eq('timeline_id', currentCycle.id)
+        .eq('timeline_id', resolvedTimeline.id)
         .order('created_at', { ascending: false });
 
       if (unifiedErr) {
@@ -402,26 +417,26 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       }
 
       mergedGoals = (unified ?? []).map(g => {
-        const inferredSource = g.source ?? currentCycle.source ?? 'custom';
+        const inferredSource = g.source ?? resolvedTimeline.source ?? 'custom';
         const goalType = inferredSource === 'global' ? 'twelve_wk_goal' : 'custom_goal';
 
         return {
-        id: g.id,
-        user_id: g.user_id,
-        title: g.title,
-        description: g.description ?? undefined,
-        status: g.status,
-        progress: g.progress ?? 0,
-        weekly_target: g.weekly_target ?? 3,
-        total_target: g.total_target ?? 36,
-        start_date: g.start_date ?? undefined,
-        end_date: g.end_date ?? undefined,
-        created_at: g.created_at ?? undefined,
-        updated_at: g.updated_at ?? undefined,
-        timeline_id: g.timeline_id ?? null,
-        source: inferredSource,
-        goal_type: goalType,
-      };
+          id: g.id,
+          user_id: g.user_id,
+          title: g.title,
+          description: g.description ?? undefined,
+          status: g.status,
+          progress: g.progress ?? 0,
+          weekly_target: g.weekly_target ?? 3,
+          total_target: g.total_target ?? 36,
+          start_date: g.start_date ?? undefined,
+          end_date: g.end_date ?? undefined,
+          created_at: g.created_at ?? undefined,
+          updated_at: g.updated_at ?? undefined,
+          timeline_id: g.timeline_id ?? null,
+          source: inferredSource,
+          goal_type: goalType,
+        };
       });
 
       console.log('Final merged goals count:', mergedGoals.length);
@@ -431,7 +446,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === 'twelve_wk_goal');
       if (twelveWeekGoals.length > 0) {
         console.log('Calculating progress for', twelveWeekGoals.length, '12-week goals');
-        await calculateGoalProgress(twelveWeekGoals, currentCycle.id);
+        await calculateGoalProgress(twelveWeekGoals, resolvedTimeline.id);
       }
 
       console.log('=== FETCH GOALS END ===');
