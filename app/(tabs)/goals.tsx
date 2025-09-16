@@ -22,6 +22,12 @@ interface Timeline {
   timeline_type?: 'cycle' | 'project' | 'challenge' | 'custom';
 }
 
+interface TimelineWeek {
+  week_number: number;
+  start_date: string;
+  end_date: string;
+}
+
 export default function Goals() {
   const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
@@ -44,7 +50,7 @@ export default function Goals() {
   
   // Timeline data
   const [allTimelines, setAllTimelines] = useState<Timeline[]>([]);
-  const [timelineWeeks, setTimelineWeeks] = useState<any[]>([]);
+  const [timelineWeeks, setTimelineWeeks] = useState<TimelineWeek[]>([]);
   const [timelineDaysLeft, setTimelineDaysLeft] = useState<any>(null);
   const [timelinesWithGoals, setTimelinesWithGoals] = useState<any[]>([]);
   
@@ -269,7 +275,7 @@ export default function Goals() {
         const { data: weeksData, error: weeksError } = await supabase
           .from('v_custom_timeline_weeks')
           .select('week_number, start_date, end_date')
-          .eq('timeline_id', timeline.id)
+          .eq('custom_timeline_id', timeline.id)
           .order('week_number', { ascending: true });
 
         if (weeksError) throw weeksError;
@@ -277,12 +283,12 @@ export default function Goals() {
         const { data: daysData, error: daysError } = await supabase
           .from('v_custom_timeline_days_left')
           .select('*')
-          .eq('timeline_id', timeline.id)
+          .eq('custom_timeline_id', timeline.id)
           .single();
 
         if (daysError && daysError.code !== 'PGRST116') throw daysError;
 
-        setTimelineWeeks(weeksData || []);
+        setTimelineWeeks((weeksData as TimelineWeek[]) || []);
         setTimelineDaysLeft(daysData);
       } else if (timeline.source === 'global') {
         // Fetch global timeline weeks
@@ -303,7 +309,7 @@ export default function Goals() {
         if (daysError && daysError.code !== 'PGRST116') throw daysError;
 
         // Map to consistent format
-        const mappedWeeks = (weeksData || []).map(week => ({
+        const mappedWeeks: TimelineWeek[] = (weeksData || []).map((week: any) => ({
           week_number: week.week_number,
           start_date: week.week_start,
           end_date: week.week_end,
@@ -336,7 +342,7 @@ export default function Goals() {
     const today = new Date().toISOString().slice(0, 10);
 
     const index = timelineWeeks.findIndex(
-      (w: any) => today >= w.start_date && today <= w.end_date
+      w => today >= w.start_date && today <= w.end_date
     );
 
     if (index !== -1) return index;
@@ -417,7 +423,7 @@ export default function Goals() {
       if (selectedTimeline.source === 'global') {
         actions = await fetchGoalActionsForWeek(goalIds, weekNumber, timelineWeeks);
       } else {
-        const customWeeks = timelineWeeks.map(week => ({
+        const customWeeks = timelineWeeks.map((week: TimelineWeek) => ({
           weekNumber: week.week_number,
           startDate: week.start_date,
           endDate: week.end_date,
