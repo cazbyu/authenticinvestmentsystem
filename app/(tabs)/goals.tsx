@@ -20,6 +20,15 @@ interface Timeline {
   start_date: string | null;
   end_date: string | null;
   timeline_type?: 'cycle' | 'project' | 'challenge' | 'custom';
+  global_cycle_id?: string | null;
+  global_cycle?: {
+    id?: string | null;
+    title?: string | null;
+    cycle_label?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    is_active?: boolean | null;
+  } | null;
 }
 
 interface TimelineWeek {
@@ -194,6 +203,8 @@ export default function Goals() {
             title: timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label,
             start_date: timeline.start_date,
             end_date: timeline.end_date,
+            global_cycle_id: timeline.global_cycle_id ?? timeline.global_cycle?.id,
+            global_cycle: timeline.global_cycle || null,
           });
         });
       }
@@ -230,11 +241,16 @@ export default function Goals() {
           // Get goal count based on timeline source
           if (timeline.source === 'global') {
             // Count 12-week goals for global timelines
+            const globalCycleId = timeline.global_cycle_id ?? timeline.global_cycle?.id;
+            const orFilter = globalCycleId
+              ? `user_global_timeline_id.eq.${timeline.id},global_cycle_id.eq.${globalCycleId}`
+              : `user_global_timeline_id.eq.${timeline.id}`;
+
             const { data: twelveWeekGoals, error } = await supabase
               .from('0008-ap-goals-12wk')
               .select('id')
               .eq('user_id', user.id)
-              .or(`user_global_timeline_id.eq.${timeline.id},global_cycle_id.eq.${timeline.id}`)
+              .or(orFilter)
               .eq('status', 'active');
 
             if (!error) {
@@ -284,11 +300,16 @@ export default function Goals() {
 
       if (timeline.source === 'global') {
         // Fetch only 12-week goals for global timelines
+        const globalCycleId = timeline.global_cycle_id ?? timeline.global_cycle?.id;
+        const orFilter = globalCycleId
+          ? `user_global_timeline_id.eq.${timeline.id},global_cycle_id.eq.${globalCycleId}`
+          : `user_global_timeline_id.eq.${timeline.id}`;
+
         const { data, error } = await supabase
           .from('0008-ap-goals-12wk')
           .select('*')
           .eq('user_id', user.id)
-          .eq('global_cycle_id', timeline.id)
+          .or(orFilter)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
         
