@@ -56,13 +56,14 @@ export default function Goals() {
   
   // Refs for initialization
   const initializedWeekRef = useRef(false);
+  
+  // Local goals state for the selected timeline
+  const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
+  const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
 
   // Use the goals hook with timeline scope
   const {
-    allGoals,
-    goalProgress,
     loading,
-    refreshGoals,
     completeActionSuggestion,
     undoActionOccurrence,
     createTwelveWeekGoal,
@@ -267,6 +268,189 @@ export default function Goals() {
     }
   };
 
+  const fetchTimelineGoals = async (timeline: Timeline) => {
+    if (!timeline) {
+      setTimelineGoals([]);
+      setTimelineGoalProgress({});
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let goalsData: any[] = [];
+
+      if (timeline.source === 'global') {
+        // Fetch only 12-week goals for global timelines
+        const { data, error } = await supabase
+          .from('0008-ap-goals-12wk')
+          .select('*')
+          .eq('user_id', user.id)
+          .or(`user_global_timeline_id.eq.${timeline.id},global_cycle_id.eq.${timeline.id}`)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        goalsData = (data || []).map(goal => ({ ...goal, goal_type: '12week' }));
+      } else if (timeline.source === 'custom') {
+        // Fetch only custom goals for custom timelines
+        const { data, error } = await supabase
+          .from('0008-ap-goals-custom')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('custom_timeline_id', timeline.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
+      }
+
+      if (goalsData.length === 0) {
+        setTimelineGoals([]);
+        setTimelineGoalProgress({});
+        return;
+      }
+
+      const goalIds = goalsData.map(g => g.id);
+
+      // Fetch related data for all goals
+      const [
+        { data: rolesData, error: rolesError },
+        { data: domainsData, error: domainsError },
+        { data: krData, error: krError }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
+      ]);
+
+      if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (krError) throw krError;
+
+      // Transform goals with related data
+      const transformedGoals = goalsData.map(goal => ({
+        ...goal,
+        domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
+        roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
+        keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+      }));
+
+      setTimelineGoals(transformedGoals);
+
+      // Calculate progress for these goals
+      await calculateTimelineGoalProgress(transformedGoals, timeline);
+
+    } catch (error) {
+      console.error('Error fetching timeline goals:', error);
+      Alert.alert('Error', (error as Error).message);
+      setTimelineGoals([]);
+      setTimelineGoalProgress({});
+    }
+  };
+
+  const calculateTimelineGoalProgress = async (goals: any[], timeline: Timeline) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const progressData: Record<string, any> = {};
+      const todayString = new Date().toISOString().split('T')[0];
+
+      for (const goal of goals) {
+        let currentWeek = 1;
+        let daysRemaining = 0;
+        let weeklyActual = 0;
+        let weeklyTarget = 0;
+        let overallActual = 0;
+        let overallTarget = 0;
+
+        if (timeline.source === 'global' && goal.goal_type === '12week') {
+          // Use timeline weeks for 12-week goals
+          currentWeek = getCurrentWeekIndex() + 1;
+          daysRemaining = getDaysRemaining();
+          weeklyTarget = goal.weekly_target || 0;
+          overallTarget = goal.total_target || 0;
+
+          // Calculate actual progress from task completions
+          const { data: goalJoins } = await supabase
+            .from('0008-ap-universal-goals-join')
+            .select('parent_id')
+            .eq('twelve_wk_goal_id', goal.id)
+            .eq('parent_type', 'task');
+
+          const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
+
+          if (taskIds.length > 0) {
+            const currentWeekData = timelineWeeks[getCurrentWeekIndex()];
+            if (currentWeekData) {
+              const { data: weeklyOccurrences } = await supabase
+                .from('0008-ap-tasks')
+                .select('*')
+                .in('parent_task_id', taskIds)
+                .eq('status', 'completed')
+                .gte('due_date', currentWeekData.start_date)
+                .lte('due_date', currentWeekData.end_date);
+
+              weeklyActual = weeklyOccurrences?.length || 0;
+            }
+
+            const { data: overallOccurrences } = await supabase
+              .from('0008-ap-tasks')
+              .select('*')
+              .in('parent_task_id', taskIds)
+              .eq('status', 'completed')
+              .gte('due_date', timeline.start_date || '1900-01-01')
+              .lte('due_date', timeline.end_date || '2100-12-31');
+
+            overallActual = overallOccurrences?.length || 0;
+          }
+        } else if (timeline.source === 'custom' && goal.goal_type === 'custom') {
+          // Calculate for custom goals
+          if (timeline.start_date && timeline.end_date) {
+            const startDate = new Date(timeline.start_date);
+            const endDate = new Date(timeline.end_date);
+            const now = new Date();
+            daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+            
+            // Find current week for custom timeline
+            const currentWeekData = timelineWeeks[getCurrentWeekIndex()];
+            if (currentWeekData) {
+              currentWeek = currentWeekData.week_number;
+            }
+          }
+
+          // Custom goals don't have weekly/total targets like 12-week goals
+          weeklyTarget = 0;
+          overallTarget = 0;
+          weeklyActual = 0;
+          overallActual = goal.progress || 0;
+        }
+
+        const overallProgress = overallTarget > 0 ? Math.round((Math.min(overallActual, overallTarget) / overallTarget) * 100) : goal.progress || 0;
+
+        progressData[goal.id] = {
+          goalId: goal.id,
+          currentWeek,
+          daysRemaining,
+          weeklyActual: Math.min(weeklyActual, weeklyTarget),
+          weeklyTarget,
+          overallActual: Math.min(overallActual, overallTarget),
+          overallTarget,
+          overallProgress,
+        };
+      }
+
+      setTimelineGoalProgress(progressData);
+    } catch (error) {
+      console.error('Error calculating timeline goal progress:', error);
+    }
+  };
+
   const fetchTimelineWeeks = async (timeline: Timeline) => {
     try {
       const supabase = getSupabaseClient();
@@ -334,6 +518,7 @@ export default function Goals() {
   useEffect(() => {
     if (selectedTimeline) {
       fetchTimelineWeeks(selectedTimeline);
+      fetchTimelineGoals(selectedTimeline);
     }
   }, [selectedTimeline]);
 
@@ -395,7 +580,9 @@ export default function Goals() {
       }
       
       // Refresh goals to update progress
-      refreshGoals();
+      if (selectedTimeline) {
+        fetchTimelineGoals(selectedTimeline);
+      }
     } catch (error) {
       console.error('Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message);
@@ -403,7 +590,7 @@ export default function Goals() {
   };
 
   const fetchWeekActions = async () => {
-    if (!selectedTimeline || timelineWeeks.length === 0 || allGoals.length === 0) {
+    if (!selectedTimeline || timelineWeeks.length === 0 || timelineGoals.length === 0) {
       setWeekGoalActions({});
       return;
     }
@@ -416,7 +603,7 @@ export default function Goals() {
         return;
       }
 
-      const goalIds = allGoals.map(g => g.id);
+      const goalIds = timelineGoals.map(g => g.id);
       const weekNumber = currentWeek.week_number;
 
       let actions: Record<string, any[]> = {};
@@ -442,10 +629,9 @@ export default function Goals() {
   };
 
   useEffect(() => {
-    if (selectedTimeline && timelineWeeks.length > 0 && allGoals.length > 0) {
+    if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
       fetchWeekActions();
     }
-  }, [selectedTimeline, currentWeekIndex, timelineWeeks, allGoals]);
 
   const handleCreateGoal = () => {
     if (!selectedTimeline) {
@@ -471,30 +657,41 @@ export default function Goals() {
 
   const handleGoalFormSuccess = () => {
     setCreateGoalModalVisible(false);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleEditGoalSuccess = () => {
     setEditGoalModalVisible(false);
     setSelectedGoal(null);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleActionEffortSuccess = () => {
     setActionEffortModalVisible(false);
     setSelectedGoalForAction(null);
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
     fetchWeekActions();
   };
 
   const handleTimelinesUpdate = () => {
     fetchAllTimelines();
-    refreshGoals();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const handleWithdrawalSuccess = () => {
     setWithdrawalFormVisible(false);
     calculateAuthenticScore();
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+    }
   };
 
   const getCurrentWeek = () => {
@@ -908,8 +1105,8 @@ export default function Goals() {
               <Text style={styles.backToTimelinesButtonText}>Back to Timelines</Text>
             </TouchableOpacity>
             
-            {allGoals.map(goal => {
-              const progress = goalProgress[goal.id];
+            {timelineGoals.map(goal => {
+              const progress = timelineGoalProgress[goal.id];
               const safeProgress = progress || {
                 weeklyActual: 0,
                 weeklyTarget: 0,
