@@ -6,17 +6,16 @@ import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { CreateGoalModal } from '@/components/goals/CreateGoalModal';
 import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
-import { CycleSetupModal } from '@/components/cycles/CycleSetupModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { ManageGlobalTimelinesModal } from '@/components/timelines/ManageGlobalTimelinesModal';
 import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
-import { useGoals } from '@/hooks/useGoals';
-import { Plus, ChevronLeft, ChevronRight, Calendar, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
+import { useGoals, fetchGoalActionsForWeek } from '@/hooks/useGoals';
+import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
 
 interface Timeline {
   id: string;
-  source: 'custom' | 'global' | 'cycle';
+  source: 'custom' | 'global';
   title?: string;
   start_date: string | null;
   end_date: string | null;
@@ -34,7 +33,6 @@ export default function Goals() {
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
   const [editGoalModalVisible, setEditGoalModalVisible] = useState(false);
   const [actionEffortModalVisible, setActionEffortModalVisible] = useState(false);
-  const [cycleSetupModalVisible, setCycleSetupModalVisible] = useState(false);
   const [manageCustomTimelinesModalVisible, setManageCustomTimelinesModalVisible] = useState(false);
   const [manageGlobalTimelinesModalVisible, setManageGlobalTimelinesModalVisible] = useState(false);
   const [withdrawalFormVisible, setWithdrawalFormVisible] = useState(false);
@@ -52,33 +50,18 @@ export default function Goals() {
   
   // Refs for initialization
   const initializedWeekRef = useRef(false);
-  const [selectedTimelineId, setSelectedTimelineId] = useState<string | null>(null);
-  const [initialGoalType, setInitialGoalType] = useState<'12week' | 'custom'>('12week');
-  const [customTimelineWeeks, setCustomTimelineWeeks] = useState<any[]>([]);
-  const [customTimelineGoals, setCustomTimelineGoals] = useState<any[]>([]);
 
   // Use the goals hook with timeline scope
   const {
-    twelveWeekGoals,
-    customGoals,
     allGoals,
-    currentCycle,
-    cycleWeeks,
-    daysLeftData,
     goalProgress,
-    cycleEffortData,
     loading,
     refreshGoals,
-    refreshAllData,
-    fetchGoalActionsForWeek,
     completeActionSuggestion,
     undoActionOccurrence,
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
-    getCurrentWeekNumber,
-    getCurrentWeekIndex,
-    getWeekData,
   } = useGoals();
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
@@ -152,17 +135,6 @@ export default function Goals() {
       if (!user) return;
 
       const timelines: Timeline[] = [];
-
-      // Add current cycle as a timeline option
-      if (currentCycle) {
-        timelines.push({
-          id: currentCycle.id,
-          source: 'cycle',
-          title: currentCycle.title || '12-Week Cycle',
-          start_date: currentCycle.start_date,
-          end_date: currentCycle.end_date,
-        });
-      }
 
       // Fetch custom timelines
       const { data: customData, error: customError } = await supabase
@@ -249,19 +221,7 @@ export default function Goals() {
           }
 
           // Get goal count based on timeline source
-          if (timeline.source === 'cycle') {
-            // Count 12-week goals for this cycle
-            const { data: cycleGoals, error } = await supabase
-              .from('0008-ap-goals-12wk')
-              .select('id')
-              .eq('user_id', user.id)
-              .eq('timeline_id', timeline.id)
-              .eq('status', 'active');
-
-            if (!error) {
-              goalCount = cycleGoals?.length || 0;
-            }
-          } else if (timeline.source === 'custom') {
+          if (timeline.source === 'custom') {
             // Count custom goals for this timeline
             const { data: customGoals, error } = await supabase
               .from('0008-ap-goals-custom')
@@ -274,10 +234,16 @@ export default function Goals() {
               goalCount = customGoals?.length || 0;
             }
           } else if (timeline.source === 'global') {
-            // Count goals linked to this global timeline
-            // This would require additional schema changes to link goals to global timelines
-            // For now, we'll show 0 goals for global timelines
-            goalCount = 0;
+            const { data: globalGoals, error } = await supabase
+              .from('0008-ap-goals-12wk')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('user_global_timeline_id', timeline.id)
+              .eq('status', 'active');
+
+            if (!error) {
+              goalCount = globalGoals?.length || 0;
+            }
           }
 
           return {
@@ -298,11 +264,7 @@ export default function Goals() {
     try {
       const supabase = getSupabaseClient();
       
-      if (timeline.source === 'cycle') {
-        // Use existing cycle weeks
-        setTimelineWeeks(cycleWeeks);
-        setTimelineDaysLeft(daysLeftData);
-      } else if (timeline.source === 'custom') {
+      if (timeline.source === 'custom') {
         // Fetch custom timeline weeks
         const { data: weeksData, error: weeksError } = await supabase
           .from('v_custom_timeline_weeks')
@@ -361,9 +323,6 @@ export default function Goals() {
     fetchAllTimelines();
   }, []);
 
-  useEffect(() => {
-    fetchAllTimelines();
-  }, [currentCycle]);
 
   useEffect(() => {
     if (selectedTimeline) {
@@ -371,13 +330,32 @@ export default function Goals() {
     }
   }, [selectedTimeline]);
 
+  const getCurrentWeekIndex = (): number => {
+    if (!timelineWeeks || timelineWeeks.length === 0) return -1;
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const index = timelineWeeks.findIndex(
+      (w: any) => today >= w.start_date && today <= w.end_date
+    );
+
+    if (index !== -1) return index;
+
+    const firstWeek = timelineWeeks[0];
+    const lastWeek = timelineWeeks[timelineWeeks.length - 1];
+    if (today < firstWeek.start_date) return 0;
+    if (today > lastWeek.end_date) return timelineWeeks.length - 1;
+
+    return -1;
+  };
+
   useEffect(() => {
     if (selectedTimeline && timelineWeeks.length > 0 && !initializedWeekRef.current) {
       const currentWeek = getCurrentWeekIndex();
       setCurrentWeekIndex(Math.max(0, currentWeek));
       initializedWeekRef.current = true;
     }
-  }, [selectedTimeline, timelineWeeks, getCurrentWeekIndex]);
+  }, [selectedTimeline, timelineWeeks]);
 
   const handleTimelineSelect = (timeline: Timeline) => {
     setSelectedTimeline(timeline);
@@ -436,17 +414,15 @@ export default function Goals() {
 
       let actions: Record<string, any[]> = {};
 
-      if (selectedTimeline.source === 'cycle') {
-        // Use existing cycle-based logic
-        actions = await fetchGoalActionsForWeek(goalIds, weekNumber);
+      if (selectedTimeline.source === 'global') {
+        actions = await fetchGoalActionsForWeek(goalIds, weekNumber, timelineWeeks);
       } else {
-        // For custom/global timelines, use custom week data
         const customWeeks = timelineWeeks.map(week => ({
           weekNumber: week.week_number,
           startDate: week.start_date,
           endDate: week.end_date,
         }));
-        actions = await fetchGoalActionsForWeek(goalIds, weekNumber, customWeeks);
+        actions = await fetchGoalActionsForWeek(goalIds, weekNumber, [], customWeeks);
       }
 
       setWeekGoalActions(actions);
@@ -478,8 +454,8 @@ export default function Goals() {
   };
 
   const handleAddAction = (goal: any) => {
-    if (selectedTimeline?.source !== 'cycle') {
-      Alert.alert('Not Available', 'Actions can only be added to 12-week cycle goals');
+    if (selectedTimeline?.source !== 'global') {
+      Alert.alert('Not Available', 'Actions can only be added to 12-week goals');
       return;
     }
     setSelectedGoalForAction(goal);
@@ -504,11 +480,6 @@ export default function Goals() {
     fetchWeekActions();
   };
 
-  const handleCycleSetupSuccess = () => {
-    setCycleSetupModalVisible(false);
-    refreshAllData();
-  };
-
   const handleTimelinesUpdate = () => {
     fetchAllTimelines();
     refreshGoals();
@@ -520,9 +491,7 @@ export default function Goals() {
   };
 
   const getCurrentWeek = () => {
-    if (selectedTimeline?.source === 'cycle') {
-      return getWeekData(currentWeekIndex);
-    } else if (timelineWeeks.length > 0) {
+    if (timelineWeeks.length > 0) {
       const week = timelineWeeks[currentWeekIndex];
       return week ? {
         weekNumber: week.week_number,
@@ -541,9 +510,7 @@ export default function Goals() {
   const getTimelineSubtitle = () => {
     if (!selectedTimeline) return '';
     
-    if (selectedTimeline.source === 'cycle') {
-      return '12-Week Cycle';
-    } else if (selectedTimeline.source === 'custom') {
+    if (selectedTimeline.source === 'custom') {
       const typeLabel = selectedTimeline.timeline_type === 'project' ? 'Project' :
                        selectedTimeline.timeline_type === 'challenge' ? 'Challenge' :
                        selectedTimeline.timeline_type === 'cycle' ? 'Custom Cycle' :
@@ -556,19 +523,11 @@ export default function Goals() {
   };
 
   const getDaysRemaining = () => {
-    if (selectedTimeline?.source === 'cycle') {
-      return daysLeftData?.days_left || 0;
-    } else {
-      return timelineDaysLeft?.days_left || 0;
-    }
+    return timelineDaysLeft?.days_left || 0;
   };
 
   const getProgressPercentage = () => {
-    if (selectedTimeline?.source === 'cycle') {
-      return daysLeftData?.pct_elapsed || 0;
-    } else {
-      return timelineDaysLeft?.pct_elapsed || 0;
-    }
+    return timelineDaysLeft?.pct_elapsed || 0;
   };
 
   const formatDateRange = (startDate: string, endDate: string) => {
@@ -594,9 +553,7 @@ export default function Goals() {
   };
 
   const getTimelineTypeLabel = (timeline: any) => {
-    if (timeline.source === 'cycle') {
-      return '12-Week Cycle';
-    } else if (timeline.source === 'custom') {
+    if (timeline.source === 'custom') {
       switch (timeline.timeline_type) {
         case 'project': return 'Project Timeline';
         case 'challenge': return 'Challenge Timeline';
@@ -610,9 +567,7 @@ export default function Goals() {
   };
 
   const getTimelineColor = (timeline: any) => {
-    if (timeline.source === 'cycle') {
-      return '#0078d4';
-    } else if (timeline.source === 'custom') {
+    if (timeline.source === 'custom') {
       return '#7c3aed';
     } else if (timeline.source === 'global') {
       return '#059669';
@@ -627,7 +582,6 @@ export default function Goals() {
   };
 
   const renderTimelineSelector = () => {
-    const cycleTimelines = allTimelines.filter(t => t.source === 'cycle');
     const customTimelines = allTimelines.filter(t => t.source === 'custom');
     const globalTimelines = allTimelines.filter(t => t.source === 'global');
 
@@ -643,42 +597,6 @@ export default function Goals() {
 
           <ScrollView style={styles.selectorContent}>
             {/* 12-Week Cycles */}
-            {cycleTimelines.length > 0 && (
-              <View style={styles.timelineGroup}>
-                <View style={styles.timelineGroupHeader}>
-                  <Text style={styles.timelineGroupTitle}>12-Week Cycles</Text>
-                  <TouchableOpacity
-                    style={styles.manageCycleButton}
-                    onPress={() => {
-                      setTimelineSelectorVisible(false);
-                      setCycleSetupModalVisible(true);
-                    }}
-                  >
-                    <Edit size={16} color="#0078d4" />
-                    <Text style={styles.manageCycleButtonText}>Manage</Text>
-                  </TouchableOpacity>
-                </View>
-                {cycleTimelines.map(timeline => (
-                  <TouchableOpacity
-                    key={timeline.id}
-                    style={[
-                      styles.timelineOption,
-                      selectedTimeline?.id === timeline.id && styles.selectedTimelineOption
-                    ]}
-                    onPress={() => handleTimelineSelect(timeline)}
-                  >
-                    <View style={styles.timelineOptionContent}>
-                      <Text style={styles.timelineOptionTitle}>{timeline.title}</Text>
-                      <Text style={styles.timelineOptionSubtitle}>12-Week Cycle</Text>
-                    </View>
-                    {selectedTimeline?.id === timeline.id && (
-                      <Text style={styles.selectedIndicator}>✓</Text>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
             {/* Custom Timelines */}
             <View style={styles.timelineGroup}>
               <View style={styles.timelineGroupHeader}>
@@ -852,14 +770,6 @@ export default function Goals() {
                 </Text>
                 <View style={styles.createTimelineButtons}>
                   <TouchableOpacity
-                    style={styles.createCycleButton}
-                    onPress={() => setCycleSetupModalVisible(true)}
-                  >
-                    <Calendar size={20} color="#ffffff" />
-                    <Text style={styles.createCycleButtonText}>Start 12-Week Cycle</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
                     style={styles.createCustomButton}
                     onPress={() => setManageCustomTimelinesModalVisible(true)}
                   >
@@ -941,14 +851,6 @@ export default function Goals() {
                   <Text style={styles.addTimelineTitle}>Add Timeline</Text>
                   <View style={styles.addTimelineButtons}>
                     <TouchableOpacity
-                      style={styles.addCycleButton}
-                      onPress={() => setCycleSetupModalVisible(true)}
-                    >
-                      <Calendar size={16} color="#0078d4" />
-                      <Text style={styles.addCycleButtonText}>12-Week Cycle</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
                       style={styles.addCustomTimelineButton}
                       onPress={() => setManageCustomTimelinesModalVisible(true)}
                     >
@@ -1020,7 +922,7 @@ export default function Goals() {
                   week={currentWeek}
                   weekActions={weekActions}
                   loadingWeekActions={loadingWeekActions}
-                  onAddAction={selectedTimeline?.source === 'cycle' ? () => handleAddAction(goal) : undefined}
+                  onAddAction={selectedTimeline?.source === 'global' ? () => handleAddAction(goal) : undefined}
                   onToggleCompletion={handleToggleCompletion}
                   onEdit={() => handleEditGoal(goal)}
                   selectedWeekNumber={currentWeek?.weekNumber}
@@ -1074,14 +976,8 @@ export default function Goals() {
         visible={actionEffortModalVisible}
         onClose={() => setActionEffortModalVisible(false)}
         goal={selectedGoalForAction}
-        cycleWeeks={cycleWeeks}
+        cycleWeeks={timelineWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
-      />
-
-      <CycleSetupModal
-        visible={cycleSetupModalVisible}
-        onClose={() => setCycleSetupModalVisible(false)}
-        onSuccess={handleCycleSetupSuccess}
       />
 
       <ManageCustomTimelinesModal
@@ -1320,22 +1216,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
   },
-  manageCycleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f9ff',
-    borderWidth: 1,
-    borderColor: '#0078d4',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 4,
-  },
-  manageCycleButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0078d4',
-  },
   manageCustomButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1517,22 +1397,6 @@ const styles = StyleSheet.create({
   addTimelineButtons: {
     gap: 8,
   },
-  addCycleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f0f9ff',
-    borderWidth: 1,
-    borderColor: '#0078d4',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  addCycleButtonText: {
-    color: '#0078d4',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   addCustomTimelineButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1568,21 +1432,6 @@ const styles = StyleSheet.create({
   createTimelineButtons: {
     gap: 12,
     width: '100%',
-  },
-  createCycleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-    justifyContent: 'center',
-  },
-  createCycleButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   createCustomButton: {
     flexDirection: 'row',
