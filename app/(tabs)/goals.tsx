@@ -108,13 +108,13 @@ export default function Goals() {
   const [timelineDaysLeft, setTimelineDaysLeft] = useState<any>(null);
   const [timelinesWithGoals, setTimelinesWithGoals] = useState<any[]>([]);
   
-  // Refs for initialization
-  const initializedWeekRef = useRef(false);
-  
   // Local goals state for the selected timeline
   const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
   const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
 
+  // Refs for initialization
+  const initializedWeekRef = useRef(false);
+  
   // Use the goals hook with timeline scope
   const {
     loading,
