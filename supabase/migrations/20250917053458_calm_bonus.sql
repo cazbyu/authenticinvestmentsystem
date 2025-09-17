@@ -1,22 +1,17 @@
 /*
-  # Create Unified Timeline Views (Corrected)
+  # Create Unified Timeline Views (Final - Corrected)
 
-  1. New Views
-     - `v_unified_timeline_weeks` - Combines global and custom timeline weeks
-     - `v_unified_timeline_days_left` - Combines global and custom timeline days left
-
-  2. Purpose
-     - Provides consistent interface for querying timeline data
-     - Uses actual column names from underlying views
+  Both global and custom views use:
+  - timeline_id
+  - week_number
+  - week_start
+  - week_end
 */
 
--- First, let's check what columns actually exist in the underlying views
--- and create the unified views based on the actual structure
-
--- Create unified timeline weeks view using actual column names
+-- Unified timeline weeks view
 CREATE OR REPLACE VIEW v_unified_timeline_weeks AS
 SELECT 
-  user_global_timeline_id AS timeline_id,
+  timeline_id,
   week_number,
   week_start,
   week_end,
@@ -26,17 +21,17 @@ FROM v_user_global_timeline_weeks
 UNION ALL
 
 SELECT 
-  id AS timeline_id,
+  timeline_id,
   week_number,
-  start_date AS week_start,
-  end_date AS week_end,
+  week_start,
+  week_end,
   'custom'::text AS source
 FROM v_custom_timeline_weeks;
 
--- Create unified timeline days left view using actual column names
+-- Unified timeline days left view
 CREATE OR REPLACE VIEW v_unified_timeline_days_left AS
 SELECT 
-  user_global_timeline_id AS timeline_id,
+  timeline_id,
   days_left,
   pct_elapsed,
   'global'::text AS source
@@ -45,12 +40,12 @@ FROM v_user_global_timeline_days_left
 UNION ALL
 
 SELECT 
-  id AS timeline_id,
+  timeline_id,
   days_left,
   pct_elapsed,
   'custom'::text AS source
 FROM v_custom_timeline_days_left;
 
--- Grant access to the views
+-- Grant access
 GRANT SELECT ON v_unified_timeline_weeks TO authenticated;
 GRANT SELECT ON v_unified_timeline_days_left TO authenticated;
