@@ -296,7 +296,9 @@ const { data: roleKRData, error: roleKRError } = await supabase
       goalData = await createCustomGoal({
         title: formData.title,
         description: formData.description,
-      });
+        custom_timeline_id: selectedTimeline?.id, // ✅ critical
+});
+
     }
 
     if (!goalData) throw new Error('Failed to create goal');
