@@ -303,21 +303,6 @@ export default function Goals() {
       setTimelineGoalProgress({});
     }
   };
-        goalIds,
-        currentWeek.week_number,
-        timelineWeeks,
-        []
-      );
-
-      console.log('Fetched week actions:', actions);
-      setWeekGoalActions(actions);
-    } catch (error) {
-      console.error('Error fetching week actions:', error);
-      setWeekGoalActions({});
-    } finally {
-      setLoadingWeekActions(false);
-    }
-  };
   
   // Modal states
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
@@ -583,92 +568,6 @@ export default function Goals() {
     }
   };
 
-  const fetchTimelineGoals = async (timeline: Timeline) => {
-    if (!timeline) {
-      setTimelineGoals([]);
-      setTimelineGoalProgress({});
-      return;
-    }
-
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      let goalsData: any[] = [];
-
-      if (timeline.source === 'global') {
-        // Fetch only 12-week goals for global timelines
-        const globalCycleId = timeline.global_cycle_id ?? timeline.global_cycle?.id;
-        const orFilter = globalCycleId
-          ? `user_global_timeline_id.eq.${timeline.id},global_cycle_id.eq.${globalCycleId}`
-          : `user_global_timeline_id.eq.${timeline.id}`;
-
-        const { data, error } = await supabase
-          .from('0008-ap-goals-12wk')
-          .select('*')
-          .eq('user_id', user.id)
-          .or(orFilter)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        goalsData = (data || []).map(goal => ({ ...goal, goal_type: '12week' }));
-      } else if (timeline.source === 'custom') {
-        // Fetch only custom goals for custom timelines
-        const { data, error } = await supabase
-          .from('0008-ap-goals-custom')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('custom_timeline_id', timeline.id)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
-      }
-
-      if (goalsData.length === 0) {
-        setTimelineGoals([]);
-        setTimelineGoalProgress({});
-        return;
-      }
-
-      const goalIds = goalsData.map(g => g.id);
-
-      // Fetch related data for all goals
-      const [
-        { data: rolesData, error: rolesError },
-        { data: domainsData, error: domainsError },
-        { data: krData, error: krError }
-      ] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
-        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
-        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
-      ]);
-
-      if (rolesError) throw rolesError;
-      if (domainsError) throw domainsError;
-      if (krError) throw krError;
-
-      // Process goals with their related data
-      const goalsWithData = goalsData.map(goal => ({
-        ...goal,
-        roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
-        domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
-        key_relationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
-      }));
-
-      setTimelineGoals(goalsWithData);
-      setTimelineGoalProgress({});
-
-    } catch (error) {
-      console.error('Error fetching timeline goals:', error);
-      setTimelineGoals([]);
-      setTimelineGoalProgress({});
-    }
-  };
-
   const fetchTimelineWeeks = async (timeline: Timeline) => {
     try {
       const supabase = getSupabaseClient();
@@ -697,10 +596,10 @@ export default function Goals() {
 
       // Normalize the data structure
       const normalizedWeeks = (weeks || []).map(week => ({
-  week_number: week.week_number,
-  start_date: week.week_start,
-  end_date: week.week_end,
-}));
+        week_number: week.week_number,
+        start_date: week.week_start,
+        end_date: week.week_end,
+      }));
 
       setTimelineWeeks(normalizedWeeks);
     } catch (error) {
