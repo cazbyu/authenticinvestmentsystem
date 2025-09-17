@@ -345,9 +345,28 @@ export default function Goals() {
       ] = await Promise.all([
         supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
         supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
-        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, title)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
-      ]
-      )
+        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
+      ]);
+
+      if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (krError) throw krError;
+
+      // Process goals with their related data
+      const goalsWithData = goalsData.map(goal => ({
+        ...goal,
+        roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
+        domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
+        key_relationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+      }));
+
+      setTimelineGoals(goalsWithData);
+      setTimelineGoalProgress({});
+
+    } catch (error) {
+      console.error('Error fetching timeline goals:', error);
+      setTimelineGoals([]);
+      setTimelineGoalProgress({});
     }
   }
 }
