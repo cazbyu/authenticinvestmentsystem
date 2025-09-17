@@ -676,18 +676,10 @@ export default function Goals() {
 
       {/* FAB for creating goals */}
       <TouchableOpacity 
-        style={styles.fab} 
+        style={styles.fabLarge} 
         onPress={() => setCreateGoalModalVisible(true)}
       >
         <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
-
-      {/* Withdrawal FAB */}
-      <TouchableOpacity 
-        style={styles.withdrawalFab} 
-        onPress={() => setWithdrawalFormVisible(true)}
-      >
-        <Minus size={20} color="#ffffff" />
       </TouchableOpacity>
 
       {/* Modals */}
@@ -979,14 +971,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  withdrawalFab: {
+  fabLarge: {
     position: 'absolute',
     bottom: 20,
-    left: 20,
+    right: 20,
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#dc2626',
+    backgroundColor: '#0078d4',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
