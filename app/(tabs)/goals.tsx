@@ -130,7 +130,7 @@ export default function Goals() {
 
   useEffect(() => {
     if (selectedTimeline) {
-      refreshAllData();
+      fetchTimelineGoals(selectedTimeline);
       fetchTimelineWeeks(selectedTimeline);
       fetchTimelineDaysLeft(selectedTimeline);
     }
@@ -320,17 +320,12 @@ export default function Goals() {
       let goalsData: any[] = [];
 
       if (timeline.source === 'global') {
-        // Fetch only 12-week goals for global timelines
-        const globalCycleId = timeline.global_cycle_id ?? timeline.global_cycle?.id;
-        const orFilter = globalCycleId
-          ? `user_global_timeline_id.eq.${timeline.id},global_cycle_id.eq.${globalCycleId}`
-          : `user_global_timeline_id.eq.${timeline.id}`;
-
+        // Fetch 12-week goals for global timelines using the correct FK
         const { data, error } = await supabase
           .from('0008-ap-goals-12wk')
           .select('*')
           .eq('user_id', user.id)
-          .or(orFilter)
+          .eq('user_global_timeline_id', timeline.id)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
         
@@ -349,6 +344,13 @@ export default function Goals() {
         if (error) throw error;
         goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
       }
+
+      console.log('Fetched goals for timeline:', {
+        timelineId: timeline.id,
+        source: timeline.source,
+        goalsCount: goalsData.length,
+        goals: goalsData.map(g => ({ id: g.id, title: g.title }))
+      });
 
       if (goalsData.length === 0) {
         setTimelineGoals([]);
@@ -378,14 +380,25 @@ export default function Goals() {
         ...goal,
         roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
         domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
-        key_relationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+        keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
       }));
+
+      console.log('Goals with data:', {
+        count: goalsWithData.length,
+        sample: goalsWithData[0] ? {
+          id: goalsWithData[0].id,
+          title: goalsWithData[0].title,
+          rolesCount: goalsWithData[0].roles?.length || 0,
+          domainsCount: goalsWithData[0].domains?.length || 0
+        } : null
+      });
 
       setTimelineGoals(goalsWithData);
       setTimelineGoalProgress({});
 
     } catch (error) {
       console.error('Error fetching timeline goals:', error);
+      Alert.alert('Error', `Failed to fetch goals: ${(error as Error).message}`);
       setTimelineGoals([]);
       setTimelineGoalProgress({});
     }
