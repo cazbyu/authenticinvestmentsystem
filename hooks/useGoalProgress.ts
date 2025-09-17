@@ -805,6 +805,12 @@ if (customErr) throw customErr;
     }
   };
 
+  const fetchGoalActionsForWeekForState = (
+    goalIds: string[],
+    weekNumber: number,
+    customWeeks?: WeekData[]
+  ) => fetchGoalActionsForWeek(goalIds, weekNumber, cycleWeeks, customWeeks || []);
+
     const refreshAllData = async () => {
     try {
       const timeline = await fetchAvailableTimelines();
@@ -1320,7 +1326,7 @@ if (customErr) throw customErr;
     refreshGoals,
     refreshAllData,
     fetchTasksAndPlansForWeek,
-    fetchGoalActionsForWeek,
+    fetchGoalActionsForWeek: fetchGoalActionsForWeekForState,
     toggleTaskDay,
     completeActionSuggestion,
     undoActionOccurrence,
