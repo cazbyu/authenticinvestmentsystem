@@ -44,6 +44,51 @@ export default function Goals() {
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   
+  // Add effect to fetch week actions when timeline or week changes
+  useEffect(() => {
+    if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
+      fetchWeekActions();
+    }
+  }, [selectedTimeline, currentWeekIndex, timelineGoals]);
+
+  const fetchWeekActions = async () => {
+    if (!selectedTimeline || timelineWeeks.length === 0 || timelineGoals.length === 0) {
+      setWeekGoalActions({});
+      return;
+    }
+
+    const currentWeek = timelineWeeks[currentWeekIndex];
+    if (!currentWeek) {
+      setWeekGoalActions({});
+      return;
+    }
+
+    setLoadingWeekActions(true);
+    try {
+      const goalIds = timelineGoals.map(g => g.id);
+      console.log('Fetching week actions for:', {
+        goalIds,
+        weekNumber: currentWeek.week_number,
+        timelineId: selectedTimeline.id
+      });
+
+      const actions = await fetchGoalActionsForWeek(
+        goalIds,
+        currentWeek.week_number,
+        timelineWeeks,
+        []
+      );
+
+      console.log('Fetched week actions:', actions);
+      setWeekGoalActions(actions);
+    } catch (error) {
+      console.error('Error fetching week actions:', error);
+      setWeekGoalActions({});
+    } finally {
+      setLoadingWeekActions(false);
+    }
+  };
+  
   // Modal states
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
   const [editGoalModalVisible, setEditGoalModalVisible] = useState(false);

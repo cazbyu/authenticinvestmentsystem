@@ -1,5 +1,5 @@
 // hooks/fetchGoalActionsForWeek.ts
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase';
 
 /** Minimal shapes so this helper stands alone. */
 export type TimelineWeekInput = {
@@ -52,8 +52,7 @@ export async function fetchGoalActionsForWeek(
   goalIds: string[],
   weekNumber: number,
   cycleWeeks: TimelineWeekInput[],
-  customTimelineWeeks: TimelineWeekInput[] = [],
-  supabase: SupabaseClient
+  customTimelineWeeks: TimelineWeekInput[] = []
 ): Promise<Record<string, TaskWithLogs[]>> {
   try {
     console.debug('[fetchGoalActionsForWeek] called with:', {
@@ -64,6 +63,7 @@ export async function fetchGoalActionsForWeek(
       customTimelineWeeksCount: customTimelineWeeks?.length ?? 0,
     });
 
+    const supabase = getSupabaseClient();
     const { data: auth } = await supabase.auth.getUser();
     const user = auth?.user ?? null;
     if (!user) {
