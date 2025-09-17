@@ -1352,7 +1352,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         end_date: data.end_date ?? undefined,
         created_at: data.created_at ?? undefined,
         updated_at: data.updated_at ?? undefined,
-        timeline_id: data.custom_timeline_id ?? selectedTimeline.id,
+        timeline_id: data.timeline_id ?? selectedTimeline.id,
         source: 'custom',
         goal_type: 'custom_goal',
       };
