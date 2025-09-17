@@ -284,37 +284,6 @@ export default function Goals() {
     }
   };
 
-  const fetchTimelineWeeks = async (timeline: Timeline) => {
-    try {
-      const supabase = getSupabaseClient();
-
-      let weeks, error;
-      
-      if (timeline.source === 'global') {
-        const result = await supabase
-          .from('v_user_global_timeline_weeks')
-          .select('week_number, week_start, week_end, timeline_id')
-          .eq('timeline_id', timeline.id)
-          .order('week_number', { ascending: true });
-        weeks = result.data;
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('v_custom_timeline_weeks')
-          .select('week_number, start_date, end_date, custom_timeline_id')
-          .eq('custom_timeline_id', timeline.id)
-          .order('week_number', { ascending: true });
-        weeks = result.data?.map(w => ({
-          week_number: w.week_number,
-          week_start: w.start_date,
-          week_end: w.end_date,
-          timeline_id: w.custom_timeline_id
-        }));
-        error = result.error;
-      }
-
-      if (error) throw error;
-
   const fetchTimelineGoals = async (timeline: Timeline) => {
     if (!timeline) {
       setTimelineGoals([]);
@@ -399,5 +368,31 @@ export default function Goals() {
       setTimelineGoals([]);
       setTimelineGoalProgress({});
     }
-  }
+  };
+
+  const fetchTimelineDaysLeft = async (timeline: UserCycle) => {
+    try {
+      const supabase = getSupabaseClient();
+
+      let data, error;
+      
+      if (timeline.source === 'global') {
+        const result = await supabase
+          .from('v_user_global_timeline_days_left')
+          .select('timeline_id, days_left, pct_elapsed')
+          .eq('timeline_id', timeline.id)
+          .maybeSingle();
+        data = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from('v_custom_timeline_days_left')
+          .select('timeline_id, days_left, pct_elapsed')
+          .eq('timeline_id', timeline.id)
+          .maybeSingle();
+        data = result.data;
+        error = result.error;
+      }
+
+      if (error && error.code !== 'PGRST116') throw error;
 }
