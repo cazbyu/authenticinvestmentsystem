@@ -223,17 +223,23 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       // NOTE: Leaving as-is to match your current backend shape.
       // If you want me to make this robust to renames and include custom timelines, say the word.
-      const { data: allTimelines, error } = await supabase
-        .from('0008-ap-user-cycles')
-        .select(`
-          *,
-          global:0008-ap-global-cycles(id, start_date, end_date, title)
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+      const { data: globalTimelines, error: globalErr } = await supabase
+  .from('0008-ap-user-global-timelines')
+  .select('*')
+  .eq('user_id', user.id)
+  .eq('status', 'active')
+  .order('created_at', { ascending: false });
 
-      if (error && error.code !== 'PGRST116') throw error;
+if (globalErr) throw globalErr;
+
+const { data: customTimelines, error: customErr } = await supabase
+  .from('0008-ap-custom-timelines')
+  .select('*')
+  .eq('user_id', user.id)
+  .eq('status', 'active')
+  .order('created_at', { ascending: false });
+
+if (customErr) throw customErr;
 
       console.log('Raw timelines from database:', allTimelines?.length || 0);
       if (allTimelines) {
