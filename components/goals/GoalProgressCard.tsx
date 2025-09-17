@@ -108,11 +108,6 @@ export function GoalProgressCard({
       return days;
     }
 
-    console.log('=== GENERATE WEEK DAYS DEBUG ===');
-    console.log('Input start date string:', startDateString);
-    console.log('Parsed start date:', start.toISOString());
-    console.log('Start day of week:', start.getDay()); // 0=Sunday, 1=Monday, etc.
-
     // Generate 7 consecutive days starting from the provided start date
     for (let i = 0; i < 7; i++) {
       const day = new Date(start);
@@ -124,9 +119,6 @@ export function GoalProgressCard({
         dayOfWeek: day.getDay(),
       });
     }
-
-    console.log('Generated days:', days);
-    console.log('=== END GENERATE WEEK DAYS DEBUG ===');
 
     return days;
   };

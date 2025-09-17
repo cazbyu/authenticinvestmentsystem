@@ -48,13 +48,6 @@ export default function Goals() {
   const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
   const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
 
-  // Add effect to fetch week actions when timeline or week changes
-  useEffect(() => {
-    if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
-      fetchWeekActions();
-    }
-  }, [selectedTimeline, currentWeekIndex, timelineGoals]);
-
   const fetchWeekActions = async () => {
     if (!selectedTimeline || timelineWeeks.length === 0 || timelineGoals.length === 0) {
       setWeekGoalActions({});
@@ -76,7 +69,240 @@ export default function Goals() {
         timelineId: selectedTimeline.id
       });
 
-      const actions = await fetchGoalActionsForWeek(
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch goal joins to get parent task IDs
+      const { data: goalJoins, error: joinsErr } = await supabase
+        .from('0008-ap-universal-goals-join')
+        .select('parent_id, twelve_wk_goal_id, custom_goal_id, goal_type')
+        .or(`twelve_wk_goal_id.in.(${goalIds.join(',')}),custom_goal_id.in.(${goalIds.join(',')})`)
+        .eq('parent_type', 'task');
+
+      if (joinsErr) {
+        console.error('Error loading goal joins:', joinsErr);
+        return;
+      }
+
+      const taskIds = (goalJoins || []).map(j => j.parent_id);
+      console.log('Found task IDs:', taskIds);
+
+      if (taskIds.length === 0) {
+        console.log('No parent tasks linked to goals');
+        setWeekGoalActions({});
+        return;
+      }
+
+      // Fetch the parent action tasks
+      const { data: tasksData, error: tasksErr } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('id', taskIds)
+        .eq('input_kind', 'count')
+        .not('status', 'in', '(completed,cancelled)');
+
+      if (tasksErr) {
+        console.error('Error fetching tasks:', tasksErr);
+        return;
+      }
+
+      console.log('Found parent tasks:', tasksData?.length || 0);
+
+      if (!tasksData || tasksData.length === 0) {
+        console.log('No active parent tasks found');
+        setWeekGoalActions({});
+        return;
+      }
+
+      // Fetch week plans for the current week
+      const { data: weekPlansData, error: weekPlansErr } = await supabase
+        .from('0008-ap-task-week-plan')
+        .select('*')
+        .in('task_id', taskIds)
+        .eq('week_number', currentWeek.week_number);
+
+      if (weekPlansErr) {
+        console.error('Error fetching week plans:', weekPlansErr);
+        return;
+      }
+
+      console.log('Found week plans:', weekPlansData?.length || 0);
+
+      // Filter tasks that have week plans for this week
+      const tasksWithWeekPlans = tasksData.filter(task =>
+        (weekPlansData || []).some(wp => wp.task_id === task.id)
+      );
+
+      console.log('Tasks with week plans for this week:', tasksWithWeekPlans.length);
+
+      if (tasksWithWeekPlans.length === 0) {
+        console.log('No tasks have week plans for this week');
+        setWeekGoalActions({});
+        return;
+      }
+
+      // Fetch completed occurrences for this week
+      const { data: occurrenceData, error: occErr } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
+        .eq('status', 'completed')
+        .gte('due_date', currentWeek.start_date)
+        .lte('due_date', currentWeek.end_date);
+
+      if (occErr) {
+        console.error('Error fetching occurrences:', occErr);
+        return;
+      }
+
+      console.log('Found occurrences:', occurrenceData?.length || 0);
+
+      // Group actions by goal
+      const actions: Record<string, any[]> = {};
+
+      for (const task of tasksWithWeekPlans) {
+        const goalJoin = (goalJoins || []).find(gj => gj.parent_id === task.id);
+        if (!goalJoin) continue;
+
+        const weekPlan = (weekPlansData || []).find(wp => wp.task_id === task.id);
+        if (!weekPlan) continue;
+
+        const goalId = goalJoin.twelve_wk_goal_id || goalJoin.custom_goal_id;
+        if (!goalId) continue;
+
+        const relevantOccurrences = (occurrenceData || []).filter(occ => occ.parent_task_id === task.id);
+
+        const taskLogs = relevantOccurrences.map(occ => ({
+          id: occ.id,
+          task_id: task.id,
+          measured_on: occ.due_date,
+          week_number: currentWeek.week_number,
+          day_of_week: new Date(occ.due_date).getDay(),
+          value: 1,
+          completed: true,
+          created_at: occ.created_at,
+        }));
+
+        const weeklyActual = taskLogs.length;
+        const weeklyTarget = weekPlan.target_days || 0;
+        const cappedWeeklyActual = Math.min(weeklyActual, weeklyTarget);
+
+        const taskWithLogs = {
+          ...task,
+          goal_type: goalJoin.goal_type === 'twelve_wk_goal' ? '12week' : 'custom',
+          logs: taskLogs,
+          weeklyActual: cappedWeeklyActual,
+          weeklyTarget,
+        };
+
+        if (!actions[goalId]) actions[goalId] = [];
+        actions[goalId].push(taskWithLogs);
+      }
+
+      console.log('Final grouped actions:', actions);
+      setWeekGoalActions(actions);
+    } catch (error) {
+      console.error('Error fetching week actions:', error);
+      setWeekGoalActions({});
+    } finally {
+      setLoadingWeekActions(false);
+    }
+  };
+
+  // Add effect to fetch week actions when timeline or week changes
+  useEffect(() => {
+    if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
+      fetchWeekActions();
+    }
+  }, [selectedTimeline, currentWeekIndex, timelineGoals]);
+
+  const fetchTimelineGoals = async (timeline: Timeline) => {
+    if (!timeline) {
+      setTimelineGoals([]);
+      setTimelineGoalProgress({});
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let goalsData: any[] = [];
+
+      if (timeline.source === 'global') {
+        // Fetch only 12-week goals for global timelines
+        const globalCycleId = timeline.global_cycle_id ?? timeline.global_cycle?.id;
+        const orFilter = globalCycleId
+          ? `user_global_timeline_id.eq.${timeline.id},global_cycle_id.eq.${globalCycleId}`
+          : `user_global_timeline_id.eq.${timeline.id}`;
+
+        const { data, error } = await supabase
+          .from('0008-ap-goals-12wk')
+          .select('*')
+          .eq('user_id', user.id)
+          .or(orFilter)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        goalsData = (data || []).map(goal => ({ ...goal, goal_type: '12week' }));
+      } else if (timeline.source === 'custom') {
+        // Fetch only custom goals for custom timelines
+        const { data, error } = await supabase
+          .from('0008-ap-goals-custom')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('custom_timeline_id', timeline.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
+      }
+
+      if (goalsData.length === 0) {
+        setTimelineGoals([]);
+        setTimelineGoalProgress({});
+        return;
+      }
+
+      const goalIds = goalsData.map(g => g.id);
+
+      // Fetch related data for all goals
+      const [
+        { data: rolesData, error: rolesError },
+        { data: domainsData, error: domainsError },
+        { data: krData, error: krError }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
+      ]);
+
+      if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (krError) throw krError;
+
+      // Process goals with their related data
+      const goalsWithData = goalsData.map(goal => ({
+        ...goal,
+        roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
+        domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
+        keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+      }));
+
+      setTimelineGoals(goalsWithData);
+      setTimelineGoalProgress({});
+
+    } catch (error) {
+      console.error('Error fetching timeline goals:', error);
+      setTimelineGoals([]);
+      setTimelineGoalProgress({});
+    }
+  };
         goalIds,
         currentWeek.week_number,
         timelineWeeks,
@@ -760,7 +986,6 @@ export default function Goals() {
 
       <ActionEffortModal
         visible={actionEffortModalVisible}
-        onClose={() => setActionEffortModalVisible(false)}
         onClose={() => {
           setActionEffortModalVisible(false);
           // Refresh data after action is created
