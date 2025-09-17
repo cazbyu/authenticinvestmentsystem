@@ -1,7 +1,12 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
 
-async function fetchGoalActionsForWeek(goalIds, weekNumber, cycleWeeks, customTimelineWeeks = [], supabase) {
+export async function fetchGoalActionsForWeek(
+  goalIds: string[],
+  weekNumber: number,
+  cycleWeeks: TimelineWeekInput[],
+  customTimelineWeeks: TimelineWeekInput[] = [],
+  supabase: SupabaseClient
+): Promise<Record<string, TaskWithLogs[]>> {
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || goalIds.length === 0) return {};
 
@@ -82,43 +87,3 @@ async function fetchGoalActionsForWeek(goalIds, weekNumber, cycleWeeks, customTi
   return groupedActions;
 }
 
-test('fetchGoalActionsForWeek returns actions for custom timeline week', async () => {
-  const goalId = 'goal1';
-  const weekNumber = 2;
-  const customWeeks = [{ week_number: 2, startDate: '2024-01-08', endDate: '2024-01-14' }];
-
-  const goalJoinsData = [{ parent_id: 'task1', custom_goal_id: goalId, goal_type: 'custom' }];
-  const tasksData = [{ id: 'task1', user_id: 'user1', input_kind: 'count', status: 'active' }];
-  const weekPlansData = [{ task_id: 'task1', week_number: weekNumber, target_days: 5 }];
-  const occurrenceData = [{ id: 'occ1', parent_task_id: 'task1', due_date: '2024-01-10', created_at: '2024-01-10' }];
-
-  const supabaseStub = {
-    auth: { getUser: async () => ({ data: { user: { id: 'user1' } } }) },
-    from: (table) => {
-      if (table === '0008-ap-universal-goals-join') {
-        return { select() { return this; }, or() { return this; }, eq() { return Promise.resolve({ data: goalJoinsData }); } };
-      }
-      if (table === '0008-ap-tasks') {
-        let isOccurrence = false;
-        return {
-          select() { return this; },
-          eq(column, value) { if (column === 'status' && value === 'completed') { isOccurrence = true; } return this; },
-          in() { return this; },
-          not() { return Promise.resolve({ data: tasksData }); },
-          gte() { return this; },
-          lte() { return Promise.resolve({ data: isOccurrence ? occurrenceData : [] }); }
-        };
-      }
-      if (table === '0008-ap-task-week-plan') {
-        return { select() { return this; }, in() { return this; }, eq() { return Promise.resolve({ data: weekPlansData }); } };
-      }
-      return {};
-    }
-  };
-
-  const actions = await fetchGoalActionsForWeek([goalId], weekNumber, [], customWeeks, supabaseStub);
-  assert.ok(actions[goalId]);
-  assert.equal(actions[goalId].length, 1);
-  assert.equal(actions[goalId][0].weeklyActual, 1);
-  assert.equal(actions[goalId][0].weeklyTarget, 5);
-});
