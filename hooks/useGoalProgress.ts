@@ -1326,7 +1326,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .from('0008-ap-goals-custom')
         .insert({
           user_id: user.id,
-          custom_timeline_id: selectedTimeline.id,
+          timeline_id: selectedTimeline.id,
           title: goalData.title,
           start_date: startDate,
           end_date: endDate,
