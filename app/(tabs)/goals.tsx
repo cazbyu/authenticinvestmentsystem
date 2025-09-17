@@ -351,7 +351,10 @@ export default function Goals() {
       let goalsData: any[] = [];
 
       if (timeline.source === 'global') {
-        // Fetch 12-week goals for global timelines using the correct FK
+        // Fetch 12-week goals for global timelines - try both FK columns
+        console.log('Fetching global timeline goals for timeline:', timeline.id);
+        
+        // First try user_global_timeline_id
         const { data, error } = await supabase
           .from('0008-ap-goals-12wk')
           .select('*')
@@ -360,9 +363,45 @@ export default function Goals() {
           .eq('status', 'active')
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
-        goalsData = (data || []).map(goal => ({ ...goal, goal_type: '12week' }));
+        console.log('Global goals query result (user_global_timeline_id):', { data, error, count: data?.length || 0 });
+        
+        if (error) {
+          console.error('Error with user_global_timeline_id query:', error);
+          throw error;
+        }
+        
+        if (data && data.length > 0) {
+          goalsData = data.map(goal => ({ ...goal, goal_type: '12week' }));
+        } else {
+          // Fallback: try global_cycle_id if user_global_timeline_id didn't work
+          console.log('No goals found with user_global_timeline_id, trying global_cycle_id fallback');
+          const globalCycleId = timeline.global_cycle_id || timeline.global_cycle?.id;
+          
+          if (globalCycleId) {
+            const { data: fallbackData, error: fallbackError } = await supabase
+              .from('0008-ap-goals-12wk')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('global_cycle_id', globalCycleId)
+              .eq('status', 'active')
+              .order('created_at', { ascending: false });
+            
+            console.log('Global goals fallback query result (global_cycle_id):', { 
+              data: fallbackData, 
+              error: fallbackError, 
+              count: fallbackData?.length || 0,
+              globalCycleId 
+            });
+            
+            if (fallbackError) {
+              console.error('Error with global_cycle_id fallback query:', fallbackError);
+            } else if (fallbackData) {
+              goalsData = fallbackData.map(goal => ({ ...goal, goal_type: '12week' }));
+            }
+          }
+        }
       } else if (timeline.source === 'custom') {
+        console.log('Fetching custom timeline goals for timeline:', timeline.id);
         // Fetch only custom goals for custom timelines
         const { data, error } = await supabase
           .from('0008-ap-goals-custom')
@@ -372,6 +411,7 @@ export default function Goals() {
           .eq('status', 'active')
           .order('created_at', { ascending: false });
 
+        console.log('Custom goals query result:', { data, error, count: data?.length || 0 });
         if (error) throw error;
         goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
       }
