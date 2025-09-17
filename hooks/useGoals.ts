@@ -398,19 +398,29 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const supabase = getSupabaseClient();
       const view = source === 'custom' ? DB.V_CUSTOM_WEEKS : DB.V_GLOBAL_WEEKS;
 
+      const selectColumns =
+        source === 'custom'
+          ? 'week_number, start_date, end_date, custom_timeline_id'
+          : 'week_number, week_start, week_end, timeline_id';
+
+      const timelineColumn = source === 'custom' ? 'custom_timeline_id' : 'timeline_id';
+
       const { data: dbWeeks, error } = await supabase
         .from(view)
-        .select('week_number, week_start, week_end, timeline_id')
-        .eq('timeline_id', timelineId)
+        .select(selectColumns)
+        .eq(timelineColumn, timelineId)
         .order('week_number', { ascending: true });
 
       if (error) throw error;
 
       const mappedWeeks: CycleWeek[] = (dbWeeks ?? []).map((w: any) => ({
         week_number: w.week_number,
-        week_start: w.week_start,
-        week_end: w.week_end,
-        user_cycle_id: timelineId,
+        week_start: source === 'custom' ? w.start_date : w.week_start,
+        week_end: source === 'custom' ? w.end_date : w.week_end,
+        user_cycle_id:
+          source === 'custom'
+            ? (w.custom_timeline_id as string | undefined) ?? timelineId
+            : (w.timeline_id as string | undefined) ?? timelineId,
       }));
 
       setCycleWeeks(mappedWeeks);
