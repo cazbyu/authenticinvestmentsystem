@@ -399,7 +399,7 @@ export default function Goals() {
       } else {
         const result = await supabase
           .from('v_custom_timeline_weeks')
-          .select('week_number, starts_on, ends_on')
+          .select('week_number, week_start, week_end')
           .eq('timeline_id', timeline.id)
           .order('week_number', { ascending: true });
         weeks = result.data;
