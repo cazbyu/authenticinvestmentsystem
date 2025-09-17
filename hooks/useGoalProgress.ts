@@ -1148,7 +1148,7 @@ if (customErr) throw customErr;
           await supabase
             .from('0008-ap-goals-custom')
             .update({
-              timeline_id: currentCycleId,
+              custom_timeline_id: currentCycleId,
               updated_at: new Date().toISOString(),
             })
             .in('id', customIds);
