@@ -401,9 +401,5 @@ export default function Goals() {
       console.error('Error fetching timeline days left:', error);
       setTimelineDaysLeft(null);
     }
-    } catch (error) {
-      console.error('Error fetching timeline days left:', error);
-      setTimelineDaysLeft(null);
-    }
   };
 }
