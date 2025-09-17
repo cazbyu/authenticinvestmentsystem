@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Alert } from 'react-native';
 import { generateCycleWeeks, formatLocalDate, isValidISODate } from '@/lib/dateUtils';
+import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 
 export type GoalType = 'twelve_wk_goal' | 'custom_goal';
 
