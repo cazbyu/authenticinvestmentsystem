@@ -395,4 +395,6 @@ export default function Goals() {
       }
 
       if (error && error.code !== 'PGRST116') throw error;
+    }
+  }
 }
