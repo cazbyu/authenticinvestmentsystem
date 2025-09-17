@@ -11,28 +11,23 @@ export function calculateTaskPoints(
 ): number {
   let points = 0;
 
-  // Base points by urgency / importance
-  if (task.urgency === 'high' && task.importance === 'high') points += 5;
-  else if (task.urgency === 'high') points += 3;
-  else if (task.importance === 'high') points += 2;
+  // Role + Domain points
+  if (roles.length > 0) points += roles.length;
+  if (domains.length > 0) points += domains.length;
 
-  // Add points for roles
-  if (roles.length > 0) {
-    points += roles.length; // 1 per role
-  }
+  // Authentic deposit bonus
+  if (task.is_authentic_deposit) points += 2;
 
-  // Add points for domains
-  if (domains.length > 0) {
-    points += domains.length; // 1 per domain
-  }
+  // Urgency / Importance weights
+  if (task.is_urgent && task.is_important) points += 1.5;
+  else if (!task.is_urgent && task.is_important) points += 3;
+  else if (task.is_urgent && !task.is_important) points += 1;
+  else points += 0.5;
 
-  // Bonus: deposits count more
-  if (task.type === 'depositIdea') points += 2;
+  // Linked to 12-week goal bonus
+  if (task.is_twelve_week_goal) points += 2;
 
-  // Bonus: tied to a 12-week goal
-  if (task.twelve_wk_goal_id) points += 3;
-
-  return points;
+  return Math.round(points * 10) / 10;
 }
 
 //
@@ -50,58 +45,64 @@ export async function calculateAuthenticScore(
       .from('0008-ap-tasks')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'completed');
+      .eq('status', 'completed')
+      .not('completed_at', 'is', null);
 
     if (tasksErr) throw tasksErr;
-    console.log('[AuthenticScore] Tasks fetched:', tasksData?.length);
+    if (!tasksData || tasksData.length === 0) {
+      console.log('[AuthenticScore] No completed tasks found.');
+      return 0;
+    }
 
-    // 2. Roles
-    const { data: rolesData, error: rolesErr } = await supabase
-      .from('0008-ap-roles')
-      .select('*')
-      .eq('user_id', userId);
+    const taskIds = tasksData.map(t => t.id);
+
+    // 2. Roles + Domains via join tables
+    const [{ data: rolesData, error: rolesErr }, { data: domainsData, error: domainsErr }] =
+      await Promise.all([
+        supabase
+          .from('0008-ap-universal-roles-join')
+          .select('parent_id, role:0008-ap-roles(id, label)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
+        supabase
+          .from('0008-ap-universal-domains-join')
+          .select('parent_id, domain:0008-ap-domains(id, name)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
+      ]);
 
     if (rolesErr) throw rolesErr;
-    console.log('[AuthenticScore] Roles fetched:', rolesData?.length);
-
-    // 3. Domains
-    const { data: domainsData, error: domainsErr } = await supabase
-      .from('0008-ap-domains')
-      .select('*')
-      .eq('user_id', userId);
-
     if (domainsErr) throw domainsErr;
-    console.log('[AuthenticScore] Domains fetched:', domainsData?.length);
+
+    // 3. Calculate deposits
+    let totalDeposits = 0;
+    for (const task of tasksData) {
+      const roles =
+        rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) ?? [];
+      const domains =
+        domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) ?? [];
+
+      const pts = calculateTaskPoints(task, roles, domains);
+      totalDeposits += pts;
+
+      console.log(`[AuthenticScore] Task ${task.id} => ${pts} pts`);
+    }
 
     // 4. Withdrawals
     const { data: withdrawalsData, error: withdrawalsErr } = await supabase
       .from('0008-ap-withdrawals')
-      .select('*')
+      .select('amount')
       .eq('user_id', userId);
 
     if (withdrawalsErr) throw withdrawalsErr;
-    console.log('[AuthenticScore] Withdrawals fetched:', withdrawalsData?.length);
 
-    // 5. Calculate total points
-    let totalDeposits = 0;
-    (tasksData ?? []).forEach((task: any) => {
-      const taskWithData = {
-        ...task,
-        roles: rolesData?.filter((r: any) => r.task_id === task.id) ?? [],
-        domains: domainsData?.filter((d: any) => d.task_id === task.id) ?? [],
-      };
+    const totalWithdrawals =
+      withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
 
-      const pts = calculateTaskPoints(taskWithData, taskWithData.roles, taskWithData.domains);
-      totalDeposits += pts;
+    console.log('[AuthenticScore] Deposits:', totalDeposits);
+    console.log('[AuthenticScore] Withdrawals:', totalWithdrawals);
 
-      console.log(`[AuthenticScore] Task ${task.id} => ${pts} pts`);
-    });
-
-    const totalWithdrawals = (withdrawalsData ?? []).length * 2;
-    console.log('[AuthenticScore] Total Deposits:', totalDeposits);
-    console.log('[AuthenticScore] Total Withdrawals:', totalWithdrawals);
-
-    const finalScore = totalDeposits - totalWithdrawals;
+    const finalScore = Math.round((totalDeposits - totalWithdrawals) * 10) / 10;
     console.log('[AuthenticScore] Final Score:', finalScore);
 
     return finalScore;
@@ -125,6 +126,10 @@ export function calculateAuthenticScoreFromTasks(
     totalDeposits += pts;
   });
 
-  const totalWithdrawals = (withdrawals ?? []).length * 2;
-  return totalDeposits - totalWithdrawals;
+  const totalWithdrawals = (withdrawals ?? []).reduce(
+    (sum, w) => sum + parseFloat(w.amount?.toString() ?? '0'),
+    0
+  );
+
+  return Math.round((totalDeposits - totalWithdrawals) * 10) / 10;
 }
