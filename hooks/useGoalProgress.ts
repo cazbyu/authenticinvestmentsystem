@@ -1332,7 +1332,7 @@ if (customErr) throw customErr;
         .from('0008-ap-goals-custom')
         .insert({
           user_id: user.id,
-          timeline_id: selectedTimeline.id,
+          custom_timeline_id: selectedTimeline.id,
           title: goalData.title,
           start_date: startDate,
           end_date: endDate,
