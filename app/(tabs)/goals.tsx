@@ -172,6 +172,11 @@ export default function Goals() {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
+      console.log('Custom timelines query result:', {
+        data: customData,
+        error: customError,
+        count: customData?.length || 0
+      });
       if (customError) throw customError;
 
       if (customData) {
@@ -270,6 +275,12 @@ export default function Goals() {
             }
           } else if (timeline.source === 'custom') {
             // Count custom goals for custom timelines
+            console.log('Fetching custom goals for timeline:', {
+              timelineId: timeline.id,
+              timelineSource: timeline.source,
+              userId: user.id
+            });
+            
             const { data: customGoals, error } = await supabase
               .from('0008-ap-goals-custom')
               .select('id')
@@ -277,6 +288,11 @@ export default function Goals() {
               .eq('custom_timeline_id', timeline.id)
               .eq('status', 'active');
 
+            console.log('Custom goals query result:', {
+              data: customGoals,
+              error: error,
+              count: customGoals?.length || 0
+            });
             if (!error) {
               goalCount = customGoals?.length || 0;
             }
