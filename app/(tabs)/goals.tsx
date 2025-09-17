@@ -696,7 +696,7 @@ export default function Goals() {
         onClose={() => setCreateGoalModalVisible(false)}
         onSubmitSuccess={() => {
           setCreateGoalModalVisible(false);
-          refreshAllData();
+          fetchTimelineGoals(selectedTimeline!);
           fetchAllTimelines();
         }}
         createTwelveWeekGoal={createTwelveWeekGoal}
@@ -709,7 +709,7 @@ export default function Goals() {
         onClose={() => setEditGoalModalVisible(false)}
         onUpdate={() => {
           setEditGoalModalVisible(false);
-          refreshAllData();
+          fetchTimelineGoals(selectedTimeline!);
           fetchAllTimelines();
         }}
         goal={selectedGoal}
@@ -720,7 +720,7 @@ export default function Goals() {
         onClose={() => {
           setActionEffortModalVisible(false);
           // Refresh data after action is created
-          refreshAllData();
+          fetchTimelineGoals(selectedTimeline!);
           fetchWeekActions();
         }}
         goal={selectedGoalForAction}
@@ -733,7 +733,9 @@ export default function Goals() {
         onClose={() => setManageCustomTimelinesModalVisible(false)}
         onUpdate={() => {
           fetchAllTimelines();
-          refreshAllData();
+          if (selectedTimeline) {
+            fetchTimelineGoals(selectedTimeline);
+          }
         }}
       />
 
@@ -742,7 +744,9 @@ export default function Goals() {
         onClose={() => setManageGlobalTimelinesModalVisible(false)}
         onUpdate={() => {
           fetchAllTimelines();
-          refreshAllData();
+          if (selectedTimeline) {
+            fetchTimelineGoals(selectedTimeline);
+          }
         }}
       />
 
