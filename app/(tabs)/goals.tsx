@@ -12,6 +12,7 @@ import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useGoals } from '@/hooks/useGoals';
 import { calculateAuthenticScore } from '@/lib/taskUtils';
+import { formatLocalDate } from '@/lib/dateUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
 
 interface Timeline {
@@ -135,6 +136,36 @@ export default function Goals() {
       fetchTimelineDaysLeft(selectedTimeline);
     }
   }, [selectedTimeline]);
+
+  // Set current week index when timeline weeks are loaded
+  useEffect(() => {
+    if (timelineWeeks.length > 0) {
+      const currentWeekIndex = getCurrentWeekIndex();
+      setCurrentWeekIndex(currentWeekIndex);
+    }
+  }, [timelineWeeks]);
+
+  const getCurrentWeekIndex = () => {
+    if (timelineWeeks.length === 0) return 0;
+    
+    const today = formatLocalDate(new Date());
+    
+    // Find the week that contains today's date
+    const currentWeekIndex = timelineWeeks.findIndex(week => 
+      today >= week.start_date && today <= week.end_date
+    );
+    
+    // If today is before the timeline starts, show week 0
+    if (currentWeekIndex === -1) {
+      if (today < timelineWeeks[0].start_date) {
+        return 0;
+      }
+      // If today is after the timeline ends, show the last week
+      return timelineWeeks.length - 1;
+    }
+    
+    return currentWeekIndex;
+  };
 
   const calculateAuthenticScore = async () => {
     try {
