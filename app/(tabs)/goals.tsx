@@ -382,6 +382,46 @@ export default function Goals() {
     }
   };
 
+  const fetchTimelineWeeks = async (timeline: Timeline) => {
+    try {
+      const supabase = getSupabaseClient();
+
+      let weeks, error;
+      
+      if (timeline.source === 'global') {
+        const result = await supabase
+          .from('v_user_global_timeline_weeks')
+          .select('week_number, week_start, week_end')
+          .eq('timeline_id', timeline.id)
+          .order('week_number', { ascending: true });
+        weeks = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from('v_custom_timeline_weeks')
+          .select('week_number, start_date, end_date')
+          .eq('timeline_id', timeline.id)
+          .order('week_number', { ascending: true });
+        weeks = result.data;
+        error = result.error;
+      }
+
+      if (error) throw error;
+
+      // Normalize the data structure
+      const normalizedWeeks = (weeks || []).map(week => ({
+        week_number: week.week_number,
+        start_date: timeline.source === 'global' ? week.week_start : week.start_date,
+        end_date: timeline.source === 'global' ? week.week_end : week.end_date,
+      }));
+
+      setTimelineWeeks(normalizedWeeks);
+    } catch (error) {
+      console.error('Error fetching timeline weeks:', error);
+      setTimelineWeeks([]);
+    }
+  };
+
   const fetchTimelineDaysLeft = async (timeline: Timeline) => {
     try {
       const supabase = getSupabaseClient();
