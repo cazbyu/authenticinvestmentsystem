@@ -80,6 +80,18 @@ export default function Goals() {
     createTaskWithWeekPlan,
   } = useGoals();
 
+  useEffect(() => {
+    fetchAllTimelines();
+    calculateAuthenticScore();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTimeline) {
+      fetchTimelineGoals(selectedTimeline);
+      fetchTimelineWeeks(selectedTimeline);
+      fetchTimelineDaysLeft(selectedTimeline);
+    }
+  }, [selectedTimeline]);
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
     if (roles && roles.length > 0) points += roles.length;
