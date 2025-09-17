@@ -44,6 +44,10 @@ export default function Goals() {
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   
+  // Local goals state for the selected timeline
+  const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
+  const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
+
   // Add effect to fetch week actions when timeline or week changes
   useEffect(() => {
     if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
@@ -108,10 +112,6 @@ export default function Goals() {
   const [timelineDaysLeft, setTimelineDaysLeft] = useState<any>(null);
   const [timelinesWithGoals, setTimelinesWithGoals] = useState<any[]>([]);
   
-  // Local goals state for the selected timeline
-  const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
-  const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
-
   // Refs for initialization
   const initializedWeekRef = useRef(false);
   
