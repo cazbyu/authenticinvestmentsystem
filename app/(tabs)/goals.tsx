@@ -414,4 +414,545 @@ export default function Goals() {
       setTimelineDaysLeft(null);
     }
   };
+
+  const handleTimelineSelect = (timeline: Timeline) => {
+    setSelectedTimeline(timeline);
+    setCurrentWeekIndex(0);
+  };
+
+  const handleBackToTimelines = () => {
+    setSelectedTimeline(null);
+    setTimelineGoals([]);
+    setTimelineWeeks([]);
+    setTimelineDaysLeft(null);
+    setWeekGoalActions({});
+  };
+
+  const renderTimelineSelector = () => (
+    <View style={styles.content}>
+      <Header 
+        title="Goal Bank" 
+        authenticScore={authenticScore}
+      />
+      
+      <ScrollView style={styles.timelinesList}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0078d4" />
+            <Text style={styles.loadingText}>Loading timelines...</Text>
+          </View>
+        ) : timelinesWithGoals.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Target size={64} color="#6b7280" />
+            <Text style={styles.emptyTitle}>No Active Timelines</Text>
+            <Text style={styles.emptyText}>
+              Create a timeline to start tracking your goals
+            </Text>
+            <View style={styles.timelineButtons}>
+              <TouchableOpacity
+                style={styles.createTimelineButton}
+                onPress={() => setManageCustomTimelinesModalVisible(true)}
+              >
+                <Plus size={20} color="#ffffff" />
+                <Text style={styles.createTimelineButtonText}>Custom Timeline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.createGlobalTimelineButton}
+                onPress={() => setManageGlobalTimelinesModalVisible(true)}
+              >
+                <Users size={20} color="#ffffff" />
+                <Text style={styles.createGlobalTimelineButtonText}>Global Timeline</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.timelinesGrid}>
+            {timelinesWithGoals.map(timeline => (
+              <TouchableOpacity
+                key={timeline.id}
+                style={[
+                  styles.timelineCard,
+                  { borderLeftColor: timeline.source === 'global' ? '#0078d4' : '#7c3aed' }
+                ]}
+                onPress={() => handleTimelineSelect(timeline)}
+              >
+                <View style={styles.timelineHeader}>
+                  <Text style={styles.timelineTitle} numberOfLines={2}>
+                    {timeline.title || 'Untitled Timeline'}
+                  </Text>
+                  <View style={styles.timelineType}>
+                    <Text style={styles.timelineTypeText}>
+                      {timeline.source === 'global' ? 'Global' : 'Custom'}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.timelineStats}>
+                  {timeline.goalCount || 0} goals • {timeline.daysRemaining || 0} days left
+                </Text>
+                
+                {timeline.start_date && timeline.end_date && (
+                  <Text style={styles.timelineDates}>
+                    {new Date(timeline.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
+                    {new Date(timeline.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Management buttons */}
+      <View style={styles.managementButtons}>
+        <TouchableOpacity
+          style={styles.manageButton}
+          onPress={() => setManageCustomTimelinesModalVisible(true)}
+        >
+          <Edit size={16} color="#7c3aed" />
+          <Text style={styles.manageButtonText}>Manage Custom</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.manageGlobalButton}
+          onPress={() => setManageGlobalTimelinesModalVisible(true)}
+        >
+          <Users size={16} color="#0078d4" />
+          <Text style={styles.manageGlobalButtonText}>Manage Global</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderSelectedTimeline = () => {
+    if (!selectedTimeline) return null;
+
+    const currentWeek = timelineWeeks[currentWeekIndex];
+    const weekGoalActionsForWeek = weekGoalActions || {};
+
+    return (
+      <View style={styles.content}>
+        <Header
+          title={selectedTimeline.title || 'Timeline Goals'}
+          authenticScore={authenticScore}
+          backgroundColor={selectedTimeline.source === 'global' ? '#0078d4' : '#7c3aed'}
+          onBackPress={handleBackToTimelines}
+          daysRemaining={timelineDaysLeft?.days_left}
+          cycleProgressPercentage={timelineDaysLeft?.pct_elapsed}
+          cycleTitle={selectedTimeline.title}
+        />
+
+        {/* Week Navigation */}
+        {timelineWeeks.length > 0 && (
+          <View style={styles.weekNavigation}>
+            <TouchableOpacity
+              style={[styles.weekNavButton, currentWeekIndex === 0 && styles.weekNavButtonDisabled]}
+              onPress={() => setCurrentWeekIndex(Math.max(0, currentWeekIndex - 1))}
+              disabled={currentWeekIndex === 0}
+            >
+              <ChevronLeft size={20} color={currentWeekIndex === 0 ? '#9ca3af' : '#0078d4'} />
+            </TouchableOpacity>
+            
+            <View style={styles.weekInfo}>
+              <Text style={styles.weekTitle}>
+                Week {currentWeek?.week_number || 1}
+              </Text>
+              {currentWeek && (
+                <Text style={styles.weekDates}>
+                  {new Date(currentWeek.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
+                  {new Date(currentWeek.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </Text>
+              )}
+            </View>
+            
+            <TouchableOpacity
+              style={[styles.weekNavButton, currentWeekIndex === timelineWeeks.length - 1 && styles.weekNavButtonDisabled]}
+              onPress={() => setCurrentWeekIndex(Math.min(timelineWeeks.length - 1, currentWeekIndex + 1))}
+              disabled={currentWeekIndex === timelineWeeks.length - 1}
+            >
+              <ChevronRight size={20} color={currentWeekIndex === timelineWeeks.length - 1 ? '#9ca3af' : '#0078d4'} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <ScrollView style={styles.goalsList}>
+          {timelineGoals.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No goals found for this timeline</Text>
+              <TouchableOpacity
+                style={styles.createGoalButton}
+                onPress={() => setCreateGoalModalVisible(true)}
+              >
+                <Plus size={20} color="#ffffff" />
+                <Text style={styles.createGoalButtonText}>Create Goal</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            timelineGoals.map(goal => {
+              const progress = timelineGoalProgress[goal.id] || {
+                currentWeek: currentWeek?.week_number || 1,
+                daysRemaining: timelineDaysLeft?.days_left || 0,
+                weeklyActual: 0,
+                weeklyTarget: goal.weekly_target || 0,
+                overallActual: 0,
+                overallTarget: goal.total_target || 0,
+                overallProgress: 0,
+              };
+              
+              return (
+                <GoalProgressCard
+                  key={goal.id}
+                  goal={goal}
+                  progress={progress}
+                  expanded={true}
+                  week={currentWeek ? {
+                    weekNumber: currentWeek.week_number,
+                    startDate: currentWeek.start_date,
+                    endDate: currentWeek.end_date,
+                  } : null}
+                  weekActions={weekGoalActionsForWeek[goal.id] || []}
+                  loadingWeekActions={loadingWeekActions}
+                  onAddAction={() => {
+                    setSelectedGoalForAction(goal);
+                    setActionEffortModalVisible(true);
+                  }}
+                  onEdit={() => {
+                    setSelectedGoal(goal);
+                    setEditGoalModalVisible(true);
+                  }}
+                  selectedWeekNumber={currentWeek?.week_number}
+                />
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {selectedTimeline ? renderSelectedTimeline() : renderTimelineSelector()}
+
+      {/* FAB for creating goals */}
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={() => setCreateGoalModalVisible(true)}
+      >
+        <Plus size={24} color="#ffffff" />
+      </TouchableOpacity>
+
+      {/* Withdrawal FAB */}
+      <TouchableOpacity 
+        style={styles.withdrawalFab} 
+        onPress={() => setWithdrawalFormVisible(true)}
+      >
+        <Minus size={20} color="#ffffff" />
+      </TouchableOpacity>
+
+      {/* Modals */}
+      <CreateGoalModal
+        visible={createGoalModalVisible}
+        onClose={() => setCreateGoalModalVisible(false)}
+        onSubmitSuccess={() => {
+          setCreateGoalModalVisible(false);
+          if (selectedTimeline) {
+            fetchTimelineGoals(selectedTimeline);
+          }
+          fetchAllTimelines();
+        }}
+        createTwelveWeekGoal={createTwelveWeekGoal}
+        createCustomGoal={createCustomGoal}
+        selectedTimeline={selectedTimeline}
+      />
+
+      <EditGoalModal
+        visible={editGoalModalVisible}
+        onClose={() => setEditGoalModalVisible(false)}
+        onUpdate={() => {
+          setEditGoalModalVisible(false);
+          if (selectedTimeline) {
+            fetchTimelineGoals(selectedTimeline);
+          }
+          fetchAllTimelines();
+        }}
+        goal={selectedGoal}
+      />
+
+      <ActionEffortModal
+        visible={actionEffortModalVisible}
+        onClose={() => setActionEffortModalVisible(false)}
+        goal={selectedGoalForAction}
+        cycleWeeks={timelineWeeks}
+        createTaskWithWeekPlan={createTaskWithWeekPlan}
+      />
+
+      <ManageCustomTimelinesModal
+        visible={manageCustomTimelinesModalVisible}
+        onClose={() => setManageCustomTimelinesModalVisible(false)}
+        onUpdate={() => {
+          fetchAllTimelines();
+        }}
+      />
+
+      <ManageGlobalTimelinesModal
+        visible={manageGlobalTimelinesModalVisible}
+        onClose={() => setManageGlobalTimelinesModalVisible(false)}
+        onUpdate={() => {
+          fetchAllTimelines();
+        }}
+      />
+
+      <WithdrawalForm
+        visible={withdrawalFormVisible}
+        onClose={() => setWithdrawalFormVisible(false)}
+        onSubmitSuccess={() => {
+          setWithdrawalFormVisible(false);
+          calculateAuthenticScore();
+        }}
+      />
+    </SafeAreaView>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  content: {
+    flex: 1,
+  },
+  timelinesList: {
+    flex: 1,
+    padding: 16,
+  },
+  timelinesGrid: {
+    gap: 12,
+  },
+  timelineCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  timelineHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  timelineTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  timelineType: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  timelineTypeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  timelineStats: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  timelineDates: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#6b7280',
+    fontSize: 16,
+    marginTop: 12,
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: '#6b7280',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  timelineButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  createTimelineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7c3aed',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  createTimelineButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  createGlobalTimelineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  createGlobalTimelineButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  managementButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  manageButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#7c3aed',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  manageButtonText: {
+    color: '#7c3aed',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  manageGlobalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  manageGlobalButtonText: {
+    color: '#0078d4',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  weekNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  weekNavButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f8fafc',
+  },
+  weekNavButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+  },
+  weekInfo: {
+    alignItems: 'center',
+  },
+  weekTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  weekDates: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  goalsList: {
+    flex: 1,
+    padding: 16,
+  },
+  createGoalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  createGoalButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#0078d4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  withdrawalFab: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#dc2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+});
