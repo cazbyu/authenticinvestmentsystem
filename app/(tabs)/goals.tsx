@@ -11,6 +11,7 @@ import { ManageGlobalTimelinesModal } from '@/components/timelines/ManageGlobalT
 import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useGoals, fetchGoalActionsForWeek } from '@/hooks/useGoals';
+import { calculateTaskPoints, calculateAuthenticScore } from '@/lib/taskUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
 
 interface Timeline {
