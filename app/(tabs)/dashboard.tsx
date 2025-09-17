@@ -161,7 +161,7 @@ export default function Dashboard() {
       }
 
       // Calculate authentic score (total balance) for header
-      await calculateAuthenticScore();
+      await refreshAuthenticScore();
 
     } catch (error) {
       console.error(`Error fetching ${activeView}:`, error);
