@@ -10,8 +10,8 @@ import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomT
 import { ManageGlobalTimelinesModal } from '@/components/timelines/ManageGlobalTimelinesModal';
 import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
-import { useGoals, fetchGoalActionsForWeek } from '@/hooks/useGoals';
-import { calculateTaskPoints, calculateAuthenticScore } from '@/lib/taskUtils';
+import { useGoals } from '@/hooks/useGoals';
+import { calculateAuthenticScore } from '@/lib/taskUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
 
 interface Timeline {
@@ -142,46 +142,8 @@ export default function Goals() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .not('completed_at', 'is', null);
-
-      if (tasksError) throw tasksError;
-
-      let totalDeposits = 0;
-      if (tasksData && tasksData.length > 0) {
-        const taskIds = tasksData.map(t => t.id);
-        const [
-          { data: rolesData },
-          { data: domainsData }
-        ] = await Promise.all([
-          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
-        ]);
-
-        for (const task of tasksData) {
-          const taskWithData = {
-            ...task,
-            roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-            domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-          };
-          totalDeposits += calculateTaskPoints(task, taskWithData.roles, taskWithData.domains);
-        }
-      }
-
-      const { data: withdrawalsData, error: withdrawalsError } = await supabase
-        .from('0008-ap-withdrawals')
-        .select('amount')
-        .eq('user_id', user.id);
-
-      if (withdrawalsError) throw withdrawalsError;
-
-      const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
-      const balance = totalDeposits - totalWithdrawals;
-      setAuthenticScore(Math.round(balance * 10) / 10);
+      const score = await calculateAuthenticScore(supabase, user.id);
+      setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
     }
