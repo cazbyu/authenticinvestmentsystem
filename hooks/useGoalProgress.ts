@@ -1142,7 +1142,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           await supabase
             .from('0008-ap-goals-custom')
             .update({
-              custom_timeline_id: currentCycleId,
+              timeline_id: currentCycleId,
               updated_at: new Date().toISOString(),
             })
             .in('id', customIds);
