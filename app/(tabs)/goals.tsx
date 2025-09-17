@@ -370,7 +370,7 @@ export default function Goals() {
     }
   };
 
-  const fetchTimelineDaysLeft = async (timeline: UserCycle) => {
+  const fetchTimelineDaysLeft = async (timeline: Timeline) => {
     try {
       const supabase = getSupabaseClient();
 
@@ -395,6 +395,11 @@ export default function Goals() {
       }
 
       if (error && error.code !== 'PGRST116') throw error;
+
+      setTimelineDaysLeft(data);
+    } catch (error) {
+      console.error('Error fetching timeline days left:', error);
+      setTimelineDaysLeft(null);
     }
-  }
+  };
 }
