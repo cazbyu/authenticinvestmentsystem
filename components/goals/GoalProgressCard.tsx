@@ -390,19 +390,12 @@ export function GoalProgressCard({
                            const hasLog = action.logs.some(
                              log => log.measured_on === day.date && log.completed
                            );
-
-                           console.log(`Day ${day.date}: hasLog=${hasLog}, logs for action:`, action.logs.map(l => ({ measured_on: l.measured_on, completed: l.completed })));
-
+                            
                            return (
                              <TouchableOpacity
                                key={day.date}
                                style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
                                onPress={onToggleCompletion ? () => {
-                                 console.log('=== DAY DOT CLICKED ===');
-                                 console.log('Action ID:', action.id);
-                                 console.log('Date:', day.date);
-                                 console.log('Current hasLog status:', hasLog);
-                                 console.log('Action logs:', action.logs);
                                  onToggleCompletion(action.id, day.date, hasLog);
                                } : undefined}
                                activeOpacity={onToggleCompletion ? 0.7 : 1}

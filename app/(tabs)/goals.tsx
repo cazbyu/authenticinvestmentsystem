@@ -761,6 +761,14 @@ export default function Goals() {
       <ActionEffortModal
         visible={actionEffortModalVisible}
         onClose={() => setActionEffortModalVisible(false)}
+        onClose={() => {
+          setActionEffortModalVisible(false);
+          // Refresh data after action is created
+          if (selectedTimeline) {
+            fetchTimelineGoals(selectedTimeline);
+            fetchWeekActions();
+          }
+        }}
         goal={selectedGoalForAction}
         cycleWeeks={timelineWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}

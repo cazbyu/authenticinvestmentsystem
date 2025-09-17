@@ -272,6 +272,8 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
       await createTaskWithWeekPlan(taskData);
 
       Alert.alert('Success', 'Action created successfully!');
+      
+      // Call onClose to trigger parent refresh
       onClose();
     } catch (error) {
       console.error('Error saving action:', error);
