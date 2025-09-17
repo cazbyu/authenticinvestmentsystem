@@ -37,16 +37,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
     const roles = task.roles || [];
     const domains = task.domains || [];
     
-    let points = 0;
-    if (roles.length > 0) points += roles.length;
-    if (domains.length > 0) points += domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
+    return calculateTaskPoints(task, roles, domains);
   };
 
   const buildScopeFilter = (tableName: string) => {
