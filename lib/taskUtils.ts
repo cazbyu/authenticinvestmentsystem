@@ -1,115 +1,130 @@
-/**
- * Centralized task scoring utilities
- * 
- * This file contains the authoritative implementations of task scoring logic
- * used throughout the application for calculating authentic investment points.
- */
+// lib/taskUtils.ts
+import { SupabaseClient } from '@supabase/supabase-js';
 
-/**
- * Calculate the "points" for a given task based on roles, domains, urgency, importance, and goal type.
- */
-export const calculateTaskPoints = (
+//
+// Calculate points for a single task
+//
+export function calculateTaskPoints(
   task: any,
   roles: any[] = [],
   domains: any[] = []
-): number => {
+): number {
   let points = 0;
 
-  // Add points for roles and domains
-  if (roles && roles.length > 0) points += roles.length;
-  if (domains && domains.length > 0) points += domains.length;
+  // Base points by urgency / importance
+  if (task.urgency === 'high' && task.importance === 'high') points += 5;
+  else if (task.urgency === 'high') points += 3;
+  else if (task.importance === 'high') points += 2;
 
-  // Authentic deposit bonus
-  if (task.is_authentic_deposit) points += 2;
+  // Add points for roles
+  if (roles.length > 0) {
+    points += roles.length; // 1 per role
+  }
 
-  // Urgent/important matrix scoring
-  if (task.is_urgent && task.is_important) points += 1.5;
-  else if (!task.is_urgent && task.is_important) points += 3;
-  else if (task.is_urgent && !task.is_important) points += 1;
-  else points += 0.5;
+  // Add points for domains
+  if (domains.length > 0) {
+    points += domains.length; // 1 per domain
+  }
 
-  // Twelve-week goal bonus
-  if (task.is_twelve_week_goal) points += 2;
+  // Bonus: deposits count more
+  if (task.type === 'depositIdea') points += 2;
 
-  return Math.round(points * 10) / 10;
-};
+  // Bonus: tied to a 12-week goal
+  if (task.twelve_wk_goal_id) points += 3;
 
-/**
- * Calculate the authentic score for a user based on completed tasks and withdrawals.
- * This is the main function used for calculating the total authentic investment balance.
- */
-export const calculateAuthenticScore = async (
-  supabase: any,
+  return points;
+}
+
+//
+// Calculate Authentic Score directly from Supabase
+//
+export async function calculateAuthenticScore(
+  supabase: SupabaseClient,
   userId: string
-): Promise<number> => {
+): Promise<number> {
   try {
-    // Calculate deposits from completed tasks
-    const { data: tasksData, error: tasksError } = await supabase
+    console.log('[AuthenticScore] Starting calculation for user:', userId);
+
+    // 1. Completed tasks (deposits)
+    const { data: tasksData, error: tasksErr } = await supabase
       .from('0008-ap-tasks')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'completed')
-      .not('completed_at', 'is', null);
+      .eq('status', 'completed');
 
-    if (tasksError) throw tasksError;
+    if (tasksErr) throw tasksErr;
+    console.log('[AuthenticScore] Tasks fetched:', tasksData?.length);
 
-    let totalDeposits = 0;
-    if (tasksData && tasksData.length > 0) {
-      const taskIds = tasksData.map(t => t.id);
-      const [
-        { data: rolesData },
-        { data: domainsData }
-      ] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
-      ]);
-
-      for (const task of tasksData) {
-        const taskWithData = {
-          ...task,
-          roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-          domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-        };
-        totalDeposits += calculateTaskPoints(task, taskWithData.roles, taskWithData.domains);
-      }
-    }
-
-    // Calculate withdrawals
-    const { data: withdrawalsData, error: withdrawalsError } = await supabase
-      .from('0008-ap-withdrawals')
-      .select('amount')
+    // 2. Roles
+    const { data: rolesData, error: rolesErr } = await supabase
+      .from('0008-ap-roles')
+      .select('*')
       .eq('user_id', userId);
 
-    if (withdrawalsError) throw withdrawalsError;
+    if (rolesErr) throw rolesErr;
+    console.log('[AuthenticScore] Roles fetched:', rolesData?.length);
 
-    const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
-    
-    const balance = totalDeposits - totalWithdrawals;
-    return Math.round(balance * 10) / 10;
-  } catch (error) {
-    console.error('Error calculating authentic score:', error);
+    // 3. Domains
+    const { data: domainsData, error: domainsErr } = await supabase
+      .from('0008-ap-domains')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (domainsErr) throw domainsErr;
+    console.log('[AuthenticScore] Domains fetched:', domainsData?.length);
+
+    // 4. Withdrawals
+    const { data: withdrawalsData, error: withdrawalsErr } = await supabase
+      .from('0008-ap-withdrawals')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (withdrawalsErr) throw withdrawalsErr;
+    console.log('[AuthenticScore] Withdrawals fetched:', withdrawalsData?.length);
+
+    // 5. Calculate total points
+    let totalDeposits = 0;
+    (tasksData ?? []).forEach((task: any) => {
+      const taskWithData = {
+        ...task,
+        roles: rolesData?.filter((r: any) => r.task_id === task.id) ?? [],
+        domains: domainsData?.filter((d: any) => d.task_id === task.id) ?? [],
+      };
+
+      const pts = calculateTaskPoints(taskWithData, taskWithData.roles, taskWithData.domains);
+      totalDeposits += pts;
+
+      console.log(`[AuthenticScore] Task ${task.id} => ${pts} pts`);
+    });
+
+    const totalWithdrawals = (withdrawalsData ?? []).length * 2;
+    console.log('[AuthenticScore] Total Deposits:', totalDeposits);
+    console.log('[AuthenticScore] Total Withdrawals:', totalWithdrawals);
+
+    const finalScore = totalDeposits - totalWithdrawals;
+    console.log('[AuthenticScore] Final Score:', finalScore);
+
+    return finalScore;
+  } catch (err) {
+    console.error('Error calculating authentic score:', err);
     return 0;
   }
-};
+}
 
-/**
- * Calculate the authentic score for a set of tasks (without database queries).
- * Used when you already have the tasks and their related data.
- */
-export const calculateAuthenticScoreFromTasks = (
+//
+// Variant: calculate Authentic Score from already-fetched tasks
+//
+export function calculateAuthenticScoreFromTasks(
   tasks: any[],
-  rolesByTask: Record<string, any[]> = {},
-  domainsByTask: Record<string, any[]> = {}
-): number => {
-  if (!tasks || tasks.length === 0) return 0;
+  withdrawals: any[] = []
+): number {
+  let totalDeposits = 0;
 
-  let total = 0;
+  (tasks ?? []).forEach((task: any) => {
+    const pts = calculateTaskPoints(task, task.roles ?? [], task.domains ?? []);
+    totalDeposits += pts;
+  });
 
-  for (const task of tasks) {
-    const roles = rolesByTask[task.id] || [];
-    const domains = domainsByTask[task.id] || [];
-    total += calculateTaskPoints(task, roles, domains);
-  }
-
-  return Math.round(total * 10) / 10;
-};
+  const totalWithdrawals = (withdrawals ?? []).length * 2;
+  return totalDeposits - totalWithdrawals;
+}
