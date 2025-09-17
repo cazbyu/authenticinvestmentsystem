@@ -480,7 +480,7 @@ export default function Goals() {
         // Fetch custom timeline weeks
         const { data: weeksData, error: weeksError } = await supabase
           .from('v_custom_timeline_weeks')
-          .select('week_number, week_start, week_end')
+          .select('week_number, start_date, end_date')
           .eq('custom_timeline_id', timeline.id)
           .order('week_number', { ascending: true });
 
@@ -494,7 +494,13 @@ export default function Goals() {
 
         if (daysError && daysError.code !== 'PGRST116') throw daysError;
 
-        setTimelineWeeks((weeksData as TimelineWeek[]) || []);
+        const mappedWeeks: TimelineWeek[] = (weeksData || []).map((week: any) => ({
+          week_number: week.week_number,
+          start_date: week.start_date,
+          end_date: week.end_date,
+        }));
+
+        setTimelineWeeks(mappedWeeks);
         setTimelineDaysLeft(daysData);
       } else if (timeline.source === 'global') {
         // Fetch global timeline weeks
