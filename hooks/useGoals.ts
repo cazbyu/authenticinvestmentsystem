@@ -397,21 +397,37 @@ export function useGoals(options: UseGoalsOptions = {}) {
     try {
       const supabase = getSupabaseClient();
       const view = source === 'custom' ? DB.V_CUSTOM_WEEKS : DB.V_GLOBAL_WEEKS;
+      const selectColumns =
+        source === 'custom'
+          ? 'week_number, start_date, end_date, custom_timeline_id'
+          : 'week_number, week_start, week_end, timeline_id';
+      const filterColumn = source === 'custom' ? 'custom_timeline_id' : 'timeline_id';
 
       const { data: dbWeeks, error } = await supabase
         .from(view)
-        .select('week_number, week_start, week_end, timeline_id')
-        .eq('timeline_id', timelineId)
+        .select(selectColumns)
+        .eq(filterColumn, timelineId)
         .order('week_number', { ascending: true });
 
       if (error) throw error;
 
-      const mappedWeeks: CycleWeek[] = (dbWeeks ?? []).map((w: any) => ({
-        week_number: w.week_number,
-        week_start: w.week_start,
-        week_end: w.week_end,
-        user_cycle_id: timelineId,
-      }));
+      const mappedWeeks: CycleWeek[] = (dbWeeks ?? []).map((w: any) => {
+        if (source === 'custom') {
+          return {
+            week_number: w.week_number,
+            week_start: w.start_date,
+            week_end: w.end_date,
+            user_cycle_id: w.custom_timeline_id,
+          };
+        }
+
+        return {
+          week_number: w.week_number,
+          week_start: w.week_start,
+          week_end: w.week_end,
+          user_cycle_id: w.timeline_id ?? timelineId,
+        };
+      });
 
       setCycleWeeks(mappedWeeks);
       return mappedWeeks;
