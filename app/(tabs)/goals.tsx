@@ -402,6 +402,4 @@ export default function Goals() {
       setTimelineDaysLeft(null);
     }
   };
-    }
-  };
 }
