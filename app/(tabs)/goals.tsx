@@ -426,25 +426,11 @@ export default function Goals() {
     try {
       const supabase = getSupabaseClient();
 
-      let data, error;
-      
-      if (timeline.source === 'global') {
-        const result = await supabase
-          .from('v_user_global_timeline_days_left')
-          .select('timeline_id, days_left, pct_elapsed')
-          .eq('timeline_id', timeline.id)
-          .maybeSingle();
-        data = result.data;
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('v_custom_timeline_days_left')
-          .select('timeline_id, days_left, pct_elapsed')
-          .eq('timeline_id', timeline.id)
-          .maybeSingle();
-        data = result.data;
-        error = result.error;
-      }
+      const { data, error } = await supabase
+        .from('v_unified_timeline_days_left')
+        .select('timeline_id, days_left, pct_elapsed, source')
+        .eq('timeline_id', timeline.id)
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
 
