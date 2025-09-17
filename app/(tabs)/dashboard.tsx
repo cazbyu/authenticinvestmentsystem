@@ -11,7 +11,7 @@ import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDetailModal';
 import { JournalView } from '@/components/journal/JournalView';
-import { calculateTaskPoints, calculateAuthenticScore } from '@/lib/taskUtils';
+import { calculateTaskPoints, calculateAuthenticScore as calculateScoreUtil } from '@/lib/taskUtils';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 
 // --- Main Dashboard Screen Component ---
