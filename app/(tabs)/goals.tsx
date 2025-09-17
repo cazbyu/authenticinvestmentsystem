@@ -399,7 +399,7 @@ export default function Goals() {
       } else {
         const result = await supabase
           .from('v_custom_timeline_weeks')
-          .select('week_number, start_date, end_date')
+          .select('week_number, starts_on, ends_on')
           .eq('timeline_id', timeline.id)
           .order('week_number', { ascending: true });
         weeks = result.data;
@@ -411,8 +411,8 @@ export default function Goals() {
       // Normalize the data structure
       const normalizedWeeks = (weeks || []).map(week => ({
         week_number: week.week_number,
-        start_date: timeline.source === 'global' ? week.week_start : week.start_date,
-        end_date: timeline.source === 'global' ? week.week_end : week.end_date,
+        start_date: timeline.source === 'global' ? week.week_start : week.starts_on,
+        end_date: timeline.source === 'global' ? week.week_end : week.ends_on,
       }));
 
       setTimelineWeeks(normalizedWeeks);
