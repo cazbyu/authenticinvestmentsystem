@@ -410,10 +410,10 @@ export default function Goals() {
 
       // Normalize the data structure
       const normalizedWeeks = (weeks || []).map(week => ({
-        week_number: week.week_number,
-        start_date: timeline.source === 'global' ? week.week_start : week.starts_on,
-        end_date: timeline.source === 'global' ? week.week_end : week.ends_on,
-      }));
+  week_number: week.week_number,
+  start_date: week.week_start,
+  end_date: week.week_end,
+}));
 
       setTimelineWeeks(normalizedWeeks);
     } catch (error) {
