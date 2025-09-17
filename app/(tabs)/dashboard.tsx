@@ -171,18 +171,18 @@ export default function Dashboard() {
     }
   };
 
-  const calculateAuthenticScore = async () => {
+ *const calculateAuthenticScore = async () => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const score = await calculateAuthenticScore(supabase, user.id);
+      const score = await calculateScoreUtil(supabase, user.id);
       setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
     }
-  };
+  };*
 
   useEffect(() => {
     fetchData();
