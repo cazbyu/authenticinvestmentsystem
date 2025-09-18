@@ -49,8 +49,6 @@ export default function Goals() {
   // Import functions from useGoalProgress hook
   const {
     toggleTaskDay,
-    completeActionSuggestion,
-    undoActionOccurrence,
   } = useGoalProgress();
   
   // Local goals state for the selected timeline
