@@ -46,6 +46,13 @@ export default function Goals() {
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   
+  // Import functions from useGoalProgress hook
+  const {
+    toggleTaskDay,
+    completeActionSuggestion,
+    undoActionOccurrence,
+  } = useGoalProgress();
+  
   // Local goals state for the selected timeline
   const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
   const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
@@ -86,6 +93,29 @@ export default function Goals() {
       fetchWeekActions();
     }
   }, [selectedTimeline, currentWeekIndex, timelineGoals]);
+
+  const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
+    try {
+      console.log('Toggling completion:', { actionId, date, completed });
+      
+      if (completed) {
+        // If currently completed, undo the completion
+        await undoActionOccurrence({ parentTaskId: actionId, whenISO: date });
+      } else {
+        // If not completed, mark as completed
+        await completeActionSuggestion({ parentTaskId: actionId, whenISO: date });
+      }
+      
+      // Refresh the week actions to show updated state
+      await fetchWeekActions();
+      
+      // Also refresh the authentic score
+      calculateAuthenticScore();
+    } catch (error) {
+      console.error('Error toggling completion:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to update completion status');
+    }
+  };
 
   // Modal states
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
@@ -740,6 +770,7 @@ export default function Goals() {
                     setEditGoalModalVisible(true);
                   }}
                   selectedWeekNumber={currentWeek?.week_number}
+                  onToggleCompletion={handleToggleCompletion}
                 />
               );
             })
