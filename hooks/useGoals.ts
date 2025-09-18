@@ -906,7 +906,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       .from(DB.TASKS)
       .insert({
         user_id: user.id,
-        timeline_id: currentCycle.id, // keep a direct reference to active timeline
+        user_cycle_id: currentCycle.id, // keep a direct reference to active timeline
         title: parent.title,
         type: 'task',
         status: 'completed',
