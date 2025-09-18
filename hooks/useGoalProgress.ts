@@ -106,7 +106,7 @@ export interface DaysLeftData {
 export interface TaskWeekPlan {
   id: string;
   task_id: string;
-  user_global_timeline_id: string;
+  user_cycle_id: string;
   week_number: number;
   target_days: number;
   created_at: string;
@@ -738,7 +738,7 @@ const allTimelines = [
   const getTodayActionSuggestions = async (): Promise<Array<{
     suggested: true;
     parent_task_id: string;
-    user_global_timeline_id: string;
+    user_cycle_id: string;
     date: string;
     remainingThisWeek: number;
   }>> => {
@@ -785,7 +785,7 @@ const allTimelines = [
       const out: Array<{
         suggested: true;
         parent_task_id: string;
-        user_global_timeline_id: string;
+        user_cycle_id: string;
         date: string;
         remainingThisWeek: number;
       }> = [];
@@ -797,7 +797,7 @@ const allTimelines = [
           out.push({
             suggested: true as const,
             parent_task_id: p.task_id,
-            user_global_timeline_id: selectedTimeline.id,
+            user_cycle_id: selectedTimeline.id,
             date: currentDateISO,
             remainingThisWeek: remaining,
           });
@@ -969,7 +969,7 @@ const allTimelines = [
       .from('0008-ap-tasks')
       .insert({
         user_id: user.id,
-        user_global_timeline_id: selectedTimeline.id,
+        user_cycle_id: selectedTimeline.id,
         title: parent.title,
         type: 'task',
         status: 'completed',
@@ -1151,7 +1151,7 @@ const allTimelines = [
         .from('0008-ap-tasks')
         .insert({
           user_id: user.id,
-          user_global_timeline_id: selectedTimeline.id,
+          user_cycle_id: selectedTimeline.id,
           title: taskData.title,
           type: 'task',
           input_kind: 'count',
@@ -1191,7 +1191,7 @@ const allTimelines = [
 
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
         task_id: insertedTask.id,
-        user_global_timeline_id: selectedTimeline.id,
+        user_cycle_id: selectedTimeline.id,
         week_number: week.weekNumber,
         target_days: week.targetDays,
       }));
