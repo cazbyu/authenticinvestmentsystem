@@ -242,6 +242,12 @@ const { data: customTimelines, error: customErr } = await supabase
 
 if (customErr) throw customErr;
 
+// ✅ FIX: merge them into one array
+const allTimelines = [
+  ...(globalTimelines ?? []).map(t => ({ ...t, source: 'global' as const })),
+  ...(customTimelines ?? []).map(t => ({ ...t, source: 'custom' as const })),
+];
+
       console.log('Raw timelines from database:', allTimelines?.length || 0);
       if (allTimelines) {
         console.log('Timeline details:', allTimelines.map(t => ({
