@@ -11,6 +11,7 @@ import { ManageGlobalTimelinesModal } from '@/components/timelines/ManageGlobalT
 import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useGoals } from '@/hooks/useGoals';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { calculateAuthenticScore } from '@/lib/taskUtils';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
