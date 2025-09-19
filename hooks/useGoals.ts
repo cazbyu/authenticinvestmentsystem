@@ -987,30 +987,42 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   const createCustomGoal = async (goalData: {
-    title: string;
-    description?: string;
-    start_date: string;
-    end_date: string;
-  }): Promise<CustomGoal | null> => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !currentCycle || currentCycle.source !== 'custom') return null;
+  title: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+}): Promise<UnifiedGoal | null> => {
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !selectedTimeline) return null;
 
-      const { data, error } = await supabase
-        .from(DB.GOALS_CUSTOM)
-        .insert({
-          user_id: user.id,
-          title: goalData.title,
-          description: goalData.description,
-          start_date: goalData.start_date,
-          end_date: goalData.end_date,
-          status: 'active',
-          progress: 0,
-          custom_timeline_id: currentCycle.id, // strict FK
-        })
-        .select('*')
-        .single();
+    // 🔍 Debug log to check what we are inserting
+    console.log("DEBUG: creating custom goal with", {
+      userId: user.id,
+      selectedTimelineId: selectedTimeline.id,
+      selectedTimelineSource: selectedTimeline.source,
+      goalData
+    });
+
+    const startDate = goalData.start_date || selectedTimeline?.start_date;
+    const endDate = goalData.end_date || selectedTimeline?.end_date;
+    if (!startDate || !endDate) throw new Error('Start date and end date are required for custom goals');
+
+    const { data, error } = await supabase
+      .from('0008-ap-goals-custom')
+      .insert({
+        user_id: user.id,
+        custom_timeline_id: selectedTimeline.id,  // <-- this is the critical FK
+        title: goalData.title,
+        start_date: startDate,
+        end_date: endDate,
+        status: 'active',
+        progress: 0,
+      })
+      .select()
+      .single();
+
 
       if (error) throw error;
       await fetchGoals(currentCycle.id);
