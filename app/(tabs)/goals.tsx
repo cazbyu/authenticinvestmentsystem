@@ -280,6 +280,15 @@ export default function Goals() {
       }
 
       setAllTimelines(timelines);
+
+// 🔍 Debug log each hydrated timeline
+    console.log("DEBUG: hydrated timelines:", timelines.map(t => ({
+      id: t.id,
+      source: t.source,
+      title: t.title,
+      start_date: t.start_date,
+      end_date: t.end_date
+    })));
       
       // Fetch goal counts for each timeline
       await fetchTimelinesWithGoalCounts(timelines);
