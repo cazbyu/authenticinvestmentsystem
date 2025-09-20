@@ -987,11 +987,11 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   const createCustomGoal = async (goalData: {
-  title: string;
-  description?: string;
-  start_date?: string;
-  end_date?: string;
-}): Promise<UnifiedGoal | null> => {
+    title: string;
+    description?: string;
+    start_date?: string;
+    end_date?: string;
+  }, selectedTimeline?: { id: string; start_date?: string | null; end_date?: string | null }): Promise<CustomGoal | null> => {
   try {
     const supabase = getSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -1049,21 +1049,14 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !currentCycle) return null;
-
-      // Create parent task
-      const { data: insertedTask, error: taskError } = await supabase
-        .from(DB.TASKS)
-        .insert({
-          user_id: user.id,
-          user_cycle_id: currentCycle.id, // we store timeline id here
-          title: taskData.title,
-          type: 'task',
+          custom_timeline_id: selectedTimeline.id,
           input_kind: 'count',
+          description: goalData.description,
           unit: 'days',
           status: 'pending',
           is_twelve_week_goal: currentCycle.source === 'global',
           recurrence_rule: taskData.recurrenceRule,
-        })
+        .from(DB.GOALS_CUSTOM)
         .select('*')
         .single();
       if (taskError) throw taskError;
@@ -1165,9 +1158,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
         const { error: krJoinError } = await supabase
           .from(DB.UNIVERSAL_KEY_REL_JOIN)
           .insert(krJoins);
-        if (krJoinError) throw krJoinError;
       }
-
+      await fetchGoals(selectedTimeline.id);
       return { id: insertedTask.id as string };
     } catch (error) {
       console.error('Error creating task with week plan:', error);

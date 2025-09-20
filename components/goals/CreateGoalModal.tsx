@@ -54,7 +54,9 @@ interface CreateGoalModalProps {
   createCustomGoal: (goalData: {
     title: string;
     description?: string;
-  }) => Promise<any>;
+    start_date?: string;
+    end_date?: string;
+  }, selectedTimeline?: { id: string; start_date?: string | null; end_date?: string | null }) => Promise<any>;
   selectedTimeline: Timeline | null;
 }
 
@@ -296,8 +298,7 @@ const { data: roleKRData, error: roleKRError } = await supabase
       goalData = await createCustomGoal({
         title: formData.title,
         description: formData.description,
-        custom_timeline_id: selectedTimeline?.id, // ✅ critical
-});
+      }, selectedTimeline);
 
     }
 
