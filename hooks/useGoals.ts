@@ -1011,6 +1011,12 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
     const { data, error } = await supabase
       .from('0008-ap-goals-custom')
+
+      console.log("DEBUG GOAL INSERT", {
+  selectedTimeline,
+  currentCycle
+});
+
       .insert({
         user_id: user.id,
         custom_timeline_id: currentCycle.id,
