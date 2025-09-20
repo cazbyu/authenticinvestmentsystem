@@ -1049,14 +1049,20 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !currentCycle) return null;
-          custom_timeline_id: selectedTimeline.id,
+
+      const { data: insertedTask, error: taskError } = await supabase
+        .from(DB.TASKS)
+        .insert({
+          user_id: user.id,
+          user_cycle_id: currentCycle.id,
+          title: taskData.title,
+          type: 'task',
           input_kind: 'count',
-          description: goalData.description,
           unit: 'days',
           status: 'pending',
           is_twelve_week_goal: currentCycle.source === 'global',
           recurrence_rule: taskData.recurrenceRule,
-        .from(DB.GOALS_CUSTOM)
+        })
         .select('*')
         .single();
       if (taskError) throw taskError;
