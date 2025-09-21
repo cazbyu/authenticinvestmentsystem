@@ -1103,7 +1103,7 @@ const allTimelines = [
       .from('0008-ap-goals-custom')
       .insert({
         user_id: user.id,
-        custom_timeline_id: currentCycle.id,  // <-- this is the critical FK
+        custom_timeline_id: selectedTimeline.id,  // <-- this is the critical FK
         title: goalData.title,
         start_date: startDate,
         end_date: endDate,
