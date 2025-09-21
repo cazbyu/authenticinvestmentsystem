@@ -1020,7 +1020,7 @@ console.log("🚨 DEBUG createCustomGoal inserting:", {
 
 // ✅ Supabase insert starts fresh
 const { data, error } = await supabase
-  .from('0008-ap-goals-custom')
+  .from(DB.GOALS_CUSTOM)   // <-- use alias, not raw string
   .insert({
         user_id: user.id,
         custom_timeline_id: selectedTimeline.id, // <-- use selectedTimeline.id, not currentCycle.id
