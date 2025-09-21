@@ -295,6 +295,8 @@ const { data: roleKRData, error: roleKRError } = await supabase
       });
     } else {
       // Create custom goal
+      console.log("🚨 DEBUG handleCreateGoal selectedTimeline:", selectedTimeline);
+
       goalData = await createCustomGoal({
         title: formData.title,
         description: formData.description,
