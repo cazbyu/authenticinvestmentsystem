@@ -1013,7 +1013,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
 // ✅ Debug log as its own statement
 console.log("🚨 DEBUG createCustomGoal inserting:", {
   userId: user.id,
-  custom_timeline_id: currentCycle?.id,
+  custom_timeline_id: selectedTimeline.id,
+  goalData,
   startDate,
   endDate,
 });
