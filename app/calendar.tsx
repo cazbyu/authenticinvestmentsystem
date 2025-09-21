@@ -11,6 +11,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react-native';
 import { expandEventsWithRecurrence, expandEventsForDate } from '@/lib/recurrenceUtils';
 import { getVisibleWindow } from '@/lib/recurrenceUtils';
+import { DraggableFab } from '@/components/DraggableFab';
 
 // Constants
 const MINUTE_HEIGHT = 1.5;
@@ -976,12 +977,9 @@ const dayEvents = expandedTasks.map(task => ({
         />
       </Modal>
 
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => setIsFormModalVisible(true)}
-      >
+      <DraggableFab onPress={() => setIsFormModalVisible(true)}>
         <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
+      </DraggableFab>
     </SafeAreaView>
   );
 }

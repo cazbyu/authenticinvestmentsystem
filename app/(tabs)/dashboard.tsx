@@ -13,6 +13,8 @@ import { DepositIdeaDetailModal } from '@/components/depositIdeas/DepositIdeaDet
 import { JournalView } from '@/components/journal/JournalView';
 import { calculateTaskPoints, calculateAuthenticScore as calculateScoreUtil } from '@/lib/taskUtils';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
+import { DraggableFab } from '@/components/DraggableFab';
+import { Plus } from 'lucide-react-native';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
@@ -351,7 +353,9 @@ export default function Dashboard() {
             </ScrollView>
         }
       </View>
-      <TouchableOpacity style={styles.fab} onPress={() => setIsFormModalVisible(true)}><Plus size={24} color="#ffffff" /></TouchableOpacity>
+      <DraggableFab onPress={() => setIsFormModalVisible(true)}>
+        <Plus size={24} color="#ffffff" />
+      </DraggableFab>
       <Modal visible={isFormModalVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskEventForm
           mode={editingTask ? "edit" : "create"}
@@ -392,7 +396,6 @@ const styles = StyleSheet.create({
     domainTag: { backgroundColor: '#fed7aa' },
     goalTag: { backgroundColor: '#bfdbfe' },
     tagText: { fontSize: 10, fontWeight: '500', color: '#374151' },
-    fab: { position: 'absolute', bottom: 20, right: 20, width: 48, height: 48, borderRadius: 24, backgroundColor: '#0078d4', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
     loadingContainer: { padding: 40, alignItems: 'center' },
     loadingText: { color: '#6b7280', fontSize: 16 },
     emptyContainer: { padding: 40, alignItems: 'center' },
