@@ -1007,32 +1007,33 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
     const startDate = goalData.start_date || selectedTimeline?.start_date;
     const endDate = goalData.end_date || selectedTimeline?.end_date;
+
     if (!startDate || !endDate) throw new Error('Start date and end date are required for custom goals');
 
-    const { data, error } = await supabase
+// ✅ Debug log as its own statement
+console.log("🚨 DEBUG createCustomGoal inserting:", {
+  userId: user.id,
+  custom_timeline_id: currentCycle?.id,
+  selectedTimelineId: selectedTimeline?.id,
+  goalData,
+  startDate,
+  endDate,
+});
 
-    console.log("🚨 DEBUG createCustomGoal inserting:", {
-      userId: user.id,
-      custom_timeline_id: currentCycle?.id,
-      selectedTimelineId: selectedTimeline?.id,
-      goalData,
-      startDate,
-      endDate,
-    });
-      
-      .from('0008-ap-goals-custom')
-      .insert({
-        user_id: user.id,
-        custom_timeline_id: currentCycle.id,
-        title: goalData.title,
-        start_date: startDate,
-        end_date: endDate,
-        status: 'active',
-        progress: 0,
-      })
-      .select()
-      .single();
-
+// ✅ Supabase insert starts fresh
+const { data, error } = await supabase
+  .from('0008-ap-goals-custom')
+  .insert({
+    user_id: user.id,
+    custom_timeline_id: currentCycle.id,
+    title: goalData.title,
+    start_date: startDate,
+    end_date: endDate,
+    status: 'active',
+    progress: 0,
+  })
+  .select()
+  .single();
 
       if (error) throw error;
       await fetchGoals(currentCycle.id);
