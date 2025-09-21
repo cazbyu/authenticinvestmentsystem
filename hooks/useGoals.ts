@@ -1010,6 +1010,16 @@ export function useGoals(options: UseGoalsOptions = {}) {
     if (!startDate || !endDate) throw new Error('Start date and end date are required for custom goals');
 
     const { data, error } = await supabase
+
+    console.log("🚨 DEBUG createCustomGoal inserting:", {
+      userId: user.id,
+      custom_timeline_id: currentCycle?.id,
+      selectedTimelineId: selectedTimeline?.id,
+      goalData,
+      startDate,
+      endDate,
+    });
+      
       .from('0008-ap-goals-custom')
       .insert({
         user_id: user.id,
