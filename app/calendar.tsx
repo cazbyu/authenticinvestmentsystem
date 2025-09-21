@@ -1300,13 +1300,13 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     padding: 20,
   },
-  fab: {
+  fabLarge: {
     position: 'absolute',
     bottom: 20,
     right: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#0078d4',
     justifyContent: 'center',
     alignItems: 'center',
