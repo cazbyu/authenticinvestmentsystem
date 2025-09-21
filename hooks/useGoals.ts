@@ -1022,13 +1022,13 @@ console.log("🚨 DEBUG createCustomGoal inserting:", {
 const { data, error } = await supabase
   .from('0008-ap-goals-custom')
   .insert({
-    user_id: user.id,
-    custom_timeline_id: currentCycle.id,
-    title: goalData.title,
-    start_date: startDate,
-    end_date: endDate,
-    status: 'active',
-    progress: 0,
+        user_id: user.id,
+        custom_timeline_id: selectedTimeline.id, // <-- use selectedTimeline.id, not currentCycle.id
+        title: goalData.title,
+        start_date: startDate,
+        end_date: endDate,
+        status: 'active',
+        progress: 0,
   })
   .select()
   .single();
