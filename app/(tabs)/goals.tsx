@@ -15,6 +15,7 @@ import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { calculateAuthenticScore } from '@/lib/taskUtils';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
+import { DraggableFab } from '@/components/DraggableFab';
 
 interface Timeline {
   id: string;
@@ -793,12 +794,9 @@ export default function Goals() {
       {selectedTimeline ? renderSelectedTimeline() : renderTimelineSelector()}
 
       {/* FAB for creating goals */}
-      <TouchableOpacity 
-        style={styles.fabLarge} 
-        onPress={() => setCreateGoalModalVisible(true)}
-      >
+      <DraggableFab onPress={() => setCreateGoalModalVisible(true)}>
         <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
+      </DraggableFab>
 
       {/* Modals */}
       <CreateGoalModal
@@ -1064,20 +1062,4 @@ const styles = StyleSheet.create({
   },
   goalsList: {
     flex: 1,
-    padding: 16,
-  },
-  createGoalButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  createGoalButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
 });

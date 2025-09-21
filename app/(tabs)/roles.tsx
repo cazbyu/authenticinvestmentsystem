@@ -975,12 +975,9 @@ export default function Roles() {
     <SafeAreaView style={styles.container}>
       {renderContent()}
 
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => setTaskFormVisible(true)}
-      >
+      <DraggableFab onPress={() => setTaskFormVisible(true)}>
         <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
+      </DraggableFab>
 
       <TouchableOpacity 
         style={styles.manageFab} 
@@ -1306,22 +1303,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
-  },
-  manageFab: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#7c3aed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
   goalsStrip: {
     backgroundColor: '#ffffff',

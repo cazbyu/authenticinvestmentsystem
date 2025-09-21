@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
+import { DraggableFab } from '@/components/DraggableFab';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -518,12 +519,9 @@ export default function Wellness() {
     <SafeAreaView style={styles.container}>
       {renderContent()}
 
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => setTaskFormVisible(true)}
-      >
+      <DraggableFab onPress={() => setTaskFormVisible(true)}>
         <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
+      </DraggableFab>
 
       {/* Modals */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
@@ -641,20 +639,4 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  goalsSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 12,
-  },
-  goalsList: {
-    gap: 12,
-  },
 });
