@@ -911,7 +911,7 @@ const allTimelines = [
           await supabase
             .from('0008-ap-goals-custom')
             .update({
-              custom_timeline_id: currentCycleId,
+              custom_timeline_id: selectedTimeline.id,
               updated_at: new Date().toISOString(),
             })
             .in('id', customIds);
