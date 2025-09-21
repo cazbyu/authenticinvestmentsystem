@@ -14,7 +14,6 @@ import { JournalView } from '@/components/journal/JournalView';
 import { calculateTaskPoints, calculateAuthenticScore as calculateScoreUtil } from '@/lib/taskUtils';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { DraggableFab } from '@/components/DraggableFab';
-import { Plus } from 'lucide-react-native';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
