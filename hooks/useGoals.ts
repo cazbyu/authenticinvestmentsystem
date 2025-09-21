@@ -1010,10 +1010,10 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
     if (!startDate || !endDate) throw new Error('Start date and end date are required for custom goals');
 
-// ✅ Debug log as its own statement
-console.log("🚨 DEBUG createCustomGoal inserting:", {
+// 🚨 Debug log before insert
+console.log("🚨 DEBUG createCustomGoal inserting into", DB.GOALS_CUSTOM, {
   userId: user.id,
-  custom_timeline_id: selectedTimeline.id,
+  custom_timeline_id: selectedTimeline?.id,
   goalData,
   startDate,
   endDate,
