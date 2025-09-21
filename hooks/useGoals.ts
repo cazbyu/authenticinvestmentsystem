@@ -1015,7 +1015,6 @@ console.log("🚨 DEBUG createCustomGoal inserting:", {
   userId: user.id,
   custom_timeline_id: currentCycle?.id,
   selectedTimelineId: selectedTimeline?.id,
-  goalData,
   startDate,
   endDate,
 });
