@@ -97,6 +97,7 @@ export function CreateGoalModal({
   const [roleKeyRelationships, setRoleKeyRelationships] = useState<{ parent_id: string; key_relationship_id: string }[]>([]);
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [currentCycle, setCurrentCycle] = useState<any>(null);
+  const [availableCycles, setAvailableCycles] = useState<any[]>([]);
 
   // Sub-form states
   const [activeSubForm, setActiveSubForm] = useState<'none' | 'action' | 'idea'>('none');
