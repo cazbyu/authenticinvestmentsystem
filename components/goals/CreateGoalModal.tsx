@@ -94,10 +94,6 @@ export function CreateGoalModal({
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [allDomains, setAllDomains] = useState<Domain[]>([]);
   const [allKeyRelationships, setAllKeyRelationships] = useState<{ id: string; name: string; role_id: string }[]>([]);
-  const [roleKeyRelationships, setRoleKeyRelationships] = useState<{ parent_id: string; key_relationship_id: string }[]>([]);
-  const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
-  const [currentCycle, setCurrentCycle] = useState<any>(null);
-  const [availableCycles, setAvailableCycles] = useState<any[]>([]);
 
   // Sub-form states
   const [activeSubForm, setActiveSubForm] = useState<'none' | 'action' | 'idea'>('none');
@@ -125,51 +121,31 @@ export function CreateGoalModal({
   useEffect(() => {
     if (visible) {
       fetchData();
-      // Pre-select all active roles and domains when modal opens
-      if (allRoles.length > 0) {
-        setPreSelectedRoles(allRoles.map(role => role.id));
-        setFormData(prev => ({ ...prev, selectedRoleIds: allRoles.map(role => role.id) }));
-      }
-      if (allDomains.length > 0) {
-        setPreSelectedDomains(allDomains.map(domain => domain.id));
-        setFormData(prev => ({ ...prev, selectedDomainIds: allDomains.map(domain => domain.id) }));
-      }
     }
-  }, [visible, allRoles, allDomains]);
+  }, [visible]);
+
+  // Separate effect for pre-selecting roles and domains after data is loaded
+  useEffect(() => {
+    if (visible && allRoles.length > 0 && allDomains.length > 0 && !createdGoalId) {
+      // Pre-select all active roles and domains when modal opens
+      const allRoleIds = allRoles.map(role => role.id);
+      const allDomainIds = allDomains.map(domain => domain.id);
+      
+      setPreSelectedRoles(allRoleIds);
+      setPreSelectedDomains(allDomainIds);
+      setFormData(prev => ({ 
+        ...prev, 
+        selectedRoleIds: allRoleIds,
+        selectedDomainIds: allDomainIds 
+      }));
+    }
+  }, [visible, allRoles, allDomains, createdGoalId]);
 
   const fetchData = async () => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
-      // Fetch current cycle
-      const today = new Date().toISOString().split("T")[0];
-
-const { data: cycles, error } = await supabase
-  .from("0008-ap-global-cycles")
-  .select("id, title, cycle_label, start_date, end_date, reflection_end, is_active, status")
-  .gte("reflection_end", today)            // current + future
-  .order("start_date", { ascending: true })
-  .limit(3);                                // current + next 2
-
-if (error) {
-  console.error("Error fetching cycles:", error);
-} else {
-  setAvailableCycles(cycles || []);
-  setCurrentCycle(cycles?.[0] || null);     // default to the first option
-}
-
-      // Fetch cycle weeks if we have a cycle
-      if (cycleData) {
-        const { data: weeksData } = await supabase
-          .from('v_user_global_timeline_weeks')
-          .select('week_number, week_start, week_end')
-          .eq('timeline_id', cycleData.id)
-          .order('week_number', { ascending: true });
-
-        setCycleWeeks(weeksData || []);
-      }
 
       // Fetch all roles
       const { data: rolesData } = await supabase
@@ -181,15 +157,6 @@ if (error) {
 
       setAllRoles(rolesData || []);
 
-          // Fetch role → key relationship mappings
-      // ✅ Use universal KR join table instead
-const { data: roleKRData, error: roleKRError } = await supabase
-  .from('0008-ap-universal-key-relationships-join')
-  .select('parent_id, key_relationship_id')
-  .eq('parent_type', 'role');
-
-      setRoleKeyRelationships(roleKRData || []);
-  
       // Fetch all domains
       const { data: domainsData } = await supabase
         .from('0008-ap-domains')
@@ -198,27 +165,13 @@ const { data: roleKRData, error: roleKRError } = await supabase
 
       setAllDomains(domainsData || []);
 
-            // Fetch all key relationships
+      // Fetch all key relationships
       const { data: krData } = await supabase
         .from('0008-ap-key-relationships')
         .select('id, name, role_id')
         .eq('user_id', user.id);
 
       setAllKeyRelationships(krData || []);
-
-      // Auto-select all roles and domains for new goals
-      if (!createdGoalId) {
-        const allRoleIds = rolesData?.map(role => role.id) || [];
-        const allDomainIds = domainsData?.map(domain => domain.id) || [];
-        
-        setFormData(prev => ({
-          ...prev,
-          selectedRoleIds: allRoleIds,
-          selectedDomainIds: allDomainIds,
-        }));
-        setPreSelectedRoles(allRoleIds);
-        setPreSelectedDomains(allDomainIds);
-      }
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -557,35 +510,6 @@ if (formData.selectedKeyRelationshipIds?.length) {
           </View>
         </View>
 
-{/* Global Cycle Picker */}
-{availableCycles.length > 0 && (
-  <View style={styles.field}>
-    <Text style={styles.label}>Select Global Cycle</Text>
-    <View style={{ borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8 }}>
-      {availableCycles.map((c) => {
-        const isSelected = currentCycle?.id === c.id;
-        return (
-          <TouchableOpacity
-            key={c.id}
-            onPress={() => setCurrentCycle(c)}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              backgroundColor: isSelected ? '#eef2ff' : '#ffffff',
-              borderBottomWidth: 1,
-              borderBottomColor: '#e5e7eb'
-            }}
-          >
-            <Text style={{ fontSize: 16, color: '#111827', fontWeight: isSelected ? '600' : '400' }}>
-              {c.title} ({c.cycle_label}) — {c.start_date} → {c.end_date}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  </View>
-)}
-        
         {/* Goal Title */}
         <View style={styles.field}>
           <Text style={styles.label}>Goal Title *</Text>
