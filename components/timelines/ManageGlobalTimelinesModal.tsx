@@ -512,7 +512,22 @@ const { data: cycleData, error } = await supabase
             <Text style={styles.selectedCycleDates}>
               {(() => {
                 const cycle = getSelectedCycleInfo();
-                return cycle ? safeFormatDateRange(cycle.start_date, cycle.end_date, `selected cycle ${cycle.id}`) : '';
+                if (!cycle) return '';
+                
+                // Apply Monday adjustment if selected
+                let startDate = cycle.start_date;
+                let endDate = cycle.end_date;
+                
+                if (formData.weekStartDay === 'monday') {
+                  const adjustedStart = new Date(cycle.start_date);
+                  const adjustedEnd = new Date(cycle.end_date);
+                  adjustedStart.setDate(adjustedStart.getDate() + 1);
+                  adjustedEnd.setDate(adjustedEnd.getDate() + 1);
+                  startDate = formatLocalDate(adjustedStart);
+                  endDate = formatLocalDate(adjustedEnd);
+                }
+                
+                return safeFormatDateRange(startDate, endDate, `selected cycle ${cycle.id}`);
               })()}
             </Text>
           </View>
@@ -538,20 +553,6 @@ const { data: cycleData, error } = await supabase
             <TouchableOpacity
               style={[
                 styles.weekStartOption,
-                formData.weekStartDay === 'sunday' && styles.activeWeekStartOption
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'sunday' }))}
-            >
-              <Text style={[
-                styles.weekStartOptionText,
-                formData.weekStartDay === 'sunday' && styles.activeWeekStartOptionText
-              ]}>
-                Sunday
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.weekStartOption,
                 formData.weekStartDay === 'monday' && styles.activeWeekStartOption
               ]}
               onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'monday' }))}
@@ -560,7 +561,7 @@ const { data: cycleData, error } = await supabase
                 styles.weekStartOptionText,
                 formData.weekStartDay === 'monday' && styles.activeWeekStartOptionText
               ]}>
-                Monday (+1 day)
+                Monday
               </Text>
             </TouchableOpacity>
           </View>
