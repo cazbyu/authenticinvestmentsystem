@@ -532,6 +532,35 @@ if (formData.selectedKeyRelationshipIds?.length) {
           </View>
         </View>
 
+{/* Global Cycle Picker */}
+{availableCycles.length > 0 && (
+  <View style={styles.field}>
+    <Text style={styles.label}>Select Global Cycle</Text>
+    <View style={{ borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8 }}>
+      {availableCycles.map((c) => {
+        const isSelected = currentCycle?.id === c.id;
+        return (
+          <TouchableOpacity
+            key={c.id}
+            onPress={() => setCurrentCycle(c)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              backgroundColor: isSelected ? '#eef2ff' : '#ffffff',
+              borderBottomWidth: 1,
+              borderBottomColor: '#e5e7eb'
+            }}
+          >
+            <Text style={{ fontSize: 16, color: '#111827', fontWeight: isSelected ? '600' : '400' }}>
+              {c.title} ({c.cycle_label}) — {c.start_date} → {c.end_date}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  </View>
+)}
+        
         {/* Goal Title */}
         <View style={styles.field}>
           <Text style={styles.label}>Goal Title *</Text>
