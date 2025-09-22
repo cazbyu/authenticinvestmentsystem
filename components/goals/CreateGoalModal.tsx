@@ -119,12 +119,23 @@ export function CreateGoalModal({
   // Main form states
   const [loading, setLoading] = useState(false);
   const [createdGoalId, setCreatedGoalId] = useState<string | null>(null);
+  const [preSelectedRoles, setPreSelectedRoles] = useState<string[]>([]);
+  const [preSelectedDomains, setPreSelectedDomains] = useState<string[]>([]);
 
   useEffect(() => {
     if (visible) {
       fetchData();
+      // Pre-select all active roles and domains when modal opens
+      if (allRoles.length > 0) {
+        setPreSelectedRoles(allRoles.map(role => role.id));
+        setFormData(prev => ({ ...prev, selectedRoleIds: allRoles.map(role => role.id) }));
+      }
+      if (allDomains.length > 0) {
+        setPreSelectedDomains(allDomains.map(domain => domain.id));
+        setFormData(prev => ({ ...prev, selectedDomainIds: allDomains.map(domain => domain.id) }));
+      }
     }
-  }, [visible]);
+  }, [visible, allRoles, allDomains]);
 
   const fetchData = async () => {
     try {
@@ -194,6 +205,20 @@ const { data: roleKRData, error: roleKRError } = await supabase
         .eq('user_id', user.id);
 
       setAllKeyRelationships(krData || []);
+
+      // Auto-select all roles and domains for new goals
+      if (!createdGoalId) {
+        const allRoleIds = rolesData?.map(role => role.id) || [];
+        const allDomainIds = domainsData?.map(domain => domain.id) || [];
+        
+        setFormData(prev => ({
+          ...prev,
+          selectedRoleIds: allRoleIds,
+          selectedDomainIds: allDomainIds,
+        }));
+        setPreSelectedRoles(allRoleIds);
+        setPreSelectedDomains(allDomainIds);
+      }
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -597,10 +622,11 @@ if (formData.selectedKeyRelationshipIds?.length) {
 
         {/* Wellness Domains */}
         <View style={styles.field}>
-          <Text style={styles.label}>Wellness Domains</Text>
+          <Text style={styles.label}>Wellness Domains (All Selected by Default)</Text>
           <View style={styles.checkboxGrid}>
             {allDomains.map(domain => {
               const isSelected = formData.selectedDomainIds.includes(domain.id);
+              const isPreSelected = preSelectedDomains.includes(domain.id);
               return (
                 <TouchableOpacity
                   key={domain.id}
@@ -610,7 +636,13 @@ if (formData.selectedKeyRelationshipIds?.length) {
                   <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={styles.checkLabel}>{domain.name}</Text>
+                  <Text style={[
+                    styles.checkLabel,
+                    isPreSelected && styles.preSelectedLabel
+                  ]}>
+                    {domain.name}
+                    {isPreSelected && ' (auto-selected)'}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -619,10 +651,11 @@ if (formData.selectedKeyRelationshipIds?.length) {
 
         {/* Active Roles */}
         <View style={styles.field}>
-          <Text style={styles.label}>Active Roles</Text>
+          <Text style={styles.label}>Active Roles (All Selected by Default)</Text>
           <View style={styles.checkboxGrid}>
             {allRoles.map(role => {
               const isSelected = formData.selectedRoleIds.includes(role.id);
+              const isPreSelected = preSelectedRoles.includes(role.id);
               return (
                 <TouchableOpacity
                   key={role.id}
@@ -632,7 +665,13 @@ if (formData.selectedKeyRelationshipIds?.length) {
                   <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={styles.checkLabel}>{role.label}</Text>
+                  <Text style={[
+                    styles.checkLabel,
+                    isPreSelected && styles.preSelectedLabel
+                  ]}>
+                    {role.label}
+                    {isPreSelected && ' (auto-selected)'}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -1247,6 +1286,10 @@ const styles = StyleSheet.create({
     color: '#0078d4',
     fontSize: 14,
     fontWeight: '600',
+  },
+  preSelectedLabel: {
+    fontWeight: '500',
+    color: '#059669',
   },
   actions: {
     padding: 16,

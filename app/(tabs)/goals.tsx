@@ -793,12 +793,67 @@ export default function Goals() {
     <SafeAreaView style={styles.container}>
       {selectedTimeline ? renderSelectedTimeline() : renderTimelineSelector()}
 
-      {/* FAB for creating goals */}
-      <DraggableFab onPress={() => setCreateGoalModalVisible(true)}>
-        <Plus size={24} color="#ffffff" />
-      </DraggableFab>
+      {/* FAB for creating goals - only show when not viewing a specific timeline */}
+      {!selectedTimeline && (
+        <DraggableFab onPress={() => setTimelineSelectorVisible(true)}>
+          <Plus size={24} color="#ffffff" />
+        </DraggableFab>
+      )}
+
+      {/* FAB for creating goals within selected timeline */}
+      {selectedTimeline && (
+        <DraggableFab onPress={() => setCreateGoalModalVisible(true)}>
+          <Plus size={24} color="#ffffff" />
+        </DraggableFab>
+      )}
 
       {/* Modals */}
+      {/* Timeline Selector Modal */}
+      <Modal visible={timelineSelectorVisible} transparent animationType="fade">
+        <View style={styles.timelineSelectorOverlay}>
+          <View style={styles.timelineSelectorContainer}>
+            <View style={styles.timelineSelectorHeader}>
+              <Text style={styles.timelineSelectorTitle}>Select Timeline for New Goal</Text>
+              <TouchableOpacity onPress={() => setTimelineSelectorVisible(false)}>
+                <X size={24} color="#1f2937" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.timelineSelectorContent}>
+              {timelinesWithGoals.map(timeline => (
+                <TouchableOpacity
+                  key={timeline.id}
+                  style={[
+                    styles.timelineSelectorItem,
+                    { borderLeftColor: timeline.source === 'global' ? '#0078d4' : '#7c3aed' }
+                  ]}
+                  onPress={() => {
+                    setSelectedTimeline(timeline);
+                    setTimelineSelectorVisible(false);
+                    setCreateGoalModalVisible(true);
+                  }}
+                >
+                  <View style={styles.timelineSelectorItemContent}>
+                    <Text style={styles.timelineSelectorItemTitle}>
+                      {timeline.title || 'Untitled Timeline'}
+                    </Text>
+                    <Text style={styles.timelineSelectorItemSubtitle}>
+                      {timeline.source === 'global' ? 'Global 12-Week' : 'Custom Timeline'}
+                    </Text>
+                    {timeline.start_date && timeline.end_date && (
+                      <Text style={styles.timelineSelectorItemDates}>
+                        {new Date(timeline.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
+                        {new Date(timeline.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <CreateGoalModal
         visible={createGoalModalVisible}
         onClose={() => setCreateGoalModalVisible(false)}
@@ -1076,5 +1131,65 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  timelineSelectorOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  timelineSelectorContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    maxHeight: '80%',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  timelineSelectorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  timelineSelectorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  timelineSelectorContent: {
+    maxHeight: 400,
+  },
+  timelineSelectorItem: {
+    backgroundColor: '#ffffff',
+    borderLeftWidth: 4,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  timelineSelectorItemContent: {
+    flex: 1,
+  },
+  timelineSelectorItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  timelineSelectorItemSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  timelineSelectorItemDates: {
+    fontSize: 12,
+    color: '#9ca3af',
   },
 });
