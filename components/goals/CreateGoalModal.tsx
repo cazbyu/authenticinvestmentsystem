@@ -135,14 +135,19 @@ export function CreateGoalModal({
       // Fetch current cycle
       const today = new Date().toISOString().split("T")[0];
 
-const { data: cycleData, error } = await supabase
-  .from("0008-ap-global-cycles") // updated table name
+const { data: cycles, error } = await supabase
+  .from("0008-ap-global-cycles")
   .select("id, title, cycle_label, start_date, end_date, reflection_end, is_active, status")
-  .gte("reflection_end", today)   // only current + future cycles
+  .gte("reflection_end", today)            // current + future
   .order("start_date", { ascending: true })
-  .limit(3); // current + next 2
+  .limit(3);                                // current + next 2
 
-      setCurrentCycle(cycleData);
+if (error) {
+  console.error("Error fetching cycles:", error);
+} else {
+  setAvailableCycles(cycles || []);
+  setCurrentCycle(cycles?.[0] || null);     // default to the first option
+}
 
       // Fetch cycle weeks if we have a cycle
       if (cycleData) {
