@@ -14,7 +14,7 @@ import { useGoals } from '@/hooks/useGoals';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { calculateAuthenticScore } from '@/lib/taskUtils';
 import { formatLocalDate } from '@/lib/dateUtils';
-import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus, X } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
 
 interface Timeline {
