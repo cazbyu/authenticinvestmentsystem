@@ -132,14 +132,14 @@ export function CreateGoalModal({
       if (!user) return;
 
       // Fetch current cycle
-      const { data: cycleData } = await supabase
-        .from('0008-ap-user-global-timelines')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(3)
-        .maybeSingle();
+      const today = new Date().toISOString().split("T")[0];
+
+const { data: cycleData, error } = await supabase
+  .from("0008-ap-global-cycles") // updated table name
+  .select("id, title, cycle_label, start_date, end_date, reflection_end, is_active, status")
+  .gte("reflection_end", today)   // only current + future cycles
+  .order("start_date", { ascending: true })
+  .limit(3); // current + next 2
 
       setCurrentCycle(cycleData);
 
