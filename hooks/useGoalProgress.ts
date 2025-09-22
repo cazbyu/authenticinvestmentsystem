@@ -106,7 +106,7 @@ export interface DaysLeftData {
 export interface TaskWeekPlan {
   id: string;
   task_id: string;
-  user_cycle_id: string;
+  user_global_timeline_id: string;
   week_number: number;
   target_days: number;
   created_at: string;
