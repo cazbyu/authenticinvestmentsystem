@@ -506,13 +506,16 @@ const { data: cycleData, error } = await supabase
                 const cycle = getSelectedCycleInfo();
                 if (!cycle) return '';
                 
-                // Apply Monday adjustment if selected
+                // Apply Monday adjustment to display dates if selected
                 let startDate = cycle.start_date;
                 let endDate = cycle.end_date;
                 
                 if (formData.weekStartDay === 'monday') {
-                  const adjustedStart = new Date(cycle.start_date);
-                  const adjustedEnd = new Date(cycle.end_date);
+                  const adjustedStart = parseLocalDate(cycle.start_date);
+                  const adjustedEnd = parseLocalDate(cycle.end_date);
+                  if (isNaN(adjustedStart.getTime()) || isNaN(adjustedEnd.getTime())) {
+                    return 'Invalid date';
+                  }
                   adjustedStart.setDate(adjustedStart.getDate() + 1);
                   adjustedEnd.setDate(adjustedEnd.getDate() + 1);
                   startDate = formatLocalDate(adjustedStart);
@@ -587,16 +590,16 @@ const { data: cycleData, error } = await supabase
                 onPress={handleCancelCreate}
                 disabled={saving}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                  {formData.weekStartDay === 'sunday' ? 'Sunday' : 'Monday'}
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={[
                   styles.saveButton,
-                  (!formData.globalCycleId || saving) && styles.saveButtonDisabled
+                  formData.weekStartDay === 'monday' && styles.activeWeekStartOption
                 ]}
                 onPress={handleCreateTimeline}
-                disabled={!formData.globalCycleId || saving}
+                onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'monday' }))}
               >
                 {saving ? (
                   <ActivityIndicator size="small" color="#ffffff" />
@@ -604,9 +607,9 @@ const { data: cycleData, error } = await supabase
                   <>
                     <Users size={20} color="#ffffff" />
                     <Text style={styles.saveButtonText}>
-                      {editingTimeline ? 'Update Global 12 Week Timeline' : 'Connect to Global 12 Week Timeline'}
+                      {editingTimeline ? 'Update Global 12 Week Timeline' : 'Activate 12 Week Timeline'}
                     </Text>
-                  </>
+                  Monday
                 )}
               </TouchableOpacity>
             </>
