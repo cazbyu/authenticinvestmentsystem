@@ -55,10 +55,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
 
   // Form state
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
     globalCycleId: '',
-    weekStartDay: 'monday' as 'sunday' | 'monday',
+    weekStartDay: 'sunday' as 'sunday' | 'monday',
   });
   
   const [saving, setSaving] = useState(false);
@@ -185,10 +183,8 @@ const { data: cycleData, error } = await supabase
 
   const resetForm = () => {
     setFormData({
-      title: '',
-      description: '',
       globalCycleId: '',
-      weekStartDay: 'monday',
+      weekStartDay: 'sunday',
     });
     setEditingTimeline(null);
     setShowGlobalCycleDropdown(false);
@@ -210,13 +206,27 @@ const { data: cycleData, error } = await supabase
       const selectedCycle = availableGlobalCycles.find(cycle => cycle.id === formData.globalCycleId);
       if (!selectedCycle) throw new Error('Selected global cycle not found');
 
+      // Calculate adjusted dates for Monday start
+      let adjustedStartDate = selectedCycle.start_date;
+      let adjustedEndDate = selectedCycle.end_date;
+      
+      if (formData.weekStartDay === 'monday') {
+        // Add one day to both start and end dates for Monday start
+        const startDate = new Date(selectedCycle.start_date);
+        const endDate = new Date(selectedCycle.end_date);
+        startDate.setDate(startDate.getDate() + 1);
+        endDate.setDate(endDate.getDate() + 1);
+        adjustedStartDate = formatLocalDate(startDate);
+        adjustedEndDate = formatLocalDate(endDate);
+      }
+
       const timelineData = {
         user_id: user.id,
         global_cycle_id: formData.globalCycleId,
-        title: formData.title.trim() || null,
-        description: formData.description.trim() || null,
-        start_date: selectedCycle.start_date,
-        end_date: selectedCycle.end_date,
+        title: null,
+        description: null,
+        start_date: adjustedStartDate,
+        end_date: adjustedEndDate,
         status: 'active',
         week_start_day: formData.weekStartDay,
         timezone: 'UTC',
@@ -259,8 +269,6 @@ const { data: cycleData, error } = await supabase
   const handleEditTimeline = (timeline: UserGlobalTimeline) => {
     setEditingTimeline(timeline);
     setFormData({
-      title: timeline.title || '',
-      description: timeline.description || '',
       globalCycleId: timeline.global_cycle_id,
       weekStartDay: timeline.week_start_day as 'sunday' | 'monday',
     });
@@ -511,34 +519,22 @@ const { data: cycleData, error } = await supabase
         )}
 
         <View style={styles.field}>
-          <Text style={styles.label}>Custom Title (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.title}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
-            placeholder="Override the default cycle title..."
-            placeholderTextColor="#9ca3af"
-            maxLength={100}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Description (Optional)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={formData.description}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-            placeholder="Add personal notes about your participation in this cycle..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-          />
-        </View>
-
-        <View style={styles.field}>
           <Text style={styles.label}>Week Start Day</Text>
           <View style={styles.weekStartToggle}>
+            <TouchableOpacity
+              style={[
+                styles.weekStartOption,
+                formData.weekStartDay === 'sunday' && styles.activeWeekStartOption
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'sunday' }))}
+            >
+              <Text style={[
+                styles.weekStartOptionText,
+                formData.weekStartDay === 'sunday' && styles.activeWeekStartOptionText
+              ]}>
+                Sunday
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.weekStartOption,
@@ -564,7 +560,7 @@ const { data: cycleData, error } = await supabase
                 styles.weekStartOptionText,
                 formData.weekStartDay === 'monday' && styles.activeWeekStartOptionText
               ]}>
-                Monday
+                Monday (+1 day)
               </Text>
             </TouchableOpacity>
           </View>
