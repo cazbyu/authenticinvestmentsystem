@@ -225,11 +225,22 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       // NOTE: Leaving as-is to match your current backend shape.
       // If you want me to make this robust to renames and include custom timelines, say the word.
       const { data: globalTimelines, error: globalErr } = await supabase
-  .from('0008-ap-user-global-timelines')
-  .select('*')
-  .eq('user_id', user.id)
-  .eq('status', 'active')
-  .order('created_at', { ascending: false });
+        .from('0008-ap-user-global-timelines')
+        .select(`
+          *,
+          global_cycle:0008-ap-global-cycles(
+            id,
+            title,
+            cycle_label,
+            start_date,
+            end_date,
+            reflection_end,
+            is_active
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
 
 if (globalErr) throw globalErr;
 
@@ -261,14 +272,14 @@ const allTimelines = [
       }
 
       const hydratedTimelines = (allTimelines || []).map(timeline => {
-        const effectiveStart = timeline.start_date ?? timeline.global?.start_date ?? null;
-        const effectiveEnd = timeline.end_date ?? timeline.global?.end_date ?? null;
+        const effectiveStart = timeline.start_date ?? timeline.global_cycle?.start_date ?? null;
+        const effectiveEnd = timeline.end_date ?? timeline.global_cycle?.end_date ?? null;
 
         return {
           ...timeline,
           start_date: effectiveStart,
           end_date: effectiveEnd,
-          title: timeline.title ?? timeline.global?.title ?? null,
+          title: timeline.title ?? timeline.global_cycle?.title ?? null,
         };
       });
 

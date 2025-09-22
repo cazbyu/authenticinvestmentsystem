@@ -572,53 +572,36 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
               : 'Manage Global Timelines'
             }
           </Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <X size={24} color="#1f2937" />
-          </TouchableOpacity>
-        </View>
-
-        {showCreateForm ? renderCreateForm() : renderTimelinesList()}
-
-        <View style={styles.actions}>
-          {showCreateForm ? (
-            <>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={handleCancelCreate}
-                disabled={saving}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  !formData.globalCycleId && styles.saveButtonDisabled
-                ]}
-                onPress={handleCreateTimeline}
-                disabled={saving || !formData.globalCycleId}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <>
-                    <Users size={20} color="#ffffff" />
-                    <Text style={styles.saveButtonText}>
-                      {editingTimeline ? 'Update Global 12 Week Timeline' : 'Activate 12 Week Timeline'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
+          <>
             <TouchableOpacity
-              style={styles.createNewButton}
-              onPress={handleStartCreate}
+              style={[
+                styles.weekStartOption,
+                formData.weekStartDay === 'sunday' && styles.activeWeekStartOption
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'sunday' }))}
             >
-              <Plus size={20} color="#ffffff" />
-              <Text style={styles.createNewButtonText}>Connect to Global 12 Week Timeline</Text>
+              <Text style={[
+                styles.weekStartOptionText,
+                formData.weekStartDay === 'sunday' && styles.activeWeekStartOptionText
+              ]}>
+                Sunday
+              </Text>
             </TouchableOpacity>
-          )}
+            <TouchableOpacity
+              style={[
+                styles.weekStartOption,
+                formData.weekStartDay === 'monday' && styles.activeWeekStartOption
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'monday' }))}
+            >
+              <Text style={[
+                styles.weekStartOptionText,
+                formData.weekStartDay === 'monday' && styles.activeWeekStartOptionText
+              ]}>
+                Monday
+              </Text>
+            </TouchableOpacity>
+          </>
         </View>
       </View>
     </Modal>
