@@ -1063,6 +1063,7 @@ const styles = StyleSheet.create({
   goalsList: {
     flex: 1,
   },
+  },
   createGoalButton: {
     flexDirection: 'row',
     alignItems: 'center',
