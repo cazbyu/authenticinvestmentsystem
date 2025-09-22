@@ -353,8 +353,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       ) : (
         <View style={styles.timelinesList}>
           {userGlobalTimelines.map(timeline => {
-            const startDate = safeParseDate(timeline.start_date, `timeline ${timeline.id} start`);
-            const endDate = safeParseDate(timeline.end_date, `timeline ${timeline.id} end`);
+            const startDate = timeline.start_date ? new Date(timeline.start_date + 'T00:00:00') : null;
+            const endDate = timeline.end_date ? new Date(timeline.end_date + 'T00:00:00') : null;
             let daysRemaining = 0;
             let totalDays = 0;
             let progress = 0;
@@ -373,8 +373,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                   <View style={styles.timelineInfo}>
                     <Text style={styles.timelineTitle}>{displayTitle}</Text>
                     <Text style={styles.timelineDates}>
-                      {startDate && endDate
-                        ? safeFormatDateRange(timeline.start_date, timeline.end_date, `timeline ${timeline.id}`)
+                      {timeline.start_date && timeline.end_date
+                        ? formatDateRange(timeline.start_date, timeline.end_date)
                         : 'Invalid date'}
                     </Text>
                     <Text style={styles.timelineStats}>
@@ -508,8 +508,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                 let endDate = cycle.end_date;
                 
                 if (formData.weekStartDay === 'monday') {
-                  const adjustedStart = parseLocalDate(cycle.start_date);
-                  const adjustedEnd = parseLocalDate(cycle.end_date);
+                  const adjustedStart = new Date(cycle.start_date + 'T00:00:00');
+                  const adjustedEnd = new Date(cycle.end_date + 'T00:00:00');
                   if (isNaN(adjustedStart.getTime()) || isNaN(adjustedEnd.getTime())) {
                     return 'Invalid date';
                   }
@@ -519,7 +519,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                   endDate = formatLocalDate(adjustedEnd);
                 }
                 
-                return safeFormatDateRange(startDate, endDate, `selected cycle ${cycle.id}`);
+                return formatDateRange(startDate, endDate);
               })()}
             </Text>
           </View>
