@@ -105,14 +105,7 @@ export function CreateGoalModal({
   // Auto-select all roles and domains when data is loaded
   useEffect(() => {
     if (visible && allRoles.length > 0 && allDomains.length > 0) {
-      const allRoleIds = allRoles.map(role => role.id);
-      const allDomainIds = allDomains.map(domain => domain.id);
-      
-      setFormData(prev => ({ 
-        ...prev, 
-        selectedRoleIds: allRoleIds,
-        selectedDomainIds: allDomainIds 
-      }));
+      // Don't auto-select roles and domains - let user choose
     }
   }, [visible, allRoles, allDomains]);
 
@@ -448,20 +441,19 @@ export function CreateGoalModal({
               {/* Active Roles */}
               <View style={styles.field}>
                 <Text style={styles.label}>Active Roles</Text>
-                <Text style={styles.fieldDescription}>All roles selected by default</Text>
                 <View style={styles.checkboxContainer}>
                   {allRoles.map(role => {
                     const isSelected = formData.selectedRoleIds.includes(role.id);
                     return (
                       <TouchableOpacity
                         key={role.id}
-                        style={styles.checkboxRow}
+                        style={styles.checkboxRowGrid}
                         onPress={() => handleMultiSelect('selectedRoleIds', role.id)}
                       >
                         <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
                           {isSelected && <Text style={styles.checkmark}>✓</Text>}
                         </View>
-                        <Text style={styles.checkboxLabel}>{role.label}</Text>
+                        <Text style={styles.checkboxLabelGrid}>{role.label}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -472,20 +464,19 @@ export function CreateGoalModal({
               {filteredKeyRelationships.length > 0 && (
                 <View style={styles.field}>
                   <Text style={styles.label}>Key Relationships</Text>
-                  <Text style={styles.fieldDescription}>Based on selected roles</Text>
                   <View style={styles.checkboxContainer}>
                     {filteredKeyRelationships.map(kr => {
                       const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
                       return (
                         <TouchableOpacity
                           key={kr.id}
-                          style={styles.checkboxRow}
+                          style={styles.checkboxRowGrid}
                           onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}
                         >
                           <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
                             {isSelected && <Text style={styles.checkmark}>✓</Text>}
                           </View>
-                          <Text style={styles.checkboxLabel}>{kr.name}</Text>
+                          <Text style={styles.checkboxLabelGrid}>{kr.name}</Text>
                         </TouchableOpacity>
                       );
                     })}
@@ -496,20 +487,19 @@ export function CreateGoalModal({
               {/* Wellness Domains */}
               <View style={styles.field}>
                 <Text style={styles.label}>Wellness Domains</Text>
-                <Text style={styles.fieldDescription}>All domains selected by default</Text>
                 <View style={styles.checkboxContainer}>
                   {allDomains.map(domain => {
                     const isSelected = formData.selectedDomainIds.includes(domain.id);
                     return (
                       <TouchableOpacity
                         key={domain.id}
-                        style={styles.checkboxRow}
+                        style={styles.checkboxRowGrid}
                         onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
                       >
                         <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
                           {isSelected && <Text style={styles.checkmark}>✓</Text>}
                         </View>
-                        <Text style={styles.checkboxLabel}>{domain.name}</Text>
+                        <Text style={styles.checkboxLabelGrid}>{domain.name}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -732,7 +722,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     borderRadius: 8,
-    overflow: 'hidden',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 8,
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -742,13 +734,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
+  checkboxRowGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '25%',
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
   checkbox: {
     width: 20,
     height: 20,
     borderWidth: 2,
     borderColor: '#d1d5db',
     borderRadius: 4,
-    marginRight: 12,
+    marginRight: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -765,6 +764,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1f2937',
     flex: 1,
+  },
+  checkboxLabelGrid: {
+    fontSize: 11,
+    color: '#1f2937',
+    flex: 1,
+    lineHeight: 14,
   },
   timelineSelectorOverlay: {
     flex: 1,
