@@ -321,7 +321,7 @@ export function CreateGoalModal({
 
               {/* Timeline Pill Buttons */}
               <View style={styles.field}>
-                <Text style={styles.label}>Timeline</Text>
+                <Text style={styles.label}>Timeline *(Select One)</Text>
                 <ScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false}
@@ -541,6 +541,8 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   timelinePillsContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: 4,
     gap: 8,
   },
