@@ -639,4 +639,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
+  },
+  goalsSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    padding: 16,
+    paddingBottom: 8,
+  },
+  goalsList: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
 });
