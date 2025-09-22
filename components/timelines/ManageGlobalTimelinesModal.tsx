@@ -353,8 +353,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       ) : (
         <View style={styles.timelinesList}>
           {userGlobalTimelines.map(timeline => {
-            const startDate = timeline.start_date ? new Date(timeline.start_date + 'T00:00:00') : null;
-            const endDate = timeline.end_date ? new Date(timeline.end_date + 'T00:00:00') : null;
+            const startDate = timeline.start_date ? parseLocalDate(timeline.start_date) : null;
+            const endDate = timeline.end_date ? parseLocalDate(timeline.end_date) : null;
             let daysRemaining = 0;
             let totalDays = 0;
             let progress = 0;
@@ -508,8 +508,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                 let endDate = cycle.end_date;
                 
                 if (formData.weekStartDay === 'monday') {
-                  const adjustedStart = new Date(cycle.start_date + 'T00:00:00');
-                  const adjustedEnd = new Date(cycle.end_date + 'T00:00:00');
+                  const adjustedStart = parseLocalDate(cycle.start_date);
+                  const adjustedEnd = parseLocalDate(cycle.end_date);
                   if (isNaN(adjustedStart.getTime()) || isNaN(adjustedEnd.getTime())) {
                     return 'Invalid date';
                   }
