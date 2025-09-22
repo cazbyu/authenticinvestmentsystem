@@ -1062,4 +1062,19 @@ const styles = StyleSheet.create({
   },
   goalsList: {
     flex: 1,
+  },
+  createGoalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  createGoalButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
