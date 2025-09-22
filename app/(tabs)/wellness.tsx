@@ -640,7 +640,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 12,
   },
-  },
   goalsSectionTitle: {
     fontSize: 18,
     fontWeight: '600',
