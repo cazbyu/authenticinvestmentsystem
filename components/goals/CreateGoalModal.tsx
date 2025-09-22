@@ -138,7 +138,7 @@ export function CreateGoalModal({
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(1)
+        .limit(3)
         .maybeSingle();
 
       setCurrentCycle(cycleData);
