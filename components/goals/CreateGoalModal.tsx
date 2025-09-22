@@ -308,7 +308,7 @@ export function CreateGoalModal({
             <View style={styles.form}>
               {/* Goal Title */}
               <View style={styles.field}>
-                <Text style={styles.label}>Goal Title</Text>
+                <Text style={styles.label}>Goal Title *</Text>
                 <TextInput
                   style={styles.input}
                   value={formData.title}
