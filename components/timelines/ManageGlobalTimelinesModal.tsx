@@ -99,26 +99,23 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
 
       // Fetch user global timelines with their linked global cycles
       const { data: timelineData, error } = await supabase
-  .from('0008-ap-user-global-timelines')
-  .select(`
-    *,
-    global_cycle:0008-ap-global-cycles(
-      id,
-      title,
-      cycle_label,
-      start_date,
-      end_date,
-      reflection_end,
-      is_active
-    ),
-    goals:0008-ap-goals-12wk(
-      id,
-      status
-    )
-  `)
-  .eq('user_id', user.id)
-  .eq('status', 'active')
-
+        .from('0008-ap-user-global-timelines')
+        .select(`
+          *,
+          global_cycle:0008-ap-global-cycles(
+            id,
+            title,
+            cycle_label,
+            start_date,
+            end_date,
+            reflection_end,
+            is_active
+          ),
+          goals:0008-ap-goals-12wk(
+            id,
+            status
+          )
+        `)
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
@@ -141,13 +138,13 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       // Fetch all active global cycles with reflection_end
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
-const { data: cycleData, error } = await supabase
-  .from("0008-ap-global-cycles")
-  .select("id, title, cycle_label, start_date, end_date, reflection_end, is_active, status")
-  .eq("status", "active")                 // current + all future
-  .gte("reflection_end", today)           // drop past cycles
-  .order("start_date", { ascending: true })
-  .limit(3);                              // current + next 2
+      const { data: cycleData, error } = await supabase
+        .from("0008-ap-global-cycles")
+        .select("id, title, cycle_label, start_date, end_date, reflection_end, is_active, status")
+        .eq("status", "active")                 // current + all future
+        .gte("reflection_end", today)           // drop past cycles
+        .order("start_date", { ascending: true })
+        .limit(3);                              // current + next 2
 
       if (error) throw error;
 
@@ -381,10 +378,10 @@ const { data: cycleData, error } = await supabase
                         : 'Invalid date'}
                     </Text>
                     <Text style={styles.timelineStats}>
-  {startDate && endDate
-    ? `${timeline.goals?.length || 0} active goals • ${daysRemaining} days remaining`
-    : 'Invalid date range'}
-</Text>
+                      {startDate && endDate
+                        ? `${timeline.goals?.length || 0} active goals • ${daysRemaining} days remaining`
+                        : 'Invalid date range'}
+                    </Text>
 
                   </View>
                   
@@ -590,16 +587,16 @@ const { data: cycleData, error } = await supabase
                 onPress={handleCancelCreate}
                 disabled={saving}
               >
-                  {formData.weekStartDay === 'sunday' ? 'Sunday' : 'Monday'}
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={[
                   styles.saveButton,
-                  formData.weekStartDay === 'monday' && styles.activeWeekStartOption
+                  !formData.globalCycleId && styles.saveButtonDisabled
                 ]}
                 onPress={handleCreateTimeline}
-                onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'monday' }))}
+                disabled={saving || !formData.globalCycleId}
               >
                 {saving ? (
                   <ActivityIndicator size="small" color="#ffffff" />
@@ -609,7 +606,7 @@ const { data: cycleData, error } = await supabase
                     <Text style={styles.saveButtonText}>
                       {editingTimeline ? 'Update Global 12 Week Timeline' : 'Activate 12 Week Timeline'}
                     </Text>
-                  Monday
+                  </>
                 )}
               </TouchableOpacity>
             </>
