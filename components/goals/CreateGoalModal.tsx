@@ -57,6 +57,7 @@ interface CreateGoalModalProps {
     end_date?: string;
   }, selectedTimeline?: { id: string; start_date?: string | null; end_date?: string | null }) => Promise<any>;
   selectedTimeline: Timeline | null;
+  allTimelines: Timeline[];
 }
 
 export function CreateGoalModal({ 
@@ -65,7 +66,8 @@ export function CreateGoalModal({
   onSubmitSuccess, 
   createTwelveWeekGoal,
   createCustomGoal,
-  selectedTimeline
+  selectedTimeline,
+  allTimelines
 }: CreateGoalModalProps) {
   // Form data state
   const [formData, setFormData] = useState({
@@ -84,30 +86,18 @@ export function CreateGoalModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Timeline selector state
-  const [availableTimelines, setAvailableTimelines] = useState<Timeline[]>([]);
+  // Timeline selection state
   const [currentSelectedTimeline, setCurrentSelectedTimeline] = useState<Timeline | null>(null);
-  const [showTimelineSelector, setShowTimelineSelector] = useState(false);
 
   useEffect(() => {
     if (visible) {
       fetchData();
-      if (selectedTimeline) {
-        setCurrentSelectedTimeline(selectedTimeline);
-      } else {
-        fetchAvailableTimelines();
-      }
+      // Set the initial timeline selection based on the prop
+      setCurrentSelectedTimeline(selectedTimeline);
     } else {
       resetForm();
     }
   }, [visible, selectedTimeline]);
-
-  // Auto-select all roles and domains when data is loaded
-  useEffect(() => {
-    if (visible && allRoles.length > 0 && allDomains.length > 0) {
-      // Don't auto-select roles and domains - let user choose
-    }
-  }, [visible, allRoles, allDomains]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -137,75 +127,6 @@ export function CreateGoalModal({
     }
   };
 
-  const fetchAvailableTimelines = async () => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const timelines: Timeline[] = [];
-
-      // Fetch custom timelines
-      const { data: customData, error: customError } = await supabase
-        .from('0008-ap-custom-timelines')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (customError) throw customError;
-
-      if (customData) {
-        customData.forEach(timeline => {
-          timelines.push({
-            id: timeline.id,
-            source: 'custom',
-            title: timeline.title,
-            start_date: timeline.start_date,
-            end_date: timeline.end_date,
-            timeline_type: timeline.timeline_type,
-          });
-        });
-      }
-
-      // Fetch global timelines
-      const { data: globalData, error: globalError } = await supabase
-        .from('0008-ap-user-global-timelines')
-        .select(`
-          *,
-          global_cycle:0008-ap-global-cycles(
-            id,
-            title,
-            cycle_label,
-            start_date,
-            end_date,
-            is_active
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (globalError) throw globalError;
-
-      if (globalData) {
-        globalData.forEach(timeline => {
-          timelines.push({
-            id: timeline.id,
-            source: 'global',
-            title: timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label,
-            start_date: timeline.start_date,
-            end_date: timeline.end_date,
-          });
-        });
-      }
-
-      setAvailableTimelines(timelines);
-    } catch (error) {
-      console.error('Error fetching available timelines:', error);
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       title: '',
@@ -216,7 +137,6 @@ export function CreateGoalModal({
       selectedKeyRelationshipIds: [],
     });
     setCurrentSelectedTimeline(null);
-    setShowTimelineSelector(false);
   };
 
   const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds', id: string) => {
@@ -399,43 +319,40 @@ export function CreateGoalModal({
                 />
               </View>
 
-              {/* Timeline Selector */}
+              {/* Timeline Pill Buttons */}
               <View style={styles.field}>
                 <Text style={styles.label}>Timeline</Text>
-                {selectedTimeline ? (
-                  <View style={styles.selectedTimelineContainer}>
-                    <View style={[styles.timelineTypeIndicator, { 
-                      backgroundColor: selectedTimeline.source === 'global' ? '#0078d4' : '#7c3aed' 
-                    }]}>
-                      <Text style={styles.timelineTypeText}>
-                        {getTimelineTypeLabel(selectedTimeline)}
-                      </Text>
-                    </View>
-                    <View style={styles.timelineDetails}>
-                      <Text style={styles.timelineTitle}>
-                        {selectedTimeline.title || 'Untitled Timeline'}
-                      </Text>
-                      {selectedTimeline.start_date && selectedTimeline.end_date && (
-                        <Text style={styles.timelineDates}>
-                          {formatDateRange(selectedTimeline.start_date, selectedTimeline.end_date)}
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.timelinePillsContainer}
+                  contentContainerStyle={styles.timelinePillsContent}
+                >
+                  {allTimelines.map(timeline => {
+                    const isSelected = currentSelectedTimeline?.id === timeline.id;
+                    const pillColor = timeline.source === 'global' ? '#0078d4' : '#7c3aed';
+                    
+                    return (
+                      <TouchableOpacity
+                        key={timeline.id}
+                        style={[
+                          styles.timelinePill,
+                          isSelected && { backgroundColor: pillColor },
+                          !isSelected && { borderColor: pillColor }
+                        ]}
+                        onPress={() => setCurrentSelectedTimeline(timeline)}
+                      >
+                        <Text style={[
+                          styles.timelinePillText,
+                          isSelected && styles.timelinePillTextSelected,
+                          !isSelected && { color: pillColor }
+                        ]}>
+                          {timeline.title || 'Untitled Timeline'}
                         </Text>
-                      )}
-                    </View>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.timelineSelector}
-                    onPress={() => setShowTimelineSelector(true)}
-                  >
-                    <Text style={styles.timelineSelectorText}>
-                      {currentSelectedTimeline 
-                        ? currentSelectedTimeline.title || 'Selected Timeline'
-                        : 'Select Timeline'
-                      }
-                    </Text>
-                    <ChevronDown size={20} color="#6b7280" />
-                  </TouchableOpacity>
-                )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
               {/* Active Roles */}
@@ -538,50 +455,6 @@ export function CreateGoalModal({
             </View>
           )}
         </ScrollView>
-
-        {/* Timeline Selector Modal */}
-        <Modal visible={showTimelineSelector} transparent animationType="fade">
-          <View style={styles.timelineSelectorOverlay}>
-            <View style={styles.timelineSelectorContainer}>
-              <View style={styles.timelineSelectorHeader}>
-                <Text style={styles.timelineSelectorTitle}>Select Timeline</Text>
-                <TouchableOpacity onPress={() => setShowTimelineSelector(false)}>
-                  <X size={24} color="#1f2937" />
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView style={styles.timelineSelectorContent}>
-                {availableTimelines.map(timeline => (
-                  <TouchableOpacity
-                    key={timeline.id}
-                    style={[
-                      styles.timelineSelectorItem,
-                      { borderLeftColor: timeline.source === 'global' ? '#0078d4' : '#7c3aed' }
-                    ]}
-                    onPress={() => {
-                      setCurrentSelectedTimeline(timeline);
-                      setShowTimelineSelector(false);
-                    }}
-                  >
-                    <View style={styles.timelineSelectorItemContent}>
-                      <Text style={styles.timelineSelectorItemTitle}>
-                        {timeline.title || 'Untitled Timeline'}
-                      </Text>
-                      <Text style={styles.timelineSelectorItemSubtitle}>
-                        {getTimelineTypeLabel(timeline)}
-                      </Text>
-                      {timeline.start_date && timeline.end_date && (
-                        <Text style={styles.timelineSelectorItemDates}>
-                          {formatDateRange(timeline.start_date, timeline.end_date)}
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
       </View>
     </Modal>
   );
@@ -648,11 +521,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 4,
-  },
-  fieldDescription: {
-    fontSize: 12,
-    color: '#6b7280',
     marginBottom: 8,
   },
   input: {
@@ -669,53 +537,27 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
-  selectedTimelineContainer: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+  timelinePillsContainer: {
+    maxHeight: 100,
   },
-  timelineTypeIndicator: {
-    paddingHorizontal: 8,
+  timelinePillsContent: {
     paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 12,
+    gap: 8,
   },
-  timelineTypeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#ffffff',
+  timelinePill: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
   },
-  timelineDetails: {
-    flex: 1,
-  },
-  timelineTitle: {
+  timelinePillText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 2,
   },
-  timelineDates: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  timelineSelector: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  timelineSelectorText: {
-    fontSize: 16,
-    color: '#1f2937',
+  timelinePillTextSelected: {
+    color: '#ffffff',
   },
   checkboxContainer: {
     backgroundColor: '#ffffff',
@@ -726,14 +568,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     padding: 8,
   },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
   checkboxRowGrid: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -742,11 +576,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 16,
+    height: 16,
     borderWidth: 2,
     borderColor: '#d1d5db',
-    borderRadius: 4,
+    borderRadius: 3,
     marginRight: 6,
     justifyContent: 'center',
     alignItems: 'center',
@@ -757,78 +591,13 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: '#1f2937',
-    flex: 1,
   },
   checkboxLabelGrid: {
     fontSize: 11,
     color: '#1f2937',
     flex: 1,
     lineHeight: 14,
-  },
-  timelineSelectorOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  timelineSelectorContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    maxHeight: '80%',
-    width: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  timelineSelectorHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  timelineSelectorTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  timelineSelectorContent: {
-    maxHeight: 400,
-  },
-  timelineSelectorItem: {
-    backgroundColor: '#ffffff',
-    borderLeftWidth: 4,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  timelineSelectorItemContent: {
-    flex: 1,
-  },
-  timelineSelectorItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  timelineSelectorItemSubtitle: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  timelineSelectorItemDates: {
-    fontSize: 12,
-    color: '#9ca3af',
   },
 });
