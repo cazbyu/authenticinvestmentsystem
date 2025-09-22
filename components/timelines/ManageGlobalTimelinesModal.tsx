@@ -20,6 +20,7 @@ interface GlobalCycle {
   cycle_label?: string;
   start_date: string;
   end_date: string;
+  reflection_end: string;
   is_active: boolean;
 }
 
@@ -110,6 +111,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       cycle_label,
       start_date,
       end_date,
+      reflection_end,
       is_active
     ),
     goals:0008-ap-goals-12wk(
@@ -139,16 +141,38 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     try {
       const supabase = getSupabaseClient();
       
-      // Fetch all active global cycles
+      // Fetch all active global cycles with reflection_end
       const { data: cycleData, error } = await supabase
         .from('0008-ap-global-cycles')
-        .select('*')
+        .select('id, title, cycle_label, start_date, end_date, reflection_end, is_active')
         .eq('is_active', true)
         .order('start_date', { ascending: false });
 
       if (error) throw error;
 
-      setAvailableGlobalCycles(cycleData || []);
+      // Filter to show current cycle + next 2 cycles
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const filteredCycles: GlobalCycle[] = [];
+      
+      if (cycleData) {
+        // Find current cycle (current date between start_date and reflection_end)
+        const currentCycle = cycleData.find(cycle => 
+          currentDate >= cycle.start_date && currentDate <= cycle.reflection_end
+        );
+        
+        if (currentCycle) {
+          filteredCycles.push(currentCycle);
+        }
+        
+        // Find next cycles (start_date after current date)
+        const futureCycles = cycleData
+          .filter(cycle => cycle.start_date > currentDate)
+          .slice(0, 2); // Take only the next 2
+        
+        filteredCycles.push(...futureCycles);
+      }
+      
+      setAvailableGlobalCycles(filteredCycles);
     } catch (error) {
       console.error('Error fetching available global cycles:', error);
       Alert.alert('Error', (error as Error).message);
@@ -293,9 +317,9 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   const renderTimelinesList = () => (
     <ScrollView style={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Global Timelines</Text>
+        <Text style={styles.headerTitle}>Global 12 Week Timelines</Text>
         <Text style={styles.headerSubtitle}>
-          Link to community cycles and global challenges
+          Connect to community 12-week cycles and global challenges
         </Text>
       </View>
 
@@ -307,16 +331,16 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       ) : userGlobalTimelines.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Users size={64} color="#6b7280" />
-          <Text style={styles.emptyTitle}>No Global Timelines</Text>
+          <Text style={styles.emptyTitle}>No Global 12 Week Timelines</Text>
           <Text style={styles.emptyText}>
-            Connect to community cycles and global challenges to track goals together
+            Connect to community 12-week cycles and global challenges to track goals together
           </Text>
           <TouchableOpacity
             style={styles.createButton}
             onPress={handleStartCreate}
           >
             <Plus size={20} color="#ffffff" />
-            <Text style={styles.createButtonText}>Connect to Global Timeline</Text>
+            <Text style={styles.createButtonText}>Connect to Global 12 Week Timeline</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -406,16 +430,16 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     <ScrollView style={styles.content}>
       <View style={styles.formHeader}>
         <Text style={styles.formTitle}>
-          {editingTimeline ? 'Edit Global Timeline' : 'Connect to Global Timeline'}
+          {editingTimeline ? 'Edit Global 12 Week Timeline' : 'Connect to Global 12 Week Timeline'}
         </Text>
         <Text style={styles.formSubtitle}>
-          Connect to a community cycle or global challenge
+          Connect to a community 12-week cycle or global challenge
         </Text>
       </View>
 
       <View style={styles.form}>
         <View style={styles.field}>
-          <Text style={styles.label}>Select Global Cycle *</Text>
+          <Text style={styles.label}>Select Global 12 Week Timeline *</Text>
           <TouchableOpacity
             style={styles.dropdown}
             onPress={() => setShowGlobalCycleDropdown(!showGlobalCycleDropdown)}
@@ -426,7 +450,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                     const cycle = availableGlobalCycles.find(c => c.id === formData.globalCycleId);
                     return cycle?.title || cycle?.cycle_label || 'Selected Cycle';
                   })()
-                : 'Select a global cycle...'
+                : 'Select a global 12-week timeline...'
               }
             </Text>
             {showGlobalCycleDropdown ? <ChevronUp size={20} color="#6b7280" /> : <ChevronDown size={20} color="#6b7280" />}
@@ -451,7 +475,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                       styles.cycleOptionTitle,
                       formData.globalCycleId === cycle.id && styles.selectedCycleOptionTitle
                     ]}>
-                      {cycle.title || cycle.cycle_label || 'Global Cycle'}
+                      {cycle.title || cycle.cycle_label || 'Global 12 Week Timeline'}
                     </Text>
                     <Text style={[
                       styles.cycleOptionDates,
@@ -469,7 +493,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
         {/* Show selected cycle info */}
         {getSelectedCycleInfo() && (
           <View style={styles.selectedCycleInfo}>
-            <Text style={styles.selectedCycleTitle}>Selected Cycle</Text>
+            <Text style={styles.selectedCycleTitle}>Selected Timeline</Text>
             <Text style={styles.selectedCycleName}>
               {getSelectedCycleInfo()?.title || getSelectedCycleInfo()?.cycle_label}
             </Text>
@@ -587,7 +611,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                   <>
                     <Users size={20} color="#ffffff" />
                     <Text style={styles.saveButtonText}>
-                      {editingTimeline ? 'Update Global Timeline' : 'Connect to Global Timeline'}
+                      {editingTimeline ? 'Update Global 12 Week Timeline' : 'Connect to Global 12 Week Timeline'}
                     </Text>
                   </>
                 )}
@@ -599,7 +623,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
               onPress={handleStartCreate}
             >
               <Plus size={20} color="#ffffff" />
-              <Text style={styles.createNewButtonText}>Connect to Global Timeline</Text>
+              <Text style={styles.createNewButtonText}>Connect to Global 12 Week Timeline</Text>
             </TouchableOpacity>
           )}
         </View>
