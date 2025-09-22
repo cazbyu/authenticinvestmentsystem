@@ -133,7 +133,7 @@ export function CreateGoalModal({
 
       // Fetch current cycle
       const { data: cycleData } = await supabase
-        .from('0008-ap-user-cycles')
+        .from('0008-ap-user-global-timelines')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
