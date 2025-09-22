@@ -142,11 +142,15 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       const supabase = getSupabaseClient();
       
       // Fetch all active global cycles with reflection_end
-      const { data: cycleData, error } = await supabase
-        .from('0008-ap-global-cycles')
-        .select('id, title, cycle_label, start_date, end_date, reflection_end, is_active')
-        .eq('is_active', true)
-        .order('start_date', { ascending: false });
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+const { data: cycleData, error } = await supabase
+  .from("0008-ap-global-cycles")
+  .select("id, title, cycle_label, start_date, end_date, reflection_end, is_active, status")
+  .eq("status", "active")                 // current + all future
+  .gte("reflection_end", today)           // drop past cycles
+  .order("start_date", { ascending: true })
+  .limit(3);                              // current + next 2
 
       if (error) throw error;
 
