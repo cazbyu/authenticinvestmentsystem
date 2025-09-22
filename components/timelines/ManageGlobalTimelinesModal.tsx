@@ -29,7 +29,6 @@ interface UserGlobalTimeline {
   user_id: string;
   global_cycle_id: string;
   title?: string;
-  description?: string;
   start_date: string;
   end_date: string;
   status: string;
@@ -224,7 +223,6 @@ const { data: cycleData, error } = await supabase
         user_id: user.id,
         global_cycle_id: formData.globalCycleId,
         title: null,
-        description: null,
         start_date: adjustedStartDate,
         end_date: adjustedEndDate,
         status: 'active',
@@ -416,12 +414,6 @@ const { data: cycleData, error } = await supabase
                     />
                   </View>
                 </View>
-
-                {timeline.description && (
-                  <Text style={styles.timelineDescription} numberOfLines={2}>
-                    {timeline.description}
-                  </Text>
-                )}
               </View>
             );
           })}
