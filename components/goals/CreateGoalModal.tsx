@@ -13,7 +13,6 @@ import {
 import { X, Target, Calendar, Users, Plus, FileText, ChevronDown, ChevronUp, Clock } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
-import { Calendar as RNCalendar } from 'react-native-calendars';
 
 interface Timeline {
   id: string;
@@ -35,10 +34,10 @@ interface Domain {
   name: string;
 }
 
-interface CycleWeek {
-  week_number: number;
-  week_start: string;
-  week_end: string;
+interface KeyRelationship {
+  id: string;
+  name: string;
+  role_id: string;
 }
 
 interface CreateGoalModalProps {
@@ -60,16 +59,6 @@ interface CreateGoalModalProps {
   selectedTimeline: Timeline | null;
 }
 
-const recurrenceOptions = [
-  { value: 'daily', label: 'Daily' },
-  { value: '6days', label: '6 days' },
-  { value: '5days', label: '5 days' },
-  { value: '4days', label: '4 days' },
-  { value: '3days', label: '3 days' },
-  { value: '2days', label: '2 days' },
-  { value: '1day', label: '1 day' },
-];
-
 export function CreateGoalModal({ 
   visible, 
   onClose, 
@@ -78,145 +67,166 @@ export function CreateGoalModal({
   createCustomGoal,
   selectedTimeline
 }: CreateGoalModalProps) {
-  // Determine goal type based on selected timeline
-  const goalType = selectedTimeline?.source === 'global' || selectedTimeline?.timeline_type === 'cycle' ? '12week' : 'custom';
-  
+  // Form data state
   const [formData, setFormData] = useState({
-  title: '',
-  description: '',
-  selectedRoleIds: [] as string[],
-  selectedDomainIds: [] as string[],
-  selectedKeyRelationshipIds: [] as string[], 
-  noteText: '',  
-});
+    title: '',
+    description: '',
+    notes: '',
+    selectedRoleIds: [] as string[],
+    selectedDomainIds: [] as string[],
+    selectedKeyRelationshipIds: [] as string[],
+  });
 
-  // Data fetching states
+  // Data states
   const [allRoles, setAllRoles] = useState<Role[]>([]);
   const [allDomains, setAllDomains] = useState<Domain[]>([]);
-  const [allKeyRelationships, setAllKeyRelationships] = useState<{ id: string; name: string; role_id: string }[]>([]);
-
-  // Sub-form states
-  const [activeSubForm, setActiveSubForm] = useState<'none' | 'action' | 'idea'>('none');
-  
-  // Action form states
-  const [actionTitle, setActionTitle] = useState('');
-  const [selectedActionWeeks, setSelectedActionWeeks] = useState<number[]>([]);
-  const [recurrenceType, setRecurrenceType] = useState('daily');
-  const [actionNotes, setActionNotes] = useState('');
-  const [submittingAction, setSubmittingAction] = useState(false);
-  const [showWeeksDropdown, setShowWeeksDropdown] = useState(false);
-  const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
-
-  // Idea form states
-  const [ideaTitle, setIdeaTitle] = useState('');
-  const [ideaNotes, setIdeaNotes] = useState('');
-  const [submittingIdea, setSubmittingIdea] = useState(false);
-
-  // Main form states
+  const [allKeyRelationships, setAllKeyRelationships] = useState<KeyRelationship[]>([]);
   const [loading, setLoading] = useState(false);
-  const [createdGoalId, setCreatedGoalId] = useState<string | null>(null);
-  const [preSelectedRoles, setPreSelectedRoles] = useState<string[]>([]);
-  const [preSelectedDomains, setPreSelectedDomains] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  // Timeline selector state
+  const [availableTimelines, setAvailableTimelines] = useState<Timeline[]>([]);
+  const [currentSelectedTimeline, setCurrentSelectedTimeline] = useState<Timeline | null>(null);
+  const [showTimelineSelector, setShowTimelineSelector] = useState(false);
 
   useEffect(() => {
     if (visible) {
       fetchData();
+      if (selectedTimeline) {
+        setCurrentSelectedTimeline(selectedTimeline);
+      } else {
+        fetchAvailableTimelines();
+      }
+    } else {
+      resetForm();
     }
-  }, [visible]);
+  }, [visible, selectedTimeline]);
 
-  // Separate effect for pre-selecting roles and domains after data is loaded
+  // Auto-select all roles and domains when data is loaded
   useEffect(() => {
-    if (visible && allRoles.length > 0 && allDomains.length > 0 && !createdGoalId) {
-      // Pre-select all active roles and domains when modal opens
+    if (visible && allRoles.length > 0 && allDomains.length > 0) {
       const allRoleIds = allRoles.map(role => role.id);
       const allDomainIds = allDomains.map(domain => domain.id);
       
-      setPreSelectedRoles(allRoleIds);
-      setPreSelectedDomains(allDomainIds);
       setFormData(prev => ({ 
         ...prev, 
         selectedRoleIds: allRoleIds,
         selectedDomainIds: allDomainIds 
       }));
     }
-  }, [visible, allRoles, allDomains, createdGoalId]);
+  }, [visible, allRoles, allDomains]);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch all roles
-      const { data: rolesData } = await supabase
-        .from('0008-ap-roles')
-        .select('id, label, color')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('label');
+      const [
+        { data: rolesData },
+        { data: domainsData },
+        { data: krData }
+      ] = await Promise.all([
+        supabase.from('0008-ap-roles').select('id, label, color').eq('user_id', user.id).eq('is_active', true).order('label'),
+        supabase.from('0008-ap-domains').select('id, name').order('name'),
+        supabase.from('0008-ap-key-relationships').select('id, name, role_id').eq('user_id', user.id)
+      ]);
 
       setAllRoles(rolesData || []);
-
-      // Fetch all domains
-      const { data: domainsData } = await supabase
-        .from('0008-ap-domains')
-        .select('id, name')
-        .order('name');
-
       setAllDomains(domainsData || []);
-
-      // Fetch all key relationships
-      const { data: krData } = await supabase
-        .from('0008-ap-key-relationships')
-        .select('id, name, role_id')
-        .eq('user_id', user.id);
-
       setAllKeyRelationships(krData || []);
-
     } catch (error) {
       console.error('Error fetching data:', error);
       Alert.alert('Error', 'Failed to load form data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAvailableTimelines = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const timelines: Timeline[] = [];
+
+      // Fetch custom timelines
+      const { data: customData, error: customError } = await supabase
+        .from('0008-ap-custom-timelines')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (customError) throw customError;
+
+      if (customData) {
+        customData.forEach(timeline => {
+          timelines.push({
+            id: timeline.id,
+            source: 'custom',
+            title: timeline.title,
+            start_date: timeline.start_date,
+            end_date: timeline.end_date,
+            timeline_type: timeline.timeline_type,
+          });
+        });
+      }
+
+      // Fetch global timelines
+      const { data: globalData, error: globalError } = await supabase
+        .from('0008-ap-user-global-timelines')
+        .select(`
+          *,
+          global_cycle:0008-ap-global-cycles(
+            id,
+            title,
+            cycle_label,
+            start_date,
+            end_date,
+            is_active
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (globalError) throw globalError;
+
+      if (globalData) {
+        globalData.forEach(timeline => {
+          timelines.push({
+            id: timeline.id,
+            source: 'global',
+            title: timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label,
+            start_date: timeline.start_date,
+            end_date: timeline.end_date,
+          });
+        });
+      }
+
+      setAvailableTimelines(timelines);
+    } catch (error) {
+      console.error('Error fetching available timelines:', error);
     }
   };
 
   const resetForm = () => {
-  setFormData({
-    title: '',
-    description: '',
-    selectedRoleIds: [],
-    selectedDomainIds: [],
-    selectedKeyRelationshipIds: [], // ✅ added so KR's don't go undefined
-    noteText: '',
-  });
-  setActiveSubForm('none');
-  setCreatedGoalId(null);
-  resetActionForm();
-  resetIdeaForm();
-};
-
-  const resetActionForm = () => {
-    setActionTitle('');
-    setSelectedActionWeeks([]);
-    setRecurrenceType('daily');
-    setActionNotes('');
-    setShowWeeksDropdown(false);
-    setShowRecurrenceDropdown(false);
+    setFormData({
+      title: '',
+      description: '',
+      notes: '',
+      selectedRoleIds: [],
+      selectedDomainIds: [],
+      selectedKeyRelationshipIds: [],
+    });
+    setCurrentSelectedTimeline(null);
+    setShowTimelineSelector(false);
   };
 
-  const resetIdeaForm = () => {
-    setIdeaTitle('');
-    setIdeaNotes('');
-  };
-
-  const validateMainForm = () => {
-    if (!formData.title.trim()) {
-      Alert.alert('Error', 'Please enter a goal title');
-      return false;
-    }
-    return true;
-  };
-
-  const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds', id: string) => {
+  const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds', id: string) => {
     setFormData(prev => {
       const currentSelection = prev[field] as string[];
       const newSelection = currentSelection.includes(id)
@@ -225,741 +235,363 @@ export function CreateGoalModal({
       return { ...prev, [field]: newSelection };
     });
   };
-  
-  const handleWeekSelect = (weekNumber: number) => {
-    setSelectedActionWeeks(prev => 
-      prev.includes(weekNumber)
-        ? prev.filter(w => w !== weekNumber)
-        : [...prev, weekNumber]
-    );
-  };
-
-  const getDatesForRecurrence = (startDate: string, endDate: string, recurrenceType: string): string[] => {
-    const dates: string[] = [];
-    const start = parseLocalDate(startDate);
-    const end = parseLocalDate(endDate);
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      console.warn('Invalid dates provided to getDatesForRecurrence:', { startDate, endDate });
-      return dates;
-    }
-
-    // Calculate how many days per week based on recurrence type
-    const daysPerWeek =
-      recurrenceType === 'daily' ? 7 : parseInt(recurrenceType.replace('days', '').replace('day', ''));
-
-    // Generate dates for the week
-    const current = new Date(start);
-    let dayCount = 0;
-    
-    while (current <= end && dayCount < daysPerWeek) {
-      dates.push(formatLocalDate(current));
-      current.setDate(current.getDate() + 1);
-      dayCount++;
-    }
-    
-    return dates;
-  };
 
   const handleCreateGoal = async () => {
-  setLoading(true);
-
-  try {
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not found');
-
-    let goalData;
-    
-    if (goalType === '12week') {
-      // Create 12-week goal
-      goalData = await createTwelveWeekGoal({
-        title: formData.title,
-        description: formData.description,
-      });
-    } else {
-      // Create custom goal
-      console.log("🚨 DEBUG handleCreateGoal selectedTimeline:", selectedTimeline);
-
-      goalData = await createCustomGoal({
-        title: formData.title,
-        description: formData.description,
-      }, selectedTimeline);
-
+    if (!formData.title.trim()) {
+      Alert.alert('Error', 'Please enter a goal title');
+      return;
     }
 
-    if (!goalData) throw new Error('Failed to create goal');
-
-    setCreatedGoalId(goalData.id);
-
-    // Insert role joins
-    if (formData.selectedRoleIds?.length) {
-      const roleJoins = formData.selectedRoleIds.map(roleId => ({
-        parent_id: goalData.id,
-        parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
-        role_id: roleId,
-        user_id: user.id,
-      }));
-      const { error: roleError } = await supabase
-        .from('0008-ap-universal-roles-join')
-        .upsert(roleJoins, { onConflict: 'parent_id,parent_type,role_id' });
-      if (roleError) throw roleError;
+    if (!currentSelectedTimeline) {
+      Alert.alert('Error', 'Please select a timeline');
+      return;
     }
 
-    // Insert domain joins
-    if (formData.selectedDomainIds?.length) {
-      const domainJoins = formData.selectedDomainIds.map(domainId => ({
-        parent_id: goalData.id,
-        parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
-        domain_id: domainId,
-        user_id: user.id,
-      }));
-      const { error: domainError } = await supabase
-        .from('0008-ap-universal-domains-join')
-        .upsert(domainJoins, { onConflict: 'parent_id,parent_type,domain_id' });
-      if (domainError) throw domainError;
-    }
+    setSaving(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not found');
 
-    // Insert note if provided
-    if (formData.noteText && formData.noteText.trim()) {
-      const { data: newNote, error: noteError } = await supabase
-        .from('0008-ap-notes')
-        .insert({
-          user_id: user.id,
-          content: formData.noteText.trim(),
-        })
-        .select()
-        .single();
-      if (noteError) throw noteError;
-
-      const { error: noteJoinError } = await supabase
-        .from('0008-ap-universal-notes-join')
-        .insert({
-          parent_id: goalData.id,
-          parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
-          note_id: newNote.id,
-          user_id: user.id,
+      // Determine goal type based on timeline
+      const goalType = currentSelectedTimeline.source === 'global' ? '12week' : 'custom';
+      
+      let goalData;
+      
+      if (goalType === '12week') {
+        goalData = await createTwelveWeekGoal({
+          title: formData.title,
+          description: formData.description,
         });
-      if (noteJoinError) throw noteJoinError;
-    }
-    
-    // Insert key relationship joins
-if (formData.selectedKeyRelationshipIds?.length) {
-  const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
-    parent_id: goalData.id,
-    parent_type: goalType === '12week' ? 'goal' : 'custom_goal',
-    key_relationship_id: krId,
-    user_id: user.id,
-  }));
-  const { error: krError } = await supabase
-    .from('0008-ap-universal-key-relationships-join')
-    .upsert(krJoins, { onConflict: 'parent_id,parent_type,key_relationship_id' });
-  if (krError) throw krError;
-}
+      } else {
+        goalData = await createCustomGoal({
+          title: formData.title,
+          description: formData.description,
+        }, currentSelectedTimeline);
+      }
 
-    Alert.alert('Success', 'Goal created successfully! You can now add actions and ideas.');
+      if (!goalData) throw new Error('Failed to create goal');
 
-  } catch (error) {
-    console.error('Error creating goal:', error);
-    Alert.alert('Error', (error as Error).message || 'Failed to create goal');
+      const goalId = goalData.id;
+      const parentType = goalType === '12week' ? 'goal' : 'custom_goal';
 
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const handleCreateIdea = async () => {
-  if (!createdGoalId) {
-    Alert.alert('Error', 'Please create the goal first');
-    return;
-  }
-
-  if (!ideaTitle.trim()) {
-    Alert.alert('Error', 'Please enter an idea title');
-    return;
-  }
-
-  setSubmittingIdea(true);
-  try {
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not found');
-
-    // 1. Create deposit idea (use actual schema fields: is_active, archived, follow_up)
-    const { data: createdIdea, error: ideaError } = await supabase
-      .from('0008-ap-deposit-ideas')
-      .insert({
-        user_id: user.id,
-        user_cycle_id: currentCycle.id,
-        title: ideaTitle.trim(),
-        is_active: true,
-        archived: false,
-        follow_up: false,
-      })
-      .select()
-      .single();
-
-    if (ideaError) throw ideaError;
-
-    // 2. Add notes if provided
-    if (ideaNotes.trim()) {
-      const { data: noteData, error: noteError } = await supabase
-        .from('0008-ap-notes')
-        .insert({
+      // Insert role joins
+      if (formData.selectedRoleIds.length > 0) {
+        const roleJoins = formData.selectedRoleIds.map(roleId => ({
+          parent_id: goalId,
+          parent_type: parentType,
+          role_id: roleId,
           user_id: user.id,
-          content: ideaNotes.trim(),
-        })
-        .select()
-        .single();
+        }));
+        const { error: roleError } = await supabase
+          .from('0008-ap-universal-roles-join')
+          .insert(roleJoins);
+        if (roleError) throw roleError;
+      }
 
-      if (noteError) throw noteError;
-
-      await supabase
-        .from('0008-ap-universal-notes-join')
-        .insert({
-          parent_id: createdIdea.id,
-          parent_type: 'depositIdea',
-          note_id: noteData.id,
+      // Insert domain joins
+      if (formData.selectedDomainIds.length > 0) {
+        const domainJoins = formData.selectedDomainIds.map(domainId => ({
+          parent_id: goalId,
+          parent_type: parentType,
+          domain_id: domainId,
           user_id: user.id,
-        });
+        }));
+        const { error: domainError } = await supabase
+          .from('0008-ap-universal-domains-join')
+          .insert(domainJoins);
+        if (domainError) throw domainError;
+      }
+
+      // Insert key relationship joins
+      if (formData.selectedKeyRelationshipIds.length > 0) {
+        const krJoins = formData.selectedKeyRelationshipIds.map(krId => ({
+          parent_id: goalId,
+          parent_type: parentType,
+          key_relationship_id: krId,
+          user_id: user.id,
+        }));
+        const { error: krError } = await supabase
+          .from('0008-ap-universal-key-relationships-join')
+          .insert(krJoins);
+        if (krError) throw krError;
+      }
+
+      // Insert note if provided
+      if (formData.notes.trim()) {
+        const { data: newNote, error: noteError } = await supabase
+          .from('0008-ap-notes')
+          .insert({
+            user_id: user.id,
+            content: formData.notes.trim(),
+          })
+          .select()
+          .single();
+        if (noteError) throw noteError;
+
+        const { error: noteJoinError } = await supabase
+          .from('0008-ap-universal-notes-join')
+          .insert({
+            parent_id: goalId,
+            parent_type: parentType,
+            note_id: newNote.id,
+            user_id: user.id,
+          });
+        if (noteJoinError) throw noteJoinError;
+      }
+
+      Alert.alert('Success', 'Goal created successfully!');
+      onSubmitSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Error creating goal:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to create goal');
+    } finally {
+      setSaving(false);
     }
-
-    // 3. Link deposit idea → goal
-    await supabase
-      .from('0008-ap-universal-goals-join')
-      .insert({
-        parent_id: createdIdea.id,
-        parent_type: 'depositIdea',
-        twelve_wk_goal_id: createdGoalId,
-        goal_type: 'twelve_wk_goal',
-        user_id: user.id,
-      });
-
-    // 4. Link to roles
-    if (formData.selectedRoleIds.length > 0) {
-      const roleJoins = formData.selectedRoleIds.map(roleId => ({
-        parent_id: createdIdea.id,
-        parent_type: 'depositIdea',
-        role_id: roleId,
-        user_id: user.id,
-      }));
-      await supabase.from('0008-ap-universal-roles-join').insert(roleJoins);
-    }
-
-    // 5. Link to domains
-    if (formData.selectedDomainIds.length > 0) {
-      const domainJoins = formData.selectedDomainIds.map(domainId => ({
-        parent_id: createdIdea.id,
-        parent_type: 'depositIdea',
-        domain_id: domainId,
-        user_id: user.id,
-      }));
-      await supabase.from('0008-ap-universal-domains-join').insert(domainJoins);
-    }
-
-    Alert.alert('Success', 'Deposit idea created successfully!');
-    resetIdeaForm();
-    setActiveSubForm('none');
-
-  } catch (error) {
-    console.error('Error creating idea:', error);
-    Alert.alert('Error', (error as Error).message || 'Failed to create idea');
-  } finally {
-    setSubmittingIdea(false);
-  }
-};
-
-  const handleClose = () => {
-    resetForm();
-    onClose();
   };
 
-  const handleFinish = () => {
-    resetForm();
-    onSubmitSuccess();
-    onClose();
-  };
-
-  // Derive Key Relationships based on selected roles
+  // Filter key relationships based on selected roles
   const filteredKeyRelationships = allKeyRelationships.filter(kr =>
-      formData.selectedRoleIds.includes(kr.role_id) 
-  );
-  
-  const renderMainForm = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.form}>
-        {/* Timeline Context */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Timeline</Text>
-          <View style={styles.timelineInfo}>
-            <Text style={styles.timelineTitle}>
-              {selectedTimeline?.title || 'No Timeline Selected'}
-            </Text>
-            <Text style={styles.timelineSubtitle}>
-              {selectedTimeline?.source === 'global' ? '12-Week Cycle' : 
-               selectedTimeline?.timeline_type === 'cycle' ? 'Custom Cycle' :
-               selectedTimeline?.timeline_type === 'project' ? 'Project Timeline' :
-               selectedTimeline?.timeline_type === 'challenge' ? 'Challenge Timeline' :
-               'Custom Timeline'}
-            </Text>
-            {selectedTimeline?.start_date && selectedTimeline?.end_date && (
-              <Text style={styles.timelineDates}>
-                {formatDateRange(selectedTimeline.start_date, selectedTimeline.end_date)}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Goal Title */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Goal Title *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.title}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
-            placeholder={goalType === '12week' 
-              ? "This should be a Lagging Indicator, or something you aspire for within your timeline"
-              : "Enter your custom goal title"
-            }
-            placeholderTextColor="#9ca3af"
-            maxLength={100}
-          />
-        </View>
-
-        {/* Goal Description */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={formData.description}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-            placeholder={goalType === '12week'
-              ? "Describe your goal and why it matters to you..."
-              : "Describe your custom goal and timeline..."
-            }
-            placeholderTextColor="#9ca3af"
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-          />
-        </View>
-
-        {/* Wellness Domains */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Wellness Domains (All Selected by Default)</Text>
-          <View style={styles.checkboxGrid}>
-            {allDomains.map(domain => {
-              const isSelected = formData.selectedDomainIds.includes(domain.id);
-              const isPreSelected = preSelectedDomains.includes(domain.id);
-              return (
-                <TouchableOpacity
-                  key={domain.id}
-                  style={styles.checkItem}
-                  onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
-                >
-                  <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={[
-                    styles.checkLabel,
-                    isPreSelected && styles.preSelectedLabel
-                  ]}>
-                    {domain.name}
-                    {isPreSelected && ' (auto-selected)'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Active Roles */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Active Roles (All Selected by Default)</Text>
-          <View style={styles.checkboxGrid}>
-            {allRoles.map(role => {
-              const isSelected = formData.selectedRoleIds.includes(role.id);
-              const isPreSelected = preSelectedRoles.includes(role.id);
-              return (
-                <TouchableOpacity
-                  key={role.id}
-                  style={styles.checkItem}
-                  onPress={() => handleMultiSelect('selectedRoleIds', role.id)}
-                >
-                  <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={[
-                    styles.checkLabel,
-                    isPreSelected && styles.preSelectedLabel
-                  ]}>
-                    {role.label}
-                    {isPreSelected && ' (auto-selected)'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-       {/* Key Relationships (filtered by selected Roles) */}
-{filteredKeyRelationships.length > 0 && (
-  <View style={styles.field}>
-    <Text style={styles.label}>Key Relationships</Text>
-    <View style={styles.checkboxGrid}>
-      {filteredKeyRelationships.map(kr => {
-        const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
-        return (
-          <TouchableOpacity
-            key={kr.id}
-            style={styles.checkItem}
-            onPress={() =>
-              setFormData(prev => ({
-                ...prev,
-                selectedKeyRelationshipIds: isSelected
-                  ? prev.selectedKeyRelationshipIds.filter(kid => kid !== kr.id)
-                  : [...prev.selectedKeyRelationshipIds, kr.id],
-              }))
-            }
-          >
-            <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-              {isSelected && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.checkLabel}>{kr.name}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  </View>
-)}
-        
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsSection}>
-          <TouchableOpacity
-            style={[
-              styles.createButton,
-              (!formData.title.trim() || loading) && styles.createButtonDisabled
-            ]}
-            onPress={handleCreateGoal}
-            disabled={!formData.title.trim() || loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <>
-                <Target size={20} color="#ffffff" />
-                <Text style={styles.createButtonText}>
-                  Create {goalType === '12week' ? '12-Week' : 'Custom'} Goal
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {createdGoalId && (
-            <View style={styles.subActionButtons}>
-              <TouchableOpacity
-                style={styles.subActionButton}
-                onPress={() => setActiveSubForm('action')}
-              >
-                <Calendar size={20} color="#0078d4" />
-                <Text style={styles.subActionButtonText}>Add Actions</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.subActionButton}
-                onPress={() => setActiveSubForm('idea')}
-              >
-                <FileText size={20} color="#0078d4" />
-                <Text style={styles.subActionButtonText}>Add Ideas</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
-
-    </ScrollView>
+    formData.selectedRoleIds.includes(kr.role_id)
   );
 
-  const renderActionForm = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.form}>
-        <View style={styles.subFormHeader}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => setActiveSubForm('none')}
-          >
-            <Text style={styles.backButtonText}>← Back to Goal</Text>
-          </TouchableOpacity>
-          <Text style={styles.subFormTitle}>Add Leading Indicators (Actions)</Text>
-        </View>
-
-        {/* Action Title */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Title *</Text>
-          <TextInput
-            style={styles.input}
-            value={actionTitle}
-            onChangeText={setActionTitle}
-            placeholder="Leading Indicators"
-            placeholderTextColor="#9ca3af"
-            maxLength={100}
-          />
-        </View>
-
-        {/* Week Selection */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Select Weeks *</Text>
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => setShowWeeksDropdown(!showWeeksDropdown)}
-          >
-            <Text style={styles.dropdownText}>
-              {selectedActionWeeks.length === 0 
-                ? 'Select weeks...' 
-                : `${selectedActionWeeks.length} week(s) selected`
-              }
-            </Text>
-            {showWeeksDropdown ? <ChevronUp size={20} color="#6b7280" /> : <ChevronDown size={20} color="#6b7280" />}
-          </TouchableOpacity>
-          
-          {showWeeksDropdown && (
-            <View style={styles.dropdownContent}>
-              <View style={styles.weekGrid}>
-                {cycleWeeks.map(week => {
-                  const isSelected = selectedActionWeeks.includes(week.week_number);
-                  return (
-                    <TouchableOpacity
-                      key={week.week_number}
-                      style={[styles.weekOption, isSelected && styles.selectedWeekOption]}
-                      onPress={() => handleWeekSelect(week.week_number)}
-                    >
-                      <Text style={[styles.weekOptionText, isSelected && styles.selectedWeekOptionText]}>
-                        Week {week.week_number}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Recurrence Type */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Frequency per Week *</Text>
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => setShowRecurrenceDropdown(!showRecurrenceDropdown)}
-          >
-            <Text style={styles.dropdownText}>
-              {recurrenceOptions.find(opt => opt.value === recurrenceType)?.label || 'Select frequency...'}
-            </Text>
-            {showRecurrenceDropdown ? <ChevronUp size={20} color="#6b7280" /> : <ChevronDown size={20} color="#6b7280" />}
-          </TouchableOpacity>
-          
-          {showRecurrenceDropdown && (
-            <View style={styles.dropdownContent}>
-              {recurrenceOptions.map(option => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[styles.dropdownOption, recurrenceType === option.value && styles.selectedDropdownOption]}
-                  onPress={() => {
-                    setRecurrenceType(option.value);
-                    setShowRecurrenceDropdown(false);
-                  }}
-                >
-                  <Text style={[
-  styles.dropdownOptionText,
-  recurrenceType === option.value && styles.selectedDropdownOptionText
-]}>
-  {option.label}
-</Text>
-
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* Pre-filled Domains and Roles */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Linked to Goal</Text>
-          <View style={styles.prefilledTags}>
-            {formData.selectedDomainIds.map(domainId => {
-              const domain = allDomains.find(d => d.id === domainId);
-              return domain ? (
-                <View key={domain.id} style={[styles.tag, styles.domainTag]}>
-                  <Text style={styles.tagText}>{domain.name}</Text>
-                </View>
-              ) : null;
-            })}
-            {formData.selectedRoleIds.map(roleId => {
-              const role = allRoles.find(r => r.id === roleId);
-              return role ? (
-                <View key={role.id} style={[styles.tag, styles.roleTag]}>
-                  <Text style={styles.tagText}>{role.label}</Text>
-                </View>
-              ) : null;
-            })}
-          </View>
-        </View>
-
-        {/* Action Notes */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Notes</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={actionNotes}
-            onChangeText={setActionNotes}
-            placeholder="Additional notes for these actions..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.createButton,
-            (!actionTitle.trim() || selectedActionWeeks.length === 0 || submittingAction) && styles.createButtonDisabled
-          ]}
-          onPress={handleCreateAction}
-          disabled={!actionTitle.trim() || selectedActionWeeks.length === 0 || submittingAction}
-        >
-          {submittingAction ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <>
-              <Calendar size={20} color="#ffffff" />
-              <Text style={styles.createButtonText}>Create Action Tasks</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-  );
-
-  const renderIdeaForm = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.form}>
-        <View style={styles.subFormHeader}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => setActiveSubForm('none')}
-          >
-            <Text style={styles.backButtonText}>← Back to Goal</Text>
-          </TouchableOpacity>
-          <Text style={styles.subFormTitle}>Add Deposit Ideas</Text>
-        </View>
-
-        {/* Idea Title */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Title *</Text>
-          <TextInput
-            style={styles.input}
-            value={ideaTitle}
-            onChangeText={setIdeaTitle}
-            placeholder="Enter idea title..."
-            placeholderTextColor="#9ca3af"
-            maxLength={100}
-          />
-        </View>
-
-        {/* Pre-filled Domains and Roles */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Linked to Goal</Text>
-          <View style={styles.prefilledTags}>
-            {formData.selectedDomainIds.map(domainId => {
-              const domain = allDomains.find(d => d.id === domainId);
-              return domain ? (
-                <View key={domain.id} style={[styles.tag, styles.domainTag]}>
-                  <Text style={styles.tagText}>{domain.name}</Text>
-                </View>
-              ) : null;
-            })}
-            {formData.selectedRoleIds.map(roleId => {
-              const role = allRoles.find(r => r.id === roleId);
-              return role ? (
-                <View key={role.id} style={[styles.tag, styles.roleTag]}>
-                  <Text style={styles.tagText}>{role.label}</Text>
-                </View>
-              ) : null;
-            })}
-          </View>
-        </View>
-
-        {/* Idea Notes */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Notes</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={ideaNotes}
-            onChangeText={setIdeaNotes}
-            placeholder="Describe your idea in detail..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.createButton,
-            (!ideaTitle.trim() || submittingIdea) && styles.createButtonDisabled
-          ]}
-          onPress={handleCreateIdea}
-          disabled={!ideaTitle.trim() || submittingIdea}
-        >
-          {submittingIdea ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <>
-              <FileText size={20} color="#ffffff" />
-              <Text style={styles.createButtonText}>Create Deposit Idea</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-  );
-
-  const renderContent = () => {
-    switch (activeSubForm) {
-      case 'action':
-        return renderActionForm();
-      case 'idea':
-        return renderIdeaForm();
-      default:
-        return renderMainForm();
-    }
+  const getTimelineTypeLabel = (timeline: Timeline) => {
+    if (timeline.source === 'global') return 'Global 12-Week';
+    if (timeline.timeline_type === 'cycle') return 'Custom Cycle';
+    if (timeline.timeline_type === 'project') return 'Project';
+    if (timeline.timeline_type === 'challenge') return 'Challenge';
+    return 'Custom Timeline';
   };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {activeSubForm === 'action' ? 'Add Actions' : 
-             activeSubForm === 'idea' ? 'Add Ideas' : 
-             'Create 12-Week Goal'}
-          </Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#1f2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Create Goal</Text>
+          <TouchableOpacity 
+            style={[styles.saveButton, (!formData.title.trim() || !currentSelectedTimeline || saving) && styles.saveButtonDisabled]}
+            onPress={handleCreateGoal}
+            disabled={!formData.title.trim() || !currentSelectedTimeline || saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
           </TouchableOpacity>
         </View>
 
-        {renderContent()}
+        <ScrollView style={styles.content}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#0078d4" />
+              <Text style={styles.loadingText}>Loading form data...</Text>
+            </View>
+          ) : (
+            <View style={styles.form}>
+              {/* Goal Title */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Goal Title</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.title}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
+                  placeholder="Enter your goal title"
+                  placeholderTextColor="#9ca3af"
+                  maxLength={100}
+                />
+              </View>
 
-        {createdGoalId && activeSubForm === 'none' && (
-          <View style={styles.actions}>
-            <TouchableOpacity 
-              style={styles.finishButton}
-              onPress={handleFinish}
-            >
-              <Text style={styles.finishButtonText}>Finish</Text>
-            </TouchableOpacity>
+              {/* Timeline Selector */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Timeline</Text>
+                {selectedTimeline ? (
+                  <View style={styles.selectedTimelineContainer}>
+                    <View style={[styles.timelineTypeIndicator, { 
+                      backgroundColor: selectedTimeline.source === 'global' ? '#0078d4' : '#7c3aed' 
+                    }]}>
+                      <Text style={styles.timelineTypeText}>
+                        {getTimelineTypeLabel(selectedTimeline)}
+                      </Text>
+                    </View>
+                    <View style={styles.timelineDetails}>
+                      <Text style={styles.timelineTitle}>
+                        {selectedTimeline.title || 'Untitled Timeline'}
+                      </Text>
+                      {selectedTimeline.start_date && selectedTimeline.end_date && (
+                        <Text style={styles.timelineDates}>
+                          {formatDateRange(selectedTimeline.start_date, selectedTimeline.end_date)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.timelineSelector}
+                    onPress={() => setShowTimelineSelector(true)}
+                  >
+                    <Text style={styles.timelineSelectorText}>
+                      {currentSelectedTimeline 
+                        ? currentSelectedTimeline.title || 'Selected Timeline'
+                        : 'Select Timeline'
+                      }
+                    </Text>
+                    <ChevronDown size={20} color="#6b7280" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Active Roles */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Active Roles</Text>
+                <Text style={styles.fieldDescription}>All roles selected by default</Text>
+                <View style={styles.checkboxContainer}>
+                  {allRoles.map(role => {
+                    const isSelected = formData.selectedRoleIds.includes(role.id);
+                    return (
+                      <TouchableOpacity
+                        key={role.id}
+                        style={styles.checkboxRow}
+                        onPress={() => handleMultiSelect('selectedRoleIds', role.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkboxLabel}>{role.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Key Relationships */}
+              {filteredKeyRelationships.length > 0 && (
+                <View style={styles.field}>
+                  <Text style={styles.label}>Key Relationships</Text>
+                  <Text style={styles.fieldDescription}>Based on selected roles</Text>
+                  <View style={styles.checkboxContainer}>
+                    {filteredKeyRelationships.map(kr => {
+                      const isSelected = formData.selectedKeyRelationshipIds.includes(kr.id);
+                      return (
+                        <TouchableOpacity
+                          key={kr.id}
+                          style={styles.checkboxRow}
+                          onPress={() => handleMultiSelect('selectedKeyRelationshipIds', kr.id)}
+                        >
+                          <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                          <Text style={styles.checkboxLabel}>{kr.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Wellness Domains */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Wellness Domains</Text>
+                <Text style={styles.fieldDescription}>All domains selected by default</Text>
+                <View style={styles.checkboxContainer}>
+                  {allDomains.map(domain => {
+                    const isSelected = formData.selectedDomainIds.includes(domain.id);
+                    return (
+                      <TouchableOpacity
+                        key={domain.id}
+                        style={styles.checkboxRow}
+                        onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkboxLabel}>{domain.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Description */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.description}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+                  placeholder="Describe your goal and why it matters..."
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                />
+              </View>
+
+              {/* Notes */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Notes</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.notes}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))}
+                  placeholder="Additional notes for this goal..."
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                />
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Timeline Selector Modal */}
+        <Modal visible={showTimelineSelector} transparent animationType="fade">
+          <View style={styles.timelineSelectorOverlay}>
+            <View style={styles.timelineSelectorContainer}>
+              <View style={styles.timelineSelectorHeader}>
+                <Text style={styles.timelineSelectorTitle}>Select Timeline</Text>
+                <TouchableOpacity onPress={() => setShowTimelineSelector(false)}>
+                  <X size={24} color="#1f2937" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.timelineSelectorContent}>
+                {availableTimelines.map(timeline => (
+                  <TouchableOpacity
+                    key={timeline.id}
+                    style={[
+                      styles.timelineSelectorItem,
+                      { borderLeftColor: timeline.source === 'global' ? '#0078d4' : '#7c3aed' }
+                    ]}
+                    onPress={() => {
+                      setCurrentSelectedTimeline(timeline);
+                      setShowTimelineSelector(false);
+                    }}
+                  >
+                    <View style={styles.timelineSelectorItemContent}>
+                      <Text style={styles.timelineSelectorItemTitle}>
+                        {timeline.title || 'Untitled Timeline'}
+                      </Text>
+                      <Text style={styles.timelineSelectorItemSubtitle}>
+                        {getTimelineTypeLabel(timeline)}
+                      </Text>
+                      {timeline.start_date && timeline.end_date && (
+                        <Text style={styles.timelineSelectorItemDates}>
+                          {formatDateRange(timeline.start_date, timeline.end_date)}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           </View>
-        )}
+        </Modal>
       </View>
     </Modal>
   );
@@ -974,48 +606,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     backgroundColor: '#ffffff',
+  },
+  closeButton: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
   },
-  closeButton: {
-    padding: 4,
+  saveButton: {
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   content: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
+  },
   form: {
     padding: 16,
-  },
-  subFormHeader: {
-    marginBottom: 24,
-  },
-  backButton: {
-    marginBottom: 8,
-  },
-  backButtonText: {
-    fontSize: 14,
-    color: '#0078d4',
-    fontWeight: '500',
-  },
-  subFormTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1f2937',
   },
   field: {
     marginBottom: 24,
   },
   label: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1f2937',
+    marginBottom: 4,
+  },
+  fieldDescription: {
+    fontSize: 12,
+    color: '#6b7280',
     marginBottom: 8,
   },
   input: {
@@ -1023,7 +670,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
     color: '#1f2937',
@@ -1032,24 +679,76 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
-  checkboxGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  checkItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '48%',
-    marginBottom: 8,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
+  selectedTimelineContainer: {
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#d1d5db',
-    borderRadius: 3,
-    marginRight: 8,
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timelineTypeIndicator: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 12,
+  },
+  timelineTypeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  timelineDetails: {
+    flex: 1,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  timelineDates: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  timelineSelector: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timelineSelectorText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  checkboxContainer: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderRadius: 4,
+    marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1062,232 +761,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  checkLabel: {
-    fontSize: 14,
-    color: '#374151',
-    flex: 1,
-  },
-  dropdown: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownText: {
+  checkboxLabel: {
     fontSize: 16,
     color: '#1f2937',
-  },
-  dropdownContent: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 200,
-  },
-  weekGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 8,
-    gap: 8,
-  },
-  weekOption: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  selectedWeekOption: {
-    backgroundColor: '#0078d4',
-    borderColor: '#0078d4',
-  },
-  weekOptionText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  selectedWeekOptionText: {
-    color: '#ffffff',
-  },
-  dropdownOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  selectedDropdownOption: {
-    backgroundColor: '#f0f9ff',
-  },
-  dropdownOptionText: {
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  selectedDropdownOptionText: {
-    color: '#0078d4',
-    fontWeight: '600',
-  },
-  prefilledTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  tag: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  roleTag: {
-    backgroundColor: '#fce7f3',
-    borderColor: '#f3e8ff',
-  },
-  domainTag: {
-    backgroundColor: '#fed7aa',
-    borderColor: '#fdba74',
-  },
-  tagText: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  actionButtonsSection: {
-    marginTop: 16,
-  },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0078d4',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    marginBottom: 16,
-  },
-  createButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  createButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  subActionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  subActionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#0078d4',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 6,
   },
-  subActionButtonText: {
-    color: '#0078d4',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  preSelectedLabel: {
-    fontWeight: '500',
-    color: '#059669',
-  },
-  actions: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
-  },
-  finishButton: {
-    backgroundColor: '#16a34a',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  finishButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  goalTypeSelector: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 2,
-  },
-  goalTypeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    gap: 8,
-  },
-  activeGoalTypeButton: {
-    backgroundColor: '#0078d4',
-  },
-  goalTypeButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  activeGoalTypeButtonText: {
-    color: '#ffffff',
-  },
-  dateButton: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  calendarOverlay: {
+  timelineSelectorOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  calendarContainer: {
+  timelineSelectorContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
+    maxHeight: '80%',
+    width: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
   },
-  calendarHeader: {
+  timelineSelectorHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1295,9 +792,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  calendarTitle: {
+  timelineSelectorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  timelineSelectorContent: {
+    maxHeight: 400,
+  },
+  timelineSelectorItem: {
+    backgroundColor: '#ffffff',
+    borderLeftWidth: 4,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  timelineSelectorItemContent: {
+    flex: 1,
+  },
+  timelineSelectorItemTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+    marginBottom: 4,
+  },
+  timelineSelectorItemSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  timelineSelectorItemDates: {
+    fontSize: 12,
+    color: '#9ca3af',
   },
 });
