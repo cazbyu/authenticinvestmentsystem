@@ -673,11 +673,19 @@ export function useGoals(options: UseGoalsOptions = {}) {
             .gte('due_date', currentCycle?.start_date || '1900-01-01')
             .lte('due_date', currentCycle?.end_date || '2100-12-31');
 
-          const { data: weekPlansData } = await supabase
-            .from(DB.TASK_WEEK_PLAN)
-            .select('target_days')
-            .in('task_id', taskIds)
-            .eq('user_cycle_id', timelineId); // we use timeline id here as "user_cycle_id"
+          const weekPlanQuery = supabase
+  .from(DB.TASK_WEEK_PLAN)
+  .select('target_days')
+  .in('task_id', taskIds);
+
+if (currentCycle?.source === 'global') {
+  weekPlanQuery.eq('user_global_timeline_id', timelineId);
+} else {
+  weekPlanQuery.eq('user_custom_timeline_id', timelineId);
+}
+
+const { data: weekPlansData, error: wpErr } = await weekPlanQuery;
+if (wpErr) throw wpErr;
 
           const overallActual = overallOccurrences?.length || 0;
           const overallTarget = weekPlansData?.reduce((sum, wp) => sum + (wp.target_days || 0), 0) || 0;
