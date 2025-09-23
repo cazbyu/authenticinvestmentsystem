@@ -406,10 +406,11 @@ const timelineColumn =
         week_number: w.week_number,
         week_start: source === 'custom' ? w.start_date : w.week_start,
         week_end: source === 'custom' ? w.end_date : w.week_end,
-        user_cycle_id:
-          source === 'custom'
-            ? (w.custom_timeline_id as string | undefined) ?? timelineId
-            : (w.timeline_id as string | undefined) ?? timelineId,
+        timeline_id:
+  source === 'custom'
+    ? (w.user_custom_timeline_id as string | undefined) ?? timelineId
+    : (w.user_global_timeline_id as string | undefined) ?? timelineId,
+
       }));
 
       setCycleWeeks(mappedWeeks);
