@@ -104,7 +104,7 @@ export interface CycleWeek {
   week_number: number;
   week_start: string; // YYYY-MM-DD
   week_end: string;   // YYYY-MM-DD
-  user_cycle_id: string; // we store timeline_id here for convenience
+  timeline_id: string; // normalized field for global/custom timeline
 }
 
 export interface DaysLeftData {
