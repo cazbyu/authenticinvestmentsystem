@@ -842,7 +842,8 @@ const { data: planned, error: planErr } = await planQuery;
           out.push({
             suggested: true as const,
             parent_task_id: p.task_id,
-            user_cycle_id: selectedTimeline.id,
+            timeline_id: selectedTimeline.id,
+            timeline_source: selectedTimeline.source,
             date: currentDateISO,
             remainingThisWeek: remaining,
           });
