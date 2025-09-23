@@ -40,7 +40,6 @@ interface TimelineWeek {
   start_date: string;
   end_date: string;
 }
-
 export default function Goals() {
   const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
@@ -51,6 +50,7 @@ export default function Goals() {
   // Import functions from useGoalProgress hook
   const {
     toggleTaskDay,
+    fetchGoalActionsForWeek,
   } = useGoalProgress();
   
   // Local goals state for the selected timeline
