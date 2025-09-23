@@ -774,88 +774,91 @@ if (weekPlansError) throw weekPlansError;
   };
 
   const getTodayActionSuggestions = async (): Promise<Array<{
-    suggested: true;
-    parent_task_id: string;
-    user_cycle_id: string;
-    date: string;
-    remainingThisWeek: number;
-  }>> => {
-    try {
-      if (!selectedTimeline || cycleWeeks.length === 0) return [];
+  suggested: true;
+  parent_task_id: string;
+  timeline_id: string;
+  timeline_source: 'global' | 'custom';
+  date: string;
+  remainingThisWeek: number;
+}>> => {
+  try {
+    if (!selectedTimeline || cycleWeeks.length === 0) return [];
 
-      const supabase = getSupabaseClient();
+    const supabase = getSupabaseClient();
 
-      const weekNumber = getCurrentWeekNumber();
-      const currentDateISO = formatLocalDate(new Date());
+    const weekNumber = getCurrentWeekNumber();
+    const currentDateISO = formatLocalDate(new Date());
 
-      const wk = cycleWeeks.find(w => w.week_number === weekNumber);
-      if (!wk) return [];
-      const weekStartISO = wk.week_start;
-      const weekEndISO   = wk.week_end;
+    const wk = cycleWeeks.find(w => w.week_number === weekNumber);
+    if (!wk) return [];
+    const weekStartISO = wk.week_start;
+    const weekEndISO = wk.week_end;
 
-      let planQuery = supabase
-  .from('0008-ap-task-week-plan')
-  .select('task_id, target_days')
-  .eq('week_number', weekNumber);
+    // get task plans for this week
+    let planQuery = supabase
+      .from('0008-ap-task-week-plan')
+      .select('task_id, target_days')
+      .eq('week_number', weekNumber);
 
-if (selectedTimeline.source === "global") {
-  planQuery = planQuery.eq('user_global_timeline_id', selectedTimeline.id);
-} else {
-  planQuery = planQuery.eq('user_custom_timeline_id', selectedTimeline.id);
-}
-
-const { data: planned, error: planErr } = await planQuery;
-
-      if (planErr) throw planErr;
-
-      const parentIds = (planned ?? []).map(p => p.task_id);
-      if (parentIds.length === 0) return [];
-
-      const { data: weekOcc, error: occErr } = await supabase
-        .from('0008-ap-tasks')
-        .select('parent_task_id, due_date')
-        .in('parent_task_id', parentIds)
-        .gte('due_date', weekStartISO)
-        .lte('due_date', weekEndISO)
-        .eq('status', 'completed');
-
-      if (occErr) throw occErr;
-
-      const completedByParent: Record<string, number> = {};
-      for (const row of weekOcc ?? []) {
-        completedByParent[row.parent_task_id] =
-          (completedByParent[row.parent_task_id] ?? 0) + 1;
-      }
-
-      const out: Array<{
-        suggested: true;
-        parent_task_id: string;
-        user_cycle_id: string;
-        date: string;
-        remainingThisWeek: number;
-      }> = [];
-
-      for (const p of planned ?? []) {
-        const actual = completedByParent[p.task_id] ?? 0;
-        const remaining = (p.target_days ?? 0) - actual;
-        if (remaining > 0) {
-          out.push({
-            suggested: true as const,
-            parent_task_id: p.task_id,
-            timeline_id: selectedTimeline.id,
-            timeline_source: selectedTimeline.source,
-            date: currentDateISO,
-            remainingThisWeek: remaining,
-          });
-        }
-      }
-
-      return out;
-    } catch (e) {
-      console.error('Error computing today suggestions:', e);
-      return [];
+    if (selectedTimeline.source === "global") {
+      planQuery = planQuery.eq('user_global_timeline_id', selectedTimeline.id);
+    } else {
+      planQuery = planQuery.eq('user_custom_timeline_id', selectedTimeline.id);
     }
-  };
+
+    const { data: planned, error: planErr } = await planQuery;
+    if (planErr) throw planErr;
+
+    const parentIds = (planned ?? []).map(p => p.task_id);
+    if (parentIds.length === 0) return [];
+
+    // fetch completed task occurrences for this week
+    const { data: weekOcc, error: occErr } = await supabase
+      .from('0008-ap-tasks')
+      .select('parent_task_id, due_date')
+      .in('parent_task_id', parentIds)
+      .gte('due_date', weekStartISO)
+      .lte('due_date', weekEndISO)
+      .eq('status', 'completed');
+
+    if (occErr) throw occErr;
+
+    const completedByParent: Record<string, number> = {};
+    for (const row of weekOcc ?? []) {
+      completedByParent[row.parent_task_id] =
+        (completedByParent[row.parent_task_id] ?? 0) + 1;
+    }
+
+    const out: Array<{
+      suggested: true;
+      parent_task_id: string;
+      timeline_id: string;
+      timeline_source: 'global' | 'custom';
+      date: string;
+      remainingThisWeek: number;
+    }> = [];
+
+    for (const p of planned ?? []) {
+      const actual = completedByParent[p.task_id] ?? 0;
+      const remaining = (p.target_days ?? 0) - actual;
+      if (remaining > 0) {
+        out.push({
+          suggested: true as const,
+          parent_task_id: p.task_id,
+          timeline_id: selectedTimeline.id,
+          timeline_source: selectedTimeline.source,
+          date: currentDateISO,
+          remainingThisWeek: remaining,
+        });
+      }
+    }
+
+    return out;
+  } catch (e) {
+    console.error('Error computing today suggestions:', e);
+    return [];
+  }
+};
 
   const fetchGoalActionsForWeekForState = (
     goalIds: string[],
