@@ -524,7 +524,7 @@ const allTimelines = [
         .from('0008-ap-task-week-plan')
         .select('*')
         .in('task_id', taskIds)
-        .eq('user_cycle_id', userCycleId)
+        .eq('user_global_timeline_id', userGlobalTimelineId)
         .eq('week_number', weekNumber);
 
       if (weekPlansError) throw weekPlansError;
