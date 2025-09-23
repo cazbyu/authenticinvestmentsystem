@@ -43,7 +43,8 @@ interface CycleWeek {
   week_number: number;
   week_start: string;
   week_end: string;
-  user_cycle_id: string;
+  user_global_timeline_id: string;
+  user_custom_timeline_id: string;
 }
 
 interface ActionEffortModalProps {
