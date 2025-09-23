@@ -500,26 +500,37 @@ const allTimelines = [
     }
   };
 
-  const fetchTasksAndPlansForWeek = async (userCycleId: string, weekNumber: number): Promise<WeeklyTaskData[]> => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+  const fetchTasksAndPlansForWeek = async (
+  timelineId: string,
+  weekNumber: number,
+  timelineType: "global" | "custom"
+): Promise<WeeklyTaskData[]> => {
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
 
-      // Fetch tasks for this user cycle
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('user_cycle_id', userCycleId)
-        .eq('input_kind', 'count')
-        .not('status', 'in', '(completed,cancelled)');
+    // Fetch tasks for this timeline
+    let query = supabase
+      .from('0008-ap-tasks')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('input_kind', 'count')
+      .not('status', 'in', '(completed,cancelled)');
 
-      if (tasksError) throw tasksError;
-      if (!tasksData || tasksData.length === 0) return [];
+    if (timelineType === "global") {
+      query = query.eq('user_global_timeline_id', timelineId);
+    } else {
+      query = query.eq('user_custom_timeline_id', timelineId);
+    }
 
-      const taskIds = tasksData.map(t => t.id);
+    const { data: tasksData, error: tasksError } = await query;
 
+    if (tasksError) throw tasksError;
+    if (!tasksData || tasksData.length === 0) return [];
+
+    const taskIds = tasksData.map(t => t.id);
+   
       // Fetch week plans for this specific week
       const { data: weekPlansData, error: weekPlansError } = await supabase
         .from('0008-ap-task-week-plan')
