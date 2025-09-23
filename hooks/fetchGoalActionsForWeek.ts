@@ -51,16 +51,17 @@ const numberOf = (w?: TimelineWeekInput) =>
 export async function fetchGoalActionsForWeek(
   goalIds: string[],
   weekNumber: number,
-  cycleWeeks: TimelineWeekInput[],
-  customTimelineWeeks: TimelineWeekInput[] = []
+  timeline: { id: string; source: 'global' | 'custom' },
+  cycleWeeks: TimelineWeekInput[]
 ): Promise<Record<string, TaskWithLogs[]>> {
   try {
     console.debug('[fetchGoalActionsForWeek] called with:', {
       goalIdsCount: goalIds?.length ?? 0,
       goalIds,
       weekNumber,
+      timelineId: timeline.id,
+      timelineSource: timeline.source,
       cycleWeeksCount: cycleWeeks?.length ?? 0,
-      customTimelineWeeksCount: customTimelineWeeks?.length ?? 0,
     });
 
     const supabase = getSupabaseClient();
@@ -75,10 +76,8 @@ export async function fetchGoalActionsForWeek(
       return {};
     }
 
-    // Resolve the requested week from either list
-    const week =
-      cycleWeeks.find(w => numberOf(w) === weekNumber) ??
-      customTimelineWeeks.find(w => numberOf(w) === weekNumber);
+    // Resolve the requested week from the provided weeks
+    const week = cycleWeeks.find(w => numberOf(w) === weekNumber);
 
     const weekStartDate = startOf(week);
     const weekEndDate = endOf(week);
@@ -96,12 +95,13 @@ export async function fetchGoalActionsForWeek(
     }
 
     // ---- 1) Join: which parent tasks are linked to the requested goals?
-    const orFilter = `twelve_wk_goal_id.in.(${goalIds.join(',')}),custom_goal_id.in.(${goalIds.join(',')})`;
+    const goalTypeField = timeline.source === 'global' ? 'twelve_wk_goal_id' : 'custom_goal_id';
+    const orFilter = `${goalTypeField}.in.(${goalIds.join(',')})`;
     console.debug('[fetchGoalActionsForWeek] universal-goals-join query filter:', orFilter);
 
     const { data: goalJoins, error: joinsErr } = await supabase
       .from('0008-ap-universal-goals-join')
-      .select('parent_id, twelve_wk_goal_id, custom_goal_id, goal_type')
+      .select(`parent_id, ${goalTypeField}, goal_type`)
       .or(orFilter)
       .eq('parent_type', 'task');
 
@@ -146,12 +146,20 @@ export async function fetchGoalActionsForWeek(
     }
 
     // ---- 3) Week-plan rows for the target week (to get target_days)
-    const { data: weekPlansData, error: weekPlansErr } = await supabase
+    let weekPlanQuery = supabase
       .from('0008-ap-task-week-plan')
       .select('*')
       .in('task_id', taskIds)
       .eq('week_number', weekNumber);
 
+    // Apply conditional timeline FK filter
+    if (timeline.source === 'global') {
+      weekPlanQuery = weekPlanQuery.eq('user_global_timeline_id', timeline.id);
+    } else {
+      weekPlanQuery = weekPlanQuery.eq('user_custom_timeline_id', timeline.id);
+    }
+
+    const { data: weekPlansData, error: weekPlansErr } = await weekPlanQuery;
     if (weekPlansErr) {
       console.error('[fetchGoalActionsForWeek] error fetching week plans:', weekPlansErr);
       return {};
@@ -202,8 +210,7 @@ export async function fetchGoalActionsForWeek(
       const weekPlan = (weekPlansData ?? []).find(wp => wp.task_id === task.id);
       if (!weekPlan) continue;
 
-      const goalId: string | undefined =
-        goalJoin.twelve_wk_goal_id ?? goalJoin.custom_goal_id;
+      const goalId: string | undefined = goalJoin[goalTypeField];
       if (!goalId) continue;
 
       const relevantOccurrences =

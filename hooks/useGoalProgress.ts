@@ -5,80 +5,58 @@ import { Alert } from 'react-native';
 import { generateCycleWeeks, formatLocalDate, isValidISODate } from '@/lib/dateUtils';
 import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 // Import CRUD functions from useGoals to avoid duplication
-import { useGoals, type Goal, type UserCycle, type CycleWeek, type DaysLeftData, type TaskWeekPlan, type TaskLog, type TaskWithLogs, type WeekData, type GoalProgress, type CycleEffortData } from '@/hooks/useGoals';
+import { 
+  useGoals, 
+  type Goal, 
+  type Timeline, 
+  type TaskWeekPlan, 
+  type UniversalGoalJoin,
+  type TwelveWeekGoal,
+  type CustomGoal
+} from '@/hooks/useGoals';
 
 /* ================================
  * PROGRESS-SPECIFIC INTERFACES
  * ================================ */
 export type GoalType = 'twelve_wk_goal' | 'custom_goal';
 
-export interface Timeline {
+export interface TaskLog {
   id: string;
-  user_id: string;
-  source: 'custom' | 'global';
-  title?: string;
-  start_date: string | null;
-  end_date: string | null;
-  status: 'active' | 'completed' | 'archived';
-  timeline_type?: 'cycle' | 'project' | 'challenge' | 'custom';
-  week_start_day?: 'sunday' | 'monday';
-  global_cycle_id?: string | null;
+  task_id: string;
+  measured_on: string; // YYYY-MM-DD
+  week_number: number;
+  day_of_week?: number;
+  value: number;
   created_at: string;
-  updated_at: string;
+  completed?: boolean;
 }
 
-export interface UnifiedGoal {
+export interface TaskWithLogs {
   id: string;
-  user_id: string;
-  title: string;
-  description?: string;
-  status: string;
-  progress: number;
-  weekly_target: number;
-  total_target: number;
-  start_date?: string;
-  end_date?: string;
-  created_at?: string;
-  updated_at?: string;
-  timeline_id: string | null;
-  source: 'custom' | 'global';
-  goal_type: GoalType;
+  logs: TaskLog[];
+  weeklyActual: number;
+  weeklyTarget: number;
+  goal_type?: '12week' | 'custom';
+  [k: string]: any; // carry through task fields from DB
 }
 
-type UnifiedGoalRow = {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  progress: number | null;
-  weekly_target: number | null;
-  total_target: number | null;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  timeline_id: string | null;
-  source?: 'custom' | 'global';
-};
+export interface CycleWeek {
+  week_number: number;
+  week_start: string; // YYYY-MM-DD
+  week_end: string;   // YYYY-MM-DD
+  timeline_id: string; // normalized field for global/custom timeline
+}
 
-export interface TwelveWeekGoal {
-  id: string;
-  title: string;
-  description?: string;
-  status: string;
-  progress: number;
-  weekly_target: number;
-  total_target: number;
-  start_date?: string;
-  end_date?: string;
-  timeline_id?: string;
-  created_at: string;
-  updated_at: string;
-  domains?: Array<{ id: string; name: string }>;
-  roles?: Array<{ id: string; label: string; color?: string }>;
-  keyRelationships?: Array<{ id: string; name: string }>;
-  notes?: Array<{ content: string; created_at: string }>;
+export interface DaysLeftData {
+  days_left: number;
+  pct_elapsed: number;
+  timeline_id: string;
+}
+
+export interface WeekData {
+  weekNumber: number;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
 }
 
 export interface WeeklyTaskData {
@@ -90,6 +68,29 @@ export interface WeeklyTaskData {
   weeklyScore: number;
 }
 
+export interface GoalProgress {
+  goalId: string;
+  currentWeek: number;
+  daysRemaining: number;
+  weeklyActual: number;
+  weeklyTarget: number;
+  overallActual: number;
+  overallTarget: number;
+  overallProgress: number; // 0..100
+}
+
+export interface CycleEffortData {
+  totalActual: number;
+  totalTarget: number;
+  overallPercentage: number;
+}
+
+// Re-export types for convenience
+export type { TwelveWeekGoal, CustomGoal, Timeline };
+
+/* ================================
+ * HOOK OPTIONS
+ * ================================ */
 interface UseGoalProgressOptions {
   scope?: {
     type: 'user' | 'role' | 'domain' | 'key_relationship';
@@ -101,7 +102,7 @@ interface UseGoalProgressOptions {
  * PROGRESS-FOCUSED HOOK
  * ================================ */
 export function useGoalProgress(options: UseGoalProgressOptions = {}) {
-  const [goals, setGoals] = useState<UnifiedGoal[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
   const [availableTimelines, setAvailableTimelines] = useState<Timeline[]>([]);
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
@@ -117,20 +118,8 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
-  } = useGoals();
-
-  const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
-    let points = 0;
-    if (roles && roles.length > 0) points += roles.length;
-    if (domains && domains.length > 0) points += domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
-  };
+    refreshGoals: refreshGoalsFromUseGoals,
+  } = useGoals(options);
 
   /* --------------------------------
    * TIMELINE MANAGEMENT (progress-specific)
@@ -224,32 +213,56 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   /* --------------------------------
    * WEEK/DAY CALCULATIONS (progress-specific)
    * -------------------------------- */
-  const fetchCycleWeeks = async (currentCycle: UserCycle) => {
+  const fetchCycleWeeks = async (timeline: Timeline) => {
     try {
       console.log('=== FETCH CYCLE WEEKS START ===');
       const supabase = getSupabaseClient();
 
-      const { data: dbWeeks, error } = await supabase
-        .from('v_unified_timeline_weeks')
-        .select('week_number, week_start, week_end, timeline_id, source')
-        .eq('timeline_id', currentCycle.id)
-        .order('week_number', { ascending: true })
-        .returns<CycleWeek[]>();
+      let weeks, error;
+      
+      // Query the correct view based on timeline source
+      if (timeline.source === 'global') {
+        const result = await supabase
+          .from('v_user_global_timeline_weeks')
+          .select('week_number, week_start, week_end, timeline_id')
+          .eq('timeline_id', timeline.id)
+          .order('week_number', { ascending: true });
+        weeks = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from('v_custom_timeline_weeks')
+          .select('week_number, start_date, end_date, custom_timeline_id')
+          .eq('custom_timeline_id', timeline.id)
+          .order('week_number', { ascending: true });
+        weeks = result.data;
+        error = result.error;
+        
+        // Normalize custom timeline week structure
+        if (weeks) {
+          weeks = weeks.map(week => ({
+            week_number: week.week_number,
+            week_start: week.start_date,
+            week_end: week.end_date,
+            timeline_id: week.custom_timeline_id,
+          }));
+        }
+      }
 
-      console.log('Database weeks query result:', { data: dbWeeks, error });
+      console.log('Database weeks query result:', { data: weeks, error });
 
       if (error) {
         console.warn('Database week view failed, using client-side fallback:', error);
-        if (currentCycle.start_date) {
+        if (timeline.start_date) {
           const clientWeeks = generateCycleWeeks(
-            currentCycle.start_date!,
-            currentCycle.week_start_day || 'monday',
-            currentCycle.end_date || undefined
+            timeline.start_date!,
+            timeline.week_start_day || 'monday',
+            timeline.end_date || undefined
           ).map(week => ({
             week_number: week.week_number,
             week_start: week.start_date,
             week_end: week.end_date,
-            timeline_id: currentCycle.id,
+            timeline_id: timeline.id,
           }));
           console.log('Using client-side fallback weeks:', clientWeeks);
           setCycleWeeks(clientWeeks);
@@ -260,10 +273,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         return [];
       }
 
-      console.log('Using database weeks:', dbWeeks);
-      setCycleWeeks(dbWeeks ?? []);
+      console.log('Using database weeks:', weeks);
+      setCycleWeeks(weeks ?? []);
       console.log('=== FETCH CYCLE WEEKS END ===');
-      return dbWeeks ?? [];
+      return weeks ?? [];
     } catch (error) {
       console.error('Error fetching cycle weeks:', error);
       setCycleWeeks([]);
@@ -271,15 +284,31 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const fetchDaysLeftData = async (currentCycle: UserCycle) => {
+  const fetchDaysLeftData = async (timeline: Timeline) => {
     try {
       console.log('=== FETCH DAYS LEFT START ===');
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from('v_unified_timeline_days_left')
-        .select('timeline_id, days_left, pct_elapsed, source')
-        .eq('timeline_id', currentCycle.id)
-        .single();
+      
+      let data, error;
+      
+      // Query the correct view based on timeline source
+      if (timeline.source === 'global') {
+        const result = await supabase
+          .from('v_user_global_timeline_days_left')
+          .select('user_global_timeline_id, days_left, pct_elapsed')
+          .eq('user_global_timeline_id', timeline.id)
+          .single();
+        data = result.data ? { ...result.data, timeline_id: result.data.user_global_timeline_id } : null;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from('v_custom_timeline_days_left')
+          .select('custom_timeline_id, days_left, pct_elapsed')
+          .eq('custom_timeline_id', timeline.id)
+          .single();
+        data = result.data ? { ...result.data, timeline_id: result.data.custom_timeline_id } : null;
+        error = result.error;
+      }
 
       if (error && error.code !== 'PGRST116') throw error;
 
@@ -297,81 +326,129 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   /* --------------------------------
    * GOAL PROGRESS CALCULATIONS (progress-specific)
    * -------------------------------- */
-  const fetchGoals = async (currentCycle?: UserCycle | Timeline | null) => {
-    console.log('=== FETCH GOALS START ===');
+  const fetchGoalsForTimeline = async (timeline?: Timeline | null) => {
+    console.log('=== FETCH GOALS FOR TIMELINE START ===');
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.log('No authenticated user found in fetchGoals');
+        console.log('No authenticated user found in fetchGoalsForTimeline');
         setGoals([]);
         return;
       }
 
-      const resolvedTimeline = currentCycle ?? selectedTimeline;
+      const resolvedTimeline = timeline ?? selectedTimeline;
 
       if (!resolvedTimeline) {
-        console.log('No timeline found in fetchGoals');
+        console.log('No timeline found in fetchGoalsForTimeline');
         setGoals([]);
         return;
       }
 
-      console.log('Fetching unified goals for timeline:', resolvedTimeline.id);
+      console.log('Fetching goals for timeline:', resolvedTimeline.id);
 
-      const { data: unified, error: unifiedErr } = await supabase
-        .from<UnifiedGoalRow>('v_unified_goals')
-        .select(`
-          id, user_id, title, description, status, progress,
-          weekly_target, total_target, start_date, end_date,
-          created_at, updated_at, timeline_id
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .eq('timeline_id', resolvedTimeline.id)
-        .order('created_at', { ascending: false });
+      let goalsData: any[] = [];
 
-      if (unifiedErr) {
-        console.error('Error fetching unified goals:', unifiedErr);
-        throw unifiedErr;
+      if (resolvedTimeline.source === 'global') {
+        // Fetch 12-week goals for global timeline
+        const { data, error } = await supabase
+          .from('0008-ap-goals-12wk')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('user_global_timeline_id', resolvedTimeline.id) // Updated FK
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        goalsData = (data || []).map(goal => ({ ...goal, goal_type: '12week' }));
+      } else {
+        // Fetch custom goals for custom timeline
+        const { data, error } = await supabase
+          .from('0008-ap-goals-custom')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('custom_timeline_id', resolvedTimeline.id) // Updated FK
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
       }
 
-      const mergedGoals = (unified ?? []).map(g => {
-        const inferredSource = g.source ?? resolvedTimeline.source ?? 'custom';
-        const goalType = inferredSource === 'global' ? 'twelve_wk_goal' : 'custom_goal';
-
-        return {
-          id: g.id,
-          user_id: g.user_id,
-          title: g.title,
-          description: g.description ?? undefined,
-          status: g.status,
-          progress: g.progress ?? 0,
-          weekly_target: g.weekly_target ?? 3,
-          total_target: g.total_target ?? 36,
-          start_date: g.start_date ?? undefined,
-          end_date: g.end_date ?? undefined,
-          created_at: g.created_at ?? undefined,
-          updated_at: g.updated_at ?? undefined,
-          timeline_id: g.timeline_id ?? null,
-          source: inferredSource,
-          goal_type: goalType,
-        };
-      });
-
-      console.log('Final merged goals count:', mergedGoals.length);
-      setGoals(mergedGoals);
-
-      // Progress calculation only for 12-week goals
-      const twelveWeekGoals = mergedGoals.filter(g => g.goal_type === 'twelve_wk_goal');
-      if (twelveWeekGoals.length > 0) {
-        console.log('Calculating progress for', twelveWeekGoals.length, '12-week goals');
-        await calculateGoalProgress(twelveWeekGoals, resolvedTimeline.id);
+      if (goalsData.length === 0) {
+        setGoals([]);
+        setGoalProgress({});
+        setCycleEffortData({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
+        return;
       }
 
-      console.log('=== FETCH GOALS END ===');
+      // Fetch related data
+      const goalIds = goalsData.map(g => g.id);
+      const [
+        { data: rolesData, error: rolesError },
+        { data: domainsData, error: domainsError },
+        { data: krData, error: krError }
+      ] = await Promise.all([
+        supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+        supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+        supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
+      ]);
+
+      if (rolesError) throw rolesError;
+      if (domainsError) throw domainsError;
+      if (krError) throw krError;
+
+      // Apply scope filtering if needed
+      let filteredGoalIds = goalIds;
+      if (options.scope && options.scope.type !== 'user' && options.scope.id) {
+        const scopeId = options.scope.id;
+        switch (options.scope.type) {
+          case 'role': {
+            const roleGoalIds = rolesData?.filter(r => r.role?.id === scopeId).map(r => r.parent_id) || [];
+            filteredGoalIds = filteredGoalIds.filter(id => roleGoalIds.includes(id));
+            break;
+          }
+          case 'domain': {
+            const domainGoalIds = domainsData?.filter(d => d.domain?.id === scopeId).map(d => d.parent_id) || [];
+            filteredGoalIds = filteredGoalIds.filter(id => domainGoalIds.includes(id));
+            break;
+          }
+          case 'key_relationship': {
+            const krGoalIds = krData?.filter(kr => kr.key_relationship?.id === scopeId).map(kr => kr.parent_id) || [];
+            filteredGoalIds = filteredGoalIds.filter(id => krGoalIds.includes(id));
+            break;
+          }
+        }
+      }
+
+      // Transform goals with related data
+      const transformedGoals = goalsData
+        .filter(goal => filteredGoalIds.includes(goal.id))
+        .map(goal => ({
+          ...goal,
+          domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
+          roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
+          keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+        }));
+
+      console.log('Final transformed goals count:', transformedGoals.length);
+      setGoals(transformedGoals);
+
+      // Progress calculation only for goals with targets
+      const goalsWithTargets = transformedGoals.filter(g => 
+        (g.goal_type === '12week' && g.weekly_target && g.total_target) ||
+        (g.goal_type === 'custom')
+      );
+      
+      if (goalsWithTargets.length > 0) {
+        console.log('Calculating progress for', goalsWithTargets.length, 'goals');
+        await calculateGoalProgress(goalsWithTargets, resolvedTimeline);
+      }
+
+      console.log('=== FETCH GOALS FOR TIMELINE END ===');
     } catch (error) {
-      console.error('Error fetching goals:', error);
+      console.error('Error fetching goals for timeline:', error);
       Alert.alert('Error', (error as Error).message);
     } finally {
       setLoading(false);
@@ -382,48 +459,48 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
    * TASK EXECUTION TRACKING (progress-specific)
    * -------------------------------- */
   const fetchTasksAndPlansForWeek = async (
-    timelineId: string,
-    weekNumber: number,
-    timelineType: "global" | "custom"
+    timeline: Timeline,
+    weekNumber: number
   ): Promise<WeeklyTaskData[]> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Fetch tasks for this timeline
-      let query = supabase
+      // Fetch tasks for this timeline with conditional FK
+      let tasksQuery = supabase
         .from('0008-ap-tasks')
         .select('*')
         .eq('user_id', user.id)
         .eq('input_kind', 'count')
         .not('status', 'in', '(completed,cancelled)');
 
-      if (timelineType === "global") {
-        query = query.eq('user_global_timeline_id', timelineId);
+      // Apply conditional timeline FK filter
+      if (timeline.source === 'global') {
+        tasksQuery = tasksQuery.eq('user_global_timeline_id', timeline.id);
       } else {
-        query = query.eq('user_custom_timeline_id', timelineId);
+        tasksQuery = tasksQuery.eq('user_custom_timeline_id', timeline.id);
       }
 
-      const { data: tasksData, error: tasksError } = await query;
+      const { data: tasksData, error: tasksError } = await tasksQuery;
 
       if (tasksError) throw tasksError;
       if (!tasksData || tasksData.length === 0) return [];
 
       const taskIds = tasksData.map(t => t.id);
      
-      // Fetch week plans for this specific week
+      // Fetch week plans for this specific week with conditional FK
       let weekPlanQuery = supabase
         .from('0008-ap-task-week-plan')
         .select('*')
         .in('task_id', taskIds)
         .eq('week_number', weekNumber);
 
-      // Dynamically filter depending on timeline type
-      if (timelineType === "global") {
-        weekPlanQuery = weekPlanQuery.eq('user_global_timeline_id', timelineId);
-      } else if (timelineType === "custom") {
-        weekPlanQuery = weekPlanQuery.eq('user_custom_timeline_id', timelineId);
+      // Apply conditional timeline FK filter
+      if (timeline.source === 'global') {
+        weekPlanQuery = weekPlanQuery.eq('user_global_timeline_id', timeline.id);
+      } else {
+        weekPlanQuery = weekPlanQuery.eq('user_custom_timeline_id', timeline.id);
       }
 
       const { data: weekPlansData, error: weekPlansError } = await weekPlanQuery;
@@ -487,7 +564,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     }
   };
 
-  const calculateGoalProgress = async (goals: UnifiedGoal[], timelineId: string) => {
+  const calculateGoalProgress = async (goals: Goal[], timeline: Timeline) => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -500,11 +577,12 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const daysRemaining = daysLeftData?.days_left || 0;
 
       for (const goal of goals) {
-        // Fetch parent action tasks linked to this goal
+        // Fetch parent action tasks linked to this goal with conditional FK
+        const goalTypeField = goal.goal_type === 'custom' ? 'custom_goal_id' : 'twelve_wk_goal_id';
         const { data: goalJoins } = await supabase
           .from('0008-ap-universal-goals-join')
           .select('parent_id')
-          .eq(goal.goal_type === 'custom_goal' ? 'custom_goal_id' : 'twelve_wk_goal_id', goal.id)
+          .eq(goalTypeField, goal.id)
           .eq('parent_type', 'task');
 
         const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
@@ -515,9 +593,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
             currentWeek,
             daysRemaining,
             weeklyActual: 0,
-            weeklyTarget: goal.weekly_target,
+            weeklyTarget: goal.goal_type === '12week' ? goal.weekly_target : 3,
             overallActual: 0,
-            overallTarget: goal.total_target,
+            overallTarget: goal.goal_type === '12week' ? goal.total_target : 100,
             overallProgress: 0,
           };
           continue;
@@ -552,25 +630,26 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           .in('parent_task_id', taskIds)
           .eq('status', 'completed');
 
-        if (selectedTimeline?.start_date && isValidISODate(selectedTimeline.start_date)) {
-          overallQuery = overallQuery.gte('due_date', selectedTimeline.start_date);
+        if (timeline?.start_date && isValidISODate(timeline.start_date)) {
+          overallQuery = overallQuery.gte('due_date', timeline.start_date);
         }
-        if (selectedTimeline?.end_date && isValidISODate(selectedTimeline.end_date)) {
-          overallQuery = overallQuery.lte('due_date', selectedTimeline.end_date);
+        if (timeline?.end_date && isValidISODate(timeline.end_date)) {
+          overallQuery = overallQuery.lte('due_date', timeline.end_date);
         }
 
         const { data: overallOccurrences } = await overallQuery;
 
-        // Sum targets across all week plans for these tasks
+        // Sum targets across all week plans for these tasks with conditional FK
         let weekPlansQuery = supabase
           .from('0008-ap-task-week-plan')
           .select('target_days')
           .in('task_id', taskIds);
 
-        if (selectedTimeline?.source === 'global') {
-          weekPlansQuery = weekPlansQuery.eq('user_global_timeline_id', timelineId);
-        } else if (selectedTimeline?.source === 'custom') {
-          weekPlansQuery = weekPlansQuery.eq('user_custom_timeline_id', timelineId);
+        // Apply conditional timeline FK filter
+        if (timeline.source === 'global') {
+          weekPlansQuery = weekPlansQuery.eq('user_global_timeline_id', timeline.id);
+        } else {
+          weekPlansQuery = weekPlansQuery.eq('user_custom_timeline_id', timeline.id);
         }
 
         const { data: weekPlansData, error: weekPlansError } = await weekPlansQuery;
@@ -587,7 +666,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           currentWeek,
           daysRemaining,
           weeklyActual,
-          weeklyTarget: goal.weekly_target,
+          weeklyTarget: goal.goal_type === '12week' ? goal.weekly_target : 3,
           overallActual: cappedOverallActual,
           overallTarget,
           overallProgress,
@@ -635,13 +714,14 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const weekStartISO = wk.week_start;
       const weekEndISO = wk.week_end;
 
-      // get task plans for this week
+      // Get task plans for this week with conditional FK
       let planQuery = supabase
         .from('0008-ap-task-week-plan')
         .select('task_id, target_days')
         .eq('week_number', weekNumber);
 
-      if (selectedTimeline.source === "global") {
+      // Apply conditional timeline FK filter
+      if (selectedTimeline.source === 'global') {
         planQuery = planQuery.eq('user_global_timeline_id', selectedTimeline.id);
       } else {
         planQuery = planQuery.eq('user_custom_timeline_id', selectedTimeline.id);
@@ -738,26 +818,32 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       .single();
     if (pErr || !parent) throw pErr ?? new Error('Parent task not found');
 
+    // Create occurrence with conditional timeline FK
+    const occurrencePayload: any = {
+      user_id: user.id,
+      title: parent.title,
+      type: 'task',
+      status: 'completed',
+      due_date: whenISO,
+      completed_at: new Date().toISOString(),
+      parent_task_id: parentTaskId,
+      is_twelve_week_goal: selectedTimeline.source === 'global',
+      // Conditional timeline FK injection
+      ...(selectedTimeline.source === 'global'
+        ? { user_global_timeline_id: selectedTimeline.id }
+        : { user_custom_timeline_id: selectedTimeline.id }),
+    };
+
     const { data: occ, error: oErr } = await supabase
       .from('0008-ap-tasks')
-      .insert({
-        user_id: user.id,
-        user_global_timeline_id: selectedTimeline.source === 'global' ? selectedTimeline.id : null,
-        user_custom_timeline_id: selectedTimeline.source === 'custom' ? selectedTimeline.id : null,
-        title: parent.title,
-        type: 'task',
-        status: 'completed',
-        due_date: whenISO,
-        completed_at: new Date().toISOString(),
-        parent_task_id: parentTaskId,
-        is_twelve_week_goal: selectedTimeline.source === 'global',
-      })
+      .insert(occurrencePayload)
       .select('id')
       .single();
     if (oErr || !occ) throw oErr ?? new Error('Failed to insert occurrence');
 
     const occId = occ.id as string;
 
+    // Copy universal joins from parent task
     await Promise.all([
       supabase.rpc('ap_copy_universal_roles_to_task', {
         from_parent_id: parentTaskId,
@@ -874,7 +960,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       console.log('Fetched weeks:', weeks?.length || 0);
       console.log('Fetched days left data:', daysLeft);
 
-      await fetchGoals(timeline);
+      await fetchGoalsForTimeline(timeline);
     } catch (error) {
       console.error('Error refreshing all data:', error);
     }
@@ -882,15 +968,12 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
   const refreshGoals = async () => {
     if (selectedTimeline) {
-      await fetchGoals(selectedTimeline);
+      await fetchGoalsForTimeline(selectedTimeline);
+    } else {
+      // Also refresh the useGoals data
+      await refreshGoalsFromUseGoals();
     }
   };
-
-  const fetchGoalActionsForWeekForState = (
-    goalIds: string[],
-    weekNumber: number,
-    customWeeks?: WeekData[]
-  ) => fetchGoalActionsForWeek(goalIds, weekNumber, cycleWeeks, customWeeks || []);
 
   /* --------------------------------
    * Effects
@@ -944,7 +1027,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
     // Timeline & week utilities
     fetchTasksAndPlansForWeek,
-    fetchGoalActionsForWeek: fetchGoalActionsForWeekForState,
+    fetchGoalActionsForWeek,
     getCurrentWeekNumber,
     getCurrentWeekIndex,
     getWeekData,

@@ -6,7 +6,6 @@ import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '../lib/date
 
 /* ================================
  * DB TABLE / VIEW CONSTANTS (single source of truth)
- * Adjust here if your DB names differ.
  * ================================ */
 const DB = {
   // Timelines
@@ -33,18 +32,10 @@ const DB = {
   ROLES: '0008-ap-roles',
   DOMAINS: '0008-ap-domains',
   KEY_REL: '0008-ap-key-relationships',
-
-  // Views (weeks + days-left); columns must expose: week_number, week_start, week_end, timeline_id
-  V_GLOBAL_WEEKS: 'v_user_global_timeline_weeks',
-  V_CUSTOM_WEEKS: 'v_custom_timeline_weeks',
-
-  // Views (days-left); columns must expose: timeline_id, days_left, pct_elapsed
-  V_GLOBAL_DAYS_LEFT: 'v_user_global_timeline_days_left',
-  V_CUSTOM_DAYS_LEFT: 'v_custom_timeline_days_left',
 };
 
 /* ================================
- * INTERFACES
+ * INTERFACES - CRUD + NORMALIZATION FOCUSED
  * ================================ */
 export interface TwelveWeekGoal {
   id: string;
@@ -56,7 +47,7 @@ export interface TwelveWeekGoal {
   total_target: number;
   start_date?: string;
   end_date?: string;
-  user_global_timeline_id?: string; // FK to 12wk timeline
+  user_global_timeline_id?: string; // Updated FK
   created_at: string;
   updated_at: string;
   domains?: Array<{ id: string; name: string }>;
@@ -74,7 +65,7 @@ export interface CustomGoal {
   end_date: string;
   status: string;
   progress: number;
-  custom_timeline_id?: string; // FK to custom timeline
+  custom_timeline_id?: string; // Updated FK
   created_at: string;
   updated_at: string;
   domains?: Array<{ id: string; name: string }>;
@@ -86,89 +77,40 @@ export interface CustomGoal {
 
 export type Goal = TwelveWeekGoal | CustomGoal;
 
-export interface UserCycle {
+export interface Timeline {
   id: string;
   user_id: string;
   source: 'custom' | 'global';
-  title?: string | null;
+  title?: string;
   start_date: string | null;
   end_date: string | null;
   status: 'active' | 'completed' | 'archived';
+  timeline_type?: 'cycle' | 'project' | 'challenge' | 'custom';
+  week_start_day?: 'sunday' | 'monday';
+  global_cycle_id?: string | null;
   created_at: string;
   updated_at: string;
-  timezone?: string | null;
-  week_start_day?: 'sunday' | 'monday';
-}
-
-export interface CycleWeek {
-  week_number: number;
-  week_start: string; // YYYY-MM-DD
-  week_end: string;   // YYYY-MM-DD
-  timeline_id: string; // normalized field for global/custom timeline
-}
-
-export interface DaysLeftData {
-  days_left: number;
-  pct_elapsed: number;
-  timeline_id: string;
 }
 
 export interface TaskWeekPlan {
   id: string;
   task_id: string;
-  user_global_timeline_id?: string;  // for global timelines
-  user_custom_timeline_id?: string;  // for custom timelines
+  user_global_timeline_id?: string;  // Updated for global timelines
+  user_custom_timeline_id?: string;  // Updated for custom timelines
   week_number: number;
   target_days: number;
   created_at: string;
 }
 
-export interface TaskLog {
+export interface UniversalGoalJoin {
   id: string;
-  task_id: string;
-  measured_on: string; // YYYY-MM-DD
-  week_number: number;
-  day_of_week?: number;
-  value: number;
+  user_id: string;
+  parent_type: string;
+  parent_id: string;
+  goal_type: 'twelve_wk_goal' | 'custom_goal';
+  twelve_wk_goal_id?: string;
+  custom_goal_id?: string;
   created_at: string;
-}
-
-export interface TaskWithLogs extends Goal {
-  logs: TaskLog[];
-  weeklyActual: number;
-  weeklyTarget: number;
-}
-
-export interface WeekData {
-  weekNumber: number;
-  startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD
-}
-
-export interface WeeklyTaskData {
-  task: any;
-  weekPlan: TaskWeekPlan | null;
-  logs: TaskLog[];
-  completed: number;
-  target: number;
-  weeklyScore: number;
-}
-
-export interface GoalProgress {
-  goalId: string;
-  currentWeek: number;
-  daysRemaining: number;
-  weeklyActual: number;
-  weeklyTarget: number;
-  overallActual: number;
-  overallTarget: number;
-  overallProgress: number; // 0..100
-}
-
-export interface CycleEffortData {
-  totalActual: number;
-  totalTarget: number;
-  overallPercentage: number;
 }
 
 /* ================================
@@ -188,20 +130,47 @@ export function useGoals(options: UseGoalsOptions = {}) {
   const [twelveWeekGoals, setTwelveWeekGoals] = useState<TwelveWeekGoal[]>([]);
   const [customGoals, setCustomGoals] = useState<CustomGoal[]>([]);
   const [allGoals, setAllGoals] = useState<Goal[]>([]);
-  const [currentCycle, setCurrentCycle] = useState<UserCycle | null>(null);
+  const [currentTimeline, setCurrentTimeline] = useState<Timeline | null>(null);
   const [loading, setLoading] = useState(false);
+
+  /* --------------------------------
+   * UNIVERSAL JOIN HELPER - CENTRALIZED
+   * -------------------------------- */
+  const insertUniversalJoins = async (
+    supabase: any,
+    userId: string,
+    parentId: string,
+    parentType: string,
+    foreignKeyField: string,
+    selectedIds?: string[],
+    tableName: string
+  ) => {
+    if (!selectedIds?.length) return;
+
+    const joins = selectedIds.map(id => ({
+      parent_id: parentId,
+      parent_type: parentType,
+      [foreignKeyField]: id,
+      user_id: userId,
+    }));
+
+    const { error } = await supabase
+      .from(tableName)
+      .insert(joins);
+    if (error) throw error;
+  };
 
   /* --------------------------------
    * Fetch current active timeline (global first, then custom)
    * -------------------------------- */
-  const fetchUserCycle = async (): Promise<UserCycle | null> => {
+  const fetchCurrentTimeline = async (): Promise<Timeline | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user }, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
       if (!user) return null;
 
-      // Prefer an active global (12wk) timeline
+      // Prefer an active global timeline
       const { data: globalTimeline, error: gErr } = await supabase
         .from(DB.USER_GLOBAL_TIMELINES)
         .select('*')
@@ -213,14 +182,14 @@ export function useGoals(options: UseGoalsOptions = {}) {
       if (gErr) throw gErr;
 
       if (globalTimeline) {
-        const hydrated: UserCycle = {
+        const hydrated: Timeline = {
           ...globalTimeline,
           source: 'global',
           title: globalTimeline.title ?? '12 Week Timeline',
           start_date: globalTimeline.start_date,
           end_date: globalTimeline.end_date,
         };
-        setCurrentCycle(hydrated);
+        setCurrentTimeline(hydrated);
         return hydrated;
       }
 
@@ -236,22 +205,22 @@ export function useGoals(options: UseGoalsOptions = {}) {
       if (cErr) throw cErr;
 
       if (customTimeline) {
-        const hydrated: UserCycle = {
+        const hydrated: Timeline = {
           ...customTimeline,
           source: 'custom',
           title: customTimeline.title ?? 'Custom Timeline',
           start_date: customTimeline.start_date,
           end_date: customTimeline.end_date,
         };
-        setCurrentCycle(hydrated);
+        setCurrentTimeline(hydrated);
         return hydrated;
       }
 
-      setCurrentCycle(null);
+      setCurrentTimeline(null);
       return null;
     } catch (error) {
-      console.error('Error fetching user cycle:', error);
-      setCurrentCycle(null);
+      console.error('Error fetching current timeline:', error);
+      setCurrentTimeline(null);
       return null;
     }
   };
@@ -259,36 +228,37 @@ export function useGoals(options: UseGoalsOptions = {}) {
   /* --------------------------------
    * Fetch goals for the active timeline (strict filtering by FK)
    * -------------------------------- */
-  const fetchGoals = async (timelineId?: string) => {
+  const fetchGoals = async (timeline?: Timeline) => {
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const activeTimeline = timeline || currentTimeline;
       let twelveWeekData: any[] = [];
       let customData: any[] = [];
 
-      if (timelineId && currentCycle) {
-        if (currentCycle.source === 'global') {
+      if (activeTimeline) {
+        if (activeTimeline.source === 'global') {
           // Only 12wk goals for global timeline
           const { data, error } = await supabase
             .from(DB.GOALS_12WK)
             .select('*')
             .eq('user_id', user.id)
-            .eq('user_global_timeline_id', timelineId) // strict
+            .eq('user_global_timeline_id', activeTimeline.id) // Updated FK
             .eq('status', 'active')
             .order('created_at', { ascending: false });
           if (error) throw error;
           twelveWeekData = data || [];
           customData = [];
-        } else if (currentCycle.source === 'custom') {
+        } else if (activeTimeline.source === 'custom') {
           // Only custom goals for custom timeline
           const { data, error } = await supabase
             .from(DB.GOALS_CUSTOM)
             .select('*')
             .eq('user_id', user.id)
-            .eq('custom_timeline_id', timelineId) // strict
+            .eq('custom_timeline_id', activeTimeline.id) // Updated FK
             .eq('status', 'active')
             .order('created_at', { ascending: false });
           if (error) throw error;
@@ -400,38 +370,43 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   /* --------------------------------
-   * GOAL CREATION FUNCTIONS (centralized here)
+   * GOAL CREATION FUNCTIONS - CENTRALIZED
    * -------------------------------- */
   const createTwelveWeekGoal = async (goalData: {
     title: string;
     description?: string;
     weekly_target?: number;
     total_target?: number;
-  }): Promise<TwelveWeekGoal | null> => {
+  }, selectedTimeline?: Timeline): Promise<TwelveWeekGoal | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !currentCycle || currentCycle.source !== 'global') return null;
+      if (!user) return null;
+
+      const timeline = selectedTimeline || currentTimeline;
+      if (!timeline || timeline.source !== 'global') {
+        throw new Error('Global timeline required for 12-week goals');
+      }
 
       const { data, error } = await supabase
         .from(DB.GOALS_12WK)
         .insert({
           user_id: user.id,
-          user_global_timeline_id: currentCycle.id, // strict FK
+          user_global_timeline_id: timeline.id, // Updated FK
           title: goalData.title,
           description: goalData.description,
           weekly_target: goalData.weekly_target ?? 3,
           total_target: goalData.total_target ?? 36,
           status: 'active',
           progress: 0,
-          start_date: currentCycle.start_date,
-          end_date: currentCycle.end_date,
+          start_date: timeline.start_date,
+          end_date: timeline.end_date,
         })
         .select('*')
         .single();
 
       if (error) throw error;
-      await fetchGoals(currentCycle.id);
+      await fetchGoals(timeline);
       return { ...data, goal_type: '12week' };
     } catch (error) {
       console.error('Error creating 12-week goal:', error);
@@ -444,14 +419,19 @@ export function useGoals(options: UseGoalsOptions = {}) {
     description?: string;
     start_date?: string;
     end_date?: string;
-  }, selectedTimeline?: { id: string; start_date?: string | null; end_date?: string | null }): Promise<CustomGoal | null> => {
+  }, selectedTimeline?: Timeline): Promise<CustomGoal | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !selectedTimeline) return null;
+      if (!user) return null;
 
-      const startDate = goalData.start_date || selectedTimeline?.start_date;
-      const endDate = goalData.end_date || selectedTimeline?.end_date;
+      const timeline = selectedTimeline || currentTimeline;
+      if (!timeline) {
+        throw new Error('Timeline required for custom goals');
+      }
+
+      const startDate = goalData.start_date || timeline?.start_date;
+      const endDate = goalData.end_date || timeline?.end_date;
 
       if (!startDate || !endDate) throw new Error('Start date and end date are required for custom goals');
 
@@ -459,8 +439,9 @@ export function useGoals(options: UseGoalsOptions = {}) {
         .from(DB.GOALS_CUSTOM)
         .insert({
           user_id: user.id,
-          custom_timeline_id: selectedTimeline.id,
+          custom_timeline_id: timeline.id, // Updated FK
           title: goalData.title,
+          description: goalData.description,
           start_date: startDate,
           end_date: endDate,
           status: 'active',
@@ -470,9 +451,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         .single();
 
       if (error) throw error;
-      if (selectedTimeline) {
-        await fetchGoals(selectedTimeline.id);
-      }
+      await fetchGoals(timeline);
 
       return { ...data, goal_type: 'custom' };
     } catch (error) {
@@ -482,7 +461,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   /* --------------------------------
-   * TASK CREATION WITH WEEK PLAN (centralized here)
+   * TASK CREATION WITH WEEK PLAN - CENTRALIZED
    * -------------------------------- */
   const createTaskWithWeekPlan = async (taskData: {
     title: string;
@@ -495,12 +474,16 @@ export function useGoals(options: UseGoalsOptions = {}) {
     selectedDomainIds?: string[];
     selectedKeyRelationshipIds?: string[];
     selectedWeeks: Array<{ weekNumber: number; targetDays: number }>;
-  }): Promise<{ id: string } | null> => {
+  }, selectedTimeline?: Timeline): Promise<{ id: string } | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !currentCycle) return null;
+      if (!user) return null;
 
+      const timeline = selectedTimeline || currentTimeline;
+      if (!timeline) throw new Error('Timeline required for task creation');
+
+      // Updated task payload with conditional timeline FK
       const insertTaskPayload: any = {
         user_id: user.id,
         title: taskData.title,
@@ -508,15 +491,13 @@ export function useGoals(options: UseGoalsOptions = {}) {
         input_kind: 'count',
         unit: 'days',
         status: 'pending',
-        is_twelve_week_goal: currentCycle.source === 'global',
+        is_twelve_week_goal: timeline.source === 'global',
         recurrence_rule: taskData.recurrenceRule,
+        // Conditional timeline FK injection
+        ...(timeline.source === 'global'
+          ? { user_global_timeline_id: timeline.id }
+          : { user_custom_timeline_id: timeline.id }),
       };
-
-      if (currentCycle.source === 'global') {
-        insertTaskPayload.user_global_timeline_id = currentCycle.id;
-      } else {
-        insertTaskPayload.user_custom_timeline_id = currentCycle.id;
-      }
 
       const { data: insertedTask, error: taskError } = await supabase
         .from(DB.TASKS)
@@ -549,45 +530,37 @@ export function useGoals(options: UseGoalsOptions = {}) {
         if (noteJoinError) throw noteJoinError;
       }
 
-      // Week plans
-      const weekPlanInserts = taskData.selectedWeeks.map(week => {
-        const base = {
-          task_id: insertedTask.id,
-          week_number: week.weekNumber,
-          target_days: week.targetDays,
-        };
-        return currentCycle.source === 'global'
-          ? { ...base, user_global_timeline_id: currentCycle.id }
-          : { ...base, user_custom_timeline_id: currentCycle.id };
-      });
+      // Week plans with conditional timeline FK
+      const weekPlanInserts = taskData.selectedWeeks.map(week => ({
+        task_id: insertedTask.id,
+        week_number: week.weekNumber,
+        target_days: week.targetDays,
+        // Conditional timeline FK injection
+        ...(timeline.source === 'global'
+          ? { user_global_timeline_id: timeline.id }
+          : { user_custom_timeline_id: timeline.id }),
+      }));
 
       const { error: weekPlanError } = await supabase
         .from(DB.TASK_WEEK_PLAN)
         .insert(weekPlanInserts);
       if (weekPlanError) throw weekPlanError;
 
-      // Link to goal
-      if (taskData.twelve_wk_goal_id) {
+      // Link to goal with conditional goal FK
+      if (taskData.twelve_wk_goal_id || taskData.custom_goal_id) {
+        const goalJoinPayload: any = {
+          parent_id: insertedTask.id,
+          parent_type: 'task',
+          user_id: user.id,
+          // Conditional goal FK and type injection
+          goal_type: timeline.source === 'global' ? 'twelve_wk_goal' : 'custom_goal',
+          twelve_wk_goal_id: timeline.source === 'global' ? taskData.twelve_wk_goal_id : null,
+          custom_goal_id: timeline.source === 'custom' ? taskData.custom_goal_id : null,
+        };
+
         const { error: goalJoinError } = await supabase
           .from(DB.UNIVERSAL_GOALS_JOIN)
-          .insert({
-            parent_id: insertedTask.id,
-            parent_type: 'task',
-            twelve_wk_goal_id: taskData.twelve_wk_goal_id,
-            goal_type: 'twelve_wk_goal',
-            user_id: user.id,
-          });
-        if (goalJoinError) throw goalJoinError;
-      } else if (taskData.custom_goal_id) {
-        const { error: goalJoinError } = await supabase
-          .from(DB.UNIVERSAL_GOALS_JOIN)
-          .insert({
-            parent_id: insertedTask.id,
-            parent_type: 'task',
-            custom_goal_id: taskData.custom_goal_id,
-            goal_type: 'custom_goal',
-            user_id: user.id,
-          });
+          .insert(goalJoinPayload);
         if (goalJoinError) throw goalJoinError;
       }
 
@@ -598,10 +571,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         insertUniversalJoins(supabase, user.id, insertedTask.id, 'task', 'key_relationship_id', taskData.selectedKeyRelationshipIds, DB.UNIVERSAL_KEY_REL_JOIN),
       ]);
 
-      if (currentCycle) {
-        await fetchGoals(currentCycle.id);
-      }
-
+      await fetchGoals(timeline);
       return { id: insertedTask.id as string };
     } catch (error) {
       console.error('Error creating task with week plan:', error);
@@ -610,53 +580,26 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   /* --------------------------------
-   * UNIVERSAL JOIN HELPER (centralized here)
-   * -------------------------------- */
-  const insertUniversalJoins = async (
-    supabase: any,
-    userId: string,
-    parentId: string,
-    parentType: string,
-    foreignKeyField: string,
-    selectedIds?: string[],
-    tableName: string
-  ) => {
-    if (!selectedIds?.length) return;
-
-    const joins = selectedIds.map(id => ({
-      parent_id: parentId,
-      parent_type: parentType,
-      [foreignKeyField]: id,
-      user_id: userId,
-    }));
-
-    const { error } = await supabase
-      .from(tableName)
-      .insert(joins);
-    if (error) throw error;
-  };
-
-  /* --------------------------------
    * Refresh orchestration
    * -------------------------------- */
   const refreshAllData = async () => {
     try {
-      const cycle = await fetchUserCycle();
-      if (!cycle) {
+      const timeline = await fetchCurrentTimeline();
+      if (!timeline) {
         setTwelveWeekGoals([]);
         setCustomGoals([]);
         setAllGoals([]);
         return;
       }
 
-      await fetchGoals(cycle.id);
+      await fetchGoals(timeline);
     } catch (error) {
       console.error('Error refreshing all data:', error);
     }
   };
 
   const refreshGoals = async () => {
-    if (currentCycle) await fetchGoals(currentCycle.id);
+    if (currentTimeline) await fetchGoals(currentTimeline);
     else await fetchGoals();
   };
 
@@ -676,7 +619,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
     twelveWeekGoals,
     customGoals,
     allGoals,
-    currentCycle,
+    currentTimeline,
     loading,
 
     // CRUD operations
@@ -689,7 +632,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
     refreshAllData,
 
     // Utilities
-    fetchUserCycle,
+    fetchCurrentTimeline,
     insertUniversalJoins,
   };
 }
