@@ -1079,21 +1079,29 @@ const { data, error } = await supabase
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !currentCycle) return null;
 
-      const { data: insertedTask, error: taskError } = await supabase
-        .from(DB.TASKS)
-        .insert({
-          user_id: user.id,
-          user_cycle_id: currentCycle.id,
-          title: taskData.title,
-          type: 'task',
-          input_kind: 'count',
-          unit: 'days',
-          status: 'pending',
-          is_twelve_week_goal: currentCycle.source === 'global',
-          recurrence_rule: taskData.recurrenceRule,
-        })
-        .select('*')
-        .single();
+      const insertTaskPayload: any = {
+  user_id: user.id,
+  title: taskData.title,
+  type: 'task',
+  input_kind: 'count',
+  unit: 'days',
+  status: 'pending',
+  is_twelve_week_goal: currentCycle.source === 'global',
+  recurrence_rule: taskData.recurrenceRule,
+};
+
+if (currentCycle.source === 'global') {
+  insertTaskPayload.user_global_timeline_id = currentCycle.id;
+} else {
+  insertTaskPayload.user_custom_timeline_id = currentCycle.id;
+}
+
+const { data: insertedTask, error: taskError } = await supabase
+  .from(DB.TASKS)
+  .insert(insertTaskPayload)
+  .select('*')
+  .single();
+
       if (taskError) throw taskError;
 
       // Optional note
