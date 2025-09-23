@@ -145,7 +145,6 @@ export default function Goals() {
     goalProgress,
     refreshGoals,
     refreshAllData,
-    fetchGoalActionsForWeek,
     completeActionSuggestion,
     undoActionOccurrence,
     createTwelveWeekGoal,
