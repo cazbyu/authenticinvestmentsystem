@@ -317,66 +317,66 @@ export function useGoals(options: UseGoalsOptions = {}) {
    * Fetch current active timeline (global first, then custom)
    * -------------------------------- */
   const fetchUserCycle = async (): Promise<UserCycle | null> => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user }, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw userErr;
-      if (!user) return null;
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw userErr;
+    if (!user) return null;
 
-      // Prefer an active global (12wk) timeline
-      const { data: globalTimeline, error: gErr } = await supabase
-        .from(DB.USER_GLOBAL_TIMELINES)
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (gErr) throw gErr;
+    // Prefer an active global (12wk) timeline
+    const { data: globalTimeline, error: gErr } = await supabase
+      .from(DB.USER_GLOBAL_TIMELINES)
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (gErr) throw gErr;
 
-      if (globalTimeline) {
-        const hydrated: UserCycle = {
-          ...globalTimeline,
-          source: 'global',
-          title: globalTimeline.title ?? '12 Week Timeline',
-          start_date: globalTimeline.start_date,
-          end_date: globalTimeline.end_date,
-        };
-        setCurrentCycle(hydrated);
-        return hydrated;
-      }
-
-      // Otherwise the active custom timeline
-      const { data: customTimeline, error: cErr } = await supabase
-        .from(DB.CUSTOM_TIMELINES)
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cErr) throw cErr;
-
-      if (customTimeline) {
-        const hydrated: UserCycle = {
-          ...customTimeline,
-          source: 'custom',
-          title: customTimeline.title ?? 'Custom Timeline',
-          start_date: customTimeline.start_date,
-          end_date: customTimeline.end_date,
-        };
-        setCurrentCycle(hydrated);
-        return hydrated;
-      }
-
-      setCurrentCycle(null);
-      return null;
-    } catch (error) {
-      console.error('Error fetching user cycle:', error);
-      setCurrentCycle(null);
-      return null;
+    if (globalTimeline) {
+      const hydrated: UserCycle = {
+        ...globalTimeline,
+        source: 'global',
+        title: globalTimeline.title ?? '12 Week Timeline',
+        start_date: globalTimeline.start_date,
+        end_date: globalTimeline.end_date,
+      };
+      setCurrentCycle(hydrated);
+      return hydrated;
     }
-  };
+
+    // Otherwise the active custom timeline
+    const { data: customTimeline, error: cErr } = await supabase
+      .from(DB.CUSTOM_TIMELINES)
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (cErr) throw cErr;
+
+    if (customTimeline) {
+      const hydrated: UserCycle = {
+        ...customTimeline,
+        source: 'custom',
+        title: customTimeline.title ?? 'Custom Timeline',
+        start_date: customTimeline.start_date,
+        end_date: customTimeline.end_date,
+      };
+      setCurrentCycle(hydrated);
+      return hydrated;
+    }
+
+    setCurrentCycle(null);
+    return null;
+  } catch (error) {
+    console.error('Error fetching user cycle:', error);
+    setCurrentCycle(null);
+    return null;
+  }
+};
 
   /* --------------------------------
    * Weeks for the active timeline
