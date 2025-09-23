@@ -1128,16 +1128,21 @@ const { data: insertedTask, error: taskError } = await supabase
       }
 
       // Week plans
-      const weekPlanInserts = taskData.selectedWeeks.map(week => ({
-        task_id: insertedTask.id,
-        user_cycle_id: currentCycle.id, // timeline id
-        week_number: week.weekNumber,
-        target_days: week.targetDays,
-      }));
-      const { error: weekPlanError } = await supabase
-        .from(DB.TASK_WEEK_PLAN)
-        .insert(weekPlanInserts);
-      if (weekPlanError) throw weekPlanError;
+const weekPlanInserts = taskData.selectedWeeks.map(week => {
+  const base = {
+    task_id: insertedTask.id,
+    week_number: week.weekNumber,
+    target_days: week.targetDays,
+  };
+  return currentCycle.source === 'global'
+    ? { ...base, user_global_timeline_id: currentCycle.id }
+    : { ...base, user_custom_timeline_id: currentCycle.id };
+});
+
+const { error: weekPlanError } = await supabase
+  .from(DB.TASK_WEEK_PLAN)
+  .insert(weekPlanInserts);
+if (weekPlanError) throw weekPlanError;
 
       // Link to goal
       if (taskData.twelve_wk_goal_id) {
