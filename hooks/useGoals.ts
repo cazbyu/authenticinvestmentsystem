@@ -1044,7 +1044,7 @@ const { data, error } = await supabase
   .single();
 
       if (error) throw error;
-      await (selectedTimeline) {
+      if (selectedTimeline) {
   await fetchGoals(selectedTimeline.id);
 }
 
