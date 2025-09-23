@@ -793,11 +793,18 @@ if (weekPlansError) throw weekPlansError;
       const weekStartISO = wk.week_start;
       const weekEndISO   = wk.week_end;
 
-      const { data: planned, error: planErr } = await supabase
-        .from('0008-ap-task-week-plan')
-        .select('task_id, target_days')
-        .eq('user_cycle_id', selectedTimeline.id)
-        .eq('week_number', weekNumber);
+      let planQuery = supabase
+  .from('0008-ap-task-week-plan')
+  .select('task_id, target_days')
+  .eq('week_number', weekNumber);
+
+if (selectedTimeline.source === "global") {
+  planQuery = planQuery.eq('user_global_timeline_id', selectedTimeline.id);
+} else {
+  planQuery = planQuery.eq('user_custom_timeline_id', selectedTimeline.id);
+}
+
+const { data: planned, error: planErr } = await planQuery;
 
       if (planErr) throw planErr;
 
