@@ -1114,54 +1114,39 @@ if (weekPlansError) throw weekPlansError;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !selectedTimeline) return null;
 
-      const { data: insertedTask, error: taskError } = await supabase
-        .from('0008-ap-tasks')
-        .insert({
-          user_id: user.id,
-          user_cycle_id: selectedTimeline.id,
-          title: taskData.title,
-          type: 'task',
-          input_kind: 'count',
-          unit: 'days',
-          status: 'pending',
-          is_twelve_week_goal: true,
-          recurrence_rule: taskData.recurrenceRule,
-        })
-        .select()
-        .single();
+      const taskInsert: any = {
+  user_id: user.id,
+  title: taskData.title,
+  type: 'task',
+  input_kind: 'count',
+  unit: 'days',
+  status: 'pending',
+  is_twelve_week_goal: true,
+  recurrence_rule: taskData.recurrenceRule,
+};
 
-      if (taskError) throw taskError;
+if (selectedTimeline.source === "global") {
+  taskInsert.user_global_timeline_id = selectedTimeline.id;
+} else {
+  taskInsert.user_custom_timeline_id = selectedTimeline.id;
+}
 
-      if (taskData.description && taskData.description.trim()) {
-        const { data: insertedNote, error: noteError } = await supabase
-          .from('0008-ap-notes')
-          .insert({
-            user_id: user.id,
-            content: taskData.description.trim(),
-          })
-          .select()
-          .single();
+const { data: insertedTask, error: taskError } = await supabase
+  .from('0008-ap-tasks')
+  .insert(taskInsert)
+  .select()
+  .single();
 
-        if (noteError) throw noteError;
-
-        const { error: noteJoinError } = await supabase
-          .from('0008-ap-universal-notes-join')
-          .insert({
-            parent_id: insertedTask.id,
-            parent_type: 'task',
-            note_id: insertedNote.id,
-            user_id: user.id,
-          });
-
-        if (noteJoinError) throw noteJoinError;
-      }
-
-      const weekPlanInserts = taskData.selectedWeeks.map(week => ({
-        task_id: insertedTask.id,
-        user_cycle_id: selectedTimeline.id,
-        week_number: week.weekNumber,
-        target_days: week.targetDays,
-      }));
+const weekPlanInserts = taskData.selectedWeeks.map(week => {
+  const base = {
+    task_id: insertedTask.id,
+    week_number: week.weekNumber,
+    target_days: week.targetDays,
+  };
+  return selectedTimeline.source === "global"
+    ? { ...base, user_global_timeline_id: selectedTimeline.id }
+    : { ...base, user_custom_timeline_id: selectedTimeline.id };
+});
 
       const { error: weekPlanError } = await supabase
         .from('0008-ap-task-week-plan')
