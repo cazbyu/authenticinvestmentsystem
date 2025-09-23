@@ -682,11 +682,19 @@ if (weekPlansError) throw weekPlansError;
         const { data: overallOccurrences } = await overallQuery;
 
         // Sum targets across all week plans for these tasks
-        const { data: weekPlansData } = await supabase
-          .from('0008-ap-task-week-plan')
-          .select('target_days')
-          .in('task_id', taskIds)
-          .eq('user_cycle_id', timelineId);
+        let weekPlansQuery = supabase
+  .from('0008-ap-task-week-plan')
+  .select('target_days')
+  .in('task_id', taskIds);
+
+if (selectedTimeline?.source === 'global') {
+  weekPlansQuery = weekPlansQuery.eq('user_global_timeline_id', timelineId);
+} else if (selectedTimeline?.source === 'custom') {
+  weekPlansQuery = weekPlansQuery.eq('user_custom_timeline_id', timelineId);
+}
+
+const { data: weekPlansData, error: weekPlansError } = await weekPlansQuery;
+if (weekPlansError) throw weekPlansError;
 
         const overallActual = overallOccurrences?.length || 0;
         const overallTarget = weekPlansData?.reduce((sum, wp) => sum + (wp.target_days || 0), 0) || 0;
