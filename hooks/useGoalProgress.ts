@@ -911,61 +911,62 @@ const { data: planned, error: planErr } = await planQuery;
   };
 
   const completeActionSuggestion = async ({
-    parentTaskId,
-    whenISO,
-  }: {
-    parentTaskId: string;
-    whenISO: string;
-  }): Promise<string> => {
-    const supabase = getSupabaseClient();
+  parentTaskId,
+  whenISO,
+}: {
+  parentTaskId: string;
+  whenISO: string;
+}): Promise<string> => {
+  const supabase = getSupabaseClient();
 
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr) throw userErr;
-    if (!user || !selectedTimeline) throw new Error('Missing user or selected timeline');
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!user || !selectedTimeline) throw new Error('Missing user or selected timeline');
 
-    const { data: parent, error: pErr } = await supabase
-      .from('0008-ap-tasks')
-      .select('id, title')
-      .eq('id', parentTaskId)
-      .single();
-    if (pErr || !parent) throw pErr ?? new Error('Parent task not found');
+  const { data: parent, error: pErr } = await supabase
+    .from('0008-ap-tasks')
+    .select('id, title')
+    .eq('id', parentTaskId)
+    .single();
+  if (pErr || !parent) throw pErr ?? new Error('Parent task not found');
 
-    const { data: occ, error: oErr } = await supabase
-      .from('0008-ap-tasks')
-      .insert({
-        user_id: user.id,
-        user_cycle_id: selectedTimeline.id,
-        title: parent.title,
-        type: 'task',
-        status: 'completed',
-        due_date: whenISO,
-        completed_at: new Date().toISOString(),
-        parent_task_id: parentTaskId,
-        is_twelve_week_goal: true,
-      })
-      .select('id')
-      .single();
-    if (oErr || !occ) throw oErr ?? new Error('Failed to insert occurrence');
+  const { data: occ, error: oErr } = await supabase
+    .from('0008-ap-tasks')
+    .insert({
+      user_id: user.id,
+      user_global_timeline_id: selectedTimeline.type === 'global' ? selectedTimeline.id : null,
+      user_custom_timeline_id: selectedTimeline.type === 'custom' ? selectedTimeline.id : null,
+      title: parent.title,
+      type: 'task',
+      status: 'completed',
+      due_date: whenISO,
+      completed_at: new Date().toISOString(),
+      parent_task_id: parentTaskId,
+      is_twelve_week_goal: selectedTimeline.type === 'global',
+    })
+    .select('id')
+    .single();
+  if (oErr || !occ) throw oErr ?? new Error('Failed to insert occurrence');
 
-    const occId = occ.id as string;
+  const occId = occ.id as string;
 
-    await Promise.all([
-      supabase.rpc('ap_copy_universal_roles_to_task', {
-        from_parent_id: parentTaskId,
-        to_task_id: occId,
-      }),
-      supabase.rpc('ap_copy_universal_domains_to_task', {
-        from_parent_id: parentTaskId,
-        to_task_id: occId,
-      }),
-      supabase.rpc('ap_copy_universal_goals_to_task', {
-        from_parent_id: parentTaskId,
-        to_task_id: occId,
-      }),
-    ]);
+  await Promise.all([
+    supabase.rpc('ap_copy_universal_roles_to_task', {
+      from_parent_id: parentTaskId,
+      to_task_id: occId,
+    }),
+    supabase.rpc('ap_copy_universal_domains_to_task', {
+      from_parent_id: parentTaskId,
+      to_task_id: occId,
+    }),
+    supabase.rpc('ap_copy_universal_goals_to_task', {
+      from_parent_id: parentTaskId,
+      to_task_id: occId,
+    }),
+  ]);
 
-    return occId;
-  };
+  return occId;
+};
 
   const undoActionOccurrence = async ({
     parentTaskId,
