@@ -1044,8 +1044,11 @@ const { data, error } = await supabase
   .single();
 
       if (error) throw error;
-      await fetchGoals(selectedTimeline.id);
-      return { ...data, goal_type: 'custom' };
+      aif (selectedTimeline) {
+  await fetchGoals(selectedTimeline.id);
+}
+
+    return { ...data, goal_type: 'custom' };
     } catch (error) {
       console.error('Error creating custom goal:', error);
       throw error;
@@ -1184,7 +1187,10 @@ const { data, error } = await supabase
           .from(DB.UNIVERSAL_KEY_REL_JOIN)
           .insert(krJoins);
       }
-      await fetchGoals(selectedTimeline.id);
+      if (selectedTimeline) {
+  await fetchGoals(selectedTimeline.id);
+}
+
       return { id: insertedTask.id as string };
     } catch (error) {
       console.error('Error creating task with week plan:', error);
