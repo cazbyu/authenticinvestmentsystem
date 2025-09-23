@@ -934,15 +934,15 @@ const { data: planned, error: planErr } = await planQuery;
     .from('0008-ap-tasks')
     .insert({
       user_id: user.id,
-      user_global_timeline_id: selectedTimeline.type === 'global' ? selectedTimeline.id : null,
-      user_custom_timeline_id: selectedTimeline.type === 'custom' ? selectedTimeline.id : null,
+      user_global_timeline_id: selectedTimeline.source === 'global' ? selectedTimeline.id : null,
+      user_custom_timeline_id: selectedTimeline.source === 'custom' ? selectedTimeline.id : null,
       title: parent.title,
       type: 'task',
       status: 'completed',
       due_date: whenISO,
       completed_at: new Date().toISOString(),
       parent_task_id: parentTaskId,
-      is_twelve_week_goal: selectedTimeline.type === 'global',
+      is_twelve_week_goal: selectedTimeline.source === 'global',
     })
     .select('id')
     .single();
