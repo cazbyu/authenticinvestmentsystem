@@ -387,11 +387,12 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const view = source === 'custom' ? DB.V_CUSTOM_WEEKS : DB.V_GLOBAL_WEEKS;
 
       const selectColumns =
-        source === 'custom'
-          ? 'week_number, start_date, end_date, custom_timeline_id'
-          : 'week_number, week_start, week_end, timeline_id';
+  source === 'custom'
+    ? 'week_number, start_date, end_date, user_custom_timeline_id'
+    : 'week_number, week_start, week_end, user_global_timeline_id';
 
-      const timelineColumn = source === 'custom' ? 'custom_timeline_id' : 'timeline_id';
+const timelineColumn =
+  source === 'custom' ? 'user_custom_timeline_id' : 'user_global_timeline_id';
 
       const { data: dbWeeks, error } = await supabase
         .from(view)
