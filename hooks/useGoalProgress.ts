@@ -525,6 +525,7 @@ const allTimelines = [
         .select('*')
         .in('task_id', taskIds)
         .eq('user_global_timeline_id', userGlobalTimelineId)
+        .eq('user_custom_timeline_id', userCustomTimelineId)
         .eq('week_number', weekNumber);
 
       if (weekPlansError) throw weekPlansError;
