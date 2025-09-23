@@ -532,15 +532,21 @@ const allTimelines = [
     const taskIds = tasksData.map(t => t.id);
    
       // Fetch week plans for this specific week
-      const { data: weekPlansData, error: weekPlansError } = await supabase
-        .from('0008-ap-task-week-plan')
-        .select('*')
-        .in('task_id', taskIds)
-        .eq('user_global_timeline_id', userGlobalTimelineId)
-        .eq('user_custom_timeline_id', userCustomTimelineId)
-        .eq('week_number', weekNumber);
+      let weekPlanQuery = supabase
+  .from('0008-ap-task-week-plan')
+  .select('*')
+  .in('task_id', taskIds)
+  .eq('week_number', weekNumber);
 
-      if (weekPlansError) throw weekPlansError;
+// Dynamically filter depending on timeline type
+if (timelineType === "global") {
+  weekPlanQuery = weekPlanQuery.eq('user_global_timeline_id', timelineId);
+} else if (timelineType === "custom") {
+  weekPlanQuery = weekPlanQuery.eq('user_custom_timeline_id', timelineId);
+}
+
+const { data: weekPlansData, error: weekPlansError } = await weekPlanQuery;
+if (weekPlansError) throw weekPlansError;
 
       // Get the week date range
       const weekData = cycleWeeks.find(w => w.week_number === weekNumber);
