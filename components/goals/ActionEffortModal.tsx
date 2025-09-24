@@ -53,6 +53,9 @@ interface ActionEffortModalProps {
   goal: TwelveWeekGoal | null;
   cycleWeeks: CycleWeek[];
   createTaskWithWeekPlan: (taskData: any) => Promise<any>;
+  onDelete?: (actionId: string) => Promise<void>;
+  initialData?: any; // For editing existing actions
+  mode?: 'create' | 'edit';
 }
 
 const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
@@ -61,6 +64,9 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
   goal,
   cycleWeeks,
   createTaskWithWeekPlan,
+  onDelete,
+  initialData,
+  mode = 'create',
 }) => {
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
@@ -83,9 +89,13 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
   useEffect(() => {
     if (visible) {
       fetchData();
-      resetForm();
+      if (mode === 'create') {
+        resetForm();
+      } else if (mode === 'edit' && initialData) {
+        loadInitialData();
+      }
     }
-  }, [visible, goal]);
+  }, [visible, goal, mode, initialData]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -147,6 +157,44 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
     }
   };
 
+  const loadInitialData = () => {
+    if (!initialData) return;
+    
+    setTitle(initialData.title || '');
+    setNotes(''); // Notes would need to be fetched separately if needed
+    
+    // Parse recurrence rule to set frequency
+    if (initialData.recurrence_rule) {
+      const rule = initialData.recurrence_rule;
+      if (rule.includes('FREQ=DAILY')) {
+        setRecurrenceType('daily');
+      } else if (rule.includes('FREQ=WEEKLY') && rule.includes('BYDAY=')) {
+        const byDayMatch = rule.match(/BYDAY=([^;]+)/);
+        if (byDayMatch) {
+          const days = byDayMatch[1].split(',');
+          const dayMap = { 'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6 };
+          const selectedDays = days.map(day => dayMap[day]).filter(d => d !== undefined);
+          
+          if (selectedDays.length === 7) {
+            setRecurrenceType('daily');
+          } else if (selectedDays.length === 5 && selectedDays.every(d => d >= 1 && d <= 5)) {
+            setRecurrenceType('5days');
+          } else {
+            setRecurrenceType('custom');
+            setSelectedCustomDays(selectedDays);
+          }
+        }
+      }
+    }
+    
+    // Load existing associations
+    setSelectedRoleIds(initialData.roles?.map(r => r.id) || []);
+    setSelectedDomainIds(initialData.domains?.map(d => d.id) || []);
+    setSelectedKeyRelationshipIds(initialData.keyRelationships?.map(kr => kr.id) || []);
+    
+    // Load selected weeks from week plans (would need to be passed in initialData)
+    setSelectedWeeks(initialData.selectedWeeks || []);
+  };
   const handleMultiSelect = (field: 'roles' | 'domains' | 'keyRelationships', id: string) => {
     let setter: React.Dispatch<React.SetStateAction<string[]>>;
     let currentSelection: string[];
@@ -255,7 +303,7 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
       const targetDays = getTargetDays();
       const recurrenceRule = generateRecurrenceRule();
 
-      // Create the task with week plan
+      // Create or update the task with week plan
       const taskData = {
         title: title.trim(),
         description: notes.trim() || undefined,
@@ -270,11 +318,12 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
           weekNumber,
           targetDays,
         })),
+        ...(mode === 'edit' && initialData ? { id: initialData.id } : {}),
       };
 
       await createTaskWithWeekPlan(taskData);
 
-      Alert.alert('Success', 'Action created successfully!');
+      Alert.alert('Success', `Action ${mode === 'edit' ? 'updated' : 'created'} successfully!`);
       
       // Call onClose to trigger parent refresh
       onClose();
@@ -286,6 +335,34 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
     }
   };
 
+  const handleDelete = () => {
+    if (!initialData?.id || !onDelete) return;
+    
+    Alert.alert(
+      'Delete Action',
+      'Are you sure you want to delete this action? This will remove all associated data and cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setSaving(true);
+              await onDelete(initialData.id);
+              Alert.alert('Success', 'Action deleted successfully!');
+              onClose();
+            } catch (error) {
+              console.error('Error deleting action:', error);
+              Alert.alert('Error', (error as Error).message || 'Failed to delete action.');
+            } finally {
+              setSaving(false);
+            }
+          }
+        }
+      ]
+    );
+  };
   const getRecurrenceLabel = (type: string) => {
     switch (type) {
       case 'daily': return 'Daily';
@@ -525,6 +602,16 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
         )}
 
         <View style={styles.actions}>
+          {mode === 'edit' && onDelete && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleDelete}
+              disabled={saving}
+            >
+              <Text style={styles.deleteButtonText}>Delete Action</Text>
+            </TouchableOpacity>
+          )}
+          
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={onClose}
@@ -534,7 +621,11 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.saveButton, (!title.trim() || selectedWeeks.length === 0 || saving) && styles.saveButtonDisabled]}
+            style={[
+              styles.saveButton, 
+              (!title.trim() || selectedWeeks.length === 0 || saving) && styles.saveButtonDisabled,
+              mode === 'edit' && onDelete && styles.saveButtonWithDelete
+            ]}
             onPress={handleSave}
             disabled={!title.trim() || selectedWeeks.length === 0 || (recurrenceType === 'custom' && selectedCustomDays.length === 0) || saving}
           >
@@ -750,6 +841,19 @@ const styles = StyleSheet.create({
     borderTopColor: '#e5e7eb',
     backgroundColor: '#ffffff',
   },
+  deleteButton: {
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   cancelButton: {
     flex: 1,
     backgroundColor: '#ffffff',
@@ -772,6 +876,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  saveButtonWithDelete: {
+    flex: 2,
   },
   saveButtonDisabled: {
     backgroundColor: '#9ca3af',

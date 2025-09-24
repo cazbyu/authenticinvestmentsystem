@@ -474,6 +474,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
     selectedDomainIds?: string[];
     selectedKeyRelationshipIds?: string[];
     selectedWeeks: Array<{ weekNumber: number; targetDays: number }>;
+    id?: string; // For editing existing tasks
   }, selectedTimeline?: Timeline): Promise<{ id: string } | null> => {
     try {
       const supabase = getSupabaseClient();
@@ -483,33 +484,61 @@ export function useGoals(options: UseGoalsOptions = {}) {
       const timeline = selectedTimeline || currentTimeline;
       if (!timeline) throw new Error('Timeline required for task creation');
 
-      // Updated task payload with conditional timeline FK
-      const insertTaskPayload: any = {
-        user_id: user.id,
-        title: taskData.title,
-        type: 'task',
-        input_kind: 'count',
-        unit: 'days',
-        status: 'pending',
-        due_date: null, // Parent tasks should not have a due_date
-        is_twelve_week_goal: timeline.source === 'global',
-        recurrence_rule: taskData.recurrenceRule,
-        // Conditional timeline FK injection
-        ...(timeline.source === 'global'
-          ? { user_global_timeline_id: timeline.id }
-          : { user_custom_timeline_id: timeline.id }),
-      };
+      let taskId: string;
+      
+      if (taskData.id) {
+        // Update existing task
+        const updateTaskPayload: any = {
+          title: taskData.title,
+          recurrence_rule: taskData.recurrenceRule,
+          updated_at: new Date().toISOString(),
+        };
 
-      const { data: insertedTask, error: taskError } = await supabase
-        .from(DB.TASKS)
-        .insert(insertTaskPayload)
-        .select('*')
-        .single();
+        const { error: taskError } = await supabase
+          .from(DB.TASKS)
+          .update(updateTaskPayload)
+          .eq('id', taskData.id);
 
-      if (taskError) throw taskError;
+        if (taskError) throw taskError;
+        taskId = taskData.id;
+
+        // Clear existing joins for update
+        await Promise.all([
+          supabase.from(DB.UNIVERSAL_ROLES_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+          supabase.from(DB.UNIVERSAL_DOMAINS_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+          supabase.from(DB.UNIVERSAL_KEY_REL_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+          supabase.from(DB.TASK_WEEK_PLAN).delete().eq('task_id', taskId),
+        ]);
+      } else {
+        // Create new task
+        const insertTaskPayload: any = {
+          user_id: user.id,
+          title: taskData.title,
+          type: 'task',
+          input_kind: 'count',
+          unit: 'days',
+          status: 'pending',
+          due_date: null, // Parent tasks should not have a due_date
+          is_twelve_week_goal: timeline.source === 'global',
+          recurrence_rule: taskData.recurrenceRule,
+          // Conditional timeline FK injection
+          ...(timeline.source === 'global'
+            ? { user_global_timeline_id: timeline.id }
+            : { user_custom_timeline_id: timeline.id }),
+        };
+
+        const { data: insertedTask, error: taskError } = await supabase
+          .from(DB.TASKS)
+          .insert(insertTaskPayload)
+          .select('*')
+          .single();
+
+        if (taskError) throw taskError;
+        taskId = insertedTask.id;
+      }
 
       // Optional note
-      if (taskData.description?.trim()) {
+      if (taskData.description?.trim() && !taskData.id) {
         const { data: insertedNote, error: noteError } = await supabase
           .from(DB.NOTES)
           .insert({
@@ -523,7 +552,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         const { error: noteJoinError } = await supabase
           .from(DB.NOTES_JOIN)
           .insert({
-            parent_id: insertedTask.id,
+            parent_id: taskId,
             parent_type: 'task',
             note_id: insertedNote.id,
             user_id: user.id,
@@ -533,7 +562,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
       // Week plans with conditional timeline FK
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
-        task_id: insertedTask.id,
+        task_id: taskId,
         week_number: week.weekNumber,
         target_days: week.targetDays,
         // Conditional timeline FK injection
@@ -550,7 +579,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
       // Link to goal with conditional goal FK
       if (taskData.twelve_wk_goal_id || taskData.custom_goal_id) {
         const goalJoinPayload: any = {
-          parent_id: insertedTask.id,
+          parent_id: taskId,
           parent_type: 'task',
           user_id: user.id,
           // Conditional goal FK and type injection
@@ -567,13 +596,13 @@ export function useGoals(options: UseGoalsOptions = {}) {
 
       // Link roles, domains, key relationships
       await Promise.all([
-        insertUniversalJoins(supabase, user.id, insertedTask.id, 'task', 'role_id', taskData.selectedRoleIds, DB.UNIVERSAL_ROLES_JOIN),
-        insertUniversalJoins(supabase, user.id, insertedTask.id, 'task', 'domain_id', taskData.selectedDomainIds, DB.UNIVERSAL_DOMAINS_JOIN),
-        insertUniversalJoins(supabase, user.id, insertedTask.id, 'task', 'key_relationship_id', taskData.selectedKeyRelationshipIds, DB.UNIVERSAL_KEY_REL_JOIN),
+        insertUniversalJoins(supabase, user.id, taskId, 'task', 'role_id', taskData.selectedRoleIds, DB.UNIVERSAL_ROLES_JOIN),
+        insertUniversalJoins(supabase, user.id, taskId, 'task', 'domain_id', taskData.selectedDomainIds, DB.UNIVERSAL_DOMAINS_JOIN),
+        insertUniversalJoins(supabase, user.id, taskId, 'task', 'key_relationship_id', taskData.selectedKeyRelationshipIds, DB.UNIVERSAL_KEY_REL_JOIN),
       ]);
 
       await fetchGoals(timeline);
-      return { id: insertedTask.id as string };
+      return { id: taskId };
     } catch (error) {
       console.error('Error creating task with week plan:', error);
       throw error;

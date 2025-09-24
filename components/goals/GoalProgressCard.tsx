@@ -38,6 +38,7 @@ interface GoalProgressCardProps {
   onPress?: () => void;
   compact?: boolean;
   selectedWeekNumber?: number;
+  onEditAction?: (action: TaskWithLogs) => void; // New prop for editing actions
 }
 
 export function GoalProgressCard({
@@ -53,6 +54,7 @@ export function GoalProgressCard({
   onPress,
   compact = false,
   selectedWeekNumber
+  onEditAction, // New prop
 }: GoalProgressCardProps) {
   const weekActions = weekActionsProp ?? [];
   const getProgressColor = (percentage: number) => {
@@ -356,7 +358,12 @@ export function GoalProgressCard({
                   const weekDays = generateWeekDays(week.startDate);
 
                   return (
-                    <View key={action.id} style={styles.actionItem}>
+                    <TouchableOpacity 
+                      key={action.id} 
+                      style={styles.actionItem}
+                      onPress={onEditAction ? () => onEditAction(action) : undefined}
+                      activeOpacity={onEditAction ? 0.7 : 1}
+                    >
                       <View style={styles.actionHeader}>
                         <Text style={styles.actionTitle} numberOfLines={1}>
                           {action.title}
@@ -402,7 +409,7 @@ export function GoalProgressCard({
                          })}
                       </View>
 
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
