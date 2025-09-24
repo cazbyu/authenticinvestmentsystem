@@ -257,44 +257,44 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   }
 };
 
-  const fetchDaysLeftData = async (timeline: Timeline) => {
-    try {
-      console.log('=== FETCH DAYS LEFT START ===');
-      const supabase = getSupabaseClient();
-      
-      let data, error;
-      
-      // Query the correct view based on timeline source
-      if (timeline.source === 'global') {
-        const result = await supabase
-          .from('v_user_global_timeline_days_left')
-          .select('user_global_timeline_id, days_left, pct_elapsed')
-          .eq('user_global_timeline_id', timeline.id)
-          .single();
-        data = result.data ? { ...result.data, timeline_id: result.data.user_global_timeline_id } : null;
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('v_custom_timeline_days_left')
-          .select('custom_timeline_id, days_left, pct_elapsed')
-          .eq('custom_timeline_id', timeline.id)
-          .single();
-        data = result.data ? { ...result.data, timeline_id: result.data.custom_timeline_id } : null;
-        error = result.error;
-      }
+  const fetchDaysLeftData = async (timeline: Timeline): Promise<DaysLeftData | null> => {
+  try {
+    const supabase = getSupabaseClient();
 
-      if (error && error.code !== 'PGRST116') throw error;
+    if (timeline.source === 'global') {
+      const { data, error } = await supabase
+        .from('v_user_global_timeline_days_left')
+        .select('user_global_timeline_id, days_left, pct_elapsed')
+        .eq('user_global_timeline_id', timeline.id)
+        .single();
 
-      console.log('Days left data result:', data);
-      setDaysLeftData(data);
-      console.log('=== FETCH DAYS LEFT END ===');
-      return data;
-    } catch (error) {
-      console.error('Error fetching days left data:', error);
-      setDaysLeftData(null);
-      return null;
+      if (error) throw error;
+
+      return {
+        timeline_id: data.user_global_timeline_id,
+        days_left: data.days_left,
+        pct_elapsed: data.pct_elapsed,
+      };
+    } else {
+      const { data, error } = await supabase
+        .from('v_custom_timeline_days_left')
+        .select('custom_timeline_id, days_left, pct_elapsed')
+        .eq('custom_timeline_id', timeline.id)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        timeline_id: data.custom_timeline_id,
+        days_left: data.days_left,
+        pct_elapsed: data.pct_elapsed,
+      };
     }
-  };
+  } catch (err) {
+    console.error('Error fetching days left data:', err);
+    return null;
+  }
+};
 
   /* --------------------------------
    * GOAL PROGRESS CALCULATIONS (progress-specific)
