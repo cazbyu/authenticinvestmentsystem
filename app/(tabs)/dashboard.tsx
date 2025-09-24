@@ -365,8 +365,6 @@ export default function Dashboard() {
     }
   };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
-  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onDelete={handleDeleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
-  const renderRegularItem = ({ item }: { item: Task }) => <TaskCard task={item} onComplete={handleCompleteTask} onDelete={handleDeleteTask} onLongPress={() => {}} onDoublePress={handleTaskDoublePress} isDragging={false} />;
   const sortOptions = [
     { value: 'due_date', label: 'Due Date' }, 
     { value: 'priority', label: 'Priority' }, 
@@ -399,7 +397,16 @@ export default function Dashboard() {
             Platform.OS === 'web' ? (
               <FlatList
                 data={tasks}
-                renderItem={renderRegularItem}
+                renderItem={({ item }) => (
+                  <TaskCard 
+                    task={item} 
+                    onComplete={handleCompleteTask} 
+                    onDelete={handleDeleteTask} 
+                    onLongPress={() => {}} 
+                    onDoublePress={handleTaskDoublePress} 
+                    isDragging={false} 
+                  />
+                )}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.taskList}
                 showsVerticalScrollIndicator={true}
@@ -408,7 +415,16 @@ export default function Dashboard() {
             ) : (
               <DraggableFlatList 
                 data={tasks} 
-                renderItem={renderDraggableItem} 
+                renderItem={({ item, drag, isActive }) => (
+                  <TaskCard 
+                    task={item} 
+                    onComplete={handleCompleteTask} 
+                    onDelete={handleDeleteTask} 
+                    onLongPress={drag} 
+                    onDoublePress={handleTaskDoublePress} 
+                    isDragging={isActive} 
+                  />
+                )}
                 keyExtractor={(item) => item.id} 
                 onDragEnd={handleDragEnd} 
                 contentContainerStyle={styles.taskList} 
