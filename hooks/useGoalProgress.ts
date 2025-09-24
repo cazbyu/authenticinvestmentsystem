@@ -216,39 +216,23 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const fetchCycleWeeks = async (timeline: Timeline): Promise<CycleWeek[]> => {
   try {
     const supabase = getSupabaseClient();
-    let weeks: CycleWeek[] = [];
+    
+    // Use unified view for both global and custom timelines
+    const result = await supabase
+      .from('v_unified_timeline_weeks')
+      .select('week_number, week_start, week_end, timeline_id, source')
+      .eq('timeline_id', timeline.id)
+      .eq('source', timeline.source)
+      .order('week_number', { ascending: true });
 
-    if (timeline.source === 'global') {
-      const result = await supabase
-        .from('v_user_global_timeline_weeks')
-        .select('week_number, week_start, week_end, user_global_timeline_id')
-        .eq('user_global_timeline_id', timeline.id)
-        .order('week_number', { ascending: true });
+    if (result.error) throw result.error;
 
-      if (result.error) throw result.error;
-
-      weeks = result.data?.map(w => ({
-        week_number: w.week_number,
-        week_start: w.week_start,
-        week_end: w.week_end,
-        timeline_id: w.user_global_timeline_id,
-      })) ?? [];
-    } else if (timeline.source === 'custom') {
-      const result = await supabase
-        .from('v_custom_timeline_weeks')
-        .select('week_number, week_start, week_end, custom_timeline_id')
-        .eq('custom_timeline_id', timeline.id)
-        .order('week_number', { ascending: true });
-
-      if (result.error) throw result.error;
-
-      weeks = result.data?.map(w => ({
-        week_number: w.week_number,
-        week_start: w.week_start,
-        week_end: w.week_end,
-        timeline_id: w.custom_timeline_id,
-      })) ?? [];
-    }
+    const weeks: CycleWeek[] = result.data?.map(w => ({
+      week_number: w.week_number,
+      week_start: w.week_start,
+      week_end: w.week_end,
+      timeline_id: w.timeline_id,
+    })) ?? [];
 
     return weeks;
   } catch (err) {
@@ -261,35 +245,21 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   try {
     const supabase = getSupabaseClient();
 
-    if (timeline.source === 'global') {
-      const { data, error } = await supabase
-        .from('v_user_global_timeline_days_left')
-        .select('user_global_timeline_id, days_left, pct_elapsed')
-        .eq('user_global_timeline_id', timeline.id)
-        .single();
+    // Use unified view for both global and custom timelines
+    const { data, error } = await supabase
+      .from('v_unified_timeline_days_left')
+      .select('timeline_id, days_left, pct_elapsed, source')
+      .eq('timeline_id', timeline.id)
+      .eq('source', timeline.source)
+      .single();
 
-      if (error) throw error;
+    if (error) throw error;
 
-      return {
-        timeline_id: data.user_global_timeline_id,
-        days_left: data.days_left,
-        pct_elapsed: data.pct_elapsed,
-      };
-    } else {
-      const { data, error } = await supabase
-        .from('v_custom_timeline_days_left')
-        .select('custom_timeline_id, days_left, pct_elapsed')
-        .eq('custom_timeline_id', timeline.id)
-        .single();
-
-      if (error) throw error;
-
-      return {
-        timeline_id: data.custom_timeline_id,
-        days_left: data.days_left,
-        pct_elapsed: data.pct_elapsed,
-      };
-    }
+    return {
+      timeline_id: data.timeline_id,
+      days_left: data.days_left,
+      pct_elapsed: data.pct_elapsed,
+    };
   } catch (err) {
     console.error('Error fetching days left data:', err);
     return null;

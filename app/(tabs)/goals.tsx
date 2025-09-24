@@ -516,25 +516,13 @@ export default function Goals() {
     try {
       const supabase = getSupabaseClient();
 
-      let weeks, error;
-      
-      if (timeline.source === 'global') {
-        const result = await supabase
-          .from('v_user_global_timeline_weeks')
-          .select('week_number, week_start, week_end')
-          .eq('timeline_id', timeline.id)
-          .order('week_number', { ascending: true });
-        weeks = result.data;
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('v_custom_timeline_weeks')
-          .select('week_number, week_start, week_end')
-          .eq('timeline_id', timeline.id)
-          .order('week_number', { ascending: true });
-        weeks = result.data;
-        error = result.error;
-      }
+      // Use unified view for both global and custom timelines
+      const { data: weeks, error } = await supabase
+        .from('v_unified_timeline_weeks')
+        .select('week_number, week_start, week_end, timeline_id, source')
+        .eq('timeline_id', timeline.id)
+        .eq('source', timeline.source)
+        .order('week_number', { ascending: true });
 
       if (error) throw error;
 
