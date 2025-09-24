@@ -806,7 +806,8 @@ export default function Goals() {
                 onPress={() => setCreateGoalModalVisible(true)}
               >
                 <Plus size={20} color="#ffffff" />
-            null
+                <Text style={styles.createGoalButtonText}>Create Goal</Text>
+              </TouchableOpacity>
           ) : (
             timelineGoals.map(goal => {
               const progress = timelineGoalProgress[goal.id] || {

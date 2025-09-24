@@ -331,11 +331,10 @@ export default function Dashboard() {
   };
   const handleDelegateTask = (task: Task) => { Alert.alert('Delegate', 'Delegation functionality coming soon!'); setIsDetailModalVisible(false); };
   const handleFormSubmitSuccess = () => {
-  }
-  setIsFormModalVisible(false);
-  setEditingTask(null);
-  fetchData();
-};
+    setIsFormModalVisible(false);
+    setEditingTask(null);
+    fetchData();
+  };
 
   const handleFormClose = () => {
     setIsFormModalVisible(false);
@@ -384,7 +383,6 @@ export default function Dashboard() {
           <AnalyticsView
             scope={{ type: 'user' }}
           />
-        ) : loading ? <View style={styles.loadingContainer}><Text style={styles.loadingText}>Loading...</Text></View>
         ) : loading ? null
           : (activeView === 'deposits' && tasks.length === 0) || (activeView === 'ideas' && depositIdeas.length === 0) ? 
             <View style={styles.emptyContainer}><Text style={styles.emptyText}>No {activeView} found</Text></View>
