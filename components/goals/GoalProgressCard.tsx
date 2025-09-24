@@ -336,9 +336,6 @@ export function GoalProgressCard({
             
             {loadingWeekActions ? (
               null
-            ) : weekActions.length === 0 && onAddAction ? (
-              <View style={styles.emptyActions}>
-                <Text style={styles.emptyActionsText}>No actions this week</Text>
                 {onAddAction && (
                   <TouchableOpacity
                     style={[styles.addActionButton, { borderColor: cardColor }]}
