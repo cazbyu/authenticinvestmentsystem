@@ -100,6 +100,66 @@ export default function Goals() {
     try {
       console.log('Toggling completion:', { actionId, date, completed });
       
+      // Optimistically update the UI immediately
+      setWeekGoalActions(prevActions => {
+        const updatedActions = { ...prevActions };
+        
+        // Find the goal that contains this action
+        for (const goalId in updatedActions) {
+          const goalActions = updatedActions[goalId];
+          const actionIndex = goalActions.findIndex(action => action.id === actionId);
+          
+          if (actionIndex !== -1) {
+            const updatedAction = { ...goalActions[actionIndex] };
+            const updatedLogs = [...updatedAction.logs];
+            
+            // Find or create the log entry for this date
+            const logIndex = updatedLogs.findIndex(log => log.measured_on === date);
+            
+            if (completed) {
+              // Remove the log entry (undo completion)
+              if (logIndex !== -1) {
+                updatedLogs.splice(logIndex, 1);
+              }
+            } else {
+              // Add or update the log entry (mark as completed)
+              if (logIndex !== -1) {
+                updatedLogs[logIndex] = { ...updatedLogs[logIndex], completed: true };
+              } else {
+                updatedLogs.push({
+                  id: `temp-${Date.now()}`,
+                  task_id: actionId,
+                  measured_on: date,
+                  week_number: timelineWeeks[currentWeekIndex]?.week_number || 1,
+                  day_of_week: new Date(date).getDay(),
+                  value: 1,
+                  completed: true,
+                  created_at: new Date().toISOString(),
+                });
+              }
+            }
+            
+            // Update the action with new logs and recalculate weeklyActual
+            updatedAction.logs = updatedLogs;
+            updatedAction.weeklyActual = Math.min(
+              updatedLogs.filter(log => log.completed).length,
+              updatedAction.weeklyTarget
+            );
+            
+            // Update the actions array
+            updatedActions[goalId] = [
+              ...goalActions.slice(0, actionIndex),
+              updatedAction,
+              ...goalActions.slice(actionIndex + 1)
+            ];
+            
+            break;
+          }
+        }
+        
+        return updatedActions;
+      });
+      
       if (completed) {
         // If currently completed, undo the completion
         await undoActionOccurrence({ parentTaskId: actionId, whenISO: date });
@@ -108,14 +168,14 @@ export default function Goals() {
         await completeActionSuggestion({ parentTaskId: actionId, whenISO: date });
       }
       
-      // Refresh the week actions to show updated state
-      await fetchWeekActions();
-      
       // Also refresh the authentic score
       calculateAuthenticScore();
     } catch (error) {
       console.error('Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to update completion status');
+      
+      // Revert the optimistic update on error
+      await fetchWeekActions();
     }
   };
 
