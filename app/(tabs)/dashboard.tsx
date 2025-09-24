@@ -35,6 +35,7 @@ export default function Dashboard() {
   const {
     completeActionSuggestion,
     undoActionOccurrence,
+    deleteTask,
   } = useGoalProgress();
   
   const fetchData = async () => {
@@ -50,6 +51,7 @@ export default function Dashboard() {
           .from('0008-ap-tasks')
           .select('*, user_global_timeline_id, custom_timeline_id')
           .eq('user_id', user.id)
+          .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event']);
 
@@ -269,27 +271,8 @@ export default function Dashboard() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            try {
-              const supabase = getSupabaseClient();
-              
-              // Delete all related data first
-              await Promise.all([
-                supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-goals-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
-                supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
-                supabase.from('0008-ap-task-week-plan').delete().eq('task_id', task.id),
-                supabase.from('0008-ap-tasks').delete().eq('parent_task_id', task.id), // Delete child occurrences
-              ]);
-              
-              // Finally delete the main task
-              const { error } = await supabase
-                .from('0008-ap-tasks')
-                .delete()
-                .eq('id', task.id);
-              
-              if (error) throw error;
+              // Use the soft delete function from useGoals hook
+              await deleteTask(task.id);
               
               Alert.alert('Success', 'Task deleted successfully');
               fetchData();
