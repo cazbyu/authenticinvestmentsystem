@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Check, FileText, Paperclip, Users, X } from 'lucide-react-native';
+import { Check, FileText, Paperclip, Users, X, Trash2 } from 'lucide-react-native';
 
 // Interface for a Task
 export interface Task {
@@ -107,7 +107,9 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
 
   // Handles the deletion of a task
   const handleDelete = () => {
-    onDelete?.(task);
+    if (onDelete) {
+      onDelete(task);
+    }
   };
   const points = calculatePoints();
 
@@ -124,11 +126,7 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
             <Text style={styles.taskTitle} numberOfLines={2}>
   {task.title}
   {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
-  {task.goals && task.goals[0] && (
-    <Text style={styles.inlineGoalChip}>  •  {task.goals[0].title}</Text>
-  )}
 </Text>
-
           </View>
           <View style={styles.taskBody}>
             <View style={styles.leftSection}>
@@ -168,6 +166,24 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
                   </View>
                 </View>
               )}
+              
+              {task.goals && task.goals.length > 0 && (
+                <View style={styles.tagRow}>
+                  <Text style={styles.tagRowLabel}>Goals:</Text>
+                  <View style={styles.tagContainer}>
+                    {task.goals.slice(0, 3).map((goal, index) => (
+                      <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
+                        <Text style={styles.pillTagText}>{goal.title}</Text>
+                      </View>
+                    ))}
+                    {task.goals.length > 3 && (
+                      <View style={[styles.pillTag, styles.morePillTag]}>
+                        <Text style={styles.pillTagText}>+{task.goals.length - 3}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
               {task.goals && task.goals.length > 0 && (
                 <View style={styles.tagRow}>
                   <Text style={styles.tagRowLabel}>Goals:</Text>
@@ -194,19 +210,19 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
             {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
             {task.has_delegates && <Users size={12} color="#6b7280" />}
           </View>
-          <View style={styles.taskActions}>
+          
+          <View style={styles.actionButtonsRow}>
             {onDelete && (
               <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-                <X size={16} color="#dc2626" />
+                <Trash2 size={14} color="#dc2626" />
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-              <View style={styles.checkmarkContainer}>
-                <Check size={20} color="#16a34a" strokeWidth={3} />
-              </View>
+              <Check size={16} color="#16a34a" strokeWidth={3} />
             </TouchableOpacity>
-            <Text style={styles.scoreText}>+{points}</Text>
           </View>
+          
+          <Text style={styles.scoreText}>+{points}</Text>
         </View>
     </TouchableOpacity>
   );
@@ -324,39 +340,38 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         gap: 4,
         marginBottom: 8,
       },
-      taskActions: {
-        flexDirection: 'column',
+      actionButtonsRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 6,
       },
       deleteButton: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         backgroundColor: '#fef2f2',
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#fecaca',
+        borderColor: '#dc2626',
       },
       scoreText: {
         fontSize: 14,
         fontWeight: '600',
         color: '#0078d4',
+        textAlign: 'center',
       },
       completeButton: {
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: 'transparent',
+        backgroundColor: '#f0fdf4',
         justifyContent: 'center',
         alignItems: 'center',
-        position: 'relative',
-      },
-      checkmarkContainer: {
-        position: 'relative',
-        justifyContent: 'center',
-        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#16a34a',
       },
       draggingItem: {
         opacity: 0.8,
