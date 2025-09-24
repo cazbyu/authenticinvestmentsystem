@@ -22,6 +22,9 @@ const DB = {
   NOTES: '0008-ap-notes',
   NOTES_JOIN: '0008-ap-universal-notes-join',
 
+  // Task logs
+  TASK_LOG: '0008-ap-task-log',
+
   // Joins
   UNIVERSAL_GOALS_JOIN: '0008-ap-universal-goals-join',
   UNIVERSAL_ROLES_JOIN: '0008-ap-universal-roles-join',
@@ -610,6 +613,61 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   /* --------------------------------
+   * TASK DELETION - CENTRALIZED
+   * -------------------------------- */
+  const deleteTask = async (taskId: string): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Verify task ownership before deletion
+      const { data: task, error: taskError } = await supabase
+        .from(DB.TASKS)
+        .select('id, user_id')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError) throw taskError;
+      if (!task || task.user_id !== user.id) {
+        throw new Error('Task not found or access denied');
+      }
+
+      // Delete all associated data in the correct order
+      await Promise.all([
+        // Delete universal joins
+        supabase.from(DB.UNIVERSAL_ROLES_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+        supabase.from(DB.UNIVERSAL_DOMAINS_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+        supabase.from(DB.UNIVERSAL_KEY_REL_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+        supabase.from(DB.UNIVERSAL_GOALS_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+        supabase.from(DB.NOTES_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+        
+        // Delete week plans
+        supabase.from(DB.TASK_WEEK_PLAN).delete().eq('task_id', taskId),
+        
+        // Delete task logs if they exist
+        supabase.from(DB.TASK_LOG).delete().eq('task_id', taskId),
+        
+        // Delete all child task occurrences
+        supabase.from(DB.TASKS).delete().eq('parent_task_id', taskId),
+      ]);
+
+      // Finally delete the main task
+      const { error: deleteError } = await supabase
+        .from(DB.TASKS)
+        .delete()
+        .eq('id', taskId);
+
+      if (deleteError) throw deleteError;
+
+      console.log('Task deleted successfully:', taskId);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
    * Refresh orchestration
    * -------------------------------- */
   const refreshAllData = async () => {
@@ -656,6 +714,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
+    deleteTask,
     deleteTask,
 
     // Data refresh
