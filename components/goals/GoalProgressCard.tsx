@@ -335,9 +335,7 @@ export function GoalProgressCard({
             </View>
             
             {loadingWeekActions ? (
-              <View style={styles.emptyActions}>
-                <Text style={styles.emptyActionsText}>Loading...</Text>
-              </View>
+              null
             ) : weekActions.length === 0 && onAddAction ? (
               <View style={styles.emptyActions}>
                 <Text style={styles.emptyActionsText}>No actions this week</Text>
