@@ -150,7 +150,6 @@ export default function Goals() {
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
-    deleteTask,
   } = useGoals();
 
   useEffect(() => {
@@ -824,13 +823,20 @@ export default function Goals() {
         visible={actionEffortModalVisible}
         onClose={() => {
           setActionEffortModalVisible(false);
+          setEditingAction(null);
+          setActionModalMode('create');
           // Refresh data after action is created
-          fetchTimelineGoals(selectedTimeline!);
-          fetchWeekActions();
+          if (selectedTimeline) {
+            fetchTimelineGoals(selectedTimeline);
+            fetchWeekActions();
+          }
         }}
-        goal={selectedGoalForAction}
+        goal={actionModalMode === 'create' ? selectedGoalForAction : editingAction?.goal}
         cycleWeeks={timelineWeeks}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
+        onDelete={handleDeleteAction}
+        initialData={editingAction}
+        mode={actionModalMode}
       />
 
       <ManageCustomTimelinesModal
