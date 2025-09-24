@@ -491,6 +491,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         input_kind: 'count',
         unit: 'days',
         status: 'pending',
+        due_date: null, // Parent tasks should not have a due_date
         is_twelve_week_goal: timeline.source === 'global',
         recurrence_rule: taskData.recurrenceRule,
         // Conditional timeline FK injection
@@ -553,9 +554,9 @@ export function useGoals(options: UseGoalsOptions = {}) {
           parent_type: 'task',
           user_id: user.id,
           // Conditional goal FK and type injection
-          goal_type: timeline.source === 'global' ? 'twelve_wk_goal' : 'custom_goal',
-          twelve_wk_goal_id: timeline.source === 'global' ? taskData.twelve_wk_goal_id : null,
-          custom_goal_id: timeline.source === 'custom' ? taskData.custom_goal_id : null,
+          goal_type: taskData.goal_type || (timeline.source === 'global' ? 'twelve_wk_goal' : 'custom_goal'),
+          twelve_wk_goal_id: taskData.twelve_wk_goal_id || null,
+          custom_goal_id: taskData.custom_goal_id || null,
         };
 
         const { error: goalJoinError } = await supabase

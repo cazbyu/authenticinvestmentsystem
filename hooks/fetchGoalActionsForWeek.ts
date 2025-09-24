@@ -95,13 +95,15 @@ export async function fetchGoalActionsForWeek(
     }
 
     // ---- 1) Join: which parent tasks are linked to the requested goals?
-    const goalTypeField = timeline.source === 'global' ? 'twelve_wk_goal_id' : 'custom_goal_id';
-    const orFilter = `${goalTypeField}.in.(${goalIds.join(',')})`;
+    // Build OR filter for both goal types since we might have mixed goals
+    const twelveWkFilter = `twelve_wk_goal_id.in.(${goalIds.join(',')})`;
+    const customFilter = `custom_goal_id.in.(${goalIds.join(',')})`;
+    const orFilter = `${twelveWkFilter},${customFilter}`;
     console.debug('[fetchGoalActionsForWeek] universal-goals-join query filter:', orFilter);
 
     const { data: goalJoins, error: joinsErr } = await supabase
       .from('0008-ap-universal-goals-join')
-      .select(`parent_id, ${goalTypeField}, goal_type`)
+      .select('parent_id, twelve_wk_goal_id, custom_goal_id, goal_type')
       .or(orFilter)
       .eq('parent_type', 'task');
 
@@ -210,7 +212,7 @@ export async function fetchGoalActionsForWeek(
       const weekPlan = (weekPlansData ?? []).find(wp => wp.task_id === task.id);
       if (!weekPlan) continue;
 
-      const goalId: string | undefined = goalJoin[goalTypeField];
+      const goalId: string | undefined = goalJoin.twelve_wk_goal_id || goalJoin.custom_goal_id;
       if (!goalId) continue;
 
       const relevantOccurrences =

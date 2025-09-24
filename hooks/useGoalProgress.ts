@@ -299,7 +299,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           .from('0008-ap-goals-12wk')
           .select('*')
           .eq('user_id', user.id)
-          .eq('user_global_timeline_id', resolvedTimeline.id) // Updated FK
+          .eq('user_global_timeline_id', resolvedTimeline.id)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
 
@@ -311,7 +311,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           .from('0008-ap-goals-custom')
           .select('*')
           .eq('user_id', user.id)
-          .eq('custom_timeline_id', resolvedTimeline.id) // Updated FK
+          .eq('custom_timeline_id', resolvedTimeline.id)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
 
@@ -521,11 +521,14 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       for (const goal of goals) {
         // Fetch parent action tasks linked to this goal with conditional FK
-        const goalTypeField = goal.goal_type === 'custom' ? 'custom_goal_id' : 'twelve_wk_goal_id';
+        const goalTypeField = goal.goal_type === '12week' ? 'twelve_wk_goal_id' : 'custom_goal_id';
+        const goalTypeValue = goal.goal_type === '12week' ? 'twelve_wk_goal' : 'custom_goal';
+        
         const { data: goalJoins } = await supabase
           .from('0008-ap-universal-goals-join')
           .select('parent_id')
           .eq(goalTypeField, goal.id)
+          .eq('goal_type', goalTypeValue)
           .eq('parent_type', 'task');
 
         const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
@@ -536,9 +539,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
             currentWeek,
             daysRemaining,
             weeklyActual: 0,
-            weeklyTarget: goal.goal_type === '12week' ? goal.weekly_target : 3,
+            weeklyTarget: goal.goal_type === '12week' ? (goal.weekly_target || 3) : 3,
             overallActual: 0,
-            overallTarget: goal.goal_type === '12week' ? goal.total_target : 100,
+            overallTarget: goal.goal_type === '12week' ? (goal.total_target || 36) : 100,
             overallProgress: 0,
           };
           continue;
@@ -609,7 +612,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           currentWeek,
           daysRemaining,
           weeklyActual,
-          weeklyTarget: goal.goal_type === '12week' ? goal.weekly_target : 3,
+          weeklyTarget: goal.goal_type === '12week' ? (goal.weekly_target || 3) : 3,
           overallActual: cappedOverallActual,
           overallTarget,
           overallProgress,

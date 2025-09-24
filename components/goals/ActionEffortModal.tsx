@@ -259,8 +259,9 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
       const taskData = {
         title: title.trim(),
         description: notes.trim() || undefined,
-        twelve_wk_goal_id: goal?.id,
-        goal_type: 'twelve_wk_goal',
+        twelve_wk_goal_id: goal?.goal_type === '12week' ? goal.id : undefined,
+        custom_goal_id: goal?.goal_type === 'custom' ? goal.id : undefined,
+        goal_type: goal?.goal_type === '12week' ? 'twelve_wk_goal' : 'custom_goal',
         recurrenceRule,
         selectedRoleIds,
         selectedDomainIds,
