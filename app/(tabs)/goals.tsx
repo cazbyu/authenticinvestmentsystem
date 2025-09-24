@@ -51,6 +51,8 @@ export default function Goals() {
   const {
     toggleTaskDay,
     fetchGoalActionsForWeek,
+    completeActionSuggestion,
+    undoActionOccurrence,
   } = useGoalProgress();
   
   // Local goals state for the selected timeline
@@ -162,8 +164,6 @@ export default function Goals() {
     goalProgress,
     refreshGoals,
     refreshAllData,
-    completeActionSuggestion,
-    undoActionOccurrence,
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
