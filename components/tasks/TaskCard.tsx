@@ -184,42 +184,26 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
                   </View>
                 </View>
               )}
-              {task.goals && task.goals.length > 0 && (
-                <View style={styles.tagRow}>
-                  <Text style={styles.tagRowLabel}>Goals:</Text>
-                  <View style={styles.tagContainer}>
-                    {task.goals.slice(0, 3).map((goal, index) => (
-                      <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
-                        <Text style={styles.pillTagText}>{goal.title}</Text>
-                      </View>
-                    ))}
-                    {task.goals.length > 3 && (
-                      <View style={[styles.pillTag, styles.morePillTag]}>
-                        <Text style={styles.pillTagText}>+{task.goals.length - 3}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              )}
             </View>
           </View>
         </View>
         <View style={styles.rightSection}>
-          <View style={styles.statusIcons}>
-            {task.has_notes && <FileText size={12} color="#6b7280" />}
-            {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
-            {task.has_delegates && <Users size={12} color="#6b7280" />}
-          </View>
-          
-          <View style={styles.actionButtonsRow}>
+          <View style={styles.topActionRow}>
+            <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
+              <Check size={16} color="#16a34a" strokeWidth={3} />
+            </TouchableOpacity>
+            
             {onDelete && (
               <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
                 <Trash2 size={14} color="#dc2626" />
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-              <Check size={16} color="#16a34a" strokeWidth={3} />
-            </TouchableOpacity>
+            
+            <View style={styles.statusIcons}>
+              {task.has_notes && <FileText size={12} color="#6b7280" />}
+              {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
+              {task.has_delegates && <Users size={12} color="#6b7280" />}
+            </View>
           </View>
           
           <Text style={styles.scoreText}>+{points}</Text>
@@ -338,12 +322,10 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        marginBottom: 8,
       },
-      actionButtonsRow: {
+      topActionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
         gap: 8,
         marginBottom: 6,
       },
