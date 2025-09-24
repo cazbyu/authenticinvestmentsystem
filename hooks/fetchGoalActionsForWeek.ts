@@ -189,6 +189,7 @@ export async function fetchGoalActionsForWeek(
       .from('0008-ap-tasks')
       .select('*')
       .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
+      .is('deleted_at', null)
       .eq('status', 'completed')
       .gte('due_date', weekStartDate)
       .lte('due_date', weekEndDate);

@@ -161,6 +161,7 @@ export default function CalendarScreen() {
         .from('0008-ap-tasks')
         .select('*, recurrence_rule')
         .eq('user_id', user.id)
+        .is('deleted_at', null)
         .not('status', 'in', '(completed,cancelled)')
         .in('type', ['task', 'event'])
         .or('due_date.not.is.null,start_date.not.is.null');

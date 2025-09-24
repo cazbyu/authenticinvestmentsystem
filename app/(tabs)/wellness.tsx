@@ -97,6 +97,7 @@ export default function Wellness() {
           .from('0008-ap-tasks')
           .select('*')
           .eq('user_id', user.id)
+          .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event']);
 

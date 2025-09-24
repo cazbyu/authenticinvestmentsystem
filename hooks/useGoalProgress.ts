@@ -118,6 +118,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
+    deleteTask,
     refreshGoals: refreshGoalsFromUseGoals,
   } = useGoals(options);
 

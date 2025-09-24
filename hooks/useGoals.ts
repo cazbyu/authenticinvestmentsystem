@@ -696,7 +696,6 @@ export function useGoals(options: UseGoalsOptions = {}) {
     createCustomGoal,
     createTaskWithWeekPlan,
     deleteTask,
-    deleteTask,
 
     // Data refresh
     refreshGoals,
