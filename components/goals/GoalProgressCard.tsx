@@ -335,14 +335,14 @@ export function GoalProgressCard({
             </View>
             
             {loadingWeekActions ? (
-              null
+              <View style={styles.weekActionsHeader}>
                 {onAddAction && (
                   <TouchableOpacity
                     style={[styles.addActionButton, { borderColor: cardColor }]}
                     onPress={onAddAction}
                   >
                     <Plus size={12} color={cardColor} />
-                    <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add action</Text>
+                    <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
                   </TouchableOpacity>
                 )}
               </View>
