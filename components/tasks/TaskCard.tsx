@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Check, FileText, Paperclip, Users } from 'lucide-react-native';
+import { Check, FileText, Paperclip, Users, X } from 'lucide-react-native';
 
 // Interface for a Task
 export interface Task {
@@ -34,6 +34,7 @@ export interface Task {
 interface TaskCardProps {
   task: Task;
   onComplete: (task: Task) => void;
+  onDelete?: (task: Task) => void;
   onLongPress?: () => void;
   onDoublePress?: (task: Task) => void;
   isDragging?: boolean;
@@ -42,7 +43,7 @@ interface TaskCardProps {
 // --- TaskCard Component ---
 // Renders a single task item in the list
 export const TaskCard = React.forwardRef<View, TaskCardProps>(
-  ({ task, onComplete, onLongPress, onDoublePress, isDragging }, ref) => {
+  ({ task, onComplete, onDelete, onLongPress, onDoublePress, isDragging }, ref) => {
     const [lastTap, setLastTap] = useState(0);
 
   // Determines the border color based on task priority
@@ -104,6 +105,10 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
     onComplete(task);
   };
 
+  // Handles the deletion of a task
+  const handleDelete = () => {
+    onDelete?.(task);
+  };
   const points = calculatePoints();
 
   return (
@@ -190,6 +195,11 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
             {task.has_delegates && <Users size={12} color="#6b7280" />}
           </View>
           <View style={styles.taskActions}>
+            {onDelete && (
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                <X size={16} color="#dc2626" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
               <View style={styles.checkmarkContainer}>
                 <Check size={20} color="#16a34a" strokeWidth={3} />
@@ -315,9 +325,19 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         marginBottom: 8,
       },
       taskActions: {
-        flexDirection: 'row',
+        flexDirection: 'column',
         alignItems: 'center',
         gap: 6,
+      },
+      deleteButton: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#fef2f2',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#fecaca',
       },
       scoreText: {
         fontSize: 14,

@@ -259,6 +259,48 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeleteTask = async (task: Task) => {
+    Alert.alert(
+      'Delete Task',
+      `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const supabase = getSupabaseClient();
+              
+              // Delete all related data first
+              await Promise.all([
+                supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-goals-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
+                supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', task.id).eq('parent_type', 'task'),
+                supabase.from('0008-ap-task-week-plan').delete().eq('task_id', task.id),
+                supabase.from('0008-ap-tasks').delete().eq('parent_task_id', task.id), // Delete child occurrences
+              ]);
+              
+              // Finally delete the main task
+              const { error } = await supabase
+                .from('0008-ap-tasks')
+                .delete()
+                .eq('id', task.id);
+              
+              if (error) throw error;
+              
+              Alert.alert('Success', 'Task deleted successfully');
+              fetchData();
+            } catch (error) {
+              Alert.alert('Error', (error as Error).message || 'Failed to delete task');
+            }
+          }
+        }
+      ]
+    );
+  };
   const handleCancelTask = async (task: Task) => {
     try {
       const supabase = getSupabaseClient();
@@ -339,8 +381,8 @@ export default function Dashboard() {
     }
   };
   const handleDragEnd = ({ data }: { data: Task[] }) => setTasks(data);
-  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
-  const renderRegularItem = ({ item }: { item: Task }) => <TaskCard task={item} onComplete={handleCompleteTask} onLongPress={() => {}} onDoublePress={handleTaskDoublePress} isDragging={false} />;
+  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<Task>) => <TaskCard task={item} onComplete={handleCompleteTask} onDelete={handleDeleteTask} onLongPress={drag} onDoublePress={handleTaskDoublePress} isDragging={isActive} />;
+  const renderRegularItem = ({ item }: { item: Task }) => <TaskCard task={item} onComplete={handleCompleteTask} onDelete={handleDeleteTask} onLongPress={() => {}} onDoublePress={handleTaskDoublePress} isDragging={false} />;
   const sortOptions = [
     { value: 'due_date', label: 'Due Date' }, 
     { value: 'priority', label: 'Priority' }, 
