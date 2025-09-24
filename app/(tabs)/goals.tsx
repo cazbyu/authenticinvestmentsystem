@@ -128,6 +128,8 @@ export default function Goals() {
   // Selected items
   const [selectedGoal, setSelectedGoal] = useState<any>(null);
   const [selectedGoalForAction, setSelectedGoalForAction] = useState<any>(null);
+  const [actionModalMode, setActionModalMode] = useState<'create' | 'edit'>('create');
+  const [editingAction, setEditingAction] = useState<any>(null);
   
   // Timeline data
   const [allTimelines, setAllTimelines] = useState<Timeline[]>([]);
