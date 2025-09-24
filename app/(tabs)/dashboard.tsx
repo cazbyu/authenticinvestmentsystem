@@ -271,6 +271,7 @@ export default function Dashboard() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            try {
               // Use the soft delete function from useGoals hook
               await deleteTask(task.id);
               
