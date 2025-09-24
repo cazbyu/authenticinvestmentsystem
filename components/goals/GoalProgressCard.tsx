@@ -53,7 +53,7 @@ export function GoalProgressCard({
   onEdit, // New prop
   onPress,
   compact = false,
-  selectedWeekNumber
+  selectedWeekNumber,
   onEditAction, // New prop
 }: GoalProgressCardProps) {
   const weekActions = weekActionsProp ?? [];
