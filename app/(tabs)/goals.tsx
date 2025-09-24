@@ -75,7 +75,7 @@ export default function Goals() {
       const actions = await fetchGoalActionsForWeek(
         goalIds,
         currentWeek.week_number,
-        selectedTimeline.id,
+        selectedTimeline,
         timelineWeeks
       );
       setWeekGoalActions(actions);
