@@ -213,76 +213,49 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   /* --------------------------------
    * WEEK/DAY CALCULATIONS (progress-specific)
    * -------------------------------- */
-  const fetchCycleWeeks = async (timeline: Timeline) => {
-    try {
-      console.log('=== FETCH CYCLE WEEKS START ===');
-      const supabase = getSupabaseClient();
+  const fetchCycleWeeks = async (timeline: Timeline): Promise<CycleWeek[]> => {
+  try {
+    const supabase = getSupabaseClient();
+    let weeks: CycleWeek[] = [];
 
-      let weeks, error;
-      
-      // Query the correct view based on timeline source
-      if (timeline.source === 'global') {
-        const result = await supabase
-          .from('v_user_global_timeline_weeks')
-          .select('week_number, week_start, week_end, timeline_id')
-          .eq('timeline_id', timeline.id)
-          .order('week_number', { ascending: true });
-        weeks = result.data;
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('v_custom_timeline_weeks')
-          .select('week_number, start_date, end_date, custom_timeline_id')
-          .eq('custom_timeline_id', timeline.id)
-          .order('week_number', { ascending: true });
-        weeks = result.data;
-        error = result.error;
-        
-        // Normalize custom timeline week structure
-        if (weeks) {
-          weeks = weeks.map(week => ({
-            week_number: week.week_number,
-            week_start: week.start_date,
-            week_end: week.end_date,
-            timeline_id: week.custom_timeline_id,
-          }));
-        }
-      }
+    if (timeline.source === 'global') {
+      const result = await supabase
+        .from('v_user_global_timeline_weeks')
+        .select('week_number, week_start, week_end, user_global_timeline_id')
+        .eq('user_global_timeline_id', timeline.id)
+        .order('week_number', { ascending: true });
 
-      console.log('Database weeks query result:', { data: weeks, error });
+      if (result.error) throw result.error;
 
-      if (error) {
-        console.warn('Database week view failed, using client-side fallback:', error);
-        if (timeline.start_date) {
-          const clientWeeks = generateCycleWeeks(
-            timeline.start_date!,
-            timeline.week_start_day || 'monday',
-            timeline.end_date || undefined
-          ).map(week => ({
-            week_number: week.week_number,
-            week_start: week.start_date,
-            week_end: week.end_date,
-            timeline_id: timeline.id,
-          }));
-          console.log('Using client-side fallback weeks:', clientWeeks);
-          setCycleWeeks(clientWeeks);
-          return clientWeeks;
-        }
-        console.log('No valid start_date for client-side fallback');
-        setCycleWeeks([]);
-        return [];
-      }
+      weeks = result.data?.map(w => ({
+        week_number: w.week_number,
+        week_start: w.week_start,
+        week_end: w.week_end,
+        timeline_id: w.user_global_timeline_id,
+      })) ?? [];
+    } else if (timeline.source === 'custom') {
+      const result = await supabase
+        .from('v_custom_timeline_weeks')
+        .select('week_number, week_start, week_end, custom_timeline_id')
+        .eq('custom_timeline_id', timeline.id)
+        .order('week_number', { ascending: true });
 
-      console.log('Using database weeks:', weeks);
-      setCycleWeeks(weeks ?? []);
-      console.log('=== FETCH CYCLE WEEKS END ===');
-      return weeks ?? [];
-    } catch (error) {
-      console.error('Error fetching cycle weeks:', error);
-      setCycleWeeks([]);
-      return [];
+      if (result.error) throw result.error;
+
+      weeks = result.data?.map(w => ({
+        week_number: w.week_number,
+        week_start: w.week_start,
+        week_end: w.week_end,
+        timeline_id: w.custom_timeline_id,
+      })) ?? [];
     }
-  };
+
+    return weeks;
+  } catch (err) {
+    console.error('Error fetching cycle weeks:', err);
+    return [];
+  }
+};
 
   const fetchDaysLeftData = async (timeline: Timeline) => {
     try {
