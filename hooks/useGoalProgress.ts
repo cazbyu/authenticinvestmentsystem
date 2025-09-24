@@ -990,6 +990,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
+    deleteTask,
 
     // Week actions state
     weekGoalActions,
