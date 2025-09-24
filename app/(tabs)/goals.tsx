@@ -117,6 +117,21 @@ export default function Goals() {
     }
   };
 
+  const handleDeleteAction = async (actionId: string) => {
+    try {
+      await deleteTask(actionId);
+      
+      // Refresh the timeline goals and week actions after deletion
+      if (selectedTimeline) {
+        await fetchTimelineGoals(selectedTimeline);
+        await fetchWeekActions();
+      }
+    } catch (error) {
+      console.error('Error deleting action:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to delete action');
+    }
+  };
+
   // Modal states
   const [createGoalModalVisible, setCreateGoalModalVisible] = useState(false);
   const [editGoalModalVisible, setEditGoalModalVisible] = useState(false);
