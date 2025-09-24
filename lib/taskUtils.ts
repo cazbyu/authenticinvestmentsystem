@@ -85,7 +85,6 @@ export async function calculateAuthenticScore(
       const pts = calculateTaskPoints(task, roles, domains);
       totalDeposits += pts;
 
-      console.log(`[AuthenticScore] Task ${task.id} => ${pts} pts`);
     }
 
     // 4. Withdrawals
