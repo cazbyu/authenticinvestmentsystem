@@ -14,6 +14,7 @@ import { JournalView } from '@/components/journal/JournalView';
 import { calculateTaskPoints, calculateAuthenticScore as calculateScoreUtil } from '@/lib/taskUtils';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { DraggableFab } from '@/components/DraggableFab';
+import { formatLocalDate } from '@/lib/dateUtils';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
@@ -42,7 +43,7 @@ export default function Dashboard() {
         // Fetch tasks/events
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-          .select('*')
+          .select('*, user_global_timeline_id, custom_timeline_id')
           .eq('user_id', user.id)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event']);
@@ -81,8 +82,14 @@ export default function Dashboard() {
         if (keyRelationshipsError) throw keyRelationshipsError;
 
         const transformedTasks = tasksData.map(task => {
+          // Derive timeline information for recurring tasks
+          const timeline_id = task.user_global_timeline_id || task.custom_timeline_id;
+          const timeline_source = task.user_global_timeline_id ? 'global' : 'custom';
+          
           return {
             ...task,
+            timeline_id,
+            timeline_source,
             roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
             domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
             goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
@@ -189,14 +196,30 @@ export default function Dashboard() {
     fetchData();
   }, [activeView, sortOption]);
 
-  const handleCompleteTask = async (taskId: string) => {
+  const handleCompleteTask = async (task: Task) => {
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase.from('0008-ap-tasks').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', taskId);
-      if (error) throw error;
+      // Check if this is a recurring task linked to a timeline
+      if (task.recurrence_rule && (task.user_global_timeline_id || task.custom_timeline_id)) {
+        // For recurring tasks linked to timelines, create an occurrence for today
+        const today = formatLocalDate(new Date());
+        await completeActionSuggestion({
+          parentTaskId: task.id,
+          whenISO: today,
+        });
+        Alert.alert('Success', 'Action completed for today!');
+      } else {
+        // For non-recurring tasks or tasks not linked to timelines, mark as completed
+        const supabase = getSupabaseClient();
+        const { error } = await supabase
+          .from('0008-ap-tasks')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('id', task.id);
+        if (error) throw error;
+        Alert.alert('Success', 'Task completed!');
+      }
       fetchData();
     } catch (error) {
-      Alert.alert('Error', (error as Error).message || 'Failed to complete task.');
+      Alert.alert('Error', (error as Error).message || 'Failed to complete action.');
     }
   };
 

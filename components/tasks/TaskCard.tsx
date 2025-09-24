@@ -12,7 +12,8 @@ export interface Task {
   start_time?: string;
   end_time?: string;
   recurrence_rule?: string;
-  recurrence_rule?: string;
+  user_global_timeline_id?: string;
+  custom_timeline_id?: string;
   is_urgent?: boolean;
   is_important?: boolean;
   status?: string;
@@ -32,7 +33,7 @@ export interface Task {
 // Props for the TaskCard component
 interface TaskCardProps {
   task: Task;
-  onComplete: (taskId: string) => void;
+  onComplete: (task: Task) => void;
   onLongPress?: () => void;
   onDoublePress?: (task: Task) => void;
   isDragging?: boolean;
@@ -100,7 +101,7 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
 
   // Handles the completion of a task
   const handleComplete = () => {
-    onComplete(task.id);
+    onComplete(task);
   };
 
   const points = calculatePoints();
