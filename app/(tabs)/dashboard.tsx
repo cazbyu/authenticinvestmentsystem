@@ -56,7 +56,38 @@ export default function Dashboard() {
           return;
         }
 
-        const taskIds = tasksData.map(t => t.id);
+        // Filter out recurring tasks that have been completed today
+        const today = formatLocalDate(new Date());
+        const recurringTaskIds = tasksData
+          .filter(task => task.recurrence_rule && (task.user_global_timeline_id || task.custom_timeline_id))
+          .map(task => task.id);
+
+        let completedTodayTaskIds: string[] = [];
+        if (recurringTaskIds.length > 0) {
+          const { data: completedToday, error: completedError } = await supabase
+            .from('0008-ap-tasks')
+            .select('parent_task_id')
+            .in('parent_task_id', recurringTaskIds)
+            .eq('due_date', today)
+            .eq('status', 'completed');
+
+          if (completedError) {
+            console.error('Error fetching completed occurrences:', completedError);
+          } else {
+            completedTodayTaskIds = (completedToday || []).map(occ => occ.parent_task_id);
+          }
+        }
+
+        // Filter out tasks that have been completed today
+        const currentTasks = tasksData.filter(task => !completedTodayTaskIds.includes(task.id));
+
+        if (currentTasks.length === 0) {
+          setTasks([]);
+          setDepositIdeas([]);
+          setLoading(false);
+          return;
+        }
+        const taskIds = currentTasks.map(t => t.id);
 
         const [
           { data: rolesData, error: rolesError },
@@ -81,7 +112,7 @@ export default function Dashboard() {
         if (delegatesError) throw delegatesError;
         if (keyRelationshipsError) throw keyRelationshipsError;
 
-        const transformedTasks = tasksData.map(task => {
+        const transformedTasks = currentTasks.map(task => {
           // Derive timeline information for recurring tasks
           const timeline_id = task.user_global_timeline_id || task.custom_timeline_id;
           const timeline_source = task.user_global_timeline_id ? 'global' : 'custom';
