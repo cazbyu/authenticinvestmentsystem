@@ -335,9 +335,8 @@ export function GoalProgressCard({
             </View>
             
             {loadingWeekActions ? (
-              <View style={styles.loadingActions}>
-                <ActivityIndicator size="small" color={cardColor} />
-                <Text style={styles.loadingActionsText}>Loading actions...</Text>
+              <View style={styles.emptyActions}>
+                <Text style={styles.emptyActionsText}>Loading...</Text>
               </View>
             ) : weekActions.length === 0 && onAddAction ? (
               <View style={styles.emptyActions}>
