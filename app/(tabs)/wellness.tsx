@@ -425,9 +425,7 @@ export default function Wellness() {
                 scope={{ type: 'domain', id: selectedDomain.id, name: selectedDomain.name }}
               />
             ) : loading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading...</Text>
-              </View>
+              null
             ) : activeView === 'deposits' ? (
               tasks.length === 0 ? (
                 <View style={styles.emptyContainer}>

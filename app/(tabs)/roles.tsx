@@ -798,9 +798,7 @@ export default function Roles() {
                 scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
               />
             ) : loading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading...</Text>
-              </View>
+              null
             ) : activeView === 'deposits' ? (
               tasks.length === 0 ? (
                 <View style={styles.emptyContainer}>

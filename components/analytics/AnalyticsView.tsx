@@ -466,11 +466,7 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading analytics...</Text>
-      </View>
-    );
+    return null;
   }
 
   if (!metrics) {

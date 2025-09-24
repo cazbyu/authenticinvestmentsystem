@@ -950,9 +950,7 @@ const dayEvents = expandedTasks.map(task => ({
       ) : (
         <ScrollView style={styles.scrollViewBase} contentContainerStyle={styles.content}>
           {loading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading calendar...</Text>
-            </View>
+            null
           ) : (
             renderContent()
           )}

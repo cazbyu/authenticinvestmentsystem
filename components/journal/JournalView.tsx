@@ -539,9 +539,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
       {/* Journal Entries */}
       <ScrollView style={styles.journalContent}>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading journal...</Text>
-          </View>
+          null
         ) : entries.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No journal entries found</Text>

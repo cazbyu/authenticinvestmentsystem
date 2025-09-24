@@ -345,9 +345,7 @@ export default function ReflectionsScreen() {
           </View>
 
           {loading ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading entries...</Text>
-            </View>
+            null
           ) : previousEntries.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
