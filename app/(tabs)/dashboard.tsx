@@ -228,7 +228,7 @@ export default function Dashboard() {
   } catch (error) {
     console.error('Error calculating authentic score:', error);
   }
-};
+ };
 
   useEffect(() => {
     fetchData();
@@ -331,6 +331,7 @@ export default function Dashboard() {
   };
   const handleDelegateTask = (task: Task) => { Alert.alert('Delegate', 'Delegation functionality coming soon!'); setIsDetailModalVisible(false); };
   const handleFormSubmitSuccess = () => {
+  }
   setIsFormModalVisible(false);
   setEditingTask(null);
   fetchData();
@@ -372,7 +373,9 @@ export default function Dashboard() {
       <Header activeView={activeView} onViewChange={setActiveView} onSortPress={() => setIsSortModalVisible(true)} authenticScore={authenticScore} />
       <View style={styles.content}>
         
-        {activeView === 'journal' ? (
+        {active
+    }
+  )View === 'journal' ? (
           <JournalView
             scope={{ type: 'user' }}
             onEntryPress={handleJournalEntryPress}
