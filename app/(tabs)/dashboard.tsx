@@ -262,6 +262,7 @@ export default function Dashboard() {
   };
 
   const handleDeleteTask = async (task: Task) => {
+    console.log('Delete task called for:', task.title);
     Alert.alert(
       'Delete Task',
       `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
@@ -272,12 +273,15 @@ export default function Dashboard() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('Attempting to delete task:', task.id);
               // Use the soft delete function from useGoals hook
               await deleteTask(task.id);
               
               Alert.alert('Success', 'Task deleted successfully');
+              console.log('Task deleted successfully');
               fetchData();
             } catch (error) {
+              console.error('Error deleting task:', error);
               Alert.alert('Error', (error as Error).message || 'Failed to delete task');
             }
           }

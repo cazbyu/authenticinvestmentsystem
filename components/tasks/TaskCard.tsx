@@ -107,7 +107,9 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
 
   // Handles the deletion of a task
   const handleDelete = () => {
-    onDelete?.(task);
+    if (onDelete) {
+      onDelete(task);
+    }
   };
   const points = calculatePoints();
 
