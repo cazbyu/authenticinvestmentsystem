@@ -11,6 +11,9 @@ const supabaseAnonKey = (Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables. Please check your .env file.');
   console.error('Required variables: EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY');
+} else {
+  console.log('Supabase URL being used:', supabaseUrl);
+  console.log('Supabase connection initialized successfully');
 }
 
 // Use appropriate storage for each platform
