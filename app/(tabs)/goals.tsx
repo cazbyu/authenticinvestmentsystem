@@ -150,6 +150,7 @@ export default function Goals() {
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
+    deleteTask,
   } = useGoals();
 
   useEffect(() => {
