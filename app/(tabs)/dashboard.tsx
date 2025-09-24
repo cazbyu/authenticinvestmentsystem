@@ -15,6 +15,7 @@ import { calculateTaskPoints, calculateAuthenticScore as calculateScoreUtil } fr
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { DraggableFab } from '@/components/DraggableFab';
 import { formatLocalDate } from '@/lib/dateUtils';
+import { useGoalProgress } from '@/hooks/useGoalProgress';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
@@ -30,7 +31,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
 
-  // 12-Week Goals
+  // Import functions from useGoalProgress hook
+  const {
+    completeActionSuggestion,
+    undoActionOccurrence,
+  } = useGoalProgress();
   
   const fetchData = async () => {
     setLoading(true);
