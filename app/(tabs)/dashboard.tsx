@@ -327,6 +327,8 @@ export default function Dashboard() {
 
   const handleActivateDepositIdea = async (depositIdea: any) => {
     try {
+      setIsDepositIdeaDetailVisible(false); // Close modal immediately
+      
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
