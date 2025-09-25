@@ -1,3 +1,165 @@
+import { useState, useEffect } from 'react';
+import { useGoals } from './useGoals';
+import { getSupabaseClient } from '../lib/supabase';
+import { formatLocalDate } from '../lib/dateUtils';
+
+// Type definitions
+interface UseGoalProgressOptions {
+  scope?: string;
+}
+
+interface WeekData {
+  weekNumber: number;
+  startDate: string;
+  endDate: string;
+}
+
+interface GoalProgress {
+  [goalId: string]: any;
+}
+
+interface CycleEffortData {
+  totalActual: number;
+  totalTarget: number;
+  overallPercentage: number;
+}
+
+interface Goal {
+  id: string;
+  title: string;
+  [key: string]: any;
+}
+
+interface Timeline {
+  id: string;
+  source: 'global' | 'custom';
+  [key: string]: any;
+}
+
+interface TaskWithLogs {
+  id: string;
+  title: string;
+  [key: string]: any;
+}
+
+export function useGoalProgress(options: UseGoalProgressOptions = {}) {
+  // State variables
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
+  const [availableTimelines, setAvailableTimelines] = useState<Timeline[]>([]);
+  const [cycleWeeks, setCycleWeeks] = useState<any[]>([]);
+  const [daysLeftData, setDaysLeftData] = useState<any>(null);
+  const [goalProgress, setGoalProgress] = useState<GoalProgress>({});
+  const [cycleEffortData, setCycleEffortData] = useState<CycleEffortData>({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
+  const [loading, setLoading] = useState(false);
+  const [loadingWeekActions, setLoadingWeekActions] = useState(false);
+  const [weekGoalActions, setWeekGoalActions] = useState<any[]>([]);
+
+  // Import functions from useGoals
+  const {
+    createTwelveWeekGoal,
+    createCustomGoal,
+    createTaskWithWeekPlan,
+    deleteTask,
+    refreshGoals: refreshGoalsFromUseGoals
+  } = useGoals();
+
+  // Placeholder functions - these need to be implemented
+  const fetchAvailableTimelines = async (): Promise<Timeline | null> => {
+    // TODO: Implement this function
+    return null;
+  };
+
+  const fetchCycleWeeks = async (timeline: Timeline): Promise<any[]> => {
+    // TODO: Implement this function
+    return [];
+  };
+
+  const fetchDaysLeftData = async (timeline: Timeline): Promise<any> => {
+    // TODO: Implement this function
+    return null;
+  };
+
+  const fetchGoalsForTimeline = async (timeline: Timeline): Promise<void> => {
+    // TODO: Implement this function
+  };
+
+  const getTodayActionSuggestions = async (): Promise<any[]> => {
+    // TODO: Implement this function
+    return [];
+  };
+
+  const fetchTasksAndPlansForWeek = async (weekNumber: number): Promise<TaskWithLogs[]> => {
+    if (!selectedTimeline || !cycleWeeks || cycleWeeks.length === 0) return [];
+
+    const wk = cycleWeeks.find(w => w.week_number === weekNumber);
+    if (!wk) return [];
+    const weekStartISO = wk.week_start;
+    const weekEndISO = wk.week_end;
+
+    const supabase = getSupabaseClient();
+
+    let query = supabase
+      .from('0008-ap-tasks')
+      .select(`
+        *,
+        0008-ap-task-week-plan!inner(target_days)
+      `)
+      .eq('type', 'task')
+      .gte('due_date', weekStartISO)
+      .lte('due_date', weekEndISO);
+
+    // Filter by timeline
+    if (selectedTimeline.source === 'global') {
+      query = query
+        .eq('is_twelve_week_goal', true)
+        .eq('0008-ap-task-week-plan.user_global_timeline_id', selectedTimeline.id);
+    } else {
+      query = query
+        .eq('custom_timeline_id', selectedTimeline.id)
+        .eq('0008-ap-task-week-plan.user_custom_timeline_id', selectedTimeline.id);
+    }
+
+    const { data: tasks, error } = await query;
+
+    if (error) {
+      console.error('Error fetching tasks for week:', error);
+      return [];
+    }
+
+    return tasks || [];
+  };
+
+  const fetchGoalActionsForWeek = async (weekNumber: number): Promise<any[]> => {
+    if (!selectedTimeline || !cycleWeeks || cycleWeeks.length === 0) return [];
+
+    const wk = cycleWeeks.find(w => w.week_number === weekNumber);
+    if (!wk) return [];
+
+    const supabase = getSupabaseClient();
+
+    let weekPlanQuery = supabase
+      .from('0008-ap-task-week-plan')
+      .select('target_days')
+      .in('task_id', []);
+
+    // Filter by timeline
+    if (selectedTimeline.source === 'global') {
+      weekPlanQuery = weekPlanQuery.eq('user_global_timeline_id', selectedTimeline.id);
+    } else {
+      weekPlanQuery = weekPlanQuery.eq('user_custom_timeline_id', selectedTimeline.id);
+    }
+
+    const { data: weekPlans, error: weekPlanError } = await weekPlanQuery;
+
+    if (weekPlanError) {
+      console.error('Error fetching week plans:', weekPlanError);
+      return [];
+    }
+
+    return weekPlans || [];
+  };
+
   const toggleTaskDay = async (taskId: string, date: string): Promise<boolean> => {
     try {
       const supabase = getSupabaseClient();
