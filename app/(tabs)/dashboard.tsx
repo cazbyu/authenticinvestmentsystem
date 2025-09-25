@@ -372,9 +372,7 @@ export default function Dashboard() {
       <Header activeView={activeView} onViewChange={setActiveView} onSortPress={() => setIsSortModalVisible(true)} authenticScore={authenticScore} />
       <View style={styles.content}>
         
-        {active
-    }
-  )View === 'journal' ? (
+        {activeView === 'journal' ? (
           <JournalView
             scope={{ type: 'user' }}
             onEntryPress={handleJournalEntryPress}
