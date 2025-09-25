@@ -1,5 +1,3 @@
-rn [];
-
       const supabase = getSupabaseClient();
 
       const weekNumber = getCurrentWeekNumber();
