@@ -363,6 +363,32 @@ export function CreateGoalModal({
                 </ScrollView>
               </View>
 
+              {/* Weekly Target */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Weekly Target</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.weeklyTarget}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, weeklyTarget: text }))}
+                  placeholder="3"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                />
+              </View>
+
+              {/* Total Target */}
+              <View style={styles.field}>
+                <Text style={styles.label}>Total Target</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.totalTarget}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, totalTarget: text }))}
+                  placeholder={currentSelectedTimeline?.source === 'global' ? '36' : '100'}
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="numeric"
+                />
+              </View>
+
               {/* Active Roles */}
               <View style={styles.field}>
                 <Text style={styles.label}>Active Roles</Text>

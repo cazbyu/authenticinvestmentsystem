@@ -130,15 +130,32 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
 
-      // 1. Update main goal data
-      const { error: goalUpdateError } = await supabase
-        .from('0008-ap-goals-12wk')
-        .update({
-          title: title.trim(),
-          description: description.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', goal.id);
+      // 1. Update main goal data based on goal type
+      let goalUpdateError;
+      
+      if (goal.goal_type === '12week') {
+        const { error } = await supabase
+          .from('0008-ap-goals-12wk')
+          .update({
+            title: title.trim(),
+            description: description.trim() || null,
+            weekly_target: parseInt(weeklyTarget) || 3,
+            total_target: parseInt(totalTarget) || 36,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', goal.id);
+        goalUpdateError = error;
+      } else {
+        const { error } = await supabase
+          .from('0008-ap-goals-custom')
+          .update({
+            title: title.trim(),
+            description: description.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', goal.id);
+        goalUpdateError = error;
+      }
 
       if (goalUpdateError) throw goalUpdateError;
 
