@@ -68,6 +68,8 @@ export interface CustomGoal {
   end_date: string;
   status: string;
   progress: number;
+  weekly_target?: number;
+  total_target?: number;
   custom_timeline_id?: string; // Updated FK
   created_at: string;
   updated_at: string;
@@ -354,6 +356,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
         .map(goal => ({
           ...goal,
           progress: goal.progress ?? 0,
+          weekly_target: 3, // Default weekly target for custom goals
+          total_target: 100, // Default total target for custom goals
           goal_type: 'custom' as const,
           domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
           roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
@@ -420,8 +424,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
   const createCustomGoal = async (goalData: {
     title: string;
     description?: string;
-    start_date?: string;
-    end_date?: string;
+    weekly_target?: number;
+    total_target?: number;
   }, selectedTimeline?: Timeline): Promise<CustomGoal | null> => {
     try {
       const supabase = getSupabaseClient();
@@ -433,8 +437,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
         throw new Error('Timeline required for custom goals');
       }
 
-      const startDate = goalData.start_date || timeline?.start_date;
-      const endDate = goalData.end_date || timeline?.end_date;
+      const startDate = timeline?.start_date;
+      const endDate = timeline?.end_date;
 
       if (!startDate || !endDate) throw new Error('Start date and end date are required for custom goals');
 
@@ -456,7 +460,12 @@ export function useGoals(options: UseGoalsOptions = {}) {
       if (error) throw error;
       await fetchGoals(timeline);
 
-      return { ...data, goal_type: 'custom' };
+      return { 
+        ...data, 
+        goal_type: 'custom',
+        weekly_target: goalData.weekly_target || 3,
+        total_target: goalData.total_target || 100,
+      };
     } catch (error) {
       console.error('Error creating custom goal:', error);
       throw error;

@@ -74,6 +74,8 @@ export function CreateGoalModal({
     title: '',
     description: '',
     notes: '',
+    weeklyTarget: '3',
+    totalTarget: '100',
     selectedRoleIds: [] as string[],
     selectedDomainIds: [] as string[],
     selectedKeyRelationshipIds: [] as string[],
@@ -132,6 +134,8 @@ export function CreateGoalModal({
       title: '',
       description: '',
       notes: '',
+      weeklyTarget: '3',
+      totalTarget: '100',
       selectedRoleIds: [],
       selectedDomainIds: [],
       selectedKeyRelationshipIds: [],
@@ -175,11 +179,15 @@ export function CreateGoalModal({
         goalData = await createTwelveWeekGoal({
           title: formData.title,
           description: formData.description,
+          weekly_target: parseInt(formData.weeklyTarget) || 3,
+          total_target: parseInt(formData.totalTarget) || 36,
         });
       } else {
         goalData = await createCustomGoal({
           title: formData.title,
           description: formData.description,
+          weekly_target: parseInt(formData.weeklyTarget) || 3,
+          total_target: parseInt(formData.totalTarget) || 100,
         }, currentSelectedTimeline);
       }
 

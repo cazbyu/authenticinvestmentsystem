@@ -26,6 +26,8 @@ export interface TaskLog {
   measured_on: string; // YYYY-MM-DD
   week_number: number;
   day_of_week?: number;
+  weekly_target?: number;
+  total_target?: number;
   value: number;
   created_at: string;
   completed?: boolean;
@@ -317,7 +319,12 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
+        goalsData = (data || []).map(goal => ({ 
+          ...goal, 
+          goal_type: 'custom',
+          weekly_target: 3, // Default weekly target for custom goals
+          total_target: 100, // Default total target for custom goals
+        }));
       }
 
       if (goalsData.length === 0) {
@@ -381,8 +388,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       // Progress calculation only for goals with targets
       const goalsWithTargets = transformedGoals.filter(g => 
-        (g.goal_type === '12week' && g.weekly_target && g.total_target) ||
-        (g.goal_type === 'custom')
+        g.weekly_target && g.total_target
       );
       
       if (goalsWithTargets.length > 0) {
@@ -613,7 +619,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           currentWeek,
           daysRemaining,
           weeklyActual,
-          weeklyTarget: goal.goal_type === '12week' ? (goal.weekly_target || 3) : 3,
+          weeklyTarget: goal.weekly_target || 3,
           overallActual: cappedOverallActual,
           overallTarget,
           overallProgress,
