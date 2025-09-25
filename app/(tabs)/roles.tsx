@@ -14,7 +14,7 @@ import { EditKRModal } from '@/components/settings/EditKRModal';
 import { JournalView } from '@/components/journal/JournalView';
 import { getSupabaseClient } from '@/lib/supabase';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
-import { Plus, Users, Edit, UserX, Ban } from 'lucide-react-native';
+import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';

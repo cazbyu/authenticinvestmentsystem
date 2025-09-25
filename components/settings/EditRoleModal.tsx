@@ -11,7 +11,7 @@ import {
   Image,
   ActivityIndicator
 } from 'react-native';
-import { X, Camera, Upload, Trash2, Palette, Plus, Edit } from 'lucide-react-native';
+import { X, Camera, Upload, Trash2, Palette, Plus, CreditCard as Edit } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { EditKRModal } from './EditKRModal';
