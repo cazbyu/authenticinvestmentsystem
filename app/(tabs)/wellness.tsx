@@ -95,7 +95,7 @@ export default function Wellness() {
         // Fetch all tasks/events for this user first
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-          .select('*')
+          .select('*, custom_timeline_id')
           .eq('user_id', user.id)
           .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
