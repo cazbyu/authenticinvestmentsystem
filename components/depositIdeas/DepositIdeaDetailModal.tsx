@@ -69,21 +69,28 @@ export function DepositIdeaDetailModal({
       setNotes(notesList);
     } catch (error) {
       console.error('Error fetching deposit idea notes:', error);
-            try {
-              onActivate(depositIdea);
-              onClose();
-            } catch (error) {
-              console.error('Error in activation:', error);
-            try {
-              onCancel(depositIdea);
-              onClose();
-            } catch (error) {
-              console.error('Error in deletion:', error);
-              onClose();
-            }
       Alert.alert('Error', (error as Error).message);
     } finally {
       setLoadingNotes(false);
+    }
+  };
+
+  const handleActivate = () => {
+    try {
+      onActivate(depositIdea);
+      onClose();
+    } catch (error) {
+      console.error('Error in activation:', error);
+    }
+  };
+
+  const handleDelete = (depositIdea: DepositIdea) => {
+    try {
+      onCancel(depositIdea);
+      onClose();
+    } catch (error) {
+      console.error('Error in deletion:', error);
+      onClose();
     }
   };
 
@@ -220,7 +227,7 @@ export function DepositIdeaDetailModal({
           
           <TouchableOpacity 
             style={[styles.button, styles.activateButton]} 
-            onPress={() => onActivate(depositIdea)}
+            onPress={handleActivate}
           >
             <Play size={16} color="#ffffff" />
             <Text style={styles.buttonText}>Activate as is</Text>
@@ -358,9 +365,6 @@ const styles = StyleSheet.create({
   },
   deleteButton: { 
     backgroundColor: '#dc2626' 
-  },
-  activateButton: { 
-    backgroundColor: '#16a34a' 
   },
   cancelButton: { 
     backgroundColor: '#dc2626' 
