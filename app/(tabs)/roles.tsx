@@ -505,6 +505,23 @@ export default function Roles() {
     }
   };
 
+  const handleActivateDepositIdea = async (depositIdea: any) => {
+    try {
+      // For now, just open the form to create a task based on the deposit idea
+      const editData = {
+        ...depositIdea,
+        type: 'task', // Convert to task
+        title: depositIdea.title,
+        selectedRoleIds: depositIdea.roles?.map(r => r.id) || [],
+        selectedDomainIds: depositIdea.domains?.map(d => d.id) || [],
+        selectedKeyRelationshipIds: depositIdea.keyRelationships?.map(kr => kr.id) || [],
+      };
+      setEditingTask(editData);
+      setTaskFormVisible(true);
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to activate deposit idea.');
+    }
+  };
   const handleTaskDoublePress = (task: Task) => {
     setSelectedTask(task);
     setTaskDetailVisible(true);

@@ -201,15 +201,23 @@ export function DepositIdeaDetailModal({
             onPress={() => onUpdate(depositIdea)}
           >
             <Edit size={16} color="#ffffff" />
-            <Text style={styles.buttonText}>Update/Activate</Text>
+            <Text style={styles.buttonText}>Update</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.button, styles.cancelButton]} 
-            onPress={() => onCancel(depositIdea)}
+            style={[styles.button, styles.activateButton]} 
+            onPress={() => handleActivate(depositIdea)}
+          >
+            <Play size={16} color="#ffffff" />
+            <Text style={styles.buttonText}>Activate</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, styles.deleteButton]} 
+            onPress={() => handleDelete(depositIdea)}
           >
             <Ban size={16} color="#ffffff" />
-            <Text style={styles.buttonText}>Cancel</Text>
+            <Text style={styles.buttonText}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -330,6 +338,12 @@ const styles = StyleSheet.create({
   },
   updateButton: { 
     backgroundColor: '#0078d4' 
+  },
+  activateButton: { 
+    backgroundColor: '#16a34a' 
+  },
+  deleteButton: { 
+    backgroundColor: '#dc2626' 
   },
   activateButton: { 
     backgroundColor: '#16a34a' 
