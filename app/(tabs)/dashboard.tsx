@@ -121,8 +121,8 @@ export default function Dashboard() {
 
         const transformedTasks = currentTasks.map(task => {
           // Derive timeline information for recurring tasks
-          const timeline_id = task.user_global_timeline_id || task.custom_timeline_id;
-          const timeline_source = task.user_global_timeline_id ? 'global' : 'custom';
+          const timeline_id = task.custom_timeline_id || null;
+          const timeline_source = task.is_twelve_week_goal ? 'global' : 'custom';
           
           return {
             ...task,

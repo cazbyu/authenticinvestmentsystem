@@ -427,10 +427,9 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       // Apply conditional timeline FK filter
       if (timeline.source === 'global') {
-        // For global timelines, filter by is_twelve_week_goal flag
-        tasksQuery = tasksQuery.eq('is_twelve_week_goal', true);
+        tasksQuery = tasksQuery.eq('user_global_timeline_id', timeline.id);
       } else {
-        tasksQuery = tasksQuery.eq('custom_timeline_id', timeline.id);
+        tasksQuery = tasksQuery.eq('user_custom_timeline_id', timeline.id);
       }
 
       const { data: tasksData, error: tasksError } = await tasksQuery;
@@ -782,10 +781,8 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       completed_at: new Date().toISOString(),
       parent_task_id: parentTaskId,
       is_twelve_week_goal: selectedTimeline.source === 'global',
-      // Conditional timeline FK injection
-      ...(selectedTimeline.source === 'global'
-        ? { user_global_timeline_id: selectedTimeline.id }
-        : { user_custom_timeline_id: selectedTimeline.id }),
+      // Only set custom_timeline_id for custom timelines
+      ...(selectedTimeline.source === 'custom' ? { custom_timeline_id: selectedTimeline.id } : {}),
     };
 
     const { data: occ, error: oErr } = await supabase
