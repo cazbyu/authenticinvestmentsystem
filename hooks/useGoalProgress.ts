@@ -427,9 +427,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
       // Apply conditional timeline FK filter
       if (timeline.source === 'global') {
-        tasksQuery = tasksQuery.eq('user_global_timeline_id', timeline.id);
+        // For global timelines, filter by is_twelve_week_goal flag
+        tasksQuery = tasksQuery.eq('is_twelve_week_goal', true);
       } else {
-        tasksQuery = tasksQuery.eq('user_custom_timeline_id', timeline.id);
+        tasksQuery = tasksQuery.eq('custom_timeline_id', timeline.id);
       }
 
       const { data: tasksData, error: tasksError } = await tasksQuery;

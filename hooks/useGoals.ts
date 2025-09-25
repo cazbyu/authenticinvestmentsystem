@@ -575,7 +575,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         task_id: taskId,
         week_number: week.weekNumber,
         target_days: week.targetDays,
-        // Conditional timeline FK injection
+        // Conditional timeline FK injection for week plans
         ...(timeline.source === 'global'
           ? { user_global_timeline_id: timeline.id }
           : { user_custom_timeline_id: timeline.id }),
