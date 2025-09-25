@@ -165,7 +165,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
         if (toAdd.length > 0) {
           const inserts = toAdd.map(id => ({
             parent_id: goal.id,
-            parent_type: goal.goal_type === '12week' ? 'goal' : 'custom_goal',
+            parent_type: 'goal',
             [childIdField]: id,
             user_id: user.id,
           }));
@@ -444,7 +444,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
             <View style={styles.confirmContainer}>
               <Text style={styles.confirmTitle}>Delete Goal</Text>
               <Text style={styles.confirmMessage}>
-                Are you sure you want to cancel this goal? This will mark it as cancelled and remove it from your active goals.
+                Are you sure you want to delete this goal? This will mark it as cancelled and remove it from your active goals.
               </Text>
               <View style={styles.confirmActions}>
                 <TouchableOpacity

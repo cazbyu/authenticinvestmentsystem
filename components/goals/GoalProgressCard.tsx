@@ -275,50 +275,6 @@ export function GoalProgressCard({
           </View>
         )}
 
-        {/* Custom Goal Date Range */}
-        {goal.goal_type === 'custom' && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Timeline</Text>
-              <Text style={styles.progressValue}>
-                {(() => {
-                  const startDate = parseLocalDate(goal.start_date);
-                  const endDate = parseLocalDate(goal.end_date);
-                  const now = new Date();
-                  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                    return 'Invalid dates';
-                  }
-                  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                  const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                  return `${daysRemaining}/${totalDays} days`;
-                })()}
-              </Text>
-            </View>
-            
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${(() => {
-                      const startDate = parseLocalDate(goal.start_date);
-                      const endDate = parseLocalDate(goal.end_date);
-                      const now = new Date();
-                      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                        return 0;
-                      }
-                      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                      const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-                      return Math.min(100, (daysPassed / totalDays) * 100);
-                    })()}%`,
-                    backgroundColor: '#0078d4',
-                  }
-                ]}
-              />
-            </View>
-          </View>
-        )}
-
         {/* Week-specific Actions (when week prop is provided) */}
         {shouldRenderWeekActions && week && (
           <View style={styles.weekActionsSection}>
