@@ -228,6 +228,7 @@ export default function Goals() {
     createCustomGoal,
     createTaskWithWeekPlan,
     deleteTask,
+    deleteGoal,
   } = useGoals();
 
   useEffect(() => {
@@ -895,6 +896,7 @@ export default function Goals() {
           fetchAllTimelines();
         }}
         goal={selectedGoal}
+        deleteGoal={deleteGoal}
       />
 
       <ActionEffortModal

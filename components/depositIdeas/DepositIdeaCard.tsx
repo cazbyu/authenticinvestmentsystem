@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { FileText, Paperclip, Users, CreditCard as Edit, Play, Ban } from 'lucide-react-native';
+import { FileText, Paperclip, Users, Edit, Play, Ban } from 'lucide-react-native';
 
 // Interface for a Deposit Idea
 export interface DepositIdea {

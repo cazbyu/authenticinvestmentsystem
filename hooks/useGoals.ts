@@ -649,6 +649,50 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   /* --------------------------------
+   * GOAL DELETION - CENTRALIZED
+   * -------------------------------- */
+  const deleteGoal = async (goalId: string, goalType: '12week' | 'custom'): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Determine the correct table based on goal type
+      const tableName = goalType === '12week' ? DB.GOALS_12WK : DB.GOALS_CUSTOM;
+
+      // Verify goal ownership before deletion
+      const { data: goal, error: goalError } = await supabase
+        .from(tableName)
+        .select('id, user_id')
+        .eq('id', goalId)
+        .single();
+
+      if (goalError) throw goalError;
+      if (!goal || goal.user_id !== user.id) {
+        throw new Error('Goal not found or access denied');
+      }
+
+      // Soft delete the goal by setting status to 'cancelled'
+      const { error: deleteError } = await supabase
+        .from(tableName)
+        .update({ 
+          status: 'cancelled',
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', goalId);
+
+      if (deleteError) throw deleteError;
+
+      console.log('Goal soft deleted successfully:', goalId);
+      
+      // Refresh goals to update the UI
+      await refreshGoals();
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      throw error;
+    }
+  };
+  /* --------------------------------
    * Refresh orchestration
    * -------------------------------- */
   const refreshAllData = async () => {
@@ -696,6 +740,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
     createCustomGoal,
     createTaskWithWeekPlan,
     deleteTask,
+    deleteGoal,
 
     // Data refresh
     refreshGoals,

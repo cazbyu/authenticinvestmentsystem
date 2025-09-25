@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { X, Plus, Users, Target, Trash2, CreditCard as Edit, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { X, Plus, Users, Target, Trash2, Edit, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
 

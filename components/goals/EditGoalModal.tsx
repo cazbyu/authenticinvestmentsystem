@@ -25,7 +25,7 @@ interface EditGoalModalProps {
   goal: TwelveWeekGoal | null;
 }
 
-export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModalProps) {
+export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: EditGoalModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [newNoteText, setNewNoteText] = useState(''); // For adding new notes
@@ -234,71 +234,17 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       setShowConfirmDeleteModal(false);
       console.log('Set saving to true');
       
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
-      console.log('User authenticated:', user.id);
-      
-      // Delete all join table entries for this goal
-      console.log('Deleting join table entries...');
-      await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-      ]);
-      console.log('Join table entries deleted');
+      // Use the soft delete function
+      await deleteGoal(goal.id, goal.goal_type);
+      console.log('Goal soft deleted successfully');
 
-      // Find and delete any tasks linked to this goal
-      console.log('Finding tasks linked to goal...');
-      const { data: goalTaskJoins, error: goalTaskJoinsError } = await supabase
-        .from('0008-ap-universal-goals-join')
-        .select('parent_id')
-        .eq('twelve_wk_goal_id', goal.id)
-        .eq('parent_type', 'task');
-
-      if (goalTaskJoinsError) throw goalTaskJoinsError;
-      console.log('Found linked tasks:', goalTaskJoins);
-
-      const taskIds = goalTaskJoins?.map(gtj => gtj.parent_id) || [];
-      
-      if (taskIds.length > 0) {
-        console.log('Deleting linked tasks and their data...');
-        await Promise.all([
-          supabase.from('0008-ap-task-week-plan').delete().in('task_id', taskIds),
-          supabase.from('0008-ap-task-log').delete().in('task_id', taskIds),
-          supabase.from('0008-ap-universal-roles-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-domains-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-key-relationships-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-notes-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-goals-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-tasks').delete().in('id', taskIds)
-        ]);
-        console.log('Linked tasks deleted');
-      }
-      
-      // Delete any remaining goal joins (deposit ideas, etc.)
-      console.log('Deleting remaining goal joins...');
-      await supabase.from('0008-ap-universal-goals-join').delete().eq('twelve_wk_goal_id', goal.id);
-      console.log('Remaining goal joins deleted');
-      
-      // Now delete the goal itself
-      console.log('Deleting goal itself...');
-      const { error } = await supabase
-        .from('0008-ap-goals-12wk')
-        .delete()
-        .eq('id', goal.id);
-
-      if (error) throw error;
-      console.log('Goal deleted successfully');
-
-      Alert.alert('Success', 'Goal deleted successfully!');
+      Alert.alert('Success', 'Goal cancelled successfully!');
       onUpdate();
       onClose();
     } catch (error) {
       console.error('Error deleting goal:', error);
       console.log('Delete error details:', error);
-      Alert.alert('Error', (error as Error).message || 'Failed to delete goal.');
+      Alert.alert('Error', (error as Error).message || 'Failed to cancel goal.');
     } finally {
       console.log('Setting saving to false');
       setSaving(false);
@@ -498,7 +444,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             <View style={styles.confirmContainer}>
               <Text style={styles.confirmTitle}>Delete Goal</Text>
               <Text style={styles.confirmMessage}>
-                Are you sure you want to delete this goal? This action cannot be undone.
+                Are you sure you want to cancel this goal? This will mark it as cancelled and remove it from your active goals.
               </Text>
               <View style={styles.confirmActions}>
                 <TouchableOpacity
