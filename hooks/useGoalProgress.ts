@@ -585,10 +585,13 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
 
         // Sum targets across all week plans for these tasks with conditional FK
         let weekPlansQuery = supabase
-          .from('0008-ap-task-week-plan')
-          .select('target_days')
-          .in('task_id', taskIds)
-          .eq('user_customer_timeline_id', timeline.id);
+  .from('0008-ap-task-week-plan')
+  .select('target_days')
+  .in('task_id', taskIds)
+  .eq(
+    timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id',
+    timeline.id
+  );
 
         const { data: weekPlansData, error: weekPlansError } = await weekPlansQuery;
         if (weekPlansError) throw weekPlansError;
