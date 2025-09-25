@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { Menu, ArrowUpDown, ChevronLeft, Edit } from 'lucide-react-native';
+import { Menu, ArrowUpDown, ChevronLeft, CreditCard as Edit } from 'lucide-react-native';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
