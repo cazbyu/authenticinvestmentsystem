@@ -327,18 +327,96 @@ export default function Dashboard() {
 
   const handleActivateDepositIdea = async (depositIdea: any) => {
     try {
-      // For now, just open the form to create a task based on the deposit idea
-      const editData = {
-        ...depositIdea,
-        type: 'task', // Convert to task
-        title: depositIdea.title,
-        selectedRoleIds: depositIdea.roles?.map(r => r.id) || [],
-        selectedDomainIds: depositIdea.domains?.map(d => d.id) || [],
-        selectedKeyRelationshipIds: depositIdea.keyRelationships?.map(kr => kr.id) || [],
-      };
-      setEditingTask(editData);
-      setIsFormModalVisible(true);
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not found');
+
+      // Create a new task based on the deposit idea
+      const { data: newTask, error: taskError } = await supabase
+        .from('0008-ap-tasks')
+        .insert({
+          user_id: user.id,
+          title: depositIdea.title,
+          type: 'task',
+          status: 'pending',
+          due_date: formatLocalDate(new Date()),
+          is_authentic_deposit: true,
+        })
+        .select()
+        .single();
+
+      if (taskError) throw taskError;
+
+      const taskId = newTask.id;
+
+      // Copy all the joins from the deposit idea to the new task
+      const joinPromises = [];
+
+      // Copy role joins
+      if (depositIdea.roles && depositIdea.roles.length > 0) {
+        const roleJoins = depositIdea.roles.map(role => ({
+          parent_id: taskId,
+          parent_type: 'task',
+          role_id: role.id,
+          user_id: user.id,
+        }));
+        joinPromises.push(
+          supabase.from('0008-ap-universal-roles-join').insert(roleJoins)
+        );
+      }
+
+      // Copy domain joins
+      if (depositIdea.domains && depositIdea.domains.length > 0) {
+        const domainJoins = depositIdea.domains.map(domain => ({
+          parent_id: taskId,
+          parent_type: 'task',
+          domain_id: domain.id,
+          user_id: user.id,
+        }));
+        joinPromises.push(
+          supabase.from('0008-ap-universal-domains-join').insert(domainJoins)
+        );
+      }
+
+      // Copy key relationship joins
+      if (depositIdea.keyRelationships && depositIdea.keyRelationships.length > 0) {
+        const krJoins = depositIdea.keyRelationships.map(kr => ({
+          parent_id: taskId,
+          parent_type: 'task',
+          key_relationship_id: kr.id,
+          user_id: user.id,
+        }));
+        joinPromises.push(
+          supabase.from('0008-ap-universal-key-relationships-join').insert(krJoins)
+        );
+      }
+
+      // Execute all join insertions
+      if (joinPromises.length > 0) {
+        const joinResults = await Promise.all(joinPromises);
+        for (const result of joinResults) {
+          if (result.error) throw result.error;
+        }
+      }
+
+      // Mark the deposit idea as activated
+      const { error: updateError } = await supabase
+        .from('0008-ap-deposit-ideas')
+        .update({
+          is_active: false,
+          archived: true,
+          activated_at: new Date().toISOString(),
+          activated_task_id: taskId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', depositIdea.id);
+
+      if (updateError) throw updateError;
+
+      Alert.alert('Success', 'Deposit idea has been activated as a task!');
+      fetchData(); // Refresh the task list
     } catch (error) {
+      console.error('Error activating deposit idea:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to activate deposit idea.');
     }
   };
