@@ -588,7 +588,7 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
           .from('0008-ap-task-week-plan')
           .select('target_days')
           .in('task_id', taskIds)
-          .eq('user_cycle_id', timeline.id);
+          .eq('user_customer_timeline_id', timeline.id);
 
         const { data: weekPlansData, error: weekPlansError } = await weekPlansQuery;
         if (weekPlansError) throw weekPlansError;
