@@ -533,10 +533,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
           due_date: null, // Parent tasks should not have a due_date
           is_twelve_week_goal: timeline.source === 'global',
           recurrence_rule: taskData.recurrenceRule,
-          // Conditional timeline FK injection
-          ...(timeline.source === 'global'
-            ? { user_global_timeline_id: timeline.id }
-            : { user_custom_timeline_id: timeline.id }),
+          // Only set custom_timeline_id for custom timelines
+          ...(timeline.source === 'custom' ? { custom_timeline_id: timeline.id } : {}),
         };
 
         const { data: insertedTask, error: taskError } = await supabase
