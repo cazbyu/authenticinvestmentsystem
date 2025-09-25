@@ -152,14 +152,8 @@ export async function fetchGoalActionsForWeek(
       .from('0008-ap-task-week-plan')
       .select('*')
       .in('task_id', taskIds)
-      .eq('week_number', weekNumber);
-
-    // Apply conditional timeline FK filter
-    if (timeline.source === 'global') {
-      weekPlanQuery = weekPlanQuery.eq('user_global_timeline_id', timeline.id);
-    } else {
-      weekPlanQuery = weekPlanQuery.eq('user_custom_timeline_id', timeline.id);
-    }
+      .eq('week_number', weekNumber)
+      .eq('user_cycle_id', timeline.id);
 
     const { data: weekPlansData, error: weekPlansErr } = await weekPlanQuery;
     if (weekPlansErr) {

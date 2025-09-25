@@ -444,14 +444,8 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         .from('0008-ap-task-week-plan')
         .select('*')
         .in('task_id', taskIds)
-        .eq('week_number', weekNumber);
-
-      // Apply conditional timeline FK filter
-      if (timeline.source === 'global') {
-        weekPlanQuery = weekPlanQuery.eq('user_global_timeline_id', timeline.id);
-      } else {
-        weekPlanQuery = weekPlanQuery.eq('user_custom_timeline_id', timeline.id);
-      }
+        .eq('week_number', weekNumber)
+        .eq('user_cycle_id', timeline.id);
 
       const { data: weekPlansData, error: weekPlansError } = await weekPlanQuery;
       if (weekPlansError) throw weekPlansError;
@@ -596,14 +590,8 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         let weekPlansQuery = supabase
           .from('0008-ap-task-week-plan')
           .select('target_days')
-          .in('task_id', taskIds);
-
-        // Apply conditional timeline FK filter
-        if (timeline.source === 'global') {
-          weekPlansQuery = weekPlansQuery.eq('user_global_timeline_id', timeline.id);
-        } else {
-          weekPlansQuery = weekPlansQuery.eq('user_custom_timeline_id', timeline.id);
-        }
+          .in('task_id', taskIds)
+          .eq('user_cycle_id', timeline.id);
 
         const { data: weekPlansData, error: weekPlansError } = await weekPlansQuery;
         if (weekPlansError) throw weekPlansError;
