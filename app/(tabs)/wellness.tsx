@@ -10,7 +10,7 @@ import { JournalView } from '@/components/journal/JournalView';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
+import { Plus, Heart, Edit, UserX, Ban } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
