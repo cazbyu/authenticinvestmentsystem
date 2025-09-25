@@ -808,6 +808,7 @@ export default function Goals() {
                 <Plus size={20} color="#ffffff" />
                 <Text style={styles.createGoalButtonText}>Create Goal</Text>
               </TouchableOpacity>
+            </View>
           ) : (
             timelineGoals.map(goal => {
               const progress = timelineGoalProgress[goal.id] || {
