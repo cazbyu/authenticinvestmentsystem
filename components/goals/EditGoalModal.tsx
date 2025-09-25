@@ -130,32 +130,15 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
 
-      // 1. Update main goal data based on goal type
-      let goalUpdateError;
-      
-      if (goal.goal_type === '12week') {
-        const { error } = await supabase
-          .from('0008-ap-goals-12wk')
-          .update({
-            title: title.trim(),
-            description: description.trim() || null,
-            weekly_target: parseInt(weeklyTarget) || 3,
-            total_target: parseInt(totalTarget) || 36,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', goal.id);
-        goalUpdateError = error;
-      } else {
-        const { error } = await supabase
-          .from('0008-ap-goals-custom')
-          .update({
-            title: title.trim(),
-            description: description.trim() || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', goal.id);
-        goalUpdateError = error;
-      }
+      // 1. Update main goal data
+      const { error: goalUpdateError } = await supabase
+        .from('0008-ap-goals-12wk')
+        .update({
+          title: title.trim(),
+          description: description.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', goal.id);
 
       if (goalUpdateError) throw goalUpdateError;
 
@@ -182,7 +165,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
         if (toAdd.length > 0) {
           const inserts = toAdd.map(id => ({
             parent_id: goal.id,
-            parent_type: 'goal',
+            parent_type: goal.goal_type === '12week' ? 'goal' : 'custom_goal',
             [childIdField]: id,
             user_id: user.id,
           }));
