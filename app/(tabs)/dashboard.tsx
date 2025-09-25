@@ -480,6 +480,7 @@ export default function Dashboard() {
         onClose={() => setIsDepositIdeaDetailVisible(false)} 
         onUpdate={handleUpdateDepositIdea}
         onCancel={handleCancelDepositIdea}
+        onActivate={handleActivateDepositIdea}
       />
       <Modal visible={isSortModalVisible} transparent animationType="fade" onRequestClose={() => setIsSortModalVisible(false)}>
         <View style={styles.modalOverlay}>
