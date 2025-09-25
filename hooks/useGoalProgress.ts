@@ -440,14 +440,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
       const taskIds = tasksData.map(t => t.id);
      
       // Fetch week plans for this specific week with conditional FK
-      let weekPlanQuery = supabase
+      const { data: weekPlansData, error: weekPlansError } = await supabase
         .from('0008-ap-task-week-plan')
         .select('*')
         .in('task_id', taskIds)
-        .eq('week_number', weekNumber)
-        .eq('user_cycle_id', timeline.id);
-
-      const { data: weekPlansData, error: weekPlansError } = await weekPlanQuery;
       if (weekPlansError) throw weekPlansError;
 
       // Get the week date range
