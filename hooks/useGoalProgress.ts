@@ -583,13 +583,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         const { data: overallOccurrences } = await overallQuery;
 
         // Sum targets across all week plans for these tasks with conditional FK
-        let weekPlansQuery = supabase
+        const { data: weekPlansData, error: weekPlansError } = await supabase
           .from('0008-ap-task-week-plan')
           .select('target_days')
           .in('task_id', taskIds)
-          .eq('user_cycle_id', timeline.id);
-
-        const { data: weekPlansData, error: weekPlansError } = await weekPlansQuery;
         if (weekPlansError) throw weekPlansError;
 
         const overallActual = overallOccurrences?.length || 0;
