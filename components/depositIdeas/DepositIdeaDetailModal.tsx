@@ -69,8 +69,18 @@ export function DepositIdeaDetailModal({
       setNotes(notesList);
     } catch (error) {
       console.error('Error fetching deposit idea notes:', error);
-            onClose(); // Close the modal after activation
-            onClose(); // Close the modal after deletion
+            try {
+              onActivate(depositIdea);
+              onClose();
+            } catch (error) {
+              console.error('Error in activation:', error);
+            try {
+              onCancel(depositIdea);
+              onClose();
+            } catch (error) {
+              console.error('Error in deletion:', error);
+              onClose();
+            }
       Alert.alert('Error', (error as Error).message);
     } finally {
       setLoadingNotes(false);
