@@ -711,6 +711,69 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
               />
             </View>
 
+            {/* Form Type Pills */}
+            <View style={styles.formTypePills}>
+              <TouchableOpacity
+                style={[
+                  styles.formTypePill,
+                  formType === 'task' && styles.activeFormTypePill
+                ]}
+                onPress={() => setFormType('task')}
+              >
+                <Text style={[
+                  styles.formTypePillText,
+                  formType === 'task' && styles.activeFormTypePillText
+                ]}>
+                  Task
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.formTypePill,
+                  formType === 'event' && styles.activeFormTypePill
+                ]}
+                onPress={() => setFormType('event')}
+              >
+                <Text style={[
+                  styles.formTypePillText,
+                  formType === 'event' && styles.activeFormTypePillText
+                ]}>
+                  Event
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.formTypePill,
+                  formType === 'depositIdea' && styles.activeFormTypePill
+                ]}
+                onPress={() => setFormType('depositIdea')}
+              >
+                <Text style={[
+                  styles.formTypePillText,
+                  formType === 'depositIdea' && styles.activeFormTypePillText
+                ]}>
+                  Deposit Idea
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.formTypePill,
+                  formType === 'withdrawal' && styles.activeFormTypePill
+                ]}
+                onPress={() => setFormType('withdrawal')}
+              >
+                <Text style={[
+                  styles.formTypePillText,
+                  formType === 'withdrawal' && styles.activeFormTypePillText
+                ]}>
+                  Withdrawal
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Goal Selection */}
             {(formData.type === 'task' || formData.type === 'event') && (
               <View style={styles.field}>
@@ -1651,5 +1714,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+  },
+  formTypeSelector: {
+    marginBottom: 24,
+  },
+  formTypePills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 24,
+  },
+  formTypePill: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  activeFormTypePill: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  formTypePillText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeFormTypePillText: {
+    color: '#ffffff',
+  },
+  goalToggleContainer: {
+    marginBottom: 24,
   },
 });
