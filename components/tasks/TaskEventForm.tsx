@@ -15,6 +15,12 @@ interface TaskEventFormProps {
 interface Role { id: string; label: string; }
 interface Domain { id: string; name: string; }
 interface KeyRelationship { id: string; name: string; role_id: string; }
+type UnifiedGoal = {
+  id: string;
+  title: string;
+  goal_type: "twelve_wk_goal" | "custom_goal";
+};
+
 interface TwelveWeekGoal { id: string; title: string; }
 
 // CUSTOM DAY COMPONENT for CALENDAR
@@ -123,14 +129,18 @@ const [selectedRecurrenceDays, setSelectedRecurrenceDays] = useState<string[]>([
 const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | null>(null);
 const [isRecurrenceModalVisible, setIsRecurrenceModalVisible] = useState(false);
 const [activeCalendarField, setActiveCalendarField] = useState<'start' | 'end'>('start');
-  const [dateInputValue, setDateInputValue] = useState('');
-  const [withdrawalDateInputValue, setWithdrawalDateInputValue] = useState('');
-  const [activeTimeField, setActiveTimeField] = useState<'time' | 'startTime' | 'endTime' | null>(null);
+const [dateInputValue, setDateInputValue] = useState('');
+const [withdrawalDateInputValue, setWithdrawalDateInputValue] = useState('');
+const [activeTimeField, setActiveTimeField] = useState<'time' | 'startTime' | 'endTime' | null>(null);
+const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
+const [withdrawalDatePickerPosition, setWithdrawalDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
+const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
-  const [datePickerPosition, setDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [withdrawalDatePickerPosition, setWithdrawalDatePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
-
+// --- Goal linking (new) ---
+const [allAvailableGoals, setAllAvailableGoals] = useState<UnifiedGoal[]>([]);
+const [selectedGoal, setSelectedGoal] = useState<UnifiedGoal | null>(null);
+const [goalDropdownOpen, setGoalDropdownOpen] = useState(false);
+  
   const generateTimeOptions = () => {
     const times = [];
     for (let hour = 0; hour < 24; hour++) {
