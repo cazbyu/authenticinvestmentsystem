@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch
 import { Calendar } from 'react-native-calendars';
 import { X, Calendar as CalendarIcon, Clock, Target, Users, FileText, Plus, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { Repeat } from 'lucide-react-native';
+import { TaskWithLogs } from '@/hooks/fetchGoalActionsForWeek';
 
 // TYPE DEFINITIONS
 interface TaskEventFormProps {
@@ -1037,6 +1038,7 @@ if (formData.schedulingType === 'task') {
 
   // Goal recurrence info states
   const [goalActionEfforts, setGoalActionEfforts] = useState<ActionEffort[]>([]);
+  const [goalActionEfforts, setGoalActionEfforts] = useState<TaskWithLogs[]>([]);
   const [goalCycleWeeks, setGoalCycleWeeks] = useState<CycleWeek[]>([]);
   const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
   const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
