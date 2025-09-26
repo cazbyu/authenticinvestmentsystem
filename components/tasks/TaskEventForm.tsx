@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Modal, FlatList } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { getSupabaseClient } from "@/lib/supabase";
+import { X, Calendar as CalendarIcon, Clock, Target, Users, FileText, Plus, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { X, Repeat} from 'lucide-react-native';
-import { parseRRule } from '@/lib/recurrenceUtils';
 
 // TYPE DEFINITIONS
 interface TaskEventFormProps {
@@ -13,7 +12,8 @@ interface TaskEventFormProps {
   onClose: () => void;
 }
 
-interface Role { id: string; label: string; }
+import { parseRRule } from '@/lib/recurrenceUtils';
+import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
 interface Domain { id: string; name: string; }
 interface KeyRelationship { id: string; name: string; role_id: string; }
 type UnifiedGoal = {
@@ -22,6 +22,9 @@ type UnifiedGoal = {
   goal_type: "twelve_wk_goal" | "custom_goal";
   timeline_id?: string;
   timeline_source?: 'global' | 'custom';
+  roles?: Array<{id: string; label: string; color?: string}>;
+  domains?: Array<{id: string; name: string}>;
+  keyRelationships?: Array<{id: string; name: string}>;
 };
 
 interface TwelveWeekGoal { id: string; title: string; }
@@ -1032,6 +1035,14 @@ if (formData.schedulingType === 'task') {
                         </TouchableOpacity>
                       </View>
 
+  // Goal recurrence info states
+  const [goalActionEfforts, setGoalActionEfforts] = useState<ActionEffort[]>([]);
+  const [goalCycleWeeks, setGoalCycleWeeks] = useState<CycleWeek[]>([]);
+  const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
+  const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
+  const [recurrenceType, setRecurrenceType] = useState('daily');
+  const [selectedCustomDays, setSelectedCustomDays] = useState<number[]>([]);
+
                       <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
                         <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
                         <Text style={styles.anytimeLabel}>Anytime</Text>
@@ -1040,6 +1051,9 @@ if (formData.schedulingType === 'task') {
 
 {/* Repeat (Recurrence) controls for TASKS */}
 {formData.schedulingType === 'task' && formData.selectedGoalIds.length === 0 && (
+  // Get selected goal object
+  const selectedGoal = availableGoals.find(goal => goal.id === formData.selectedGoalId);
+
 <View style={{ marginTop: 12 }}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
     <Text style={styles.compactSectionTitle}>Repeat</Text>
@@ -1047,6 +1061,20 @@ if (formData.schedulingType === 'task') {
       value={isRepeating}
       onValueChange={(value) => {
         setIsRepeating(value);
+  // Fetch goal action efforts and weeks when a goal is selected
+  useEffect(() => {
+    if (formData.selectedGoalId && selectedGoal) {
+      fetchGoalActionEffortsAndWeeks(selectedGoal);
+    } else {
+      setGoalActionEfforts([]);
+      setGoalCycleWeeks([]);
+      setSelectedWeeks([]);
+      setRecurrenceType('daily');
+      setSelectedCustomDays([]);
+      setLoadingGoalRecurrenceInfo(false);
+    }
+  }, [formData.selectedGoalId, selectedGoal]);
+
         if (value) {
           setIsRecurrenceModalVisible(true);
         } else {
@@ -1065,7 +1093,7 @@ if (formData.schedulingType === 'task') {
     >
       <Text style={styles.recurrenceButtonText}>
         {getRecurrenceDisplayText()}
-      </Text>
+      selectedGoalId: initialData.selectedGoalId || '',
     </TouchableOpacity>
   )}
 </View>
@@ -1110,9 +1138,23 @@ if (formData.schedulingType === 'task') {
       value={endDateInputValue}
       onChangeText={handleEndDateInputChange}
       editable={false}
-    />
+        .select(`
+          id, title, user_global_timeline_id, custom_timeline_id,
+          goal_roles:0008-ap-universal-roles-join(
+            role:0008-ap-roles(id, label, color)
+          ),
+          goal_domains:0008-ap-universal-domains-join(
+            domain:0008-ap-domains(id, name)
+          ),
+          goal_key_relationships:0008-ap-universal-key-relationships-join(
+            key_relationship:0008-ap-key-relationships(id, name)
+          )
+        `)
   </TouchableOpacity>
 </View>
+        .eq('0008-ap-universal-roles-join.parent_type', 'goal')
+        .eq('0008-ap-universal-domains-join.parent_type', 'goal')
+        .eq('0008-ap-universal-key-relationships-join.parent_type', 'goal')
                       </View>
 
                       <View>
@@ -1122,15 +1164,34 @@ if (formData.schedulingType === 'task') {
                           onPress={() => {
                             startTimeInputRef.current?.measure((_, __, w, h, px, py) => {
                               setTimePickerPosition({ x: px, y: py, width: w, height: h });
+          timeline_id: goal.user_global_timeline_id || goal.custom_timeline_id,
+          timeline_source: goal.user_global_timeline_id ? 'global' as const : 'custom' as const,
+          roles: goal.goal_roles?.map(gr => gr.role).filter(Boolean) || [],
+          domains: goal.goal_domains?.map(gd => gd.domain).filter(Boolean) || [],
+          keyRelationships: goal.goal_key_relationships?.map(gkr => gkr.key_relationship).filter(Boolean) || [],
                               setActiveTimeField('startTime');
                               setShowTimePicker(true);
                             });
                           }}
                           disabled={formData.isAnytime}
                         >
-                          <Text style={[styles.compactInputLabel, formData.isAnytime && styles.disabledText]}>Start</Text>
+        .select(`
+          id, title, custom_timeline_id,
+          goal_roles:0008-ap-universal-roles-join(
+            role:0008-ap-roles(id, label, color)
+          ),
+          goal_domains:0008-ap-universal-domains-join(
+            domain:0008-ap-domains(id, name)
+          ),
+          goal_key_relationships:0008-ap-universal-key-relationships-join(
+            key_relationship:0008-ap-key-relationships(id, name)
+          )
+        `)
                           <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.startTime}</Text>
                         </TouchableOpacity>
+        .eq('0008-ap-universal-roles-join.parent_type', 'custom_goal')
+        .eq('0008-ap-universal-domains-join.parent_type', 'custom_goal')
+        .eq('0008-ap-universal-key-relationships-join.parent_type', 'custom_goal')
                       </View>
 
                       <View>
@@ -1140,6 +1201,11 @@ if (formData.schedulingType === 'task') {
                           onPress={() => {
                             endTimeInputRef.current?.measure((_, __, w, h, px, py) => {
                               setTimePickerPosition({ x: px, y: py, width: w, height: h });
+          timeline_id: goal.custom_timeline_id,
+          timeline_source: 'custom' as const,
+          roles: goal.goal_roles?.map(gr => gr.role).filter(Boolean) || [],
+          domains: goal.goal_domains?.map(gd => gd.domain).filter(Boolean) || [],
+          keyRelationships: goal.goal_key_relationships?.map(gkr => gkr.key_relationship).filter(Boolean) || [],
                               setActiveTimeField('endTime');
                               setShowTimePicker(true);
                             });
@@ -1150,18 +1216,112 @@ if (formData.schedulingType === 'task') {
                           <Text style={[styles.compactInputValue, formData.isAnytime && styles.disabledText]}>{formData.endTime}</Text>
                         </TouchableOpacity>
                       </View>
+  const fetchGoalActionEffortsAndWeeks = useCallback(async (goal: UnifiedGoal) => {
+    if (!goal.timeline_id) return;
+
+    setLoadingGoalRecurrenceInfo(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch tasks linked to this goal
+      const goalFilter = goal.goal_type === '12week' 
+        ? `twelve_wk_goal_id.eq.${goal.id}`
+        : `custom_goal_id.eq.${goal.id}`;
+
+      const { data: goalJoins, error: joinsError } = await supabase
+        .from('0008-ap-universal-goals-join')
+        .select('parent_id')
+        .or(goalFilter)
+        .eq('parent_type', 'task');
+
+      if (joinsError) throw joinsError;
+
+      const taskIds = goalJoins?.map(j => j.parent_id) || [];
+
+      if (taskIds.length === 0) {
+        setGoalActionEfforts([]);
+        setGoalCycleWeeks([]);
+        return;
+      }
+
+      // Fetch action effort tasks (input_kind = 'count')
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('0008-ap-tasks')
+        .select('id, title, recurrence_rule')
+        .eq('user_id', user.id)
+        .in('id', taskIds)
+        .eq('input_kind', 'count')
+        .not('status', 'in', '(completed,cancelled)');
+
+      if (tasksError) throw tasksError;
+
+      if (!tasksData || tasksData.length === 0) {
+        setGoalActionEfforts([]);
+        setGoalCycleWeeks([]);
+        return;
+      }
+
+      // Fetch week plans for these tasks
+      const { data: weekPlansData, error: weekPlansError } = await supabase
+        .from('0008-ap-task-week-plan')
+        .select('task_id, week_number, target_days')
+        .in('task_id', tasksData.map(t => t.id));
+
+      if (weekPlansError) throw weekPlansError;
+
+      // Combine tasks with their week plans
+      const actionEfforts: ActionEffort[] = tasksData.map(task => ({
+        id: task.id,
+        title: task.title,
+        recurrence_rule: task.recurrence_rule,
+        weekPlans: weekPlansData?.filter(wp => wp.task_id === task.id) || [],
+      }));
+
+      setGoalActionEfforts(actionEfforts);
+
+      // Fetch cycle weeks for the timeline
+      const { data: cycleWeeksData, error: cycleWeeksError } = await supabase
+        .from('v_unified_timeline_weeks')
+        .select('week_number, week_start, week_end')
+        .eq('timeline_id', goal.timeline_id)
+        .eq('source', goal.timeline_source)
+        .order('week_number');
+
+      if (cycleWeeksError) throw cycleWeeksError;
+
+      setGoalCycleWeeks(cycleWeeksData || []);
+
+      // Pre-fill roles, domains, and key relationships from goal
+      setFormData(prev => ({
+        ...prev,
+        selectedRoleIds: goal.roles?.map(r => r.id) || [],
+        selectedDomainIds: goal.domains?.map(d => d.id) || [],
+        selectedKeyRelationshipIds: goal.keyRelationships?.map(kr => kr.id) || [],
+      }));
+
+    } catch (error) {
+      console.error('Error fetching goal action efforts:', error);
+      setGoalActionEfforts([]);
+      setGoalCycleWeeks([]);
+    } finally {
+      setLoadingGoalRecurrenceInfo(false);
+    }
+  }, []);
+
 
                       <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
                         <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
                         <Text style={styles.anytimeLabel}>Anytime</Text>
                       </TouchableOpacity>
-                    </View>
+                            formData.selectedGoalId === goal.id && styles.selectedGoalOption
 
 {/* Repeat (Recurrence) controls */}
 {formData.schedulingType === 'event' && formData.selectedGoalIds.length === 0 && (
 <View style={{ marginTop: 12 }}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-    <Text style={styles.compactSectionTitle}>Repeat</Text>
+                            formData.selectedGoalId === goal.id && styles.selectedGoalOptionText
     <Switch
       value={isRepeating}
       onValueChange={(value) => {
@@ -1173,11 +1333,125 @@ if (formData.schedulingType === 'task') {
   </View>
   {isRepeating && (
     <TouchableOpacity
+
+                {/* Goal Action Plan Information */}
+                {formData.selectedGoalId && selectedGoal && (
+                  <View style={styles.goalActionPlanSection}>
+                    <Text style={styles.goalActionPlanTitle}>Goal Action Plan</Text>
+                    
+                    {loadingGoalRecurrenceInfo ? (
+                      <View style={styles.loadingGoalInfo}>
+                        <ActivityIndicator size="small" color="#0078d4" />
+                        <Text style={styles.loadingGoalInfoText}>Loading action plan...</Text>
+                      </View>
+                    ) : (
+                      <>
+                        {goalActionEfforts.length > 0 && (
+                          <View style={styles.goalInfoCard}>
+                            <Text style={styles.goalInfoLabel}>Planned Actions</Text>
+                            <Text style={styles.goalInfoValue}>
+                              {goalActionEfforts.length} action{goalActionEfforts.length !== 1 ? 's' : ''}
+                            </Text>
+                            
+                            <Text style={styles.goalInfoLabel}>Frequency</Text>
+                            <Text style={styles.goalInfoValue}>
+                              {getRecurrenceSummary(goalActionEfforts)}
+                            </Text>
+                            
+                            {goalCycleWeeks.length > 0 && (
+                              <>
+                                <Text style={styles.goalInfoLabel}>Weeks</Text>
+                                <Text style={styles.goalInfoValue}>
+                                  {summarizeWeeks(goalCycleWeeks)} ({goalCycleWeeks.length} total)
+                                </Text>
+                              </>
+                            )}
+                          </View>
+                        )}
+
+                        {/* Week Selection for Goal Actions */}
+                        {goalCycleWeeks.length > 0 && (
+                          <View style={styles.field}>
+                            <Text style={styles.label}>Select Weeks for This Task</Text>
+                            <View style={styles.weekSelector}>
+                              <TouchableOpacity
+                                style={[styles.weekButton, selectedWeeks.length === goalCycleWeeks.length && styles.weekButtonSelected]}
+                                onPress={handleSelectAllWeeks}
+                              >
+                                <Text style={[styles.weekButtonText, selectedWeeks.length === goalCycleWeeks.length && styles.weekButtonTextSelected]}>
+                                  Select All
+                                </Text>
+                              </TouchableOpacity>
+
+                              {goalCycleWeeks.map(weekData => (
+                                <TouchableOpacity
+                                  key={weekData.week_number}
+                                  style={[styles.weekButton, selectedWeeks.includes(weekData.week_number) && styles.weekButtonSelected]}
+                                  onPress={() => handleWeekToggle(weekData.week_number)}
+                                >
+                                  <Text style={[styles.weekButtonText, selectedWeeks.includes(weekData.week_number) && styles.weekButtonTextSelected]}>
+                                    Week {weekData.week_number}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Frequency Selection for Goal Actions */}
+                        {formData.selectedGoalId && (
+                          <View style={styles.field}>
+                            <Text style={styles.label}>Frequency per week</Text>
+                            <View style={styles.frequencySelector}>
+                              {['daily', '6days', '5days', '4days', '3days', '2days', '1day', 'custom'].map(type => (
+                                <TouchableOpacity
+                                  key={type}
+                                  style={[styles.frequencyButton, recurrenceType === type && styles.frequencyButtonSelected]}
+                                  onPress={() => handleRecurrenceSelect(type)}
+                                >
+                                  <Text style={[styles.frequencyButtonText, recurrenceType === type && styles.frequencyButtonTextSelected]}>
+                                    {getRecurrenceLabel(type)}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Custom Days Selection */}
+                        {recurrenceType === 'custom' && formData.selectedGoalId && (
+                          <View style={styles.field}>
+                            <Text style={styles.label}>Select Days</Text>
+                            <View style={styles.customDaysSelector}>
+                              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => (
+                                <TouchableOpacity
+                                  key={index}
+                                  style={[
+                                    styles.customDayButton,
+                                    selectedCustomDays.includes(index) && styles.customDayButtonSelected
+                                  ]}
+                                  onPress={() => handleCustomDayToggle(index)}
+                                >
+                                  <Text style={[
+                                    styles.customDayButtonText,
+                                    selectedCustomDays.includes(index) && styles.customDayButtonTextSelected
+                                  ]}>
+                                    {dayName}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
       style={styles.recurrenceButton}
       onPress={() => setIsRecurrenceModalVisible(true)}
     >
       <Text style={styles.recurrenceButtonText}>
-        {getRecurrenceDisplayText()}
+            {formData.schedulingType === 'task' && formData.selectedGoalId.length === 0 && (
       </Text>
     </TouchableOpacity>
   )}
@@ -1204,6 +1478,103 @@ if (formData.schedulingType === 'task') {
         onPress={() => {
           setFormData((prev) => {
             const next = isSelected
+  // Helper functions for goal recurrence display
+  const summarizeWeeks = (weeks: { week_number: number }[]): string => {
+    if (weeks.length === 0) return 'No weeks';
+    
+    const sortedWeeks = weeks.map(w => w.week_number).sort((a, b) => a - b);
+    const ranges: string[] = [];
+    let start = sortedWeeks[0];
+    let end = start;
+    
+    for (let i = 1; i < sortedWeeks.length; i++) {
+      if (sortedWeeks[i] === end + 1) {
+        end = sortedWeeks[i];
+      } else {
+        ranges.push(start === end ? `${start}` : `${start}-${end}`);
+        start = end = sortedWeeks[i];
+      }
+    }
+    ranges.push(start === end ? `${start}` : `${start}-${end}`);
+    
+    return ranges.join(', ');
+  };
+
+  const getRecurrenceSummary = (actions: ActionEffort[]): string => {
+    if (actions.length === 0) return 'No actions';
+    
+    const frequencies = new Set<string>();
+    
+    actions.forEach(action => {
+      if (action.recurrence_rule) {
+        const rule = parseRRule(action.recurrence_rule);
+        if (rule) {
+          if (rule.freq === 'DAILY') {
+            frequencies.add('Daily');
+          } else if (rule.freq === 'WEEKLY' && rule.byday) {
+            if (rule.byday.length === 7) {
+              frequencies.add('Daily');
+            } else if (rule.byday.length === 5 && rule.byday.every(d => ['MO', 'TU', 'WE', 'TH', 'FR'].includes(d))) {
+              frequencies.add('Weekdays');
+            } else {
+              frequencies.add(`Custom (${rule.byday.join(', ')})`);
+            }
+          } else {
+            frequencies.add('Custom');
+          }
+        }
+      }
+    });
+    
+    return Array.from(frequencies).join(', ') || 'Custom';
+  };
+
+  const getRecurrenceLabel = (type: string) => {
+    switch (type) {
+      case 'daily': return 'Daily';
+      case '6days': return '6 days a week';
+      case '5days': return '5 days a week';
+      case '4days': return '4 days a week';
+      case '3days': return '3 days a week';
+      case '2days': return 'Twice a week';
+      case '1day': return 'Once a week';
+      case 'custom': return 'Custom';
+      default: return 'Custom';
+    }
+  };
+
+  const handleWeekToggle = (weekNumber: number) => {
+    setSelectedWeeks(prev => 
+      prev.includes(weekNumber)
+        ? prev.filter(w => w !== weekNumber)
+        : [...prev, weekNumber]
+    );
+  };
+
+  const handleSelectAllWeeks = () => {
+    const allWeekNumbers = goalCycleWeeks.map(w => w.week_number);
+    if (selectedWeeks.length === allWeekNumbers.length) {
+      setSelectedWeeks([]);
+    } else {
+      setSelectedWeeks(allWeekNumbers);
+    }
+  };
+
+  const handleRecurrenceSelect = (type: string) => {
+    setRecurrenceType(type);
+    if (type !== 'custom') {
+      setSelectedCustomDays([]);
+    }
+  };
+
+  const handleCustomDayToggle = (dayIndex: number) => {
+    setSelectedCustomDays(prev => 
+      prev.includes(dayIndex)
+        ? prev.filter(d => d !== dayIndex)
+        : [...prev, dayIndex]
+    );
+  };
+
               ? prev.selectedGoalIds.filter((id) => id !== g.id)
               : [...prev.selectedGoalIds, g.id];
             const nextSelectedGoalId =
@@ -1214,14 +1585,11 @@ if (formData.schedulingType === 'task') {
               ...prev,
               selectedGoalIds: next,
               selectedGoalId: nextSelectedGoalId,
-            };
-          });
-        }}
-      >
-        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-          {isSelected && <Text style={styles.checkmark}>✓</Text>}
-        </View>
-        <Text style={styles.checkLabel}>
+            {formData.schedulingType === 'event' && formData.selectedGoalId.length === 0 && (
+    setFormData(prev => ({
+      ...prev,
+      selectedGoalId: prev.selectedGoalId === goalId ? '' : goalId
+    }));
           {g.title} {g.goal_type === "custom_goal" ? "(Custom)" : "(12-Week)"}
         </Text>
       </TouchableOpacity>
@@ -1293,7 +1661,7 @@ if (formData.schedulingType === 'task') {
                 const isSelected = formData.selectedRoleIds.includes(role.id);
                 return (
                   <TouchableOpacity
-                    key={role.id}
+      recurrence_rule: formData.selectedGoalId ? null : generateRecurrenceRule(),
                     style={styles.checkItem}
                     onPress={() => handleMultiSelect('selectedRoleIds', role.id)}
                   >
@@ -1356,6 +1724,7 @@ if (formData.schedulingType === 'task') {
         </View>
 
         {/* Pop-up Mini Calendar Modal */}
+                  const isFromGoal = selectedGoal?.roles?.some(gr => gr.id === role.id);
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
             <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}>
@@ -1365,7 +1734,13 @@ if (formData.schedulingType === 'task') {
   markedDates={{
     [toDateString(
       activeCalendarField === 'end'
-        ? ((formData as any).eventEndDate || formData.dueDate)
+                      <Text style={[
+                        styles.checkLabel,
+                        isFromGoal && styles.inheritedLabel
+                      ]}>
+                        {role.label}
+                        {isFromGoal && ' (from goal)'}
+                      </Text>
         : formData.dueDate
     )]: { selected: true }
   }}
@@ -1373,22 +1748,29 @@ if (formData.schedulingType === 'task') {
   hideExtraDays={true}
 />
 
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* Pop-up Withdrawal Calendar Modal */}
-        <Modal transparent visible={showWithdrawalCalendar} onRequestClose={() => setShowWithdrawalCalendar(false)}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowWithdrawalCalendar(false)}>
-            <View style={[styles.calendarPopup, { top: withdrawalDatePickerPosition.y + withdrawalDatePickerPosition.height, left: withdrawalDatePickerPosition.x }]}>
-              <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
-                <Calendar
-                  onDayPress={onWithdrawalCalendarDayPress}
-                  markedDates={{ [toDateString(formData.withdrawalDate)]: { selected: true } }}
+    if (formData.selectedGoalId) {
+      const goal = availableGoals.find(g => g.id === formData.selectedGoalId);
+      if (goal) {
+        const goalJoin = {
+          parent_id: taskId,
+          parent_type: 'task',
+                    const isFromGoal = selectedGoal?.keyRelationships?.some(gkr => gkr.id === kr.id);
+          goal_type: goal.goal_type === '12week' ? 'twelve_wk_goal' : 'custom_goal',
+          twelve_wk_goal_id: goal.goal_type === '12week' ? formData.selectedGoalId : null,
+          custom_goal_id: goal.goal_type === 'custom' ? formData.selectedGoalId : null,
+          user_id: user.id,
+        };
+        insertPromises.push(supabase.from('0008-ap-universal-goals-join').insert([goalJoin]));
+      }
                   dayComponent={CustomDayComponent}
                   hideExtraDays={true}
-                />
+                        <Text style={[
+                          styles.checkLabel,
+                          isFromGoal && styles.inheritedLabel
+                        ]}>
+                          {kr.name}
+                          {isFromGoal && ' (from goal)'}
+                        </Text>
               </ScrollView>
             </View>
           </TouchableOpacity>
@@ -1402,6 +1784,7 @@ if (formData.schedulingType === 'task') {
   ref={timeListRef}
   data={timeOptions}
   keyExtractor={(item) => item}
+                  const isFromGoal = selectedGoal?.domains?.some(gd => gd.id === domain.id);
   getItemLayout={(_, index) => ({
     length: TIME_ROW_HEIGHT,
     offset: TIME_ROW_HEIGHT * index,
@@ -1411,7 +1794,13 @@ if (formData.schedulingType === 'task') {
     const currentValue = activeTimeField ? (formData as any)[activeTimeField] : null;
     const idx = currentValue ? timeOptions.indexOf(currentValue) : -1;
     return idx >= 0 ? idx : 0;
-  })()}
+                      <Text style={[
+                        styles.checkLabel,
+                        isFromGoal && styles.inheritedLabel
+                      ]}>
+                        {domain.name}
+                        {isFromGoal && ' (from goal)'}
+                      </Text>
   renderItem={({ item }) => {
     const label = activeTimeField === 'endTime'
       ? `${item} (${getDurationLabel(formData.startTime, item)})`
@@ -1454,6 +1843,22 @@ if (formData.schedulingType === 'task') {
 };
 
 
+interface ActionEffort {
+  id: string;
+  title: string;
+  recurrence_rule?: string;
+  weekPlans: Array<{
+    week_number: number;
+    target_days: number;
+  }>;
+}
+
+interface CycleWeek {
+  week_number: number;
+  week_start: string;
+  week_end: string;
+}
+
 
 /** Recurrence Settings Modal (inline) */
 interface RecurrenceSettingsModalProps {
@@ -1480,7 +1885,7 @@ function RecurrenceSettingsModal({ visible, onClose, onSave, initialSettings }: 
   const toggleDay = (day: string) => {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
-
+    selectedGoalId: '' as string,
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.recurrenceContainer}>
@@ -1681,6 +2086,33 @@ const styles = StyleSheet.create({
      fontStyle: 'italic',
    },
    chipsContainer: {
+  customDaysSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  customDayButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  customDayButtonSelected: {
+    backgroundColor: '#1f2937',
+    borderColor: '#1f2937',
+  },
+  customDayButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  customDayButtonTextSelected: {
+    color: '#ffffff',
+  },
      flexDirection: 'row',
      flexWrap: 'wrap',
      gap: 8,
@@ -1718,6 +2150,80 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 12,
     color: '#6b7280',
+  },
+  goalActionPlanSection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  goalActionPlanTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  loadingGoalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  loadingGoalInfoText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  goalInfoCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  goalInfoLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 4,
+    marginTop: 8,
+  },
+  goalInfoValue: {
+    fontSize: 14,
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  weekSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  inheritedLabel: {
+    fontWeight: '600',
+    color: '#0078d4',
+  },
+  },
+  weekButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  weekButtonSelected: {
+    backgroundColor: '#1f2937',
+    borderColor: '#1f2937',
+  },
+  weekButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  weekButtonTextSelected: {
+    color: '#ffffff',
   },
 
 
