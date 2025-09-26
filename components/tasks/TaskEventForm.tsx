@@ -1052,12 +1052,12 @@ if (formData.schedulingType === 'task') {
                       </View>
 
   // Goal recurrence info states
-  const [goalActionEfforts, setGoalActionEfforts] = useState([] as ActionEffort[]);
+const [goalActionEfforts, setGoalActionEfforts] = useState([] as ActionEffort[]);
 const [goalCycleWeeks, setGoalCycleWeeks] = useState([] as CycleWeek[]);
 const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
 const [selectedWeeks, setSelectedWeeks] = useState([] as number[]);
-  const [recurrenceType, setRecurrenceType] = useState('daily');
-  const [selectedCustomDays, setSelectedCustomDays] = useState<number[]>([]);
+const [recurrenceType, setRecurrenceType] = useState<'daily' | 'weekly' | 'custom'>('daily');
+const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
 
                       <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
                         <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
