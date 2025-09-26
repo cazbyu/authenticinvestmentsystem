@@ -1052,10 +1052,10 @@ if (formData.schedulingType === 'task') {
                       </View>
 
   // Goal recurrence info states
-  const [goalActionEfforts, setGoalActionEfforts] = useState<ActionEffort[]>([]);
-  const [goalCycleWeeks, setGoalCycleWeeks] = useState<CycleWeek[]>([]);
-  const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
-  const [selectedWeeks, setSelectedWeeks] = useState<number[]>([]);
+  const [goalActionEfforts, setGoalActionEfforts] = useState([] as ActionEffort[]);
+const [goalCycleWeeks, setGoalCycleWeeks] = useState([] as CycleWeek[]);
+const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
+const [selectedWeeks, setSelectedWeeks] = useState([] as number[]);
   const [recurrenceType, setRecurrenceType] = useState('daily');
   const [selectedCustomDays, setSelectedCustomDays] = useState<number[]>([]);
 
