@@ -222,6 +222,33 @@ const [goalDropdownOpen, setGoalDropdownOpen] = useState(false);
         const { data: krData } = await supabase.from('0008-ap-key-relationships').select('id,name,role_id').eq('user_id', user.id);
         const { data: goalData } = await supabase.from('0008-ap-goals-12wk').select('id,title').eq('user_id', user.id).eq('status', 'active');
 
+        // --- NEW: fetch custom goals and build unified list from both sources ---
+const { data: customGoals, error: customGoalsError } = await supabase
+  .from('0008-ap-goals-custom')
+  .select('id, title, status, created_at')
+  .eq('user_id', user.id)
+  .eq('status', 'active')
+  .order('created_at', { ascending: false });
+
+if (customGoalsError) {
+  console.error('Error fetching custom goals:', customGoalsError);
+}
+
+// Normalize both sets into UnifiedGoal[]
+const normalized12wk = (twelveGoals || []).map(g => ({
+  id: g.id,
+  title: g.title,
+  type: 'twelve_wk_goal' as const,
+}));
+
+const normalizedCustom = (customGoals || []).map(g => ({
+  id: g.id,
+  title: g.title,
+  type: 'custom_goal' as const,
+}));
+
+setAllAvailableGoals([...normalized12wk, ...normalizedCustom]);
+
         setRoles(roleData || []);
         setDomains(domainData || []);
         setKeyRelationships(krData || []);
