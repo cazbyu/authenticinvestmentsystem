@@ -895,36 +895,38 @@ if (formData.schedulingType === 'task') {
                       </TouchableOpacity>
                     </View>
 
-{/* Repeat (Recurrence) controls for TASKS */}
-<View style={{ marginTop: 12 }}>
-  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-    <Text style={styles.compactSectionTitle}>Repeat</Text>
-    <Switch
-      value={isRepeating}
-      onValueChange={(value) => {
-        setIsRepeating(value);
-        if (value) {
-          setIsRecurrenceModalVisible(true);
-        } else {
-          setSelectedRecurrenceDays([]);
-          setRecurrenceEndDate(null);
-          setRecurrenceFrequency('Weekly');
-        }
-      }}
-    />
-  </View>
+{/* Repeat (Recurrence) controls for TASKS - Hidden when goal is selected */}
+{!formData.selectedGoalId && (
+  <View style={{ marginTop: 12 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Text style={styles.compactSectionTitle}>Repeat</Text>
+      <Switch
+        value={isRepeating}
+        onValueChange={(value) => {
+          setIsRepeating(value);
+          if (value) {
+            setIsRecurrenceModalVisible(true);
+          } else {
+            setSelectedRecurrenceDays([]);
+            setRecurrenceEndDate(null);
+            setRecurrenceFrequency('Weekly');
+          }
+        }}
+      />
+    </View>
 
-  {isRepeating && (
-    <TouchableOpacity
-      style={styles.recurrenceButton}
-      onPress={() => setIsRecurrenceModalVisible(true)}
-    >
-      <Text style={styles.recurrenceButtonText}>
-        {getRecurrenceDisplayText()}
-      </Text>
-    </TouchableOpacity>
-  )}
-</View>
+    {isRepeating && (
+      <TouchableOpacity
+        style={styles.recurrenceButton}
+        onPress={() => setIsRecurrenceModalVisible(true)}
+      >
+        <Text style={styles.recurrenceButtonText}>
+          {getRecurrenceDisplayText()}
+        </Text>
+      </TouchableOpacity>
+    )}
+  </View>
+)}
                     
                   </>
                 )}
@@ -1012,30 +1014,32 @@ if (formData.schedulingType === 'task') {
                       </TouchableOpacity>
                     </View>
 
-{/* Repeat (Recurrence) controls */}
-<View style={{ marginTop: 12 }}>
-  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-    <Text style={styles.compactSectionTitle}>Repeat</Text>
-    <Switch
-      value={isRepeating}
-      onValueChange={(value) => {
-        setIsRepeating(value);
-        if (value) setIsRecurrenceModalVisible(true);
-        if (!value) { setSelectedRecurrenceDays([]); setRecurrenceEndDate(null); setRecurrenceFrequency('Weekly'); }
-      }}
-    />
+{/* Repeat (Recurrence) controls - Hidden when goal is selected */}
+{!formData.selectedGoalId && (
+  <View style={{ marginTop: 12 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Text style={styles.compactSectionTitle}>Repeat</Text>
+      <Switch
+        value={isRepeating}
+        onValueChange={(value) => {
+          setIsRepeating(value);
+          if (value) setIsRecurrenceModalVisible(true);
+          if (!value) { setSelectedRecurrenceDays([]); setRecurrenceEndDate(null); setRecurrenceFrequency('Weekly'); }
+        }}
+      />
+    </View>
+    {isRepeating && (
+      <TouchableOpacity
+        style={styles.recurrenceButton}
+        onPress={() => setIsRecurrenceModalVisible(true)}
+      >
+        <Text style={styles.recurrenceButtonText}>
+          {getRecurrenceDisplayText()}
+        </Text>
+      </TouchableOpacity>
+    )}
   </View>
-  {isRepeating && (
-    <TouchableOpacity
-      style={styles.recurrenceButton}
-      onPress={() => setIsRecurrenceModalVisible(true)}
-    >
-      <Text style={styles.recurrenceButtonText}>
-        {getRecurrenceDisplayText()}
-      </Text>
-    </TouchableOpacity>
-  )}
-</View>
+)}
                   </>
                 )}
 
