@@ -673,32 +673,6 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
           </View>
         ) : (
           <View style={styles.form}>
-            {/* Type Selection */}
-            {mode === 'create' && (
-              <View style={styles.field}>
-                <Text style={styles.label}>Type</Text>
-                <View style={styles.typeSelector}>
-                  {(['task', 'event', 'depositIdea', 'withdrawal'] as const).map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.typeButton,
-                        formData.type === type && styles.activeTypeButton
-                      ]}
-                      onPress={() => setFormData(prev => ({ ...prev, type }))}
-                    >
-                      <Text style={[
-                        styles.typeButtonText,
-                        formData.type === type && styles.activeTypeButtonText
-                      ]}>
-                        {type === 'depositIdea' ? 'Idea' : type.charAt(0).toUpperCase() + type.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
             {/* Title */}
             <View style={styles.field}>
               <Text style={styles.label}>Title *</Text>
