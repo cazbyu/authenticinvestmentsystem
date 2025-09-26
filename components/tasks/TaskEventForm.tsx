@@ -1147,7 +1147,10 @@ if (formData.schedulingType === 'task') {
             <TextInput style={[styles.input, { height: 100 }]} placeholder={getNotesPlaceholder()} value={formData.notes} onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))} multiline />
         </ScrollView>
 
+        <View style={styles.actions}>
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={loading}><Text style={styles.submitButtonText}>{loading ? 'Saving...' : mode === 'edit' ? 'Update Action' : 'Save Action'}</Text></TouchableOpacity>
+        </View>
+      </>
 
         {/* Pop-up Mini Calendar Modal */}
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
