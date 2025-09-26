@@ -4,7 +4,6 @@ import { Calendar } from 'react-native-calendars';
 import { X, Calendar as CalendarIcon, Clock, Target, Users, FileText, Plus, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { Repeat } from 'lucide-react-native';
 import { TaskWithLogs } from '@/hooks/fetchGoalActionsForWeek';
-import { ActionEffort, CycleWeek } from '../../types'; 
 
 // TYPE DEFINITIONS
 interface TaskEventFormProps {
