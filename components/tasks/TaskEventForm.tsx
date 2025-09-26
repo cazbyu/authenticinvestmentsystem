@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Modal, FlatList } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { getSupabaseClient } from "@/lib/supabase";
 import { X, Repeat} from 'lucide-react-native';
+import { parseRRule } from '@/lib/recurrenceUtils';
 
 // TYPE DEFINITIONS
 interface TaskEventFormProps {
@@ -19,6 +20,8 @@ type UnifiedGoal = {
   id: string;
   title: string;
   goal_type: "twelve_wk_goal" | "custom_goal";
+  timeline_id?: string;
+  timeline_source?: 'global' | 'custom';
 };
 
 interface TwelveWeekGoal { id: string; title: string; }
@@ -140,6 +143,9 @@ const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width
 const [allAvailableGoals, setAllAvailableGoals] = useState<UnifiedGoal[]>([]);
 const [selectedGoal, setSelectedGoal] = useState<UnifiedGoal | null>(null);
 const [goalDropdownOpen, setGoalDropdownOpen] = useState(false);
+const [goalActionEfforts, setGoalActionEfforts] = useState<any[]>([]);
+const [goalCycleWeeks, setGoalCycleWeeks] = useState<any[]>([]);
+const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
   
   const generateTimeOptions = () => {
     const times = [];
@@ -306,9 +312,169 @@ useEffect(() => {
     setWithdrawalDateInputValue(formatDateForInput(formData.withdrawalDate));
   }, [formData.withdrawalDate]);
 
+  const fetchGoalActionEffortsAndWeeks = useCallback(async (goal: UnifiedGoal) => {
+    if (!goal.timeline_id) return;
+    
+    setLoadingGoalRecurrenceInfo(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch tasks linked to this goal
+      const goalTypeField = goal.goal_type === '12week' ? 'twelve_wk_goal_id' : 'custom_goal_id';
+      const { data: goalJoins, error: joinsError } = await supabase
+        .from('0008-ap-universal-goals-join')
+        .select('parent_id')
+        .eq(goalTypeField, goal.id)
+        .eq('parent_type', 'task');
+
+      if (joinsError) throw joinsError;
+
+      const taskIds = (goalJoins || []).map(j => j.parent_id);
+      if (taskIds.length === 0) {
+        setGoalActionEfforts([]);
+        setGoalCycleWeeks([]);
+        return;
+      }
+
+      // Fetch action effort tasks (input_kind = 'count')
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('0008-ap-tasks')
+        .select('*')
+        .in('id', taskIds)
+        .eq('input_kind', 'count')
+        .not('status', 'in', '(completed,cancelled)')
+        .is('deleted_at', null);
+
+      if (tasksError) throw tasksError;
+
+      if (!tasksData || tasksData.length === 0) {
+        setGoalActionEfforts([]);
+        setGoalCycleWeeks([]);
+        return;
+      }
+
+      // Fetch week plans for these tasks
+      const timelineIdField = goal.timeline_source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id';
+      const { data: weekPlansData, error: weekPlansError } = await supabase
+        .from('0008-ap-task-week-plan')
+        .select('*')
+        .in('task_id', tasksData.map(t => t.id))
+        .eq(timelineIdField, goal.timeline_id);
+
+      if (weekPlansError) throw weekPlansError;
+
+      // Combine tasks with their week plans
+      const actionEfforts = tasksData.map(task => ({
+        ...task,
+        weekPlans: (weekPlansData || []).filter(wp => wp.task_id === task.id)
+      }));
+
+      // Fetch cycle weeks for the timeline
+      const { data: cycleWeeksData, error: cycleWeeksError } = await supabase
+        .from('v_unified_timeline_weeks')
+        .select('*')
+        .eq('timeline_id', goal.timeline_id)
+        .eq('source', goal.timeline_source)
+        .order('week_number');
+
+      if (cycleWeeksError) throw cycleWeeksError;
+
+      setGoalActionEfforts(actionEfforts);
+      setGoalCycleWeeks(cycleWeeksData || []);
+    } catch (error) {
+      console.error('Error fetching goal recurrence info:', error);
+      setGoalActionEfforts([]);
+      setGoalCycleWeeks([]);
+    } finally {
+      setLoadingGoalRecurrenceInfo(false);
+    }
+  }, []);
+
+  // Effect to fetch goal recurrence info when goal selection changes
+  useEffect(() => {
+    if (formData.selectedGoalIds.length === 1) {
+      const selectedGoal = allAvailableGoals.find(g => g.id === formData.selectedGoalIds[0]);
+      if (selectedGoal) {
+        fetchGoalActionEffortsAndWeeks(selectedGoal);
+      }
+    } else {
+      setGoalActionEfforts([]);
+      setGoalCycleWeeks([]);
+      setLoadingGoalRecurrenceInfo(false);
+    }
+  }, [formData.selectedGoalIds, allAvailableGoals, fetchGoalActionEffortsAndWeeks]);
+
+  // Helper function to summarize weeks
+  const summarizeWeeks = (weeks: { week_number: number }[]) => {
+    if (weeks.length === 0) return 'No weeks';
+    
+    const sortedWeeks = weeks.map(w => w.week_number).sort((a, b) => a - b);
+    const ranges: string[] = [];
+    let start = sortedWeeks[0];
+    let end = start;
+    
+    for (let i = 1; i < sortedWeeks.length; i++) {
+      if (sortedWeeks[i] === end + 1) {
+        end = sortedWeeks[i];
+      } else {
+        ranges.push(start === end ? `${start}` : `${start}-${end}`);
+        start = end = sortedWeeks[i];
+      }
+    }
+    ranges.push(start === end ? `${start}` : `${start}-${end}`);
+    
+    return ranges.join(', ');
+  };
+
+  // Helper function to get recurrence summary
+  const getRecurrenceSummary = (actions: any[]) => {
+    if (actions.length === 0) return 'No actions';
+    
+    const frequencies = new Set<string>();
+    
+    actions.forEach(action => {
+      if (action.recurrence_rule) {
+        const rule = parseRRule(action.recurrence_rule);
+        if (rule) {
+          if (rule.freq === 'DAILY') {
+            frequencies.add('Daily');
+          } else if (rule.freq === 'WEEKLY' && rule.byday) {
+            if (rule.byday.length === 7) {
+              frequencies.add('Daily');
+            } else if (rule.byday.length === 5 && rule.byday.every(d => ['MO', 'TU', 'WE', 'TH', 'FR'].includes(d))) {
+              frequencies.add('Weekdays');
+            } else {
+              const dayNames = rule.byday.map(d => {
+                const dayMap = { 'SU': 'Sun', 'MO': 'Mon', 'TU': 'Tue', 'WE': 'Wed', 'TH': 'Thu', 'FR': 'Fri', 'SA': 'Sat' };
+                return dayMap[d] || d;
+              }).join(', ');
+              frequencies.add(`Custom (${dayNames})`);
+            }
+          } else {
+            frequencies.add('Custom');
+          }
+        }
+      } else {
+        frequencies.add('One-time');
+      }
+    });
+    
+    return Array.from(frequencies).join(', ');
+  };
+
   const handleMultiSelect = (field: 'selectedRoleIds' | 'selectedDomainIds' | 'selectedKeyRelationshipIds' | 'selectedGoalIds', id: string) => {
     setFormData(prev => {
       const currentSelection = prev[field] as string[];
+      
+      // For goals, only allow one selection at a time
+      if (field === 'selectedGoalIds') {
+        const newSelection = currentSelection.includes(id) ? [] : [id];
+        return { ...prev, [field]: newSelection };
+      }
+      
+      // For other fields, allow multiple selections
       const newSelection = currentSelection.includes(id)
         ? currentSelection.filter(itemId => itemId !== id)
         : [...currentSelection, id];
@@ -1064,6 +1230,34 @@ if (formData.schedulingType === 'task') {
 </View>
 
     )}
+
+          {/* Goal Action Plan Information */}
+          {formData.selectedGoalIds.length === 1 && (
+            <View style={styles.goalRecurrenceSection}>
+              <Text style={styles.goalRecurrenceTitle}>Goal Action Plan</Text>
+              {loadingGoalRecurrenceInfo ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Loading action plan...</Text>
+                </View>
+              ) : goalActionEfforts.length === 0 ? (
+                <Text style={styles.goalRecurrenceText}>No action efforts defined for this goal</Text>
+              ) : (
+                <View style={styles.goalRecurrenceContent}>
+                  <Text style={styles.goalRecurrenceText}>
+                    {goalActionEfforts.length} action{goalActionEfforts.length !== 1 ? 's' : ''} planned
+                  </Text>
+                  <Text style={styles.goalRecurrenceText}>
+                    Frequency: {getRecurrenceSummary(goalActionEfforts)}
+                  </Text>
+                  {goalCycleWeeks.length > 0 && (
+                    <Text style={styles.goalRecurrenceText}>
+                      Weeks: {summarizeWeeks(goalActionEfforts.flatMap(a => a.weekPlans || []))}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
   </View>
 )}
 
@@ -1491,6 +1685,40 @@ const styles = StyleSheet.create({
      flexWrap: 'wrap',
      gap: 8,
    },
+  goalChip: {
+    backgroundColor: '#bfdbfe',
+    borderColor: '#93c5fd',
+  },
+  goalRecurrenceSection: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#0078d4',
+  },
+  goalRecurrenceTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0078d4',
+    marginBottom: 8,
+  },
+  goalRecurrenceContent: {
+    gap: 4,
+  },
+  goalRecurrenceText: {
+    fontSize: 12,
+    color: '#374151',
+    lineHeight: 16,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
 
 
 // Recurrence styles
