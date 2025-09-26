@@ -210,12 +210,66 @@ const [activeCalendarField, setActiveCalendarField] = useState<'start' | 'end'>(
         const { data: roleData } = await supabase.from('0008-ap-roles').select('id,label').eq('user_id', user.id).eq('is_active', true);
         const { data: domainData } = await supabase.from('0008-ap-domains').select('id,name');
         const { data: krData } = await supabase.from('0008-ap-key-relationships').select('id,name,role_id').eq('user_id', user.id);
-        const { data: goalData } = await supabase.from('0008-ap-goals-12wk').select('id,title').eq('user_id', user.id).eq('status', 'active');
+        
+        // Fetch both 12-week and custom goals
+        const [
+          { data: twelveWeekGoalsData, error: twelveWeekError },
+          { data: customGoalsData, error: customError }
+        ] = await Promise.all([
+          supabase
+            .from('0008-ap-goals-12wk')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'active'),
+          supabase
+            .from('0008-ap-goals-custom')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+        ]);
+
+        if (twelveWeekError) throw twelveWeekError;
+        if (customError) throw customError;
+
+        const allGoalsData = [
+          ...(twelveWeekGoalsData || []).map(goal => ({ ...goal, goal_type: '12week' as const })),
+          ...(customGoalsData || []).map(goal => ({ ...goal, goal_type: 'custom' as const }))
+        ];
+
+        if (allGoalsData.length === 0) {
+          setTwelveWeekGoals([]);
+        } else {
+          const goalIds = allGoalsData.map(g => g.id);
+
+          // Fetch related data for all goals
+          const [
+            { data: rolesData, error: rolesError },
+            { data: domainsData, error: domainsError },
+            { data: krData, error: krError }
+          ] = await Promise.all([
+            supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label, color)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+            supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal']),
+            supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
+          ]);
+
+          if (rolesError) throw rolesError;
+          if (domainsError) throw domainsError;
+          if (krError) throw krError;
+
+          // Transform goals with their related data
+          const transformedGoals = allGoalsData.map(goal => ({
+            ...goal,
+            roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
+            domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
+            keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
+          }));
+
+          setTwelveWeekGoals(transformedGoals);
+        }
 
         setRoles(roleData || []);
         setDomains(domainData || []);
         setKeyRelationships(krData || []);
-        setTwelveWeekGoals(goalData || []);
       } catch (error) {
         console.error('Error fetching options:', error);
         Alert.alert('Error', (error as Error).message || 'Failed to load options');
