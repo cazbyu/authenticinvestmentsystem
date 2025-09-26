@@ -1043,7 +1043,7 @@ if (formData.schedulingType === 'task') {
 
             {formData.schedulingType === 'depositIdea' && (
               <>
-                <Text style={styles.sectionTitle}>12-Week Goals</Text>
+                <Text style={styles.sectionTitle}>Goals</Text>
                 <View style={styles.checkboxGrid}>
                   {twelveWeekGoals.map(goal => {
                     const isSelected = formData.selectedGoalIds?.includes(goal.id);
