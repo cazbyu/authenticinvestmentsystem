@@ -1024,13 +1024,13 @@ if (formData.schedulingType === 'task') {
         No active goals found. Create one from Goal Bank.
       </Text>
     ) : (
-      <View style={styles.chipsContainer}>
+      <View style={styles.checkboxGrid}>
         {allAvailableGoals.map((g) => {
           const selected = formData.selectedGoalIds.includes(g.id);
           return (
             <TouchableOpacity
               key={`${g.goal_type}:${g.id}`}
-              style={[styles.chip, selected && styles.chipSelected]}
+              style={styles.checkItem}
               onPress={() => {
                 setFormData((prev) => {
                   const next = selected
@@ -1049,13 +1049,16 @@ if (formData.schedulingType === 'task') {
                 });
               }}
             >
-              <Text style={styles.chipText}>
-                {g.title} {g.goal_type === "custom_goal" ? "(Custom)" : "(12-Week)"}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+             <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+        <Text style={styles.checkLabel}>
+          {g.title} {g.goal_type === "custom_goal" ? "(Custom)" : "(12-Week)"}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</View>
     )}
   </View>
 )}
