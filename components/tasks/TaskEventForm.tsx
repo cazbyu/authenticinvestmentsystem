@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Modal, FlatList } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { X, Calendar as CalendarIcon, Clock, Target, Users, FileText, Plus, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { X, Repeat} from 'lucide-react-native';
+import { Repeat } from 'lucide-react-native';
 
 // TYPE DEFINITIONS
 interface TaskEventFormProps {
