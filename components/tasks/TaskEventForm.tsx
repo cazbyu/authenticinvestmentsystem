@@ -939,6 +939,8 @@ if (formData.schedulingType === 'task') {
     }
   };
 
+  const selectedGoal = availableGoals.find(goal => goal.id === formData.selectedGoalId);
+  
   return (
     <View style={styles.formContainer}>
         <View style={styles.modalHeader}>
@@ -1051,6 +1053,8 @@ if (formData.schedulingType === 'task') {
                         </TouchableOpacity>
                       </View>
 
+
+                      
   // Goal recurrence info states
 const [goalActionEfforts, setGoalActionEfforts] = useState([] as ActionEffort[]);
 const [goalCycleWeeks, setGoalCycleWeeks] = useState([] as CycleWeek[]);
