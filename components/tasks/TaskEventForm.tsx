@@ -685,209 +685,185 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
               />
             </View>
 
-            {/* Form Type Pills */}
-            <View style={styles.formTypePills}>
-              <TouchableOpacity
-                style={[
-                  styles.formTypePill,
-                  formData.type === 'task' && styles.activeFormTypePill
-                ]}
-                onPress={() => setFormData(prev => ({ ...prev, type: 'task' }))}
-              >
-                <Text style={[
-                  styles.formTypePillText,
-                  formData.type === 'task' && styles.activeFormTypePillText
-                ]}>
-                  Task
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.formTypePill,
-                  formData.type === 'event' && styles.activeFormTypePill
-                ]}
-                onPress={() => setFormData(prev => ({ ...prev, type: 'event' }))}
-              >
-                <Text style={[
-                  styles.formTypePillText,
-                  formData.type === 'event' && styles.activeFormTypePillText
-                ]}>
-                  Event
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.formTypePill,
-                  formData.type === 'depositIdea' && styles.activeFormTypePill
-                ]}
-                onPress={() => setFormData(prev => ({ ...prev, type: 'depositIdea' }))}
-              >
-                <Text style={[
-                  styles.formTypePillText,
-                  formData.type === 'depositIdea' && styles.activeFormTypePillText
-                ]}>
-                  Deposit Idea
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.formTypePill,
-                  formData.type === 'withdrawal' && styles.activeFormTypePill
-                ]}
-                onPress={() => setFormData(prev => ({ ...prev, type: 'withdrawal' }))}
-              >
-                <Text style={[
-                  styles.formTypePillText,
-                  formData.type === 'withdrawal' && styles.activeFormTypePillText
-                ]}>
-                  Withdrawal
-                </Text>
-              </TouchableOpacity>
+            {/* Form Type Pills - Centered */}
+            <View style={styles.pillContainer}>
+              {(['task', 'event', 'depositIdea', 'withdrawal'] as const).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.pill,
+                    formData.type === type && styles.activePill
+                  ]}
+                  onPress={() => setFormData(prev => ({ ...prev, type }))}
+                >
+                  <Text style={[
+                    styles.pillText,
+                    formData.type === type && styles.activePillText
+                  ]}>
+                    {type === 'depositIdea' ? 'Deposit Idea' : type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
-            {/* Goal Selection */}
-            {(formData.type === 'task' || formData.type === 'event') && (
-              <View style={styles.field}>
-                <View style={styles.toggleRow}>
-                  <Text style={styles.label}>Link to Goal</Text>
+            {/* Toggle Switches - 2x2 Grid, Centered */}
+            <View style={styles.toggleGrid}>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Urgent</Text>
                   <Switch
-                    value={formData.selectedGoalIds.length > 0}
-                    onValueChange={handleGoalToggle}
-                    trackColor={{ false: '#d1d5db', true: '#0078d4' }}
+                    value={formData.isUrgent}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, isUrgent: value }))}
+                    trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
                     thumbColor="#ffffff"
                   />
                 </View>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Important</Text>
+                  <Switch
+                    value={formData.isImportant}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, isImportant: value }))}
+                    trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+              </View>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Authentic Deposit</Text>
+                  <Switch
+                    value={formData.isAuthenticDeposit}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, isAuthenticDeposit: value }))}
+                    trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Goal</Text>
+                  <Switch
+                    value={!!selectedGoalId}
+                    onValueChange={(value) => {
+                      if (!value) {
+                        setFormData(prev => ({ ...prev, selectedGoalIds: [] }));
+                      } else {
+                        fetchAllAvailableGoals();
+                      }
+                    }}
+                    trackColor={{ false: '#e5e7eb', true: '#0078d4' }}
+                    thumbColor="#ffffff"
+                  />
+                </View>
+              </View>
+            </View>
 
-                {formData.selectedGoalIds.length > 0 && (
-                  <View style={styles.goalSelection}>
-                    <TouchableOpacity
-                      style={styles.goalDropdown}
-                      onPress={() => setShowGoalDropdown(!showGoalDropdown)}
-                    >
-                      <Text style={styles.goalDropdownText}>
-                        {selectedGoalId 
-                          ? getSelectedGoal()?.title || 'Selected Goal'
-                          : 'Select a goal...'
-                        }
-                      </Text>
-                      {showGoalDropdown ? <ChevronUp size={20} color="#6b7280" /> : <ChevronDown size={20} color="#6b7280" />}
-                    </TouchableOpacity>
-                    
-                    {showGoalDropdown && (
-                      <View style={styles.goalDropdownContent}>
-                        {availableGoals.map(goal => (
-                          <TouchableOpacity
-                            key={goal.id}
-                            style={[
-                              styles.goalDropdownOption,
-                              selectedGoalId === goal.id && styles.selectedGoalDropdownOption
-                            ]}
-                            onPress={() => handleGoalSelect(goal.id)}
-                          >
-                            <View style={styles.goalOptionContent}>
-                              <Text style={[
-                                styles.goalOptionTitle,
-                                selectedGoalId === goal.id && styles.selectedGoalOptionTitle
-                              ]}>
-                                {goal.title}
-                              </Text>
-                              <Text style={[
-                                styles.goalOptionType,
-                                selectedGoalId === goal.id && styles.selectedGoalOptionType
-                              ]}>
-                                {goal.goal_type === '12week' ? '12-Week Goal' : 'Custom Goal'}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                )}
+            {/* Goal Selection */}
+            {selectedGoalId && (
+              <View style={styles.field}>
+                <View style={styles.goalSelection}>
+                  <TouchableOpacity
+                    style={styles.goalDropdown}
+                    onPress={() => setShowGoalDropdown(!showGoalDropdown)}
+                  >
+                    <Text style={styles.goalDropdownText}>
+                      {selectedGoalId 
+                        ? getSelectedGoal()?.title || 'Selected Goal'
+                        : 'Select a goal...'
+                      }
+                    </Text>
+                    {showGoalDropdown ? <ChevronUp size={20} color="#6b7280" /> : <ChevronDown size={20} color="#6b7280" />}
+                  </TouchableOpacity>
+                  
+                  {showGoalDropdown && (
+                    <View style={styles.goalDropdownContent}>
+                      {availableGoals.map(goal => (
+                        <TouchableOpacity
+                          key={goal.id}
+                          style={[
+                            styles.goalDropdownOption,
+                            selectedGoalId === goal.id && styles.selectedGoalDropdownOption
+                          ]}
+                          onPress={() => handleGoalSelect(goal.id)}
+                        >
+                          <View style={styles.goalOptionContent}>
+                            <Text style={[
+                              styles.goalOptionTitle,
+                              selectedGoalId === goal.id && styles.selectedGoalOptionTitle
+                            ]}>
+                              {goal.title}
+                            </Text>
+                            <Text style={[
+                              styles.goalOptionType,
+                              selectedGoalId === goal.id && styles.selectedGoalOptionType
+                            ]}>
+                              {goal.goal_type === '12week' ? '12-Week Goal' : 'Custom Goal'}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
               </View>
             )}
 
-            {/* Date/Time Fields */}
-            {formData.type === 'task' && (
-              <View style={styles.field}>
+            {/* Due Date */}
+            <View style={styles.dateSection}>
+              <View style={styles.dateField}>
                 <Text style={styles.label}>Due Date</Text>
                 <TouchableOpacity
-                  style={styles.dateButton}
+                  style={styles.compactDateButton}
                   onPress={() => setShowCalendar(true)}
+                >
+                  <CalendarIcon size={16} color="#6b7280" />
+                  <Text style={styles.compactDateButtonText}>
+                    {formatDateForDisplay(formData.dueDate)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.anytimeCheckbox}>
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={() => setFormData(prev => ({ ...prev, isAnytime: !prev.isAnytime }))}
+                >
+                  <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}>
+                    {formData.isAnytime && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Anytime</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Start Date (for events) */}
+            {formData.type === 'event' && (
+              <View style={styles.field}>
+                <Text style={styles.label}>Start Date</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowStartCalendar(true)}
                 >
                   <CalendarIcon size={20} color="#6b7280" />
                   <Text style={styles.dateButtonText}>
-                    {formatDateForDisplay(formData.dueDate)}
+                    {formatDateForDisplay(formData.startDate)}
                   </Text>
                 </TouchableOpacity>
               </View>
             )}
 
+            {/* End Date (for events) */}
             {formData.type === 'event' && (
-              <>
-                <View style={styles.field}>
-                  <Text style={styles.label}>Start Date</Text>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowStartCalendar(true)}
-                  >
-                    <CalendarIcon size={20} color="#6b7280" />
-                    <Text style={styles.dateButtonText}>
-                      {formatDateForDisplay(formData.startDate)}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>End Date</Text>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowEndCalendar(true)}
-                  >
-                    <CalendarIcon size={20} color="#6b7280" />
-                    <Text style={styles.dateButtonText}>
-                      {formatDateForDisplay(formData.endDate)}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {formData.type === 'withdrawal' && (
-              <>
-                <View style={styles.field}>
-                  <Text style={styles.label}>Amount *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.amount}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, amount: text }))}
-                    placeholder="0.0"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>Date</Text>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowCalendar(true)}
-                  >
-                    <CalendarIcon size={20} color="#6b7280" />
-                    <Text style={styles.dateButtonText}>
-                      {formData.withdrawalDate.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
+              <View style={styles.field}>
+                <Text style={styles.label}>End Date</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowEndCalendar(true)}
+                >
+                  <CalendarIcon size={20} color="#6b7280" />
+                  <Text style={styles.dateButtonText}>
+                    {formatDateForDisplay(formData.endDate)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Time Fields for Events */}
@@ -936,64 +912,43 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
               </View>
             )}
 
-            {/* Anytime Toggle for Tasks */}
-            {formData.type === 'task' && (
-              <View style={styles.field}>
-                <View style={styles.toggleRow}>
-                  <Text style={styles.label}>Anytime</Text>
-                  <Switch
-                    value={formData.isAnytime}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, isAnytime: value }))}
-                    trackColor={{ false: '#d1d5db', true: '#0078d4' }}
-                    thumbColor="#ffffff"
-                  />
-                </View>
-              </View>
-            )}
-
-            {/* Priority Toggles */}
-            {(formData.type === 'task' || formData.type === 'event') && (
+            {/* Withdrawal specific fields */}
+            {formData.type === 'withdrawal' && (
               <>
                 <View style={styles.field}>
-                  <View style={styles.toggleRow}>
-                    <Text style={styles.label}>Urgent</Text>
-                    <Switch
-                      value={formData.isUrgent}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, isUrgent: value }))}
-                      trackColor={{ false: '#d1d5db', true: '#eab308' }}
-                      thumbColor="#ffffff"
-                    />
-                  </View>
+                  <Text style={styles.label}>Amount *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.amount}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, amount: text }))}
+                    placeholder="0.0"
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="decimal-pad"
+                  />
                 </View>
 
                 <View style={styles.field}>
-                  <View style={styles.toggleRow}>
-                    <Text style={styles.label}>Important</Text>
-                    <Switch
-                      value={formData.isImportant}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, isImportant: value }))}
-                      trackColor={{ false: '#d1d5db', true: '#16a34a' }}
-                      thumbColor="#ffffff"
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.field}>
-                  <View style={styles.toggleRow}>
-                    <Text style={styles.label}>Authentic Deposit</Text>
-                    <Switch
-                      value={formData.isAuthenticDeposit}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, isAuthenticDeposit: value }))}
-                      trackColor={{ false: '#d1d5db', true: '#7c3aed' }}
-                      thumbColor="#ffffff"
-                    />
-                  </View>
+                  <Text style={styles.label}>Date</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowCalendar(true)}
+                  >
+                    <CalendarIcon size={20} color="#6b7280" />
+                    <Text style={styles.dateButtonText}>
+                      {formData.withdrawalDate.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </>
             )}
 
             {/* Repeat Section - Only show when no goal is selected */}
-            {(formData.type === 'task' || formData.type === 'event') && !selectedGoalId && (
+            {!selectedGoalId && (
               <View style={styles.field}>
                 <Text style={styles.label}>Repeat</Text>
                 <View style={styles.recurrenceSelector}>
@@ -1410,16 +1365,116 @@ const styles = StyleSheet.create({
   },
   typeButtonText: {
     fontSize: 14,
-    fontWeight: '500',
     color: '#6b7280',
+    fontWeight: '500',
   },
   activeTypeButtonText: {
     color: '#ffffff',
   },
+  pillContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 8,
+  },
+  pill: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  activePill: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  pillText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  activePillText: {
+    color: '#ffffff',
+  },
+  toggleGrid: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   toggleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 40,
+    marginBottom: 16,
+  },
+  toggleItem: {
     alignItems: 'center',
+    minWidth: 120,
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  dateSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 16,
+    marginBottom: 16,
+  },
+  dateField: {
+    flex: 1,
+  },
+  compactDateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  compactDateButtonText: {
+    fontSize: 14,
+    color: '#1f2937',
+  },
+  anytimeCheckbox: {
+    justifyContent: 'flex-end',
+    paddingBottom: 12,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  checkedBox: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  checkmark: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: '#1f2937',
+    fontWeight: '500',
   },
   goalSelection: {
     marginTop: 12,
@@ -1521,25 +1576,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '48%',
     marginBottom: 8,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 3,
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkedBox: {
-    backgroundColor: '#0078d4',
-    borderColor: '#0078d4',
-  },
-  checkmark: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   checkLabel: {
     fontSize: 14,
