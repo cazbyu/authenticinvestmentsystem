@@ -162,8 +162,8 @@ const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width
 const [allAvailableGoals, setAllAvailableGoals] = useState<UnifiedGoal[]>([]);
 const [selectedGoal, setSelectedGoal] = useState<UnifiedGoal | null>(null);
 const [goalDropdownOpen, setGoalDropdownOpen] = useState(false);
-const [goalActionEfforts, setGoalActionEfforts] = useState<any[]>([]);
-const [goalCycleWeeks, setGoalCycleWeeks] = useState<any[]>([]);
+const [goalActionEfforts, setGoalActionEfforts] = useState<ActionEffort[]>([]);
+const [goalCycleWeeks, setGoalCycleWeeks] = useState<CycleWeek[]>([]);
 const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
   
   const generateTimeOptions = () => {
