@@ -159,11 +159,11 @@ const [withdrawalDatePickerPosition, setWithdrawalDatePickerPosition] = useState
 const [timePickerPosition, setTimePickerPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
 // --- Goal linking (new) ---
-const [allAvailableGoals, setAllAvailableGoals] = useState<UnifiedGoal[]>([]);
-const [selectedGoal, setSelectedGoal] = useState<UnifiedGoal | null>(null);
+const [allAvailableGoals, setAllAvailableGoals] = useState([] as UnifiedGoal[]);
+const [selectedGoal, setSelectedGoal] = useState(null as UnifiedGoal | null);
 const [goalDropdownOpen, setGoalDropdownOpen] = useState(false);
-const [goalActionEfforts, setGoalActionEfforts] = useState<ActionEffort[]>([]);
-const [goalCycleWeeks, setGoalCycleWeeks] = useState<CycleWeek[]>([]);
+const [goalActionEfforts, setGoalActionEfforts] = useState([] as ActionEffort[]);
+const [goalCycleWeeks, setGoalCycleWeeks] = useState([] as CycleWeek[]);
 const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
   
   const generateTimeOptions = () => {
@@ -939,7 +939,7 @@ if (formData.schedulingType === 'task') {
     }
   };
 
-  const selectedGoal = availableGoals.find(goal => goal.id === formData.selectedGoalId);
+
   
   return (
     <View style={styles.formContainer}>
@@ -1055,13 +1055,7 @@ if (formData.schedulingType === 'task') {
 
 
                       
-  // Goal recurrence info states
-const [goalActionEfforts, setGoalActionEfforts] = useState([] as ActionEffort[]);
-const [goalCycleWeeks, setGoalCycleWeeks] = useState([] as CycleWeek[]);
-const [loadingGoalRecurrenceInfo, setLoadingGoalRecurrenceInfo] = useState(false);
-const [selectedWeeks, setSelectedWeeks] = useState([] as number[]);
-const [recurrenceType, setRecurrenceType] = useState('daily');
-const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
+
 
                       <TouchableOpacity style={styles.anytimeContainer} onPress={() => setFormData(prev => ({...prev, isAnytime: !prev.isAnytime}))}>
                         <View style={[styles.checkbox, formData.isAnytime && styles.checkedBox]}><Text style={styles.checkmark}>{formData.isAnytime ? '✓' : ''}</Text></View>
@@ -1071,54 +1065,37 @@ const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
 
 {/* Repeat (Recurrence) controls for TASKS */}
 {formData.schedulingType === 'task' && formData.selectedGoalIds.length === 0 && (
- 
-<View style={{ marginTop: 12 }}>
-  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-    <Text style={styles.compactSectionTitle}>Repeat</Text>
-    <Switch
-      value={isRepeating}
-      onValueChange={(value) => {
-        setIsRepeating(value);
-  // Fetch goal action efforts and weeks when a goal is selected
-  useEffect(() => {
-    if (formData.selectedGoalId && selectedGoal) {
-      fetchGoalActionEffortsAndWeeks(selectedGoal);
-    } else {
-      setGoalActionEfforts([]);
-      setGoalCycleWeeks([]);
-      setSelectedWeeks([]);
-      setRecurrenceType('daily');
-      setSelectedCustomDays([]);
-      setLoadingGoalRecurrenceInfo(false);
-    }
-  }, [formData.selectedGoalId, selectedGoal]);
+  <View style={{ marginTop: 12 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Text style={styles.compactSectionTitle}>Repeat</Text>
+      <Switch
+        value={isRepeating}
+        onValueChange={(value) => {
+          setIsRepeating(value);
+          if (value) {
+            setIsRecurrenceModalVisible(true);
+          } else {
+            setSelectedRecurrenceDays([]);
+            setRecurrenceEndDate(null);
+            setRecurrenceFrequency('Weekly');
+          }
+        }}
+      />
+    </View>
 
-        if (value) {
-          setIsRecurrenceModalVisible(true);
-        } else {
-          setSelectedRecurrenceDays([]);
-          setRecurrenceEndDate(null);
-          setRecurrenceFrequency('Weekly');
-        }
-      }}
-    />
+    {isRepeating && (
+      <TouchableOpacity
+        style={styles.recurrenceButton}
+        onPress={() => setIsRecurrenceModalVisible(true)}
+      >
+        <Text style={styles.recurrenceButtonText}>
+          {getRecurrenceDisplayText()}
+        </Text>
+      </TouchableOpacity>
+    )}
   </View>
-
-  {isRepeating && (
-    <TouchableOpacity
-      style={styles.recurrenceButton}
-      onPress={() => setIsRecurrenceModalVisible(true)}
-    >
-      <Text style={styles.recurrenceButtonText}>
-        {getRecurrenceDisplayText()}
-      selectedGoalId: initialData.selectedGoalId || '',
-    </TouchableOpacity>
-  )}
-</View>
 )}
-                    
-                  </>
-                )}
+
                 {formData.schedulingType === 'event' && (
                   <>
                     <Text style={styles.compactSectionTitle}>Schedule</Text>
@@ -1742,7 +1719,7 @@ const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
         </View>
 
         {/* Pop-up Mini Calendar Modal */}
-                  const isFromGoal = selectedGoal?.roles?.some(gr => gr.id === role.id);
+
         <Modal transparent visible={showMiniCalendar} onRequestClose={() => setShowMiniCalendar(false)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowMiniCalendar(false)}>
             <View style={[styles.calendarPopup, { top: datePickerPosition.y + datePickerPosition.height, left: datePickerPosition.x }]}>
@@ -1772,7 +1749,7 @@ const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
         const goalJoin = {
           parent_id: taskId,
           parent_type: 'task',
-                    const isFromGoal = selectedGoal?.keyRelationships?.some(gkr => gkr.id === kr.id);
+                   
           goal_type: goal.goal_type === '12week' ? 'twelve_wk_goal' : 'custom_goal',
           twelve_wk_goal_id: goal.goal_type === '12week' ? formData.selectedGoalId : null,
           custom_goal_id: goal.goal_type === 'custom' ? formData.selectedGoalId : null,
@@ -1780,13 +1757,9 @@ const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
         };
         insertPromises.push(supabase.from('0008-ap-universal-goals-join').insert([goalJoin]));
       }
-                  dayComponent={CustomDayComponent}
-                  hideExtraDays={true}
-                        <Text style={[
-                          styles.checkLabel,
-                          isFromGoal && styles.inheritedLabel
-                        ]}>
-                          {kr.name}
+                  
+                        <Text style={styles.checkLabel}>{kr.name}</Text>
+
                           {isFromGoal && ' (from goal)'}
                         </Text>
               </ScrollView>
@@ -1802,7 +1775,7 @@ const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
   ref={timeListRef}
   data={timeOptions}
   keyExtractor={(item) => item}
-                  const isFromGoal = selectedGoal?.domains?.some(gd => gd.id === domain.id);
+                  
   getItemLayout={(_, index) => ({
     length: TIME_ROW_HEIGHT,
     offset: TIME_ROW_HEIGHT * index,
@@ -1812,10 +1785,8 @@ const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
     const currentValue = activeTimeField ? (formData as any)[activeTimeField] : null;
     const idx = currentValue ? timeOptions.indexOf(currentValue) : -1;
     return idx >= 0 ? idx : 0;
-                      <Text style={[
-                        styles.checkLabel,
-                        isFromGoal && styles.inheritedLabel
-                      ]}>
+                      <Text style={styles.checkLabel}>{domain.name}</Text>
+
                         {domain.name}
                         {isFromGoal && ' (from goal)'}
                       </Text>
