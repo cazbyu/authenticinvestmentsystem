@@ -873,6 +873,7 @@ if (formData.schedulingType === 'task') {
                     </View>
 
 {/* Repeat (Recurrence) controls for TASKS */}
+{formData.schedulingType === 'task' && formData.selectedGoalIds.length === 0 && (
 <View style={{ marginTop: 12 }}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
     <Text style={styles.compactSectionTitle}>Repeat</Text>
@@ -902,6 +903,7 @@ if (formData.schedulingType === 'task') {
     </TouchableOpacity>
   )}
 </View>
+)}
                     
                   </>
                 )}
@@ -990,6 +992,7 @@ if (formData.schedulingType === 'task') {
                     </View>
 
 {/* Repeat (Recurrence) controls */}
+{formData.schedulingType === 'event' && formData.selectedGoalIds.length === 0 && (
 <View style={{ marginTop: 12 }}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
     <Text style={styles.compactSectionTitle}>Repeat</Text>
@@ -1013,6 +1016,7 @@ if (formData.schedulingType === 'task') {
     </TouchableOpacity>
   )}
 </View>
+)}
                   </>
                 )}
 
