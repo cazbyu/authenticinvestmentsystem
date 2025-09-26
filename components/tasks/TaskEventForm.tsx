@@ -716,13 +716,13 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
               <TouchableOpacity
                 style={[
                   styles.formTypePill,
-                  formType === 'task' && styles.activeFormTypePill
+                  formData.type === 'task' && styles.activeFormTypePill
                 ]}
-                onPress={() => setFormType('task')}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'task' }))}
               >
                 <Text style={[
                   styles.formTypePillText,
-                  formType === 'task' && styles.activeFormTypePillText
+                  formData.type === 'task' && styles.activeFormTypePillText
                 ]}>
                   Task
                 </Text>
@@ -731,13 +731,13 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
               <TouchableOpacity
                 style={[
                   styles.formTypePill,
-                  formType === 'event' && styles.activeFormTypePill
+                  formData.type === 'event' && styles.activeFormTypePill
                 ]}
-                onPress={() => setFormType('event')}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'event' }))}
               >
                 <Text style={[
                   styles.formTypePillText,
-                  formType === 'event' && styles.activeFormTypePillText
+                  formData.type === 'event' && styles.activeFormTypePillText
                 ]}>
                   Event
                 </Text>
@@ -746,13 +746,13 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
               <TouchableOpacity
                 style={[
                   styles.formTypePill,
-                  formType === 'depositIdea' && styles.activeFormTypePill
+                  formData.type === 'depositIdea' && styles.activeFormTypePill
                 ]}
-                onPress={() => setFormType('depositIdea')}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'depositIdea' }))}
               >
                 <Text style={[
                   styles.formTypePillText,
-                  formType === 'depositIdea' && styles.activeFormTypePillText
+                  formData.type === 'depositIdea' && styles.activeFormTypePillText
                 ]}>
                   Deposit Idea
                 </Text>
@@ -761,13 +761,13 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
               <TouchableOpacity
                 style={[
                   styles.formTypePill,
-                  formType === 'withdrawal' && styles.activeFormTypePill
+                  formData.type === 'withdrawal' && styles.activeFormTypePill
                 ]}
-                onPress={() => setFormType('withdrawal')}
+                onPress={() => setFormData(prev => ({ ...prev, type: 'withdrawal' }))}
               >
                 <Text style={[
                   styles.formTypePillText,
-                  formType === 'withdrawal' && styles.activeFormTypePillText
+                  formData.type === 'withdrawal' && styles.activeFormTypePillText
                 ]}>
                   Withdrawal
                 </Text>
