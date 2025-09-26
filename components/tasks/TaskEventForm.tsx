@@ -235,7 +235,7 @@ if (customGoalsError) {
 }
 
 // Normalize both sets into UnifiedGoal[]
-const normalized12wk = (twelveGoals || []).map(g => ({
+const normalized12wk = (goalData || []).map(g => ({
   id: g.id,
   title: g.title,
   type: 'twelve_wk_goal' as const,
