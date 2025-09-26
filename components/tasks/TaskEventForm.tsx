@@ -786,7 +786,7 @@ if (formData.schedulingType === 'task') {
                 </View>
                 <View style={styles.compactSwitchRow}>
                   <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Authentic Deposit</Text><Switch value={formData.is_authentic_deposit} onValueChange={(val) => setFormData(prev => ({...prev, is_authentic_deposit: val}))} /></View>
-                  <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>12-Week Goal</Text><Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} /></View>
+                  <View style={styles.compactSwitchContainer}><Text style={styles.compactSwitchLabel}>Goal</Text><Switch value={formData.is_twelve_week_goal} onValueChange={(val) => setFormData(prev => ({...prev, is_twelve_week_goal: val}))} /></View>
                 </View>
 
                 {formData.schedulingType === 'task' && (
