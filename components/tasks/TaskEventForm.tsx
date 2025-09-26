@@ -1017,29 +1017,45 @@ if (formData.schedulingType === 'task') {
                 )}
 
                 {formData.is_twelve_week_goal && (
-                  <>
-                    <Text style={styles.sectionTitle}>Goals</Text>
-                    <View style={styles.checkboxGrid}>
-                      {twelveWeekGoals.map(goal => {
-                        const isSelected = formData.selectedGoalId === goal.id;
-                        return (
-                          <TouchableOpacity
-                            key={goal.id}
-                            style={styles.checkItem}
-                            onPress={() => setFormData(prev => ({ ...prev, selectedGoalId: isSelected ? null : goal.id }))}
-                          >
-                            <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                              {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                            </View>
-                            <Text style={styles.checkLabel}>{goal.title}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </>
-                )}
-              </>
-            )}
+  <View style={styles.fieldGroup}>
+    <Text style={styles.subLabel}>Link to one or more goals</Text>
+    <View style={styles.chipsContainer}>
+      {allAvailableGoals.length === 0 ? (
+        <Text style={styles.hintText}>No active goals found. Create one from Goal Bank.</Text>
+      ) : (
+        allAvailableGoals.map((g) => {
+          const selected = formData.selectedGoalIds.includes(g.id);
+          return (
+            <TouchableOpacity
+              key={`${g.type}:${g.id}`}
+              style={[styles.chip, selected && styles.chipSelected]}
+              onPress={() => {
+                setFormData(prev => {
+                  const next = selected
+                    ? prev.selectedGoalIds.filter(id => id !== g.id)
+                    : [...prev.selectedGoalIds, g.id];
+                  // maintain backward compat: if selecting a 12-week goal also set selectedGoalId
+                  const nextSelectedGoalId =
+                    g.type === 'twelve_wk_goal' && !selected ? g.id : prev.selectedGoalId;
+
+                  return {
+                    ...prev,
+                    selectedGoalIds: next,
+                    selectedGoalId: nextSelectedGoalId,
+                  };
+                });
+              }}
+            >
+              <Text style={styles.chipText}>
+                {g.title} {g.type === 'custom_goal' ? '(Custom)' : '(12-Week)'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })
+      )}
+    </View>
+  </View>
+)}
 
             {formData.schedulingType === 'depositIdea' && (
               <>
