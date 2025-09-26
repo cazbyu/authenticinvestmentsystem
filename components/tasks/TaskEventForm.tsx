@@ -1067,9 +1067,7 @@ const [selectedCustomDays, setSelectedCustomDays] = useState([] as number[]);
 
 {/* Repeat (Recurrence) controls for TASKS */}
 {formData.schedulingType === 'task' && formData.selectedGoalIds.length === 0 && (
-  // Get selected goal object
-  const selectedGoal = availableGoals.find(goal => goal.id === formData.selectedGoalId);
-
+ 
 <View style={{ marginTop: 12 }}>
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
     <Text style={styles.compactSectionTitle}>Repeat</Text>
