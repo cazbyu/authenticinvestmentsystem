@@ -28,6 +28,21 @@ type UnifiedGoal = {
   keyRelationships?: Array<{id: string; name: string}>;
 };
 
+type ActionEffort = {
+  id: string;
+  title?: string;
+  description?: string;
+  due_date?: string | null;
+  recurrence_rule?: string | null;
+};
+
+type CycleWeek = {
+  id: string;
+  week_number: number;
+  start_date?: string;
+  end_date?: string;
+};
+
 interface TwelveWeekGoal { id: string; title: string; }
 
 // CUSTOM DAY COMPONENT for CALENDAR
