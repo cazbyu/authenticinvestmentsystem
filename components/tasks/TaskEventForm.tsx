@@ -1019,24 +1019,27 @@ if (formData.schedulingType === 'task') {
                 {formData.is_twelve_week_goal && (
   <View style={styles.fieldGroup}>
     <Text style={styles.subLabel}>Link to one or more goals</Text>
-    <View style={styles.chipsContainer}>
-      {allAvailableGoals.length === 0 ? (
-        <Text style={styles.hintText}>No active goals found. Create one from Goal Bank.</Text>
-      ) : (
-        allAvailableGoals.map((g) => {
+    {allAvailableGoals.length === 0 ? (
+      <Text style={styles.hintText}>
+        No active goals found. Create one from Goal Bank.
+      </Text>
+    ) : (
+      <View style={styles.chipsContainer}>
+        {allAvailableGoals.map((g) => {
           const selected = formData.selectedGoalIds.includes(g.id);
           return (
             <TouchableOpacity
               key={`${g.type}:${g.id}`}
               style={[styles.chip, selected && styles.chipSelected]}
               onPress={() => {
-                setFormData(prev => {
+                setFormData((prev) => {
                   const next = selected
-                    ? prev.selectedGoalIds.filter(id => id !== g.id)
+                    ? prev.selectedGoalIds.filter((id) => id !== g.id)
                     : [...prev.selectedGoalIds, g.id];
-                  // maintain backward compat: if selecting a 12-week goal also set selectedGoalId
                   const nextSelectedGoalId =
-                    g.type === 'twelve_wk_goal' && !selected ? g.id : prev.selectedGoalId;
+                    g.type === "twelve_wk_goal" && !selected
+                      ? g.id
+                      : prev.selectedGoalId;
 
                   return {
                     ...prev,
@@ -1047,13 +1050,13 @@ if (formData.schedulingType === 'task') {
               }}
             >
               <Text style={styles.chipText}>
-                {g.title} {g.type === 'custom_goal' ? '(Custom)' : '(12-Week)'}
+                {g.title} {g.type === "custom_goal" ? "(Custom)" : "(12-Week)"}
               </Text>
             </TouchableOpacity>
           );
-        })
-      )}
-    </View>
+        })}
+      </View>
+    )}
   </View>
 )}
 
