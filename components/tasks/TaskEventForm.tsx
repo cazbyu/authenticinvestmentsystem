@@ -1025,31 +1025,30 @@ if (formData.schedulingType === 'task') {
       </Text>
     ) : (
       <View style={styles.checkboxGrid}>
-        {allAvailableGoals.map((g) => {
-          const selected = formData.selectedGoalIds.includes(g.id);
-          return (
-            <TouchableOpacity
-              key={`${g.goal_type}:${g.id}`}
-              style={styles.checkItem}
-              onPress={() => {
-                setFormData((prev) => {
-                  const next = selected
-                    ? prev.selectedGoalIds.filter((id) => id !== g.id)
-                    : [...prev.selectedGoalIds, g.id];
-                  const nextSelectedGoalId =
-                    g.goal_type === "twelve_wk_goal" && !selected
-                      ? g.id
-                      : prev.selectedGoalId;
-
-                  return {
-                    ...prev,
-                    selectedGoalIds: next,
-                    selectedGoalId: nextSelectedGoalId,
-                  };
-                });
-              }}
-            >
-             <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+  {allAvailableGoals.map((g) => {
+    const isSelected = formData.selectedGoalIds.includes(g.id);
+    return (
+      <TouchableOpacity
+        key={`${g.goal_type}:${g.id}`}
+        style={styles.checkItem}
+        onPress={() => {
+          setFormData((prev) => {
+            const next = isSelected
+              ? prev.selectedGoalIds.filter((id) => id !== g.id)
+              : [...prev.selectedGoalIds, g.id];
+            const nextSelectedGoalId =
+              g.goal_type === "twelve_wk_goal" && !isSelected
+                ? g.id
+                : prev.selectedGoalId;
+            return {
+              ...prev,
+              selectedGoalIds: next,
+              selectedGoalId: nextSelectedGoalId,
+            };
+          });
+        }}
+      >
+        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
           {isSelected && <Text style={styles.checkmark}>✓</Text>}
         </View>
         <Text style={styles.checkLabel}>
@@ -1059,6 +1058,7 @@ if (formData.schedulingType === 'task') {
     );
   })}
 </View>
+
     )}
   </View>
 )}
