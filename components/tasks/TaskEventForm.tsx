@@ -16,7 +16,7 @@ import { X, Repeat } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
 // ⬇️ If your ActionEffortModal lives elsewhere, update this path
-import ActionEffortModal from './ActionEffortModal';
+import ActionEffortModal from '../goals/ActionEffortModal';
 
 // ------------ Types & Models ------------
 type SchedulingType = 'task' | 'event' | 'depositIdea' | 'withdrawal';
