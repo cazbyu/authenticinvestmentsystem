@@ -117,6 +117,7 @@ export default function TaskEventForm({
     important: false,
     authenticDeposit: false,
     goalToggle: false,
+    repeat: false,
     roles: [],
     domains: [],
     keyRelationships: [],
