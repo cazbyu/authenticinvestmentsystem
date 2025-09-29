@@ -15,6 +15,7 @@ import { Calendar } from 'react-native-calendars';
 import { X, Repeat } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import { formatLocalDate } from '@/lib/dateUtils';
+import { useTheme } from '@/contexts/ThemeContext';
 
 // ⬇️ If your ActionEffortModal lives elsewhere, update this path
 import ActionEffortModal from '../goals/ActionEffortModal';
@@ -92,6 +93,7 @@ export default function TaskEventForm({
   onClose?: () => void;
   onSubmitSuccess?: () => void;
 }) {
+  const { colors } = useTheme();
 
   // UI & refs
   const scrollRef = useRef<ScrollView>(null);
