@@ -118,6 +118,7 @@ export default function TaskEventForm({
     authenticDeposit: false,
     goalToggle: false,
     repeat: false,
+    repeat: false,
     roles: [],
     domains: [],
     keyRelationships: [],
@@ -149,7 +150,7 @@ export default function TaskEventForm({
 
   // Flip goal mode when a goal is chosen while goal toggle is ON
   useEffect(() => {
-    const enabled = !!formData.goalToggle && !!formData.selectedGoal;
+    const enabled = !!formData.goalToggle && !!formData.selectedGoal && !!formData.repeat;
     setGoalMode(enabled);
     if (enabled) {
       // Prefill from goal
@@ -166,7 +167,7 @@ export default function TaskEventForm({
       // Optionally scroll to bottom to show goal area controls
       scrollRef.current?.scrollToEnd({ animated: true });
     }
-  }, [formData.goalToggle, formData.selectedGoal]);
+  }, [formData.goalToggle, formData.selectedGoal, formData.repeat]);
 
   // ------------ Fetchers ------------
   async function fetchRoles() {
@@ -431,6 +432,15 @@ export default function TaskEventForm({
                 <Switch value={formData.goalToggle} onValueChange={(v) => setFormData(p => ({ ...p, goalToggle: v }))} />
               </View>
             </View>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Repeat</Text>
+                <Switch value={formData.repeat} onValueChange={(v) => setFormData(p => ({ ...p, repeat: v }))} />
+              </View>
+              <View style={styles.toggleItem}>
+                {/* Empty space to maintain grid alignment */}
+              </View>
+            </View>
           </View>
 
           {/* Goal picker (shows when Goal toggle ON) */}
@@ -460,6 +470,35 @@ export default function TaskEventForm({
             </View>
           )}
         </View>
+
+        {/* Inline Recurrence Picker (when Repeat is ON but Goal is OFF) */}
+        {formData.repeat && !formData.goalToggle && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Repeat Frequency</Text>
+            <View style={styles.recurrenceOptions}>
+              {(['daily', 'weekly', 'monthly'] as const).map((freq) => (
+                <TouchableOpacity
+                  key={freq}
+                  style={[
+                    styles.recurrenceOption,
+                    formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionActive
+                  ]}
+                  onPress={() => setFormData(prev => ({ 
+                    ...prev, 
+                    recurrenceRule: `RRULE:FREQ=${freq.toUpperCase()}` 
+                  }))}
+                >
+                  <Text style={[
+                    styles.recurrenceOptionText,
+                    formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionTextActive
+                  ]}>
+                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Dates & Recurrence */}
         {formData.schedulingType === 'task' && (
@@ -764,13 +803,13 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 40,
+    gap: 30,
   },
   toggleItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minWidth: 140,
+    minWidth: 120,
   },
   toggleLabel: {
     fontSize: 16,
@@ -821,4 +860,30 @@ const styles = StyleSheet.create({
   saveButton: { flex: 1, backgroundColor: '#0078d4', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   saveButtonDisabled: { backgroundColor: '#9ca3af' },
   saveButtonText: { color: '#fff', fontWeight: '700', paddingVertical: 12 },
+  recurrenceOptions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  recurrenceOption: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  recurrenceOptionActive: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  recurrenceOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  recurrenceOptionTextActive: {
+    color: '#ffffff',
+  },
 });
