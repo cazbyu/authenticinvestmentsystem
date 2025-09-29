@@ -547,7 +547,7 @@ export default function TaskEventForm({
                 </View>
 
                 {/* Weekly Days Selection */}
-                {formData.recurrenceRule === 'RRULE:FREQ=WEEKLY' && (
+                {formData.recurrenceRule?.startsWith('RRULE:FREQ=WEEKLY') && (
                   <View style={styles.weeklyDaysContainer}>
                     <View style={styles.weeklyDaysGrid}>
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => {
