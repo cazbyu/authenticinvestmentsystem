@@ -407,59 +407,57 @@ export default function TaskEventForm({
         </View>
 
         {/* Task-specific toggles */}
-        {formData.schedulingType === 'task' && (
-          <View style={styles.toggleSection}>
-            <View style={styles.toggleGrid}>
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleItem}>
-                  <Text style={styles.toggleLabel}>Urgent</Text>
-                  <Switch value={formData.urgent} onValueChange={(v) => setFormData(p => ({ ...p, urgent: v }))} />
-                </View>
-                <View style={styles.toggleItem}>
-                  <Text style={styles.toggleLabel}>Important</Text>
-                  <Switch value={formData.important} onValueChange={(v) => setFormData(p => ({ ...p, important: v }))} />
-                </View>
+        <View style={styles.toggleSection}>
+          <View style={styles.toggleGrid}>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Urgent</Text>
+                <Switch value={formData.urgent} onValueChange={(v) => setFormData(p => ({ ...p, urgent: v }))} />
               </View>
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleItem}>
-                  <Text style={styles.toggleLabel}>Authentic Deposit</Text>
-                  <Switch value={formData.authenticDeposit} onValueChange={(v) => setFormData(p => ({ ...p, authenticDeposit: v }))} />
-                </View>
-                <View style={styles.toggleItem}>
-                  <Text style={styles.toggleLabel}>Goal</Text>
-                  <Switch value={formData.goalToggle} onValueChange={(v) => setFormData(p => ({ ...p, goalToggle: v }))} />
-                </View>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Important</Text>
+                <Switch value={formData.important} onValueChange={(v) => setFormData(p => ({ ...p, important: v }))} />
               </View>
             </View>
-
-            {/* Goal picker (shows when Goal toggle ON) */}
-            {formData.goalToggle && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.subLabel}>Select Goal</Text>
-                <View style={styles.goalPickerRow}>
-                  {availableGoals.length === 0 ? (
-                    <Text style={{ color: '#6b7280' }}>No active goals</Text>
-                  ) : (
-                    availableGoals.map(g => {
-                      const active = formData.selectedGoal?.id === g.id;
-                      return (
-                        <TouchableOpacity
-                          key={`${g.goal_type}-${g.id}`}
-                          style={[styles.goalChip, active && styles.goalChipActive]}
-                          onPress={() => handleGoalPick(g.id)}
-                        >
-                          <Text style={[styles.goalChipText, active && styles.goalChipTextActive]}>
-                            {g.title} {g.goal_type === '12week' ? '• 12wk' : '• Custom'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </View>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Authentic Deposit</Text>
+                <Switch value={formData.authenticDeposit} onValueChange={(v) => setFormData(p => ({ ...p, authenticDeposit: v }))} />
               </View>
-            )}
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Goal</Text>
+                <Switch value={formData.goalToggle} onValueChange={(v) => setFormData(p => ({ ...p, goalToggle: v }))} />
+              </View>
+            </View>
           </View>
-        )}
+
+          {/* Goal picker (shows when Goal toggle ON) */}
+          {formData.goalToggle && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={styles.subLabel}>Select Goal</Text>
+              <View style={styles.goalPickerRow}>
+                {availableGoals.length === 0 ? (
+                  <Text style={{ color: '#6b7280' }}>No active goals</Text>
+                ) : (
+                  availableGoals.map(g => {
+                    const active = formData.selectedGoal?.id === g.id;
+                    return (
+                      <TouchableOpacity
+                        key={`${g.goal_type}-${g.id}`}
+                        style={[styles.goalChip, active && styles.goalChipActive]}
+                        onPress={() => handleGoalPick(g.id)}
+                      >
+                        <Text style={[styles.goalChipText, active && styles.goalChipTextActive]}>
+                          {g.title} {g.goal_type === '12week' ? '• 12wk' : '• Custom'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </View>
+            </View>
+          )}
+        </View>
 
         {/* Dates & Recurrence */}
         {formData.schedulingType === 'task' && (
