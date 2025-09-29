@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Calendar } from 'react-native-calendars';
+import { Calendar } from 'react-native-calendars'; // Optional: keep only if you want full calendar UI here
 import { X, Repeat } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
@@ -96,8 +96,6 @@ export default function TaskEventForm({
   const scrollRef = useRef<ScrollView>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showDueDateCalendar, setShowDueDateCalendar] = useState(false);
-  const [showStartDateCalendar, setShowStartDateCalendar] = useState(false);
 
   // Recurrence state
   const [selectedWeeklyDays, setSelectedWeeklyDays] = useState<number[]>([]);
@@ -476,22 +474,13 @@ export default function TaskEventForm({
             <View style={styles.fieldRow}>
               <View style={[styles.field, { flex: 1 }]}>
                 <Text style={styles.label}>Due Date</Text>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowDueDateCalendar(true)}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {formData.dueDate ? 
-                      formData.dueDate.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      }) : 
-                      'Select due date'
-                    }
-                  </Text>
-                </TouchableOpacity>
+                {/* TODO: replace with your date picker */}
+                <TextInput
+                  style={styles.input}
+                  placeholder="YYYY-MM-DD"
+                  value={formData.dueDate ? formData.dueDate.toISOString().slice(0,10) : ''}
+                  onChangeText={() => {}}
+                />
               </View>
               <View style={[styles.field, { flex: 1 }]}>
                 <Text style={styles.label}>Complete By</Text>
@@ -835,47 +824,19 @@ export default function TaskEventForm({
           <>
             <View style={{ gap: 12 }}>
               <Text style={styles.label}>Event Timing</Text>
-              {/* Start Date */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Start Date</Text>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowStartDateCalendar(true)}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {formData.startDate ? 
-                      formData.startDate.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      }) : 
-                      'Select start date'
-                    }
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              {/* End Date */}
-              <View style={styles.field}>
-                <Text style={styles.label}>End Date</Text>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowStartDateCalendar(true)}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {formData.endDate ? 
-                      formData.endDate.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      }) : 
-                      'Select end date'
-                    }
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              {/* TODO: Replace placeholders with proper pickers */}
+              <TextInput
+                style={styles.input}
+                placeholder="Start (YYYY-MM-DD HH:mm)"
+                value={formData.startDate ? formData.startDate.toISOString() : ''}
+                onChangeText={() => {}}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="End (YYYY-MM-DD HH:mm)"
+                value={formData.endDate ? formData.endDate.toISOString() : ''}
+                onChangeText={() => {}}
+              />
             </View>
           </>
         )}
@@ -1004,68 +965,6 @@ export default function TaskEventForm({
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Due Date Calendar Modal */}
-      <Modal visible={showDueDateCalendar} transparent animationType="fade">
-        <View style={styles.calendarOverlay}>
-          <View style={styles.calendarContainer}>
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Select Due Date</Text>
-              <TouchableOpacity onPress={() => setShowDueDateCalendar(false)}>
-                <X size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-            <Calendar
-              onDayPress={(day) => {
-                setFormData(prev => ({ ...prev, dueDate: new Date(day.dateString + 'T00:00:00') }));
-                setShowDueDateCalendar(false);
-              }}
-              markedDates={{
-                [formData.dueDate?.toISOString().slice(0, 10) || '']: {
-                  selected: true,
-                  selectedColor: '#0078d4'
-                }
-              }}
-              theme={{
-                selectedDayBackgroundColor: '#0078d4',
-                todayTextColor: '#0078d4',
-                arrowColor: '#0078d4',
-              }}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Start Date Calendar Modal */}
-      <Modal visible={showStartDateCalendar} transparent animationType="fade">
-        <View style={styles.calendarOverlay}>
-          <View style={styles.calendarContainer}>
-            <View style={styles.calendarHeader}>
-              <Text style={styles.calendarTitle}>Select Start Date</Text>
-              <TouchableOpacity onPress={() => setShowStartDateCalendar(false)}>
-                <X size={20} color="#6b7280" />
-              </TouchableOpacity>
-            </View>
-            <Calendar
-              onDayPress={(day) => {
-                setFormData(prev => ({ ...prev, startDate: new Date(day.dateString + 'T00:00:00') }));
-                setShowStartDateCalendar(false);
-              }}
-              markedDates={{
-                [formData.startDate?.toISOString().slice(0, 10) || '']: {
-                  selected: true,
-                  selectedColor: '#0078d4'
-                }
-              }}
-              theme={{
-                selectedDayBackgroundColor: '#0078d4',
-                todayTextColor: '#0078d4',
-                arrowColor: '#0078d4',
-              }}
-            />
-          </View>
-        </View>
-      </Modal>
 
       {/* GOAL MODE — Reuse ActionEffortModal */}
       {goalMode && formData.selectedGoal && (
@@ -1231,43 +1130,10 @@ const styles = StyleSheet.create({
   dateButton: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#e5e7eb',
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  calendarOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  calendarContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  calendarTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
   },
 
   actions: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 24 },
@@ -1284,14 +1150,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   repeatToggleContainerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    marginBottom: 16,
+    marginTop: 16,
+    alignItems: 'flex-start',
   },
   recurrenceOptions: {
     flexDirection: 'row',
@@ -1460,10 +1320,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   recurrenceSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
+    marginTop: 16,
+    paddingHorizontal: 16,
   },
   recurrenceLabel: {
     fontSize: 16,
