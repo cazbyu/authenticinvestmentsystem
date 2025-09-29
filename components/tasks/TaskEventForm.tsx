@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import { Calendar } from 'react-native-calendars'; // Optional: keep only if you want full calendar UI here
 import { X, Repeat } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -98,6 +99,7 @@ export default function TaskEventForm({
   const [saving, setSaving] = useState(false);
   const [showDueDateCalendar, setShowDueDateCalendar] = useState(false);
   const [showStartDateCalendar, setShowStartDateCalendar] = useState(false);
+  const [showEndDateCalendar, setShowEndDateCalendar] = useState(false);
   const [showEndDateCalendar, setShowEndDateCalendar] = useState(false);
 
   // Recurrence state
@@ -470,6 +472,257 @@ export default function TaskEventForm({
             </View>
           )}
         </View>
+          {/* Repeat Section for Events */}
+          {formData.type === 'event' && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Repeat</Text>
+                <Switch
+                  value={formData.isRecurring}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, isRecurring: value }))}
+                  trackColor={{ false: '#f3f4f6', true: '#0078d4' }}
+                  thumbColor={formData.isRecurring ? '#ffffff' : '#f4f3f4'}
+                />
+              </View>
+
+              {formData.isRecurring && (
+                <View style={styles.recurringOptions}>
+                  {/* Frequency Selection */}
+                  <View style={styles.field}>
+                    <Text style={styles.label}>Frequency</Text>
+                    <View style={styles.frequencyButtons}>
+                      {['daily', 'weekly', 'monthly', 'custom'].map((freq) => (
+                        <TouchableOpacity
+                          key={freq}
+                          style={[
+                            styles.frequencyButton,
+                            formData.recurrenceFrequency === freq && styles.activeFrequencyButton
+                          ]}
+                          onPress={() => setFormData(prev => ({ ...prev, recurrenceFrequency: freq }))}
+                        >
+                          <Text style={[
+                            styles.frequencyButtonText,
+                            formData.recurrenceFrequency === freq && styles.activeFrequencyButtonText
+                          ]}>
+                            {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Weekly Day Selection */}
+                  {formData.recurrenceFrequency === 'weekly' && (
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Days of the week</Text>
+                      <View style={styles.dayButtons}>
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                          <TouchableOpacity
+                            key={day}
+                            style={[
+                              styles.dayButton,
+                              formData.selectedDays.includes(index) && styles.activeDayButton
+                            ]}
+                            onPress={() => handleDayToggle(index)}
+                          >
+                            <Text style={[
+                              styles.dayButtonText,
+                              formData.selectedDays.includes(index) && styles.activeDayButtonText
+                            ]}>
+                              {day}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Custom Options */}
+                  {formData.recurrenceFrequency === 'custom' && (
+                    <View style={styles.field}>
+                      <Text style={styles.label}>Custom Pattern</Text>
+                      <View style={styles.customOptions}>
+                        <TouchableOpacity
+                          style={[
+                            styles.customOption,
+                            formData.customPattern === 'biweekly' && styles.activeCustomOption
+                          ]}
+                          onPress={() => setFormData(prev => ({ ...prev, customPattern: 'biweekly' }))}
+                        >
+                          <Text style={[
+                            styles.customOptionText,
+                            formData.customPattern === 'biweekly' && styles.activeCustomOptionText
+                          ]}>
+                            Bi-weekly
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity
+                          style={[
+                            styles.customOption,
+                            formData.customPattern === 'monthly' && styles.activeCustomOption
+                          ]}
+                          onPress={() => setFormData(prev => ({ ...prev, customPattern: 'monthly' }))}
+                        >
+                          <Text style={[
+                            styles.customOptionText,
+                            formData.customPattern === 'monthly' && styles.activeCustomOptionText
+                          ]}>
+                            Monthly
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Bi-weekly Day Selection */}
+                      {formData.customPattern === 'biweekly' && (
+                        <View style={styles.subField}>
+                          <Text style={styles.subLabel}>Select days</Text>
+                          <View style={styles.dayButtons}>
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                              <TouchableOpacity
+                                key={day}
+                                style={[
+                                  styles.dayButton,
+                                  formData.selectedDays.includes(index) && styles.activeDayButton
+                                ]}
+                                onPress={() => handleDayToggle(index)}
+                              >
+                                <Text style={[
+                                  styles.dayButtonText,
+                                  formData.selectedDays.includes(index) && styles.activeDayButtonText
+                                ]}>
+                                  {day}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Monthly Options */}
+                      {formData.customPattern === 'monthly' && (
+                        <View style={styles.subField}>
+                          <Text style={styles.subLabel}>Monthly pattern</Text>
+                          <View style={styles.monthlyOptions}>
+                            <TouchableOpacity
+                              style={[
+                                styles.monthlyOption,
+                                formData.monthlyPattern === 'date' && styles.activeMonthlyOption
+                              ]}
+                              onPress={() => setFormData(prev => ({ ...prev, monthlyPattern: 'date' }))}
+                            >
+                              <Text style={[
+                                styles.monthlyOptionText,
+                                formData.monthlyPattern === 'date' && styles.activeMonthlyOptionText
+                              ]}>
+                                Same Date
+                              </Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                              style={[
+                                styles.monthlyOption,
+                                formData.monthlyPattern === 'weekday' && styles.activeMonthlyOption
+                              ]}
+                              onPress={() => setFormData(prev => ({ ...prev, monthlyPattern: 'weekday' }))}
+                            >
+                              <Text style={[
+                                styles.monthlyOptionText,
+                                formData.monthlyPattern === 'weekday' && styles.activeMonthlyOptionText
+                              ]}>
+                                Same Weekday
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {formData.monthlyPattern === 'weekday' && (
+                            <View style={styles.weekdayOptions}>
+                              <View style={styles.weekdayRow}>
+                                <Text style={styles.weekdayLabel}>Which occurrence?</Text>
+                                <View style={styles.occurrenceButtons}>
+                                  {['First', 'Second', 'Third', 'Fourth', 'Last'].map((occurrence) => (
+                                    <TouchableOpacity
+                                      key={occurrence}
+                                      style={[
+                                        styles.occurrenceButton,
+                                        formData.weekdayOccurrence === occurrence.toLowerCase() && styles.activeOccurrenceButton
+                                      ]}
+                                      onPress={() => setFormData(prev => ({ ...prev, weekdayOccurrence: occurrence.toLowerCase() }))}
+                                    >
+                                      <Text style={[
+                                        styles.occurrenceButtonText,
+                                        formData.weekdayOccurrence === occurrence.toLowerCase() && styles.activeOccurrenceButtonText
+                                      ]}>
+                                        {occurrence}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ))}
+                                </View>
+                              </View>
+                              
+                              <View style={styles.weekdayRow}>
+                                <Text style={styles.weekdayLabel}>Which day?</Text>
+                                <View style={styles.dayButtons}>
+                                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                                    <TouchableOpacity
+                                      key={day}
+                                      style={[
+                                        styles.dayButton,
+                                        formData.selectedWeekday === index && styles.activeDayButton
+                                      ]}
+                                      onPress={() => setFormData(prev => ({ ...prev, selectedWeekday: index }))}
+                                    >
+              <Calendar
+                onDayPress={(day) => {
+                  setFormData(prev => ({ ...prev, start_date: day.dateString }));
+                  setShowStartDateCalendar(false);
+                }}
+                markedDates={{
+                  [formData.start_date]: {
+                    selected: true,
+                    selectedColor: '#0078d4'
+                  }
+                }}
+                theme={{
+                  selectedDayBackgroundColor: '#0078d4',
+                  todayTextColor: '#0078d4',
+                  arrowColor: '#0078d4',
+                }}
+              />
+              )}
+            </View>
+          )}
+
+        {/* End Date Calendar Modal */}
+        <Modal visible={showEndDateCalendar} transparent animationType="fade">
+          <View style={styles.calendarOverlay}>
+            <View style={styles.calendarContainer}>
+              <View style={styles.calendarHeader}>
+                <Text style={styles.calendarTitle}>Select End Date</Text>
+                <TouchableOpacity onPress={() => setShowEndDateCalendar(false)}>
+                  <X size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              <Calendar
+                onDayPress={(day) => {
+                  setFormData(prev => ({ ...prev, end_date: day.dateString }));
+                  setShowEndDateCalendar(false);
+                }}
+                markedDates={{
+                  [formData.end_date]: {
+                    selected: true,
+                    selectedColor: '#0078d4'
+                  }
+                }}
+                theme={{
+                  selectedDayBackgroundColor: '#0078d4',
+                  todayTextColor: '#0078d4',
+                  arrowColor: '#0078d4',
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
 
         {/* Dates & Recurrence */}
         {formData.schedulingType === 'task' && (
@@ -1228,7 +1481,7 @@ export default function TaskEventForm({
                 setFormData(prev => ({ ...prev, end_date: day.dateString }));
                 setShowEndDateCalendar(false);
               }}
-              markedDates={{
+                onPress={() => setShowEndDateCalendar(true)}
                 [formData.end_date || formatLocalDate(new Date())]: {
                   selected: true,
                   selectedColor: '#0078d4'
