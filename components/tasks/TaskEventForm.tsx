@@ -55,6 +55,7 @@ interface FormData {
   important: boolean;
   authenticDeposit: boolean;
   goalToggle: boolean;
+  repeat: boolean;
 
   // Dates / Times (Task & Event)
   dueDate?: Date;            // Task
