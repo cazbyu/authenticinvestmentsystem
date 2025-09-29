@@ -80,6 +80,19 @@ interface FormData {
 
 // ------------ Component ------------
 export default function TaskEventForm({ mode = 'create', initialData }: { mode?: 'create' | 'edit'; initialData?: any }) {
+export default function TaskEventForm({ 
+  mode = 'create', 
+  initialData, 
+  onClose, 
+  onSubmitSuccess 
+}: { 
+  mode?: 'create' | 'edit'; 
+  initialData?: any;
+  onClose?: () => void;
+  onSubmitSuccess?: () => void;
+}) {
+  const { onClose, onSubmitSuccess } = initialData || {};
+
   // UI & refs
   const scrollRef = useRef<ScrollView>(null);
   const [loading, setLoading] = useState(true);
@@ -357,6 +370,7 @@ export default function TaskEventForm({ mode = 'create', initialData }: { mode?:
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{mode === 'edit' ? 'Edit' : 'New'} Item</Text>
         <TouchableOpacity onPress={() => {/* TODO: close navigation */}} style={{ padding: 8 }}>
+        <TouchableOpacity onPress={onClose} style={{ padding: 8 }}>
           <X size={22} color="#111827" />
         </TouchableOpacity>
       </View>
@@ -605,6 +619,7 @@ export default function TaskEventForm({ mode = 'create', initialData }: { mode?:
         {/* Footer */}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.cancelButton} onPress={() => {/* TODO: close */}} disabled={saving}>
+          <TouchableOpacity style={styles.cancelButton} onPress={onClose} disabled={saving}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
