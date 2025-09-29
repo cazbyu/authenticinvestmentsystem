@@ -79,7 +79,6 @@ interface FormData {
 }
 
 // ------------ Component ------------
-export default function TaskEventForm({ mode = 'create', initialData }: { mode?: 'create' | 'edit'; initialData?: any }) {
 export default function TaskEventForm({ 
   mode = 'create', 
   initialData, 
@@ -91,7 +90,6 @@ export default function TaskEventForm({
   onClose?: () => void;
   onSubmitSuccess?: () => void;
 }) {
-  const { onClose, onSubmitSuccess } = initialData || {};
 
   // UI & refs
   const scrollRef = useRef<ScrollView>(null);
@@ -233,7 +231,7 @@ export default function TaskEventForm({
   // If you want to show/select weeks like ActionEffortModal
   async function fetchCycleWeeks() {
     // TODO: Replace with your real timeline fetch
-    // For now we’ll just create 12 numbered weeks.
+    // For now we'll just create 12 numbered weeks.
     const fakeWeeks: CycleWeek[] = Array.from({ length: 12 }, (_, i) => ({
       week_number: i + 1,
       week_start: '',
@@ -283,7 +281,7 @@ export default function TaskEventForm({
 
     // NOTE: Adjust to your schema if join views differ.
     // Minimal fetch (id, title) shown above; here we assume you have join helpers or can stitch manually later.
-    // For now, we’ll just set the base (title) and let ActionEffortModal handle associations visually.
+    // For now, we'll just set the base (title) and let ActionEffortModal handle associations visually.
     setFormData(prev => ({ ...prev, selectedGoal: base }));
   }
 
@@ -369,7 +367,6 @@ export default function TaskEventForm({
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{mode === 'edit' ? 'Edit' : 'New'} Item</Text>
-        <TouchableOpacity onPress={() => {/* TODO: close navigation */}} style={{ padding: 8 }}>
         <TouchableOpacity onPress={onClose} style={{ padding: 8 }}>
           <X size={22} color="#111827" />
         </TouchableOpacity>
@@ -618,7 +615,6 @@ export default function TaskEventForm({
 
         {/* Footer */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.cancelButton} onPress={() => {/* TODO: close */}} disabled={saving}>
           <TouchableOpacity style={styles.cancelButton} onPress={onClose} disabled={saving}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -635,7 +631,7 @@ export default function TaskEventForm({
           onClose={() => setGoalModalVisible(false)}
           goal={formData.selectedGoal}
           cycleWeeks={cycleWeeks}
-          // This function comes from your modal contract: create a task + week plan from the modal’s collected fields
+          // This function comes from your modal contract: create a task + week plan from the modal's collected fields
           createTaskWithWeekPlan={async (payload) => {
             // 🔗 You can either:
             //  A) create a task immediately here (modal-driven flow), OR
