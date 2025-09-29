@@ -125,7 +125,6 @@ export default function TaskEventForm({
     authenticDeposit: false,
     goalToggle: false,
     repeat: false,
-    repeat: false,
     roles: [],
     domains: [],
     keyRelationships: [],
@@ -496,7 +495,7 @@ export default function TaskEventForm({
             </View>
 
             {/* Repeat toggle */}
-            <View style={styles.repeatToggleContainer}>
+            <View style={styles.repeatToggleContainerLeft}>
               <View style={styles.toggleItem}>
                 <Text style={styles.toggleLabel}>Repeat</Text>
                 <Switch value={formData.repeat} onValueChange={(v) => setFormData(p => ({ ...p, repeat: v }))} />
@@ -550,7 +549,6 @@ export default function TaskEventForm({
                 {/* Weekly Days Selection */}
                 {formData.recurrenceRule === 'RRULE:FREQ=WEEKLY' && (
                   <View style={styles.weeklyDaysContainer}>
-                    <Text style={styles.subLabel}>Select Days</Text>
                     <View style={styles.weeklyDaysGrid}>
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => {
                         const isSelected = selectedWeeklyDays.includes(index);
@@ -842,7 +840,7 @@ export default function TaskEventForm({
             </View>
 
             {/* Repeat toggle */}
-            <View style={styles.repeatToggleContainer}>
+            <View style={styles.repeatToggleContainerLeft}>
               <View style={styles.toggleItem}>
                 <Text style={styles.toggleLabel}>Repeat</Text>
                 <Switch value={formData.repeat} onValueChange={(v) => setFormData(p => ({ ...p, repeat: v }))} />
@@ -1473,9 +1471,12 @@ const styles = StyleSheet.create({
   saveButtonDisabled: { backgroundColor: '#9ca3af' },
   saveButtonText: { color: '#fff', fontWeight: '700', paddingVertical: 12 },
   repeatToggleContainer: {
-    alignItems: 'center',
     marginTop: 16,
-    marginBottom: 8,
+    alignItems: 'center',
+  },
+  repeatToggleContainerLeft: {
+    marginTop: 16,
+    alignItems: 'flex-start',
   },
   recurrenceOptions: {
     flexDirection: 'row',
@@ -1639,5 +1640,18 @@ const styles = StyleSheet.create({
   },
   dayOfWeekSelector: {
     alignItems: 'center',
+  },
+  weekDaysSection: {
+    marginTop: 12,
+  },
+  recurrenceSection: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+  },
+  recurrenceLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
   },
 });
