@@ -97,6 +97,13 @@ export default function TaskEventForm({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Recurrence state
+  const [selectedWeeklyDays, setSelectedWeeklyDays] = useState<number[]>([]);
+  const [customRecurrenceType, setCustomRecurrenceType] = useState<'biweekly' | 'monthly'>('biweekly');
+  const [monthlyOption, setMonthlyOption] = useState<'date' | 'weekday'>('date');
+  const [monthlyWeekday, setMonthlyWeekday] = useState<'first' | 'second' | 'third' | 'fourth' | 'last'>('first');
+  const [monthlyDayOfWeek, setMonthlyDayOfWeek] = useState<number>(1); // Monday
+
   // Options fetched from DB
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [availableDomains, setAvailableDomains] = useState<Domain[]>([]);
@@ -521,7 +528,295 @@ export default function TaskEventForm({
                       </Text>
                     </TouchableOpacity>
                   ))}
+                  <TouchableOpacity
+                    style={[
+                      styles.recurrenceOption,
+                      formData.recurrenceRule?.includes('CUSTOM') && styles.recurrenceOptionActive
+                    ]}
+                    onPress={() => setFormData(prev => ({ 
+                      ...prev, 
+                      recurrenceRule: 'CUSTOM' 
+                    }))}
+                  >
+                    <Text style={[
+                      styles.recurrenceOptionText,
+                      formData.recurrenceRule?.includes('CUSTOM') && styles.recurrenceOptionTextActive
+                    ]}>
+                      Custom
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+
+                {/* Weekly Days Selection */}
+                {formData.recurrenceRule === 'RRULE:FREQ=WEEKLY' && (
+                  <View style={styles.weeklyDaysContainer}>
+                    <Text style={styles.subLabel}>Select Days</Text>
+                    <View style={styles.weeklyDaysGrid}>
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => {
+                        const isSelected = selectedWeeklyDays.includes(index);
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.weeklyDayButton,
+                              isSelected && styles.weeklyDayButtonSelected
+                            ]}
+                            onPress={() => {
+                              const newDays = isSelected
+                                ? selectedWeeklyDays.filter(d => d !== index)
+                                : [...selectedWeeklyDays, index];
+                              setSelectedWeeklyDays(newDays);
+                              
+                              // Update recurrence rule with selected days
+                              if (newDays.length > 0) {
+                                const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                const byDays = newDays.map(dayIndex => dayNames[dayIndex]).join(',');
+                                setFormData(prev => ({ 
+                                  ...prev, 
+                                  recurrenceRule: `RRULE:FREQ=WEEKLY;BYDAY=${byDays}` 
+                                }));
+                              } else {
+                                setFormData(prev => ({ 
+                                  ...prev, 
+                                  recurrenceRule: 'RRULE:FREQ=WEEKLY' 
+                                }));
+                              }
+                            }}
+                          >
+                            <Text style={[
+                              styles.weeklyDayButtonText,
+                              isSelected && styles.weeklyDayButtonTextSelected
+                            ]}>
+                              {dayName}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Custom Recurrence Options */}
+                {formData.recurrenceRule?.includes('CUSTOM') && (
+                  <View style={styles.customRecurrenceContainer}>
+                    <Text style={styles.subLabel}>Custom Frequency</Text>
+                    
+                    {/* Bi-weekly / Monthly selector */}
+                    <View style={styles.customTypeSelector}>
+                      <TouchableOpacity
+                        style={[
+                          styles.customTypeButton,
+                          customRecurrenceType === 'biweekly' && styles.customTypeButtonActive
+                        ]}
+                        onPress={() => setCustomRecurrenceType('biweekly')}
+                      >
+                        <Text style={[
+                          styles.customTypeButtonText,
+                          customRecurrenceType === 'biweekly' && styles.customTypeButtonTextActive
+                        ]}>
+                          Bi-weekly
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.customTypeButton,
+                          customRecurrenceType === 'monthly' && styles.customTypeButtonActive
+                        ]}
+                        onPress={() => setCustomRecurrenceType('monthly')}
+                      >
+                        <Text style={[
+                          styles.customTypeButtonText,
+                          customRecurrenceType === 'monthly' && styles.customTypeButtonTextActive
+                        ]}>
+                          Monthly
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Bi-weekly options */}
+                    {customRecurrenceType === 'biweekly' && (
+                      <View style={styles.biweeklyOptions}>
+                        <Text style={styles.subLabel}>Select Days (every 2 weeks)</Text>
+                        <View style={styles.weeklyDaysGrid}>
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => {
+                            const isSelected = selectedWeeklyDays.includes(index);
+                            return (
+                              <TouchableOpacity
+                                key={index}
+                                style={[
+                                  styles.weeklyDayButton,
+                                  isSelected && styles.weeklyDayButtonSelected
+                                ]}
+                                onPress={() => {
+                                  const newDays = isSelected
+                                    ? selectedWeeklyDays.filter(d => d !== index)
+                                    : [...selectedWeeklyDays, index];
+                                  setSelectedWeeklyDays(newDays);
+                                  
+                                  // Update recurrence rule for bi-weekly
+                                  if (newDays.length > 0) {
+                                    const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                    const byDays = newDays.map(dayIndex => dayNames[dayIndex]).join(',');
+                                    setFormData(prev => ({ 
+                                      ...prev, 
+                                      recurrenceRule: `RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=${byDays}` 
+                                    }));
+                                  } else {
+                                    setFormData(prev => ({ 
+                                      ...prev, 
+                                      recurrenceRule: 'RRULE:FREQ=WEEKLY;INTERVAL=2' 
+                                    }));
+                                  }
+                                }}
+                              >
+                                <Text style={[
+                                  styles.weeklyDayButtonText,
+                                  isSelected && styles.weeklyDayButtonTextSelected
+                                ]}>
+                                  {dayName}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Monthly options */}
+                    {customRecurrenceType === 'monthly' && (
+                      <View style={styles.monthlyOptions}>
+                        <Text style={styles.subLabel}>Monthly Pattern</Text>
+                        
+                        {/* Date vs Weekday selector */}
+                        <View style={styles.monthlyTypeSelector}>
+                          <TouchableOpacity
+                            style={[
+                              styles.monthlyTypeButton,
+                              monthlyOption === 'date' && styles.monthlyTypeButtonActive
+                            ]}
+                            onPress={() => {
+                              setMonthlyOption('date');
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                recurrenceRule: 'RRULE:FREQ=MONTHLY' 
+                              }));
+                            }}
+                          >
+                            <Text style={[
+                              styles.monthlyTypeButtonText,
+                              monthlyOption === 'date' && styles.monthlyTypeButtonTextActive
+                            ]}>
+                              Same Date
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.monthlyTypeButton,
+                              monthlyOption === 'weekday' && styles.monthlyTypeButtonActive
+                            ]}
+                            onPress={() => {
+                              setMonthlyOption('weekday');
+                              const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                              const byDay = dayNames[monthlyDayOfWeek];
+                              const setPos = monthlyWeekday === 'last' ? '-1' : 
+                                           monthlyWeekday === 'first' ? '1' :
+                                           monthlyWeekday === 'second' ? '2' :
+                                           monthlyWeekday === 'third' ? '3' : '4';
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                recurrenceRule: `RRULE:FREQ=MONTHLY;BYDAY=${setPos}${byDay}` 
+                              }));
+                            }}
+                          >
+                            <Text style={[
+                              styles.monthlyTypeButtonText,
+                              monthlyOption === 'weekday' && styles.monthlyTypeButtonTextActive
+                            ]}>
+                              Same Weekday
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Weekday-specific options */}
+                        {monthlyOption === 'weekday' && (
+                          <View style={styles.weekdayOptions}>
+                            {/* Week selector */}
+                            <View style={styles.weekSelector}>
+                              <Text style={styles.subLabel}>Which Week?</Text>
+                              <View style={styles.weekSelectorGrid}>
+                                {(['first', 'second', 'third', 'fourth', 'last'] as const).map((week) => (
+                                  <TouchableOpacity
+                                    key={week}
+                                    style={[
+                                      styles.weekSelectorButton,
+                                      monthlyWeekday === week && styles.weekSelectorButtonActive
+                                    ]}
+                                    onPress={() => {
+                                      setMonthlyWeekday(week);
+                                      const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                      const byDay = dayNames[monthlyDayOfWeek];
+                                      const setPos = week === 'last' ? '-1' : 
+                                                   week === 'first' ? '1' :
+                                                   week === 'second' ? '2' :
+                                                   week === 'third' ? '3' : '4';
+                                      setFormData(prev => ({ 
+                                        ...prev, 
+                                        recurrenceRule: `RRULE:FREQ=MONTHLY;BYDAY=${setPos}${byDay}` 
+                                      }));
+                                    }}
+                                  >
+                                    <Text style={[
+                                      styles.weekSelectorButtonText,
+                                      monthlyWeekday === week && styles.weekSelectorButtonTextActive
+                                    ]}>
+                                      {week.charAt(0).toUpperCase() + week.slice(1)}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+
+                            {/* Day of week selector */}
+                            <View style={styles.dayOfWeekSelector}>
+                              <Text style={styles.subLabel}>Which Day?</Text>
+                              <View style={styles.weeklyDaysGrid}>
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => (
+                                  <TouchableOpacity
+                                    key={index}
+                                    style={[
+                                      styles.weeklyDayButton,
+                                      monthlyDayOfWeek === index && styles.weeklyDayButtonSelected
+                                    ]}
+                                    onPress={() => {
+                                      setMonthlyDayOfWeek(index);
+                                      const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                      const byDay = dayNames[index];
+                                      const setPos = monthlyWeekday === 'last' ? '-1' : 
+                                                   monthlyWeekday === 'first' ? '1' :
+                                                   monthlyWeekday === 'second' ? '2' :
+                                                   monthlyWeekday === 'third' ? '3' : '4';
+                                      setFormData(prev => ({ 
+                                        ...prev, 
+                                        recurrenceRule: `RRULE:FREQ=MONTHLY;BYDAY=${setPos}${byDay}` 
+                                      }));
+                                    }}
+                                  >
+                                    <Text style={[
+                                      styles.weeklyDayButtonText,
+                                      monthlyDayOfWeek === index && styles.weeklyDayButtonTextSelected
+                                    ]}>
+                                      {dayName}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             )}
           </>
@@ -579,7 +874,295 @@ export default function TaskEventForm({
                       </Text>
                     </TouchableOpacity>
                   ))}
+                  <TouchableOpacity
+                    style={[
+                      styles.recurrenceOption,
+                      formData.recurrenceRule?.includes('CUSTOM') && styles.recurrenceOptionActive
+                    ]}
+                    onPress={() => setFormData(prev => ({ 
+                      ...prev, 
+                      recurrenceRule: 'CUSTOM' 
+                    }))}
+                  >
+                    <Text style={[
+                      styles.recurrenceOptionText,
+                      formData.recurrenceRule?.includes('CUSTOM') && styles.recurrenceOptionTextActive
+                    ]}>
+                      Custom
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+
+                {/* Weekly Days Selection */}
+                {formData.recurrenceRule === 'RRULE:FREQ=WEEKLY' && (
+                  <View style={styles.weeklyDaysContainer}>
+                    <Text style={styles.subLabel}>Select Days</Text>
+                    <View style={styles.weeklyDaysGrid}>
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => {
+                        const isSelected = selectedWeeklyDays.includes(index);
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.weeklyDayButton,
+                              isSelected && styles.weeklyDayButtonSelected
+                            ]}
+                            onPress={() => {
+                              const newDays = isSelected
+                                ? selectedWeeklyDays.filter(d => d !== index)
+                                : [...selectedWeeklyDays, index];
+                              setSelectedWeeklyDays(newDays);
+                              
+                              // Update recurrence rule with selected days
+                              if (newDays.length > 0) {
+                                const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                const byDays = newDays.map(dayIndex => dayNames[dayIndex]).join(',');
+                                setFormData(prev => ({ 
+                                  ...prev, 
+                                  recurrenceRule: `RRULE:FREQ=WEEKLY;BYDAY=${byDays}` 
+                                }));
+                              } else {
+                                setFormData(prev => ({ 
+                                  ...prev, 
+                                  recurrenceRule: 'RRULE:FREQ=WEEKLY' 
+                                }));
+                              }
+                            }}
+                          >
+                            <Text style={[
+                              styles.weeklyDayButtonText,
+                              isSelected && styles.weeklyDayButtonTextSelected
+                            ]}>
+                              {dayName}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
+                {/* Custom Recurrence Options */}
+                {formData.recurrenceRule?.includes('CUSTOM') && (
+                  <View style={styles.customRecurrenceContainer}>
+                    <Text style={styles.subLabel}>Custom Frequency</Text>
+                    
+                    {/* Bi-weekly / Monthly selector */}
+                    <View style={styles.customTypeSelector}>
+                      <TouchableOpacity
+                        style={[
+                          styles.customTypeButton,
+                          customRecurrenceType === 'biweekly' && styles.customTypeButtonActive
+                        ]}
+                        onPress={() => setCustomRecurrenceType('biweekly')}
+                      >
+                        <Text style={[
+                          styles.customTypeButtonText,
+                          customRecurrenceType === 'biweekly' && styles.customTypeButtonTextActive
+                        ]}>
+                          Bi-weekly
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.customTypeButton,
+                          customRecurrenceType === 'monthly' && styles.customTypeButtonActive
+                        ]}
+                        onPress={() => setCustomRecurrenceType('monthly')}
+                      >
+                        <Text style={[
+                          styles.customTypeButtonText,
+                          customRecurrenceType === 'monthly' && styles.customTypeButtonTextActive
+                        ]}>
+                          Monthly
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Bi-weekly options */}
+                    {customRecurrenceType === 'biweekly' && (
+                      <View style={styles.biweeklyOptions}>
+                        <Text style={styles.subLabel}>Select Days (every 2 weeks)</Text>
+                        <View style={styles.weeklyDaysGrid}>
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => {
+                            const isSelected = selectedWeeklyDays.includes(index);
+                            return (
+                              <TouchableOpacity
+                                key={index}
+                                style={[
+                                  styles.weeklyDayButton,
+                                  isSelected && styles.weeklyDayButtonSelected
+                                ]}
+                                onPress={() => {
+                                  const newDays = isSelected
+                                    ? selectedWeeklyDays.filter(d => d !== index)
+                                    : [...selectedWeeklyDays, index];
+                                  setSelectedWeeklyDays(newDays);
+                                  
+                                  // Update recurrence rule for bi-weekly
+                                  if (newDays.length > 0) {
+                                    const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                    const byDays = newDays.map(dayIndex => dayNames[dayIndex]).join(',');
+                                    setFormData(prev => ({ 
+                                      ...prev, 
+                                      recurrenceRule: `RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=${byDays}` 
+                                    }));
+                                  } else {
+                                    setFormData(prev => ({ 
+                                      ...prev, 
+                                      recurrenceRule: 'RRULE:FREQ=WEEKLY;INTERVAL=2' 
+                                    }));
+                                  }
+                                }}
+                              >
+                                <Text style={[
+                                  styles.weeklyDayButtonText,
+                                  isSelected && styles.weeklyDayButtonTextSelected
+                                ]}>
+                                  {dayName}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Monthly options */}
+                    {customRecurrenceType === 'monthly' && (
+                      <View style={styles.monthlyOptions}>
+                        <Text style={styles.subLabel}>Monthly Pattern</Text>
+                        
+                        {/* Date vs Weekday selector */}
+                        <View style={styles.monthlyTypeSelector}>
+                          <TouchableOpacity
+                            style={[
+                              styles.monthlyTypeButton,
+                              monthlyOption === 'date' && styles.monthlyTypeButtonActive
+                            ]}
+                            onPress={() => {
+                              setMonthlyOption('date');
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                recurrenceRule: 'RRULE:FREQ=MONTHLY' 
+                              }));
+                            }}
+                          >
+                            <Text style={[
+                              styles.monthlyTypeButtonText,
+                              monthlyOption === 'date' && styles.monthlyTypeButtonTextActive
+                            ]}>
+                              Same Date
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.monthlyTypeButton,
+                              monthlyOption === 'weekday' && styles.monthlyTypeButtonActive
+                            ]}
+                            onPress={() => {
+                              setMonthlyOption('weekday');
+                              const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                              const byDay = dayNames[monthlyDayOfWeek];
+                              const setPos = monthlyWeekday === 'last' ? '-1' : 
+                                           monthlyWeekday === 'first' ? '1' :
+                                           monthlyWeekday === 'second' ? '2' :
+                                           monthlyWeekday === 'third' ? '3' : '4';
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                recurrenceRule: `RRULE:FREQ=MONTHLY;BYDAY=${setPos}${byDay}` 
+                              }));
+                            }}
+                          >
+                            <Text style={[
+                              styles.monthlyTypeButtonText,
+                              monthlyOption === 'weekday' && styles.monthlyTypeButtonTextActive
+                            ]}>
+                              Same Weekday
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Weekday-specific options */}
+                        {monthlyOption === 'weekday' && (
+                          <View style={styles.weekdayOptions}>
+                            {/* Week selector */}
+                            <View style={styles.weekSelector}>
+                              <Text style={styles.subLabel}>Which Week?</Text>
+                              <View style={styles.weekSelectorGrid}>
+                                {(['first', 'second', 'third', 'fourth', 'last'] as const).map((week) => (
+                                  <TouchableOpacity
+                                    key={week}
+                                    style={[
+                                      styles.weekSelectorButton,
+                                      monthlyWeekday === week && styles.weekSelectorButtonActive
+                                    ]}
+                                    onPress={() => {
+                                      setMonthlyWeekday(week);
+                                      const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                      const byDay = dayNames[monthlyDayOfWeek];
+                                      const setPos = week === 'last' ? '-1' : 
+                                                   week === 'first' ? '1' :
+                                                   week === 'second' ? '2' :
+                                                   week === 'third' ? '3' : '4';
+                                      setFormData(prev => ({ 
+                                        ...prev, 
+                                        recurrenceRule: `RRULE:FREQ=MONTHLY;BYDAY=${setPos}${byDay}` 
+                                      }));
+                                    }}
+                                  >
+                                    <Text style={[
+                                      styles.weekSelectorButtonText,
+                                      monthlyWeekday === week && styles.weekSelectorButtonTextActive
+                                    ]}>
+                                      {week.charAt(0).toUpperCase() + week.slice(1)}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+
+                            {/* Day of week selector */}
+                            <View style={styles.dayOfWeekSelector}>
+                              <Text style={styles.subLabel}>Which Day?</Text>
+                              <View style={styles.weeklyDaysGrid}>
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => (
+                                  <TouchableOpacity
+                                    key={index}
+                                    style={[
+                                      styles.weeklyDayButton,
+                                      monthlyDayOfWeek === index && styles.weeklyDayButtonSelected
+                                    ]}
+                                    onPress={() => {
+                                      setMonthlyDayOfWeek(index);
+                                      const dayNames = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                                      const byDay = dayNames[index];
+                                      const setPos = monthlyWeekday === 'last' ? '-1' : 
+                                                   monthlyWeekday === 'first' ? '1' :
+                                                   monthlyWeekday === 'second' ? '2' :
+                                                   monthlyWeekday === 'third' ? '3' : '4';
+                                      setFormData(prev => ({ 
+                                        ...prev, 
+                                        recurrenceRule: `RRULE:FREQ=MONTHLY;BYDAY=${setPos}${byDay}` 
+                                      }));
+                                    }}
+                                  >
+                                    <Text style={[
+                                      styles.weeklyDayButtonText,
+                                      monthlyDayOfWeek === index && styles.weeklyDayButtonTextSelected
+                                    ]}>
+                                      {dayName}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             )}
           </>
@@ -919,5 +1502,142 @@ const styles = StyleSheet.create({
   },
   recurrenceOptionTextActive: {
     color: '#ffffff',
+  },
+  weeklyDaysContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  weeklyDaysGrid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  weeklyDayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  weeklyDayButtonSelected: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  weeklyDayButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  weeklyDayButtonTextSelected: {
+    color: '#ffffff',
+  },
+  customRecurrenceContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  customTypeSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 2,
+    marginTop: 8,
+  },
+  customTypeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  customTypeButtonActive: {
+    backgroundColor: '#0078d4',
+  },
+  customTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  customTypeButtonTextActive: {
+    color: '#ffffff',
+  },
+  biweeklyOptions: {
+    marginTop: 12,
+  },
+  monthlyOptions: {
+    marginTop: 12,
+  },
+  monthlyTypeSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 2,
+    marginTop: 8,
+  },
+  monthlyTypeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  monthlyTypeButtonActive: {
+    backgroundColor: '#0078d4',
+  },
+  monthlyTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  monthlyTypeButtonTextActive: {
+    color: '#ffffff',
+  },
+  weekdayOptions: {
+    marginTop: 12,
+    gap: 12,
+  },
+  weekSelector: {
+    alignItems: 'center',
+  },
+  weekSelectorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  weekSelectorButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  weekSelectorButtonActive: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  weekSelectorButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  weekSelectorButtonTextActive: {
+    color: '#ffffff',
+  },
+  dayOfWeekSelector: {
+    alignItems: 'center',
   },
 });
