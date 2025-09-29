@@ -409,7 +409,7 @@ export default function TaskEventForm({
           ))}
         </View>
 
-        {/* Task-specific toggles */}
+        {/* Toggle switches - 2x2 grid, centered */}
         <View style={styles.toggleSection}>
           <View style={styles.toggleGrid}>
             <View style={styles.toggleRow}>
@@ -430,15 +430,6 @@ export default function TaskEventForm({
               <View style={styles.toggleItem}>
                 <Text style={styles.toggleLabel}>Goal</Text>
                 <Switch value={formData.goalToggle} onValueChange={(v) => setFormData(p => ({ ...p, goalToggle: v }))} />
-              </View>
-            </View>
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleItem}>
-                <Text style={styles.toggleLabel}>Repeat</Text>
-                <Switch value={formData.repeat} onValueChange={(v) => setFormData(p => ({ ...p, repeat: v }))} />
-              </View>
-              <View style={styles.toggleItem}>
-                {/* Empty space to maintain grid alignment */}
               </View>
             </View>
           </View>
@@ -471,35 +462,6 @@ export default function TaskEventForm({
           )}
         </View>
 
-        {/* Inline Recurrence Picker (when Repeat is ON but Goal is OFF) */}
-        {formData.repeat && !formData.goalToggle && (
-          <View style={styles.field}>
-            <Text style={styles.label}>Repeat Frequency</Text>
-            <View style={styles.recurrenceOptions}>
-              {(['daily', 'weekly', 'monthly'] as const).map((freq) => (
-                <TouchableOpacity
-                  key={freq}
-                  style={[
-                    styles.recurrenceOption,
-                    formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionActive
-                  ]}
-                  onPress={() => setFormData(prev => ({ 
-                    ...prev, 
-                    recurrenceRule: `RRULE:FREQ=${freq.toUpperCase()}` 
-                  }))}
-                >
-                  <Text style={[
-                    styles.recurrenceOptionText,
-                    formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionTextActive
-                  ]}>
-                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* Dates & Recurrence */}
         {formData.schedulingType === 'task' && (
           <>
@@ -526,34 +488,101 @@ export default function TaskEventForm({
               </View>
             </View>
 
-            {/* Recurrence (simple placeholder; ActionEffortModal handles advanced) */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Repeat</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Repeat size={18} color="#4b5563" />
-                <Text style={{ color: '#4b5563' }}>Set in Action Effort (opens when a goal is selected)</Text>
+            {/* Repeat toggle */}
+            <View style={styles.repeatToggleContainer}>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Repeat</Text>
+                <Switch value={formData.repeat} onValueChange={(v) => setFormData(p => ({ ...p, repeat: v }))} />
               </View>
             </View>
+
+            {/* Inline Recurrence Picker (when Repeat is ON but Goal is OFF) */}
+            {formData.repeat && !formData.goalToggle && (
+              <View style={styles.field}>
+                <Text style={styles.label}>Repeat Frequency</Text>
+                <View style={styles.recurrenceOptions}>
+                  {(['daily', 'weekly', 'monthly'] as const).map((freq) => (
+                    <TouchableOpacity
+                      key={freq}
+                      style={[
+                        styles.recurrenceOption,
+                        formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionActive
+                      ]}
+                      onPress={() => setFormData(prev => ({ 
+                        ...prev, 
+                        recurrenceRule: `RRULE:FREQ=${freq.toUpperCase()}` 
+                      }))}
+                    >
+                      <Text style={[
+                        styles.recurrenceOptionText,
+                        formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionTextActive
+                      ]}>
+                        {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </>
         )}
 
         {formData.schedulingType === 'event' && (
-          <View style={{ gap: 12 }}>
-            <Text style={styles.label}>Event Timing</Text>
-            {/* TODO: Replace placeholders with proper pickers */}
-            <TextInput
-              style={styles.input}
-              placeholder="Start (YYYY-MM-DD HH:mm)"
-              value={formData.startDate ? formData.startDate.toISOString() : ''}
-              onChangeText={() => {}}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="End (YYYY-MM-DD HH:mm)"
-              value={formData.endDate ? formData.endDate.toISOString() : ''}
-              onChangeText={() => {}}
-            />
-          </View>
+          <>
+            <View style={{ gap: 12 }}>
+              <Text style={styles.label}>Event Timing</Text>
+              {/* TODO: Replace placeholders with proper pickers */}
+              <TextInput
+                style={styles.input}
+                placeholder="Start (YYYY-MM-DD HH:mm)"
+                value={formData.startDate ? formData.startDate.toISOString() : ''}
+                onChangeText={() => {}}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="End (YYYY-MM-DD HH:mm)"
+                value={formData.endDate ? formData.endDate.toISOString() : ''}
+                onChangeText={() => {}}
+              />
+            </View>
+
+            {/* Repeat toggle */}
+            <View style={styles.repeatToggleContainer}>
+              <View style={styles.toggleItem}>
+                <Text style={styles.toggleLabel}>Repeat</Text>
+                <Switch value={formData.repeat} onValueChange={(v) => setFormData(p => ({ ...p, repeat: v }))} />
+              </View>
+            </View>
+
+            {/* Inline Recurrence Picker (when Repeat is ON but Goal is OFF) */}
+            {formData.repeat && !formData.goalToggle && (
+              <View style={styles.field}>
+                <Text style={styles.label}>Repeat Frequency</Text>
+                <View style={styles.recurrenceOptions}>
+                  {(['daily', 'weekly', 'monthly'] as const).map((freq) => (
+                    <TouchableOpacity
+                      key={freq}
+                      style={[
+                        styles.recurrenceOption,
+                        formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionActive
+                      ]}
+                      onPress={() => setFormData(prev => ({ 
+                        ...prev, 
+                        recurrenceRule: `RRULE:FREQ=${freq.toUpperCase()}` 
+                      }))}
+                    >
+                      <Text style={[
+                        styles.recurrenceOptionText,
+                        formData.recurrenceRule === `RRULE:FREQ=${freq.toUpperCase()}` && styles.recurrenceOptionTextActive
+                      ]}>
+                        {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
         )}
 
         {formData.schedulingType === 'depositIdea' && (
@@ -860,6 +889,11 @@ const styles = StyleSheet.create({
   saveButton: { flex: 1, backgroundColor: '#0078d4', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   saveButtonDisabled: { backgroundColor: '#9ca3af' },
   saveButtonText: { color: '#fff', fontWeight: '700', paddingVertical: 12 },
+  repeatToggleContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
   recurrenceOptions: {
     flexDirection: 'row',
     justifyContent: 'center',
