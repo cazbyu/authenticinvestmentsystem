@@ -14,6 +14,7 @@ import {
 import { Calendar } from 'react-native-calendars';
 import { X, Repeat } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
+import { formatLocalDate } from '@/lib/dateUtils';
 
 // ⬇️ If your ActionEffortModal lives elsewhere, update this path
 import ActionEffortModal from '../goals/ActionEffortModal';
