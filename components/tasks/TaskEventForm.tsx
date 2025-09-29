@@ -100,7 +100,6 @@ export default function TaskEventForm({
   const [showDueDateCalendar, setShowDueDateCalendar] = useState(false);
   const [showStartDateCalendar, setShowStartDateCalendar] = useState(false);
   const [showEndDateCalendar, setShowEndDateCalendar] = useState(false);
-  const [showEndDateCalendar, setShowEndDateCalendar] = useState(false);
 
   // Recurrence state
   const [selectedWeeklyDays, setSelectedWeeklyDays] = useState<number[]>([]);
@@ -672,6 +671,37 @@ export default function TaskEventForm({
                                       ]}
                                       onPress={() => setFormData(prev => ({ ...prev, selectedWeekday: index }))}
                                     >
+                                      <Text style={[
+                                        styles.dayButtonText,
+                                        formData.selectedWeekday === index && styles.activeDayButtonText
+                                      ]}>
+                                        {day}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ))}
+                                </View>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+        {/* Start Date Calendar Modal */}
+        <Modal visible={showStartDateCalendar} transparent animationType="fade">
+          <View style={styles.calendarOverlay}>
+            <View style={styles.calendarContainer}>
+              <View style={styles.calendarHeader}>
+                <Text style={styles.calendarTitle}>Select Start Date</Text>
+                <TouchableOpacity onPress={() => setShowStartDateCalendar(false)}>
+                  <X size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
               <Calendar
                 onDayPress={(day) => {
                   setFormData(prev => ({ ...prev, start_date: day.dateString }));
@@ -689,9 +719,9 @@ export default function TaskEventForm({
                   arrowColor: '#0078d4',
                 }}
               />
-              )}
             </View>
-          )}
+          </View>
+        </Modal>
 
         {/* End Date Calendar Modal */}
         <Modal visible={showEndDateCalendar} transparent animationType="fade">
@@ -1481,7 +1511,7 @@ export default function TaskEventForm({
                 setFormData(prev => ({ ...prev, end_date: day.dateString }));
                 setShowEndDateCalendar(false);
               }}
-                onPress={() => setShowEndDateCalendar(true)}
+              markedDates={{
                 [formData.end_date || formatLocalDate(new Date())]: {
                   selected: true,
                   selectedColor: '#0078d4'
