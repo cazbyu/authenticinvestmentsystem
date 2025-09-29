@@ -507,7 +507,7 @@ export default function TaskEventForm({
               <View style={styles.field}>
                 <Text style={styles.label}>Repeat Frequency</Text>
                 <View style={styles.recurrenceOptions}>
-                  {(['daily', 'weekly', 'monthly'] as const).map((freq) => (
+                  {(['daily', 'weekly'] as const).map((freq) => (
                     <TouchableOpacity
                       key={freq}
                       style={[
