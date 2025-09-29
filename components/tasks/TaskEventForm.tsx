@@ -96,6 +96,9 @@ export default function TaskEventForm({
   const scrollRef = useRef<ScrollView>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showDueDateCalendar, setShowDueDateCalendar] = useState(false);
+  const [showStartDateCalendar, setShowStartDateCalendar] = useState(false);
+  const [showEndDateCalendar, setShowEndDateCalendar] = useState(false);
 
   // Recurrence state
   const [selectedWeeklyDays, setSelectedWeeklyDays] = useState<number[]>([]);
