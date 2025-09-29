@@ -373,24 +373,6 @@ export default function TaskEventForm({
       </View>
 
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
-        {/* Type Selector */}
-        <View style={styles.typeRow}>
-          {(['task','event','depositIdea','withdrawal'] as SchedulingType[]).map(type => {
-            const active = formData.schedulingType === type;
-            return (
-              <TouchableOpacity
-                key={type}
-                onPress={() => setFormData(prev => ({ ...prev, schedulingType: type }))}
-                style={[styles.typeChip, active && styles.typeChipActive]}
-              >
-                <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                  {type === 'depositIdea' ? 'Deposit Idea' : type.charAt(0).toUpperCase() + type.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
         {/* Title */}
         <View style={styles.field}>
           <Text style={styles.label}>Title *</Text>
@@ -403,15 +385,51 @@ export default function TaskEventForm({
           />
         </View>
 
-        {/* Task-only Toggles */}
+        {/* Type Selector Pills - Centered below Title */}
+        <View style={styles.pillContainer}>
+          {(['task', 'event', 'depositIdea', 'withdrawal'] as const).map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.typePill,
+                formData.schedulingType === type && styles.typePillActive
+              ]}
+              onPress={() => setFormData(prev => ({ ...prev, schedulingType: type }))}
+            >
+              <Text style={[
+                styles.typePillText,
+                formData.schedulingType === type && styles.typePillTextActive
+              ]}>
+                {type === 'depositIdea' ? 'Deposit Idea' : type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Task-specific toggles */}
         {formData.schedulingType === 'task' && (
-          <View style={styles.field}>
-            <Text style={styles.label}>Task Toggles</Text>
-            <View style={styles.toggleRow}>
-              <Toggle label="Urgent" value={formData.urgent} onChange={(v) => setFormData(p => ({ ...p, urgent: v }))} />
-              <Toggle label="Important" value={formData.important} onChange={(v) => setFormData(p => ({ ...p, important: v }))} />
-              <Toggle label="Authentic Deposit" value={formData.authenticDeposit} onChange={(v) => setFormData(p => ({ ...p, authenticDeposit: v }))} />
-              <Toggle label="Goal" value={formData.goalToggle} onChange={(v) => setFormData(p => ({ ...p, goalToggle: v }))} />
+          <View style={styles.toggleSection}>
+            <View style={styles.toggleGrid}>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Urgent</Text>
+                  <Switch value={formData.urgent} onValueChange={(v) => setFormData(p => ({ ...p, urgent: v }))} />
+                </View>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Important</Text>
+                  <Switch value={formData.important} onValueChange={(v) => setFormData(p => ({ ...p, important: v }))} />
+                </View>
+              </View>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Authentic Deposit</Text>
+                  <Switch value={formData.authenticDeposit} onValueChange={(v) => setFormData(p => ({ ...p, authenticDeposit: v }))} />
+                </View>
+                <View style={styles.toggleItem}>
+                  <Text style={styles.toggleLabel}>Goal</Text>
+                  <Switch value={formData.goalToggle} onValueChange={(v) => setFormData(p => ({ ...p, goalToggle: v }))} />
+                </View>
+              </View>
             </View>
 
             {/* Goal picker (shows when Goal toggle ON) */}
@@ -707,13 +725,58 @@ const styles = StyleSheet.create({
 
   fieldRow: { flexDirection: 'row', gap: 12 },
 
-  toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  toggleItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    gap: 12, paddingHorizontal: 12, paddingVertical: 10,
-    borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb',
+  pillContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+    paddingHorizontal: 16,
   },
-  toggleLabel: { color: '#111827', fontWeight: '500' },
+  typePill: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  typePillActive: {
+    backgroundColor: '#0078d4',
+    borderColor: '#0078d4',
+  },
+  typePillText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  typePillTextActive: {
+    color: '#ffffff',
+  },
+  toggleSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  toggleGrid: {
+    gap: 12,
+    alignItems: 'center',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+  },
+  toggleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minWidth: 140,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+  },
 
   goalPickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   goalChip: {
@@ -731,6 +794,23 @@ const styles = StyleSheet.create({
   checkedBox: { backgroundColor: '#0078d4', borderColor: '#0078d4' },
   checkmark: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
   checkLabel: { color: '#111827' },
+
+  dateSection: {
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  dateField: {
+    marginBottom: 12,
+    maxWidth: 300,
+  },
+  dateButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
 
   actions: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 24 },
   cancelButton: {
