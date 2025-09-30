@@ -51,6 +51,8 @@ interface TaskEventFormProps {
 export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onClose }: TaskEventFormProps) {
   const { colors } = useTheme();
   
+  const { colors } = useTheme();
+  
   // Form state
   const [formData, setFormData] = useState({
     title: '',
