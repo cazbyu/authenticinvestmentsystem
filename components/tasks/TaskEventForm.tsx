@@ -448,7 +448,7 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
           end_date: formData.type === 'event' ? formData.endDate : null,
           start_time: formData.startTime || null,
           end_time: formData.endTime || null,
-          is_anytime: formData.isAnytime,
+          is_all_day: formData.isAnytime,
           is_urgent: formData.isUrgent,
           is_important: formData.isImportant,
           is_authentic_deposit: formData.isAuthenticDeposit,
