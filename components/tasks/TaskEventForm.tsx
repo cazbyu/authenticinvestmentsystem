@@ -17,7 +17,6 @@ import { X, Calendar as CalendarIcon, Clock, Plus, Minus } from 'lucide-react-na
 import { getSupabaseClient } from '@/lib/supabase';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useTheme } from '@/contexts/ThemeContext';
 
 interface Role {
   id: string;
