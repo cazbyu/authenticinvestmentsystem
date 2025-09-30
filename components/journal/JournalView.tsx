@@ -83,25 +83,30 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
           .from('0008-ap-tasks')
           .select(`
             *,
-            task_roles:0008-ap-universal-roles-join!left(
+            task_roles:0008-ap-universal-roles-join!inner(
               role:0008-ap-roles(id, label)
             ),
-            task_domains:0008-ap-universal-domains-join!left(
+            task_domains:0008-ap-universal-domains-join(
               domain:0008-ap-domains(id, name)
             ),
-            task_goals:0008-ap-universal-goals-join!left(
+            task_goals:0008-ap-universal-goals-join(
               goal:0008-ap-goals-12wk(id, title)
             ),
-            task_key_relationships:0008-ap-universal-key-relationships-join!left(
+            task_key_relationships:0008-ap-universal-key-relationships-join(
               key_relationship:0008-ap-key-relationships(id, name)
             ),
-            task_notes:0008-ap-universal-notes-join!left(
+            task_notes:0008-ap-universal-notes-join(
               note:0008-ap-notes(id, content, created_at)
             )
           `)
           .eq('user_id', user.id)
           .eq('status', 'completed')
           .not('completed_at', 'is', null)
+          .eq('0008-ap-universal-roles-join.parent_type', 'task')
+          .eq('0008-ap-universal-domains-join.parent_type', 'task')
+          .eq('0008-ap-universal-goals-join.parent_type', 'task')
+          .eq('0008-ap-universal-key-relationships-join.parent_type', 'task')
+          .eq('0008-ap-universal-notes-join.parent_type', 'task');
 
         // Apply scope filtering at database level
         if (scope.type !== 'user' && scope.id) {
@@ -166,20 +171,24 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
           .from('0008-ap-withdrawals')
           .select(`
             *,
-            withdrawal_roles:0008-ap-universal-roles-join!left(
+            withdrawal_roles:0008-ap-universal-roles-join(
               role:0008-ap-roles(id, label)
             ),
-            withdrawal_domains:0008-ap-universal-domains-join!left(
+            withdrawal_domains:0008-ap-universal-domains-join(
               domain:0008-ap-domains(id, name)
             ),
-            withdrawal_key_relationships:0008-ap-universal-key-relationships-join!left(
+            withdrawal_key_relationships:0008-ap-universal-key-relationships-join(
               key_relationship:0008-ap-key-relationships(id, name)
             ),
-            withdrawal_notes:0008-ap-universal-notes-join!left(
+            withdrawal_notes:0008-ap-universal-notes-join(
               note:0008-ap-notes(id, content, created_at)
             )
           `)
           .eq('user_id', user.id)
+          .eq('0008-ap-universal-roles-join.parent_type', 'withdrawal')
+          .eq('0008-ap-universal-domains-join.parent_type', 'withdrawal')
+          .eq('0008-ap-universal-key-relationships-join.parent_type', 'withdrawal')
+          .eq('0008-ap-universal-notes-join.parent_type', 'withdrawal');
 
         // Apply scope filtering at database level
         if (scope.type !== 'user' && scope.id) {
@@ -530,7 +539,9 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
       {/* Journal Entries */}
       <ScrollView style={styles.journalContent}>
         {loading ? (
-          null
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading journal...</Text>
+          </View>
         ) : entries.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No journal entries found</Text>
