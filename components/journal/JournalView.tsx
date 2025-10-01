@@ -34,11 +34,11 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
   const [totalBalance, setTotalBalance] = useState(0);
 
   const calculateTaskPoints = (task: any) => {
-    const roles = task.roles || [];
-    const domains = task.domains || [];
-    
-    return calculateTaskPoints(task, roles, domains);
-  };
+  const roles = task.roles || [];
+  const domains = task.domains || [];
+  // TODO: Replace with real formula
+  return (roles?.length || 0) + (domains?.length || 0);
+};
 
   const buildScopeFilter = (tableName: string) => {
     if (scope.type === 'user' || !scope.id) {
