@@ -94,37 +94,36 @@ let journalQuery = supabase
     notes
   `)
   .eq('user_id', user.id)
-  .eq('status', 'completed')       // ⚠️ remove if your view doesn’t have status
-  .not('completed_at', 'is', null) // ⚠️ remove if your view doesn’t have completed_at
   .gte('action_date', '2025-09-01') // adjust cutoff date as needed
   .order('action_date', { ascending: false });
 
-        // Apply scope filtering at database level
-        if (scope.type !== 'user' && scope.id) {
-          switch (scope.type) {
-            case 'role':
-              tasksQuery = tasksQuery.eq('0008-ap-universal-roles-join.role_id', scope.id);
-              break;
-            case 'key_relationship':
-              tasksQuery = tasksQuery.eq('0008-ap-universal-key-relationships-join.key_relationship_id', scope.id);
-              break;
-            case 'domain':
-              tasksQuery = tasksQuery.eq('0008-ap-universal-domains-join.domain_id', scope.id);
-              break;
-          }
-        }
+// ---- Scope filtering ----
+if (scope.type !== 'user' && scope.id) {
+  switch (scope.type) {
+    case 'role':
+      journalQuery = journalQuery.eq('role_id', scope.id);
+      break;
+    case 'key_relationship':
+      journalQuery = journalQuery.eq('key_relationship_id', scope.id);
+      break;
+    case 'domain':
+      journalQuery = journalQuery.eq('domain_id', scope.id);
+      break;
+  }
+}
 
-        if (dateFilter) {
-          tasksQuery = tasksQuery.gte('completed_at', dateFilter);
-        }
+// ---- Date filter override (if user picks custom range) ----
+if (dateFilter) {
+  journalQuery = journalQuery.gte('action_date', dateFilter);
+}
 
-        const { data: tasksData, error: tasksError } = await journalQuery;
-        if (tasksError) {
-          console.error('Tasks query error:', tasksError);
-          // If the complex query fails, fall back to simpler approach
-          await fetchJournalEntriesSimple();
-          return;
-        }
+// ---- Execute ----
+const { data: tasksData, error: tasksError } = await journalQuery;
+if (tasksError) {
+  console.error('Journal query error:', tasksError);
+  await fetchJournalEntriesSimple();
+  return;
+}
 
         if (tasksData) {
           for (const task of tasksData) {
@@ -299,11 +298,7 @@ let journalQuery = supabase
           .eq('status', 'completed')
           .not('completed_at', 'is', null);
 
-        if (dateFilter) {
-          tasksQuery = tasksQuery.gte('completed_at', dateFilter);
-        }
-
-        const { data: tasksData, error: tasksError } = await tasksQuery;
+                const { data: tasksData, error: tasksError } = await journalQuery;
         if (tasksError) throw tasksError;
 
         if (tasksData && tasksData.length > 0) {
