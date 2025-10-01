@@ -79,10 +79,13 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
 
       // Fetch deposits (completed tasks/events) with all related data in one query
       if (filter === 'all' || filter === 'deposits') {
-        let tasksQuery = supabase
+        // Fetch completed tasks/events with all their linked info
+let tasksQuery = supabase
   .from('0008-ap-tasks')
   .select(`
     *,
+    parent:0008-ap-parents!inner(id, parent_type),
+
     task_roles:0008-ap-universal-roles-join!inner(
       role:0008-ap-roles(id, label)
     ),
@@ -97,13 +100,13 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
     ),
     task_notes:0008-ap-universal-notes-join(
       note:0008-ap-notes(id, content, created_at)
-    ),
-    parent:0008_v_universal_parents_expanded!inner(id, parent_type, title, created_at)
+    )
   `)
   .eq('user_id', user.id)
   .eq('status', 'completed')
   .not('completed_at', 'is', null)
-  .eq('parent.parent_type', 'task');
+  .eq('parent.parent_type', 'task') // Filter only parents of type "task"
+  .gte('completed_at', '2025-09-01'); // adjust cutoff date as needed
 
         // Apply scope filtering at database level
         if (scope.type !== 'user' && scope.id) {
