@@ -80,33 +80,30 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
       // Fetch deposits (completed tasks/events) with all related data in one query
       if (filter === 'all' || filter === 'deposits') {
         let tasksQuery = supabase
-          .from('0008-ap-tasks')
-          .select(`
-            *,
-            task_roles:0008-ap-universal-roles-join!inner(
-              role:0008-ap-roles(id, label)
-            ),
-            task_domains:0008-ap-universal-domains-join(
-              domain:0008-ap-domains(id, name)
-            ),
-            task_goals:0008-ap-universal-goals-join(
-              goal:0008-ap-goals-12wk(id, title)
-            ),
-            task_key_relationships:0008-ap-universal-key-relationships-join(
-              key_relationship:0008-ap-key-relationships(id, name)
-            ),
-            task_notes:0008-ap-universal-notes-join(
-              note:0008-ap-notes(id, content, created_at)
-            )
-          `)
-          .eq('user_id', user.id)
-          .eq('status', 'completed')
-          .not('completed_at', 'is', null)
-          .eq('0008-ap-universal-roles-join.parent_type', 'task')
-          .eq('0008-ap-universal-domains-join.parent_type', 'task')
-          .eq('0008-ap-universal-goals-join.parent_type', 'task')
-          .eq('0008-ap-universal-key-relationships-join.parent_type', 'task')
-          .eq('0008-ap-universal-notes-join.parent_type', 'task');
+  .from('0008-ap-tasks')
+  .select(`
+    *,
+    task_roles:0008-ap-universal-roles-join!inner(
+      role:0008-ap-roles(id, label)
+    ),
+    task_domains:0008-ap-universal-domains-join(
+      domain:0008-ap-domains(id, name)
+    ),
+    task_goals:0008-ap-universal-goals-join(
+      goal:0008-ap-goals-12wk(id, title)
+    ),
+    task_key_relationships:0008-ap-universal-key-relationships-join(
+      key_relationship:0008-ap-key-relationships(id, name)
+    ),
+    task_notes:0008-ap-universal-notes-join(
+      note:0008-ap-notes(id, content, created_at)
+    ),
+    parent:0008_v_universal_parents_expanded!inner(id, parent_type, title, created_at)
+  `)
+  .eq('user_id', user.id)
+  .eq('status', 'completed')
+  .not('completed_at', 'is', null)
+  .eq('parent.parent_type', 'task');
 
         // Apply scope filtering at database level
         if (scope.type !== 'user' && scope.id) {
