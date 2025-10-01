@@ -80,6 +80,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
       // Fetch deposits (completed tasks/events) with all related data in one query
       if (filter === 'all' || filter === 'deposits') {
         // Fetch completed tasks/events with all their linked info
+// ---- One query against the view ----
 let journalQuery = supabase
   .from('0008_v_journal')
   .select(`
@@ -87,73 +88,57 @@ let journalQuery = supabase
     entry_type,
     user_id,
     title,
-    completed_at,
+    action_date,
+    amount,      -- will be null for tasks; present for withdrawals if your view includes it
     roles,
     domains,
     goals,
     notes
   `)
-  .eq('user_id', user.id)
-  .gte('completed_at', '2025-09-01') // adjust cutoff date as needed
-  .order('completed_at', { ascending: false });
+  .eq('user_id', user.id);
 
-// ---- Scope filtering ----
-if (scope.type !== 'user' && scope.id) {
-  switch (scope.type) {
-    case 'role':
-      journalQuery = journalQuery.eq('role_id', scope.id);
-      break;
-    case 'key_relationship':
-      journalQuery = journalQuery.eq('key_relationship_id', scope.id);
-      break;
-    case 'domain':
-      journalQuery = journalQuery.eq('domain_id', scope.id);
-      break;
-  }
-}
-
-// ---- Date filter override (if user picks custom range) ----
 if (dateFilter) {
   journalQuery = journalQuery.gte('action_date', dateFilter);
+} else {
+  journalQuery = journalQuery.gte('action_date', '2025-09-01');
 }
 
-// ---- Execute ----
-const { data: tasksData, error: tasksError } = await journalQuery;
-if (tasksError) {
-  console.error('Journal query error:', tasksError);
-  await fetchJournalEntriesSimple();
+journalQuery = journalQuery.order('action_date', { ascending: false });
+
+const { data: journalRows, error: journalError } = await journalQuery;
+if (journalError) {
+  console.error('Journal query error:', journalError);
+  await fetchJournalEntriesSimple(); // fall back
   return;
 }
 
-        if (tasksData) {
-          for (const task of tasksData) {
-            // Transform nested data to flat structure
-            const taskWithData = {
-              ...task,
-              roles: task.task_roles?.map(tr => tr.role).filter(Boolean) || [],
-              domains: task.task_domains?.map(td => td.domain).filter(Boolean) || [],
-              goals: task.task_goals?.map(tg => tg.goal).filter(Boolean) || [],
-              keyRelationships: task.task_key_relationships?.map(tkr => tkr.key_relationship).filter(Boolean) || [],
-            };
+// Build entries from the unified rows
+if (journalRows?.length) {
+  for (const row of journalRows) {
+    const isDeposit = row.entry_type === 'task';
+    const roles = row.roles ?? [];
+    const domains = row.domains ?? [];
 
-            const points = calculateTaskPoints(taskWithData);
-            const hasNotes = task.task_notes && task.task_notes.length > 0;
+    const points = isDeposit
+      ? calculateTaskPoints({ roles, domains, title: row.title })
+      : 0;
 
-            journalEntries.push({
-              id: task.id,
-              date: task.completed_at?.split('T')[0] || task.due_date,
-              description: task.title,
-              type: 'deposit',
-              amount: points,
-              balance: 0, // Will be calculated later
-              has_notes: hasNotes,
-              source_id: task.id,
-              source_type: 'task',
-              source_data: taskWithData,
-            });
-          }
-        }
-      }
+    const amount = isDeposit ? points : Number(row.amount ?? 0);
+
+    journalEntries.push({
+      id: row.id,
+      date: row.action_date,              // << important: use action_date from the view
+      description: row.title,
+      type: isDeposit ? 'deposit' : 'withdrawal',
+      amount,
+      balance: 0,
+      has_notes: Array.isArray(row.notes) && row.notes.length > 0,
+      source_id: row.id,
+      source_type: isDeposit ? 'task' : 'withdrawal',
+      source_data: row,
+    });
+  }
+}
 
       // Fetch withdrawals with all related data in one query
       if (filter === 'all' || filter === 'withdrawals') {
