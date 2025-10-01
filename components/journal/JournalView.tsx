@@ -34,10 +34,16 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
   const [totalBalance, setTotalBalance] = useState(0);
 
   const calculateTaskPoints = (task: any) => {
-  const roles = task.roles || [];
-  const domains = task.domains || [];
-  // TODO: Replace with real formula
-  return (roles?.length || 0) + (domains?.length || 0);
+  const roleCount = Array.isArray(task.roles) ? task.roles.length : 0;
+  const domainCount = Array.isArray(task.domains) ? task.domains.length : 0;
+
+  // Simple, deterministic scoring so it's not 0.0
+  // Tweak weights to your real logic as needed.
+  const base = 1;              // every completed task is at least 1 point
+  const perRole = 1;           // +1 per role
+  const perDomain = 0.5;       // +0.5 per domain
+
+  return base + roleCount * perRole + domainCount * perDomain;
 };
 
   const buildScopeFilter = (tableName: string) => {
