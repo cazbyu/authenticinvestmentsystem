@@ -118,7 +118,7 @@ let journalQuery = supabase
           tasksQuery = tasksQuery.gte('completed_at', dateFilter);
         }
 
-        const { data: tasksData, error: tasksError } = await tasksQuery;
+        const { data: tasksData, error: tasksError } = await journalQuery;
         if (tasksError) {
           console.error('Tasks query error:', tasksError);
           // If the complex query fails, fall back to simpler approach
