@@ -87,15 +87,15 @@ let journalQuery = supabase
     entry_type,
     user_id,
     title,
-    action_date,
+    completed_at,
     roles,
     domains,
     goals,
     notes
   `)
   .eq('user_id', user.id)
-  .gte('action_date', '2025-09-01') // adjust cutoff date as needed
-  .order('action_date', { ascending: false });
+  .gte('completed_at', '2025-09-01') // adjust cutoff date as needed
+  .order('completed_at', { ascending: false });
 
 // ---- Scope filtering ----
 if (scope.type !== 'user' && scope.id) {
@@ -157,78 +157,55 @@ if (tasksError) {
 
       // Fetch withdrawals with all related data in one query
       if (filter === 'all' || filter === 'withdrawals') {
-        let withdrawalsQuery = supabase
-          .from('0008-ap-withdrawals')
-          .select(`
-            *,
-            withdrawal_roles:0008-ap-universal-roles-join(
-              role:0008-ap-roles(id, label)
-            ),
-            withdrawal_domains:0008-ap-universal-domains-join(
-              domain:0008-ap-domains(id, name)
-            ),
-            withdrawal_key_relationships:0008-ap-universal-key-relationships-join(
-              key_relationship:0008-ap-key-relationships(id, name)
-            ),
-            withdrawal_notes:0008-ap-universal-notes-join(
-              note:0008-ap-notes(id, content, created_at)
-            )
-          `)
-          .eq('user_id', user.id)
-          .eq('0008-ap-universal-roles-join.parent_type', 'withdrawal')
-          .eq('0008-ap-universal-domains-join.parent_type', 'withdrawal')
-          .eq('0008-ap-universal-key-relationships-join.parent_type', 'withdrawal')
-          .eq('0008-ap-universal-notes-join.parent_type', 'withdrawal');
+        // Fetch withdrawals first
+let withdrawalsQuery = supabase
+  .from('0008-ap-withdrawals')
+  .select('*')
+  .eq('user_id', user.id);
 
-        // Apply scope filtering at database level
-        if (scope.type !== 'user' && scope.id) {
-          switch (scope.type) {
-            case 'role':
-              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-roles-join.role_id', scope.id);
-              break;
-            case 'key_relationship':
-              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-key-relationships-join.key_relationship_id', scope.id);
-              break;
-            case 'domain':
-              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-domains-join.domain_id', scope.id);
-              break;
-          }
-        }
+if (dateFilter) {
+  withdrawalsQuery = withdrawalsQuery.gte('withdrawn_at', dateFilter);
+}
 
-        if (dateFilter) {
-          withdrawalsQuery = withdrawalsQuery.gte('withdrawn_at', dateFilter);
-        }
+const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
+if (withdrawalsError) {
+  console.error('Withdrawals query error:', withdrawalsError);
+} else if (withdrawalsData?.length) {
+  const withdrawalIds = withdrawalsData.map(w => w.id);
 
-        const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
-        if (withdrawalsError) {
-          console.error('Withdrawals query error:', withdrawalsError);
-          // Continue without withdrawals if query fails
-        } else if (withdrawalsData) {
-          for (const withdrawal of withdrawalsData) {
-            // Transform nested data to flat structure
-            const withdrawalWithData = {
-              ...withdrawal,
-              roles: withdrawal.withdrawal_roles?.map(wr => wr.role).filter(Boolean) || [],
-              domains: withdrawal.withdrawal_domains?.map(wd => wd.domain).filter(Boolean) || [],
-              keyRelationships: withdrawal.withdrawal_key_relationships?.map(wkr => wkr.key_relationship).filter(Boolean) || [],
-            };
+  // Fetch related roles, domains, key relationships, notes manually
+  const [
+    { data: wRoles },
+    { data: wDomains },
+    { data: wKeyRels },
+    { data: wNotes }
+  ] = await Promise.all([
+    supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id,label)').in('parent_id', withdrawalIds).eq('parent_type','withdrawal'),
+    supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id,name)').in('parent_id', withdrawalIds).eq('parent_type','withdrawal'),
+    supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id,name)').in('parent_id', withdrawalIds).eq('parent_type','withdrawal'),
+    supabase.from('0008-ap-universal-notes-join').select('parent_id, note:0008-ap-notes(id,content,created_at)').in('parent_id', withdrawalIds).eq('parent_type','withdrawal')
+  ]);
 
-            const hasNotes = withdrawal.withdrawal_notes && withdrawal.withdrawal_notes.length > 0;
+  for (const w of withdrawalsData) {
+    const roles = wRoles?.filter(r => r.parent_id === w.id).map(r => r.role) || [];
+    const domains = wDomains?.filter(d => d.parent_id === w.id).map(d => d.domain) || [];
+    const keyRelationships = wKeyRels?.filter(k => k.parent_id === w.id).map(k => k.key_relationship) || [];
+    const notes = wNotes?.filter(n => n.parent_id === w.id).map(n => n.note) || [];
 
-            journalEntries.push({
-              id: withdrawal.id,
-              date: withdrawal.withdrawn_at,
-              description: withdrawal.title,
-              type: 'withdrawal',
-              amount: parseFloat(withdrawal.amount.toString()),
-              balance: 0, // Will be calculated later
-              has_notes: hasNotes,
-              source_id: withdrawal.id,
-              source_type: 'withdrawal',
-              source_data: withdrawalWithData,
-            });
-          }
-        }
+    journalEntries.push({
+      id: w.id,
+      date: w.withdrawn_at,
+      description: w.title,
+      type: 'withdrawal',
+      amount: parseFloat(w.amount),
+      balance: 0,
+      has_notes: notes.length > 0,
+      source_id: w.id,
+      source_type: 'withdrawal',
+      source_data: { ...w, roles, domains, keyRelationships, notes }
+    });
+  }
+}
       }
 
       // Sort by date and calculate running balance
