@@ -80,33 +80,24 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
       // Fetch deposits (completed tasks/events) with all related data in one query
       if (filter === 'all' || filter === 'deposits') {
         // Fetch completed tasks/events with all their linked info
-let tasksQuery = supabase
-  .from('0008-ap-tasks')
+let journalQuery = supabase
+  .from('0008_v_journal')
   .select(`
-    *,
-    parent:0008-ap-parents!inner(id, parent_type),
-
-    task_roles:0008-ap-universal-roles-join!inner(
-      role:0008-ap-roles(id, label)
-    ),
-    task_domains:0008-ap-universal-domains-join(
-      domain:0008-ap-domains(id, name)
-    ),
-    task_goals:0008-ap-universal-goals-join(
-      goal:0008-ap-goals-12wk(id, title)
-    ),
-    task_key_relationships:0008-ap-universal-key-relationships-join(
-      key_relationship:0008-ap-key-relationships(id, name)
-    ),
-    task_notes:0008-ap-universal-notes-join(
-      note:0008-ap-notes(id, content, created_at)
-    )
+    id,
+    entry_type,
+    user_id,
+    title,
+    action_date,
+    roles,
+    domains,
+    goals,
+    notes
   `)
   .eq('user_id', user.id)
-  .eq('status', 'completed')
-  .not('completed_at', 'is', null)
-  .eq('parent.parent_type', 'task') // Filter only parents of type "task"
-  .gte('completed_at', '2025-09-01'); // adjust cutoff date as needed
+  .eq('status', 'completed')       // ⚠️ remove if your view doesn’t have status
+  .not('completed_at', 'is', null) // ⚠️ remove if your view doesn’t have completed_at
+  .gte('action_date', '2025-09-01') // adjust cutoff date as needed
+  .order('action_date', { ascending: false });
 
         // Apply scope filtering at database level
         if (scope.type !== 'user' && scope.id) {
