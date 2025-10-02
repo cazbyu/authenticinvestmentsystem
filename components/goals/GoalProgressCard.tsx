@@ -345,10 +345,12 @@ export function GoalProgressCard({
                                key={day.date}
                                style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
                                onPress={onToggleCompletion ? async () => {
+                                 console.log('[GoalProgressCard] Day dot clicked:', { actionId: action.id, date: day.date, hasLog });
                                  try {
                                    await onToggleCompletion(action.id, day.date, hasLog);
+                                   console.log('[GoalProgressCard] Toggle completed successfully');
                                  } catch (error) {
-                                   console.error('Error in day dot toggle:', error);
+                                   console.error('[GoalProgressCard] Error in day dot toggle:', error);
                                  }
                                } : undefined}
                                activeOpacity={onToggleCompletion ? 0.7 : 1}
