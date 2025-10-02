@@ -12,6 +12,7 @@ import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useGoals } from '@/hooks/useGoals';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
+import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 import { calculateAuthenticScore } from '@/lib/taskUtils';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus, X } from 'lucide-react-native';
@@ -47,10 +48,9 @@ export default function Goals() {
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   
-  // Import functions from useGoalProgress hook
+  // Import functions from useGoalProgress hook (but NOT fetchGoalActionsForWeek - we use the standalone one)
   const {
     toggleTaskDay,
-    fetchGoalActionsForWeek,
     completeActionSuggestion,
     undoActionOccurrence,
   } = useGoalProgress();
