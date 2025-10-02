@@ -953,6 +953,22 @@ export default function Goals() {
                   weekActions={weekGoalActionsForWeek[goal.id] || []}
                   loadingWeekActions={loadingWeekActions}
                   onAddAction={() => {
+                    if (!selectedTimeline) {
+                      Alert.alert('Error', 'Please select a timeline first.');
+                      return;
+                    }
+
+                    // Validate goal type matches timeline source
+                    if (goal.goal_type === '12week' && selectedTimeline.source !== 'global') {
+                      Alert.alert('Error', '12-week goals can only be used with global timelines.');
+                      return;
+                    }
+
+                    if (goal.goal_type === 'custom' && selectedTimeline.source !== 'custom') {
+                      Alert.alert('Error', 'Custom goals can only be used with custom timelines.');
+                      return;
+                    }
+
                     setSelectedGoalForAction(goal);
                     setActionEffortModalVisible(true);
                   }}
@@ -1036,8 +1052,8 @@ export default function Goals() {
         }}
         goal={actionModalMode === 'create' ? selectedGoalForAction : editingAction?.goal}
         cycleWeeks={timelineWeeks}
+        timeline={selectedTimeline}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
-        onDelete={handleDeleteAction}
         initialData={editingAction}
         mode={actionModalMode}
       />

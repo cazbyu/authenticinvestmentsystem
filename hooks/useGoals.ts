@@ -537,7 +537,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
           // --- THIS IS THE FIX ---
           // Conditionally add the correct timeline foreign key to the main task record
           ...(timeline.source === 'global' && { user_global_timeline_id: timeline.id }),
-          ...(timeline.source === 'custom' && { user_custom_timeline_id: timeline.id }),
+          ...(timeline.source === 'custom' && { custom_timeline_id: timeline.id }),
         };
 
         const { data: insertedTask, error: taskError } = await supabase

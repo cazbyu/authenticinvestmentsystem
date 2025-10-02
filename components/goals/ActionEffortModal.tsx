@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { X, Plus } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
+import { Timeline } from '@/hooks/useGoals';
 
 interface Role {
   id: string;
@@ -41,10 +42,8 @@ interface TwelveWeekGoal {
 
 interface CycleWeek {
   week_number: number;
-  week_start: string;
-  week_end: string;
-  user_global_timeline_id: string;
-  user_custom_timeline_id: string;
+  start_date: string;
+  end_date: string;
 }
 
 interface ActionEffortModalProps {
@@ -52,7 +51,8 @@ interface ActionEffortModalProps {
   onClose: () => void;
   goal: TwelveWeekGoal | null;
   cycleWeeks: CycleWeek[];
-  createTaskWithWeekPlan: (taskData: any) => Promise<any>;
+  timeline: Timeline | null;
+  createTaskWithWeekPlan: (taskData: any, timeline: Timeline) => Promise<any>;
   onDelete?: (actionId: string) => Promise<void>;
   initialData?: any; // For editing existing actions
   mode?: 'create' | 'edit';
@@ -63,6 +63,7 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
   onClose,
   goal,
   cycleWeeks,
+  timeline,
   createTaskWithWeekPlan,
   onDelete,
   initialData,
@@ -298,6 +299,22 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
       return;
     }
 
+    if (!timeline) {
+      Alert.alert('Error', 'No timeline selected. Please select a timeline first.');
+      return;
+    }
+
+    // Validate goal type matches timeline source
+    if (goal?.goal_type === '12week' && timeline.source !== 'global') {
+      Alert.alert('Error', '12-week goals can only be used with global timelines.');
+      return;
+    }
+
+    if (goal?.goal_type === 'custom' && timeline.source !== 'custom') {
+      Alert.alert('Error', 'Custom goals can only be used with custom timelines.');
+      return;
+    }
+
     setSaving(true);
     try {
       const targetDays = getTargetDays();
@@ -321,7 +338,7 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
         ...(mode === 'edit' && initialData ? { id: initialData.id } : {}),
       };
 
-      await createTaskWithWeekPlan(taskData);
+      await createTaskWithWeekPlan(taskData, timeline);
 
       console.log('[ActionEffortModal] Task saved successfully, closing modal');
 
