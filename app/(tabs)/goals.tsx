@@ -223,18 +223,135 @@ export default function Goals() {
     }
   };
 
-  const handleDeleteAction = async (actionId: string) => {
+  // Undo state for delete operations
+  const [undoState, setUndoState] = useState<{
+    taskId: string;
+    weekNumber?: number;
+    deleteType: 'week' | 'all';
+    timeout: any;
+  } | null>(null);
+
+  const handleDeleteAction = async (actionId: string, weekNumber: number) => {
+    if (!selectedTimeline) return;
+
+    Alert.alert(
+      'Delete Action',
+      'Choose how to delete this action:',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'This Week Only',
+          onPress: async () => {
+            try {
+              await deleteTaskWeekPlan(actionId, weekNumber, selectedTimeline as any);
+
+              // Refresh the data
+              const newGoals = await fetchTimelineGoals(selectedTimeline);
+              await fetchWeekActions(newGoals);
+
+              // Set up undo with timeout
+              const timeout = setTimeout(() => {
+                setUndoState(null);
+              }, 5000);
+
+              setUndoState({
+                taskId: actionId,
+                weekNumber,
+                deleteType: 'week',
+                timeout,
+              });
+
+              Alert.alert(
+                'Action Deleted',
+                'Action removed from this week only.',
+                [
+                  {
+                    text: 'Undo',
+                    onPress: () => handleUndoDelete(),
+                  },
+                  {
+                    text: 'OK',
+                    style: 'cancel',
+                  },
+                ]
+              );
+            } catch (error) {
+              console.error('Error deleting action for week:', error);
+              Alert.alert('Error', (error as Error).message || 'Failed to delete action');
+            }
+          },
+        },
+        {
+          text: 'All Weeks',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTask(actionId);
+
+              // Refresh the data
+              const newGoals = await fetchTimelineGoals(selectedTimeline);
+              await fetchWeekActions(newGoals);
+
+              // Set up undo with timeout
+              const timeout = setTimeout(() => {
+                setUndoState(null);
+              }, 5000);
+
+              setUndoState({
+                taskId: actionId,
+                deleteType: 'all',
+                timeout,
+              });
+
+              Alert.alert(
+                'Action Deleted',
+                'Action removed from all weeks.',
+                [
+                  {
+                    text: 'Undo',
+                    onPress: () => handleUndoDelete(),
+                  },
+                  {
+                    text: 'OK',
+                    style: 'cancel',
+                  },
+                ]
+              );
+            } catch (error) {
+              console.error('Error deleting action:', error);
+              Alert.alert('Error', (error as Error).message || 'Failed to delete action');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleUndoDelete = async () => {
+    if (!undoState || !selectedTimeline) return;
+
     try {
-      await deleteTask(actionId);
-      
-      // Refresh the timeline goals and week actions after deletion
-      if (selectedTimeline) {
-        const newGoals = await fetchTimelineGoals(selectedTimeline);
-        await fetchWeekActions(newGoals);
+      // Clear the timeout
+      clearTimeout(undoState.timeout);
+
+      if (undoState.deleteType === 'week' && undoState.weekNumber) {
+        await undoDeleteTaskWeekPlan(undoState.taskId, undoState.weekNumber, selectedTimeline as any);
+      } else {
+        await undoDeleteTask(undoState.taskId);
       }
+
+      // Refresh the data
+      const newGoals = await fetchTimelineGoals(selectedTimeline);
+      await fetchWeekActions(newGoals);
+
+      setUndoState(null);
+      Alert.alert('Success', 'Action restored successfully!');
     } catch (error) {
-      console.error('Error deleting action:', error);
-      Alert.alert('Error', (error as Error).message || 'Failed to delete action');
+      console.error('Error undoing delete:', error);
+      Alert.alert('Error', (error as Error).message || 'Failed to restore action');
     }
   };
 
@@ -265,19 +382,28 @@ export default function Goals() {
   const {
     loading,
     allGoals,
-    goalProgress,
     refreshGoals,
     refreshAllData,
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
     deleteTask,
+    deleteTaskWeekPlan,
     deleteGoal,
+    undoDeleteTask,
+    undoDeleteTaskWeekPlan,
   } = useGoals();
 
   useEffect(() => {
     fetchAllTimelines();
     calculateAuthenticScore();
+
+    // Cleanup undo timeout on unmount
+    return () => {
+      if (undoState?.timeout) {
+        clearTimeout(undoState.timeout);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -836,6 +962,7 @@ export default function Goals() {
                   }}
                   selectedWeekNumber={currentWeek?.week_number}
                   onToggleCompletion={handleToggleCompletion}
+                  onDeleteAction={handleDeleteAction}
                 />
               );
             })

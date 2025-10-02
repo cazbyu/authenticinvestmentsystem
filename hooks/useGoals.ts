@@ -660,6 +660,107 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   /* --------------------------------
+   * DELETE TASK FOR SPECIFIC WEEK ONLY
+   * -------------------------------- */
+  const deleteTaskWeekPlan = async (taskId: string, weekNumber: number, timeline: Timeline): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Build the query with the correct timeline FK
+      const timelineColumn = timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id';
+
+      // Soft delete the week plan by setting deleted_at timestamp
+      const { error: deleteError } = await supabase
+        .from(DB.TASK_WEEK_PLAN)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('task_id', taskId)
+        .eq('week_number', weekNumber)
+        .eq(timelineColumn, timeline.id);
+
+      if (deleteError) throw deleteError;
+
+      console.log('Task week plan soft deleted successfully:', { taskId, weekNumber });
+
+      // Check if all week plans for this task are now deleted
+      const { data: remainingWeekPlans, error: checkError } = await supabase
+        .from(DB.TASK_WEEK_PLAN)
+        .select('id')
+        .eq('task_id', taskId)
+        .is('deleted_at', null);
+
+      if (checkError) throw checkError;
+
+      // If no week plans remain, soft delete the parent task as well
+      if (!remainingWeekPlans || remainingWeekPlans.length === 0) {
+        console.log('No remaining week plans, soft deleting parent task:', taskId);
+        await deleteTask(taskId);
+      }
+    } catch (error) {
+      console.error('Error deleting task week plan:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
+   * UNDO TASK DELETION
+   * -------------------------------- */
+  const undoDeleteTask = async (taskId: string): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Restore the task by clearing deleted_at timestamp
+      const { error: restoreError } = await supabase
+        .from(DB.TASKS)
+        .update({ deleted_at: null })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (restoreError) throw restoreError;
+
+      console.log('Task restored successfully:', taskId);
+    } catch (error) {
+      console.error('Error restoring task:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
+   * UNDO TASK WEEK PLAN DELETION
+   * -------------------------------- */
+  const undoDeleteTaskWeekPlan = async (taskId: string, weekNumber: number, timeline: Timeline): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Build the query with the correct timeline FK
+      const timelineColumn = timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id';
+
+      // Restore the week plan by clearing deleted_at timestamp
+      const { error: restoreError } = await supabase
+        .from(DB.TASK_WEEK_PLAN)
+        .update({ deleted_at: null })
+        .eq('task_id', taskId)
+        .eq('week_number', weekNumber)
+        .eq(timelineColumn, timeline.id);
+
+      if (restoreError) throw restoreError;
+
+      // Also restore the parent task if it was deleted
+      await undoDeleteTask(taskId);
+
+      console.log('Task week plan restored successfully:', { taskId, weekNumber });
+    } catch (error) {
+      console.error('Error restoring task week plan:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
    * GOAL DELETION - CENTRALIZED
    * -------------------------------- */
   const deleteGoal = async (goalId: string, goalType: '12week' | 'custom'): Promise<void> => {
@@ -751,7 +852,10 @@ export function useGoals(options: UseGoalsOptions = {}) {
     createCustomGoal,
     createTaskWithWeekPlan,
     deleteTask,
+    deleteTaskWeekPlan,
     deleteGoal,
+    undoDeleteTask,
+    undoDeleteTaskWeekPlan,
 
     // Data refresh
     refreshGoals,

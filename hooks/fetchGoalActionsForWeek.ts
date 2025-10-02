@@ -153,7 +153,8 @@ export async function fetchGoalActionsForWeek(
       .select('*')
       .in('task_id', taskIds)
       .eq('week_number', weekNumber)
-      .eq(timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id', timeline.id);
+      .eq(timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id', timeline.id)
+      .is('deleted_at', null);
 
     const { data: weekPlansData, error: weekPlansErr } = await weekPlanQuery;
     if (weekPlansErr) {

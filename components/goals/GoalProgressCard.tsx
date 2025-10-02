@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit } from 'lucide-react-native';
+import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit, Trash2 } from 'lucide-react-native';
 import { GoalProgress } from '@/hooks/useGoalProgress';
 import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
@@ -39,6 +39,7 @@ interface GoalProgressCardProps {
   compact?: boolean;
   selectedWeekNumber?: number;
   onEditAction?: (action: TaskWithLogs) => void; // New prop for editing actions
+  onDeleteAction?: (actionId: string, weekNumber: number) => void; // New prop for deleting actions
 }
 
 export function GoalProgressCard({
@@ -55,6 +56,7 @@ export function GoalProgressCard({
   compact = false,
   selectedWeekNumber,
   onEditAction, // New prop
+  onDeleteAction, // New prop
 }: GoalProgressCardProps) {
   const weekActions = weekActionsProp ?? [];
   const getProgressColor = (percentage: number) => {
@@ -308,21 +310,33 @@ export function GoalProgressCard({
                   const weekDays = generateWeekDays(week.startDate);
 
                   return (
-                    <TouchableOpacity 
-                      key={action.id} 
-                      style={styles.actionItem}
-                      onPress={onEditAction ? () => onEditAction(action) : undefined}
-                      activeOpacity={onEditAction ? 0.7 : 1}
-                    >
+                    <View key={action.id} style={styles.actionItem}>
                       <View style={styles.actionHeader}>
-                        <Text style={styles.actionTitle} numberOfLines={1}>
-                          {action.title}
-                        </Text>
-                        {action.input_kind === 'count' && (
-                          <Text style={styles.actionCount}>
-                            {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
+                        <TouchableOpacity
+                          style={styles.actionTitleContainer}
+                          onPress={onEditAction ? () => onEditAction(action) : undefined}
+                          activeOpacity={onEditAction ? 0.7 : 1}
+                        >
+                          <Text style={styles.actionTitle} numberOfLines={1}>
+                            {action.title}
                           </Text>
-                        )}
+                        </TouchableOpacity>
+                        <View style={styles.actionHeaderRight}>
+                          {action.input_kind === 'count' && (
+                            <Text style={styles.actionCount}>
+                              {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
+                            </Text>
+                          )}
+                          {onDeleteAction && week && (
+                            <TouchableOpacity
+                              style={styles.deleteIconButton}
+                              onPress={() => onDeleteAction(action.id, week.weekNumber)}
+                              activeOpacity={0.7}
+                            >
+                              <Trash2 size={16} color="#6b7280" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
                       
                       {/* Day labels above circles for this action */}
@@ -361,7 +375,7 @@ export function GoalProgressCard({
                          })}
                       </View>
 
-                    </TouchableOpacity>
+                    </View>
                   );
                 })}
               </View>
@@ -627,17 +641,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
+  actionTitleContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
   actionTitle: {
     fontSize: 12,
     fontWeight: '500',
     color: '#1f2937',
-    flex: 1,
-    marginRight: 8,
+  },
+  actionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   actionCount: {
     fontSize: 11,
     fontWeight: '600',
     color: '#6b7280',
+  },
+  deleteIconButton: {
+    padding: 4,
+    borderRadius: 4,
   },
   dayDots: {
     flexDirection: 'row',
