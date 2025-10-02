@@ -59,8 +59,9 @@ export default function Goals() {
   const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
   const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
 
-  const fetchWeekActions = async () => {
-    if (!selectedTimeline || timelineWeeks.length === 0 || timelineGoals.length === 0) {
+  // MODIFIED: This function now accepts the goals array directly to avoid using stale state.
+  const fetchWeekActions = async (goalsToFetch: any[]) => {
+    if (!selectedTimeline || timelineWeeks.length === 0 || goalsToFetch.length === 0) {
       setWeekGoalActions({});
       return;
     }
@@ -73,7 +74,7 @@ export default function Goals() {
 
     setLoadingWeekActions(true);
     try {
-      const goalIds = timelineGoals.map(g => g.id);
+      const goalIds = goalsToFetch.map(g => g.id);
       const actions = await fetchGoalActionsForWeek(
         goalIds,
         currentWeek.week_number,
@@ -89,10 +90,10 @@ export default function Goals() {
     }
   };
 
-  // Add effect to fetch week actions when timeline or week changes
+  // MODIFIED: The useEffect now passes the state variable `timelineGoals` to the updated fetchWeekActions.
   useEffect(() => {
     if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
-      fetchWeekActions();
+      fetchWeekActions(timelineGoals);
     }
   }, [selectedTimeline, currentWeekIndex, timelineGoals]);
 
@@ -175,7 +176,7 @@ export default function Goals() {
       Alert.alert('Error', (error as Error).message || 'Failed to update completion status');
       
       // Revert the optimistic update on error
-      await fetchWeekActions();
+      await fetchWeekActions(timelineGoals); // Pass current goals to revert correctly
     }
   };
 
@@ -185,8 +186,8 @@ export default function Goals() {
       
       // Refresh the timeline goals and week actions after deletion
       if (selectedTimeline) {
-        await fetchTimelineGoals(selectedTimeline);
-        await fetchWeekActions();
+        const newGoals = await fetchTimelineGoals(selectedTimeline);
+        await fetchWeekActions(newGoals);
       }
     } catch (error) {
       console.error('Error deleting action:', error);
@@ -359,14 +360,14 @@ export default function Goals() {
 
       setAllTimelines(timelines);
 
-// 🔍 Debug log each hydrated timeline
-    console.log("DEBUG: hydrated timelines:", timelines.map(t => ({
-      id: t.id,
-      source: t.source,
-      title: t.title,
-      start_date: t.start_date,
-      end_date: t.end_date
-    })));
+      // 🔍 Debug log each hydrated timeline
+      console.log("DEBUG: hydrated timelines:", timelines.map(t => ({
+        id: t.id,
+        source: t.source,
+        title: t.title,
+        start_date: t.start_date,
+        end_date: t.end_date
+      })));
       
       // Fetch goal counts for each timeline
       await fetchTimelinesWithGoalCounts(timelines);
@@ -452,25 +453,22 @@ export default function Goals() {
     }
   };
 
+  // MODIFIED: This function now returns the fetched goals to be used in the refresh chain.
   const fetchTimelineGoals = async (timeline: Timeline) => {
     if (!timeline) {
       setTimelineGoals([]);
       setTimelineGoalProgress({});
-      return;
+      return [];
     }
 
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) return [];
 
       let goalsData: any[] = [];
 
       if (timeline.source === 'global') {
-        // Fetch 12-week goals for global timelines - try both FK columns
-        console.log('Fetching global timeline goals for timeline:', timeline.id);
-        
-        // First try user_global_timeline_id
         const { data, error } = await supabase
           .from('0008-ap-goals-12wk')
           .select('*')
@@ -479,46 +477,26 @@ export default function Goals() {
           .eq('status', 'active')
           .order('created_at', { ascending: false });
         
-        console.log('Global goals query result (user_global_timeline_id):', { data, error, count: data?.length || 0 });
-        
-        if (error) {
-          console.error('Error with user_global_timeline_id query:', error);
-          throw error;
-        }
+        if (error) throw error;
         
         if (data && data.length > 0) {
           goalsData = data.map(goal => ({ ...goal, goal_type: '12week' }));
         } else {
-          // Fallback: try global_cycle_id if user_global_timeline_id didn't work
-          console.log('No goals found with user_global_timeline_id, trying global_cycle_id fallback');
           const globalCycleId = timeline.global_cycle_id || timeline.global_cycle?.id;
-          
           if (globalCycleId) {
-            const { data: fallbackData, error: fallbackError } = await supabase
+            const { data: fallbackData } = await supabase
               .from('0008-ap-goals-12wk')
               .select('*')
               .eq('user_id', user.id)
               .eq('global_cycle_id', globalCycleId)
               .eq('status', 'active')
               .order('created_at', { ascending: false });
-            
-            console.log('Global goals fallback query result (global_cycle_id):', { 
-              data: fallbackData, 
-              error: fallbackError, 
-              count: fallbackData?.length || 0,
-              globalCycleId 
-            });
-            
-            if (fallbackError) {
-              console.error('Error with global_cycle_id fallback query:', fallbackError);
-            } else if (fallbackData) {
+            if (fallbackData) {
               goalsData = fallbackData.map(goal => ({ ...goal, goal_type: '12week' }));
             }
           }
         }
       } else if (timeline.source === 'custom') {
-        console.log('Fetching custom timeline goals for timeline:', timeline.id);
-        // Fetch only custom goals for custom timelines
         const { data, error } = await supabase
           .from('0008-ap-goals-custom')
           .select('*')
@@ -526,28 +504,18 @@ export default function Goals() {
           .eq('custom_timeline_id', timeline.id)
           .eq('status', 'active')
           .order('created_at', { ascending: false });
-
-        console.log('Custom goals query result:', { data, error, count: data?.length || 0 });
         if (error) throw error;
         goalsData = (data || []).map(goal => ({ ...goal, goal_type: 'custom' }));
       }
 
-      console.log('Fetched goals for timeline:', {
-        timelineId: timeline.id,
-        source: timeline.source,
-        goalsCount: goalsData.length,
-        goals: goalsData.map(g => ({ id: g.id, title: g.title }))
-      });
-
       if (goalsData.length === 0) {
         setTimelineGoals([]);
         setTimelineGoalProgress({});
-        return;
+        return [];
       }
 
       const goalIds = goalsData.map(g => g.id);
 
-      // Fetch related data for all goals
       const [
         { data: rolesData, error: rolesError },
         { data: domainsData, error: domainsError },
@@ -558,11 +526,8 @@ export default function Goals() {
         supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
       ]);
 
-      if (rolesError) throw rolesError;
-      if (domainsError) throw domainsError;
-      if (krError) throw krError;
+      if (rolesError || domainsError || krError) throw rolesError || domainsError || krError;
 
-      // Process goals with their related data
       const goalsWithData = goalsData.map(goal => ({
         ...goal,
         roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
@@ -570,48 +535,34 @@ export default function Goals() {
         keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
       }));
 
-      console.log('Goals with data:', {
-        count: goalsWithData.length,
-        sample: goalsWithData[0] ? {
-          id: goalsWithData[0].id,
-          title: goalsWithData[0].title,
-          rolesCount: goalsWithData[0].roles?.length || 0,
-          domainsCount: goalsWithData[0].domains?.length || 0
-        } : null
-      });
-
       setTimelineGoals(goalsWithData);
       setTimelineGoalProgress({});
+      return goalsWithData;
 
     } catch (error) {
       console.error('Error fetching timeline goals:', error);
       Alert.alert('Error', `Failed to fetch goals: ${(error as Error).message}`);
       setTimelineGoals([]);
       setTimelineGoalProgress({});
+      return [];
     }
   };
 
   const fetchTimelineWeeks = async (timeline: Timeline) => {
     try {
       const supabase = getSupabaseClient();
-
-      // Use unified view for both global and custom timelines
       const { data: weeks, error } = await supabase
         .from('v_unified_timeline_weeks')
         .select('week_number, week_start, week_end, timeline_id, source')
         .eq('timeline_id', timeline.id)
         .eq('source', timeline.source)
         .order('week_number', { ascending: true });
-
       if (error) throw error;
-
-      // Normalize the data structure
       const normalizedWeeks = (weeks || []).map(week => ({
         week_number: week.week_number,
         start_date: week.week_start,
         end_date: week.week_end,
       }));
-
       setTimelineWeeks(normalizedWeeks);
     } catch (error) {
       console.error('Error fetching timeline weeks:', error);
@@ -622,15 +573,12 @@ export default function Goals() {
   const fetchTimelineDaysLeft = async (timeline: Timeline) => {
     try {
       const supabase = getSupabaseClient();
-
       const { data, error } = await supabase
         .from('v_unified_timeline_days_left')
         .select('timeline_id, days_left, pct_elapsed, source')
         .eq('timeline_id', timeline.id)
         .maybeSingle();
-
       if (error && error.code !== 'PGRST116') throw error;
-
       setTimelineDaysLeft(data);
     } catch (error) {
       console.error('Error fetching timeline days left:', error);
@@ -901,14 +849,14 @@ export default function Goals() {
 
       <ActionEffortModal
         visible={actionEffortModalVisible}
-        onClose={() => {
+        onClose={async () => { // MODIFIED: The handler is now async.
           setActionEffortModalVisible(false);
           setEditingAction(null);
           setActionModalMode('create');
-          // Refresh data after action is created
+          // MODIFIED: This logic now chains the fetches to prevent race conditions.
           if (selectedTimeline) {
-            fetchTimelineGoals(selectedTimeline);
-            fetchWeekActions();
+            const newGoals = await fetchTimelineGoals(selectedTimeline);
+            await fetchWeekActions(newGoals);
           }
         }}
         goal={actionModalMode === 'create' ? selectedGoalForAction : editingAction?.goal}
