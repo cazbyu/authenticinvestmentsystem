@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, TextInput, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, TextInput, Image, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as ImagePicker from 'expo-image-picker';
 import { Header } from '@/components/Header';
 import { ManageRolesModal } from '@/components/settings/ManageRolesModal';
+import { ArchivedTimelinesView } from '@/components/settings/ArchivedTimelinesView';
+import { NorthStarEditor } from '@/components/northStar/NorthStarEditor';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -25,6 +27,8 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isRolesModalVisible, setIsRolesModalVisible] = useState(false);
+  const [showNorthStarEditor, setShowNorthStarEditor] = useState(false);
+  const [showTimelineArchive, setShowTimelineArchive] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   const [profile, setProfile] = useState({
     first_name: '',
@@ -442,12 +446,34 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* North Star Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>North Star</Text>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => setShowNorthStarEditor(true)}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Mission & Vision Statements</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => setShowNorthStarEditor(true)}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>1-Year Goals</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Goal Bank Settings Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Goal Bank Settings</Text>
 
-          <TouchableOpacity style={styles.settingButton}>
-            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Goal Timelines</Text>
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => setShowTimelineArchive(true)}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Timeline Archive</Text>
           </TouchableOpacity>
 
           <View style={styles.settingRow}>
@@ -469,7 +495,7 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.settingButton}
             onPress={() => Alert.alert('Info', 'Custom timelines can be managed from the Goal Bank screen')}
           >
@@ -556,6 +582,30 @@ export default function SettingsScreen() {
         visible={isRolesModalVisible}
         onClose={() => setIsRolesModalVisible(false)}
       />
+
+      <Modal visible={showNorthStarEditor} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>North Star</Text>
+            <TouchableOpacity onPress={() => setShowNorthStarEditor(false)}>
+              <Text style={styles.closeModalButton}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <NorthStarEditor onUpdate={() => {}} />
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={showTimelineArchive} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Timeline Archive</Text>
+            <TouchableOpacity onPress={() => setShowTimelineArchive(false)}>
+              <Text style={styles.closeModalButton}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <ArchivedTimelinesView onUpdate={() => {}} />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -605,4 +655,16 @@ const styles = StyleSheet.create({
   connectButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
   disconnectButton: { backgroundColor: '#dc2626' },
   disconnectButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  modalContainer: { flex: 1, backgroundColor: '#f8fafc' },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+  },
+  modalTitle: { fontSize: 18, fontWeight: '600', color: '#1f2937' },
+  closeModalButton: { fontSize: 16, fontWeight: '600', color: '#0078d4' },
 });

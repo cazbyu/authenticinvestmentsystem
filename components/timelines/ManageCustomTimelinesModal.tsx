@@ -190,32 +190,34 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
     setShowCreateForm(true);
   };
 
-  const handleDeleteTimeline = async (timeline: CustomTimeline) => {
+  const handleArchiveTimeline = async (timeline: CustomTimeline) => {
     Alert.alert(
-      'Delete Timeline',
-      `Are you sure you want to delete "${timeline.title}"? This action cannot be undone.`,
+      'Archive Timeline',
+      `Are you sure you want to archive "${timeline.title}"? You can restore it later from Settings.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Archive',
           style: 'destructive',
           onPress: async () => {
             try {
               const supabase = getSupabaseClient();
-              
-              // Delete the timeline itself (cascade removes linked goals)
+
               const { error } = await supabase
                 .from('0008-ap-custom-timelines')
-                .delete()
+                .update({
+                  status: 'archived',
+                  updated_at: new Date().toISOString(),
+                })
                 .eq('id', timeline.id);
 
               if (error) throw error;
 
-              Alert.alert('Success', 'Timeline deleted successfully');
+              Alert.alert('Success', 'Timeline archived successfully');
               fetchTimelines();
               onUpdate?.();
             } catch (error) {
-              console.error('Error deleting timeline:', error);
+              console.error('Error archiving timeline:', error);
               Alert.alert('Error', (error as Error).message);
             }
           }
@@ -306,7 +308,7 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteTimelineButton}
-                      onPress={() => handleDeleteTimeline(timeline)}
+                      onPress={() => handleArchiveTimeline(timeline)}
                     >
                       <Trash2 size={16} color="#dc2626" />
                     </TouchableOpacity>
