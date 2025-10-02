@@ -235,6 +235,10 @@ export default function Goals() {
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [deleteActionData, setDeleteActionData] = useState<{ actionId: string; weekNumber: number } | null>(null);
 
+  // Undo confirmation modal state
+  const [undoConfirmVisible, setUndoConfirmVisible] = useState(false);
+  const [undoMessage, setUndoMessage] = useState('');
+
   const handleDeleteAction = async (actionId: string, weekNumber: number) => {
     if (!selectedTimeline) return;
 
@@ -267,26 +271,8 @@ export default function Goals() {
         timeout,
       });
 
-      if (Platform.OS === 'web') {
-        if (window.confirm('Action removed from this week. Click OK to undo, or Cancel to confirm.')) {
-          handleUndoDelete();
-        }
-      } else {
-        Alert.alert(
-          'Action Deleted',
-          'Action removed from this week only.',
-          [
-            {
-              text: 'Undo',
-              onPress: () => handleUndoDelete(),
-            },
-            {
-              text: 'OK',
-              style: 'cancel',
-            },
-          ]
-        );
-      }
+      setUndoMessage('Action removed from this week only.');
+      setUndoConfirmVisible(true);
     } catch (error) {
       console.error('Error deleting action for week:', error);
       if (Platform.OS === 'web') {
@@ -321,26 +307,8 @@ export default function Goals() {
         timeout,
       });
 
-      if (Platform.OS === 'web') {
-        if (window.confirm('Action removed from all weeks. Click OK to undo, or Cancel to confirm.')) {
-          handleUndoDelete();
-        }
-      } else {
-        Alert.alert(
-          'Action Deleted',
-          'Action removed from all weeks.',
-          [
-            {
-              text: 'Undo',
-              onPress: () => handleUndoDelete(),
-            },
-            {
-              text: 'OK',
-              style: 'cancel',
-            },
-          ]
-        );
-      }
+      setUndoMessage('Action removed from all weeks.');
+      setUndoConfirmVisible(true);
     } catch (error) {
       console.error('Error deleting action:', error);
       if (Platform.OS === 'web') {
@@ -1153,6 +1121,48 @@ export default function Goals() {
                 onPress={() => setDeleteConfirmVisible(false)}
               >
                 <Text style={styles.deleteModalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Undo Confirmation Modal */}
+      <Modal
+        visible={undoConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setUndoConfirmVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModal}>
+            <View style={styles.deleteModalHeader}>
+              <Text style={styles.deleteModalTitle}>Action Deleted</Text>
+              <TouchableOpacity onPress={() => setUndoConfirmVisible(false)}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.deleteModalMessage}>
+              {undoMessage}
+            </Text>
+
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={styles.deleteModalButton}
+                onPress={() => {
+                  setUndoConfirmVisible(false);
+                  handleUndoDelete();
+                }}
+              >
+                <Text style={styles.deleteModalButtonText}>Undo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonCancel]}
+                onPress={() => setUndoConfirmVisible(false)}
+              >
+                <Text style={styles.deleteModalButtonCancelText}>OK</Text>
               </TouchableOpacity>
             </View>
           </View>
