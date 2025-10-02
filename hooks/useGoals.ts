@@ -135,7 +135,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
   const [twelveWeekGoals, setTwelveWeekGoals] = useState<TwelveWeekGoal[]>([]);
   const [customGoals, setCustomGoals] = useState<CustomGoal[]>([]);
   const [allGoals, setAllGoals] = useState<Goal[]>([]);
-  const [currentTimeline, setCurrentTimeline] = useState<Timeline | null>(null);
+  const [currentTimeline, setCurrentTimeline] = useState<Timeline | null>([]);
   const [loading, setLoading] = useState(false);
 
   /* --------------------------------
@@ -533,8 +533,11 @@ export function useGoals(options: UseGoalsOptions = {}) {
           due_date: null, // Parent tasks should not have a due_date
           is_twelve_week_goal: timeline.source === 'global',
           recurrence_rule: taskData.recurrenceRule,
-          // Only set custom_timeline_id for custom timelines
-          ...(timeline.source === 'custom' ? { custom_timeline_id: timeline.id } : {}),
+          
+          // --- THIS IS THE FIX ---
+          // Conditionally add the correct timeline foreign key to the main task record
+          ...(timeline.source === 'global' && { user_global_timeline_id: timeline.id }),
+          ...(timeline.source === 'custom' && { user_custom_timeline_id: timeline.id }),
         };
 
         const { data: insertedTask, error: taskError } = await supabase
@@ -759,3 +762,4 @@ export function useGoals(options: UseGoalsOptions = {}) {
     insertUniversalJoins,
   };
 }
+
