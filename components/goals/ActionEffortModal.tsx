@@ -323,10 +323,13 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
 
       await createTaskWithWeekPlan(taskData);
 
-      Alert.alert('Success', `Action ${mode === 'edit' ? 'updated' : 'created'} successfully!`);
-      
-      // Call onClose to trigger parent refresh
+      console.log('[ActionEffortModal] Task saved successfully, closing modal');
+
+      // Call onClose to trigger parent refresh (this will refresh the goals list)
       onClose();
+
+      // Show success alert after triggering refresh
+      Alert.alert('Success', `Action ${mode === 'edit' ? 'updated' : 'created'} successfully!`);
     } catch (error) {
       console.error('Error saving action:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to save action.');

@@ -61,29 +61,35 @@ export default function Goals() {
 
   // MODIFIED: This function now accepts the goals array directly to avoid using stale state.
   const fetchWeekActions = async (goalsToFetch: any[]) => {
+    console.log('[fetchWeekActions] Called with goals:', goalsToFetch.length);
     if (!selectedTimeline || timelineWeeks.length === 0 || goalsToFetch.length === 0) {
+      console.log('[fetchWeekActions] Early return - timeline:', !!selectedTimeline, 'weeks:', timelineWeeks.length, 'goals:', goalsToFetch.length);
       setWeekGoalActions({});
       return;
     }
 
     const currentWeek = timelineWeeks[currentWeekIndex];
     if (!currentWeek) {
+      console.log('[fetchWeekActions] No current week at index:', currentWeekIndex);
       setWeekGoalActions({});
       return;
     }
 
+    console.log('[fetchWeekActions] Fetching for week:', currentWeek.week_number);
     setLoadingWeekActions(true);
     try {
       const goalIds = goalsToFetch.map(g => g.id);
+      console.log('[fetchWeekActions] Goal IDs:', goalIds);
       const actions = await fetchGoalActionsForWeek(
         goalIds,
         currentWeek.week_number,
         selectedTimeline,
         timelineWeeks
       );
+      console.log('[fetchWeekActions] Actions returned:', JSON.stringify(actions, null, 2));
       setWeekGoalActions(actions);
     } catch (error) {
-      console.error('Error fetching week actions:', error);
+      console.error('[fetchWeekActions] Error fetching week actions:', error);
       setWeekGoalActions({});
     } finally {
       setLoadingWeekActions(false);
@@ -850,13 +856,18 @@ export default function Goals() {
       <ActionEffortModal
         visible={actionEffortModalVisible}
         onClose={async () => { // MODIFIED: The handler is now async.
+          console.log('[Goals] ActionEffortModal onClose - starting refresh');
           setActionEffortModalVisible(false);
           setEditingAction(null);
           setActionModalMode('create');
           // MODIFIED: This logic now chains the fetches to prevent race conditions.
           if (selectedTimeline) {
+            console.log('[Goals] Fetching timeline goals for:', selectedTimeline.id);
             const newGoals = await fetchTimelineGoals(selectedTimeline);
+            console.log('[Goals] Timeline goals fetched, count:', newGoals.length);
+            console.log('[Goals] Fetching week actions for goals:', newGoals.map(g => g.id));
             await fetchWeekActions(newGoals);
+            console.log('[Goals] Week actions fetch completed');
           }
         }}
         goal={actionModalMode === 'create' ? selectedGoalForAction : editingAction?.goal}

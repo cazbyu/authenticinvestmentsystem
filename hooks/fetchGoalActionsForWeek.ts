@@ -55,7 +55,7 @@ export async function fetchGoalActionsForWeek(
   cycleWeeks: TimelineWeekInput[]
 ): Promise<Record<string, TaskWithLogs[]>> {
   try {
-    console.debug('[fetchGoalActionsForWeek] called with:', {
+    console.log('[fetchGoalActionsForWeek] called with:', {
       goalIdsCount: goalIds?.length ?? 0,
       goalIds,
       weekNumber,
@@ -68,11 +68,11 @@ export async function fetchGoalActionsForWeek(
     const { data: auth } = await supabase.auth.getUser();
     const user = auth?.user ?? null;
     if (!user) {
-      console.debug('[fetchGoalActionsForWeek] no authenticated user — returning {}');
+      console.log('[fetchGoalActionsForWeek] no authenticated user — returning {}');
       return {};
     }
     if (!goalIds || goalIds.length === 0) {
-      console.debug('[fetchGoalActionsForWeek] empty goalIds — returning {}');
+      console.log('[fetchGoalActionsForWeek] empty goalIds — returning {}');
       return {};
     }
 
@@ -82,7 +82,7 @@ export async function fetchGoalActionsForWeek(
     const weekStartDate = startOf(week);
     const weekEndDate = endOf(week);
 
-    console.debug('[fetchGoalActionsForWeek] resolved week:', {
+    console.log('[fetchGoalActionsForWeek] resolved week:', {
       weekNumber,
       found: Boolean(week),
       weekStartDate,
@@ -99,7 +99,7 @@ export async function fetchGoalActionsForWeek(
     const twelveWkFilter = `twelve_wk_goal_id.in.(${goalIds.join(',')})`;
     const customFilter = `custom_goal_id.in.(${goalIds.join(',')})`;
     const orFilter = `${twelveWkFilter},${customFilter}`;
-    console.debug('[fetchGoalActionsForWeek] universal-goals-join query filter:', orFilter);
+    console.log('[fetchGoalActionsForWeek] universal-goals-join query filter:', orFilter);
 
     const { data: goalJoins, error: joinsErr } = await supabase
       .from('0008-ap-universal-goals-join')
@@ -113,14 +113,14 @@ export async function fetchGoalActionsForWeek(
     }
 
     const taskIds = (goalJoins ?? []).map(j => j.parent_id);
-    console.debug('[fetchGoalActionsForWeek] goalJoins:', {
+    console.log('[fetchGoalActionsForWeek] goalJoins:', {
       count: goalJoins?.length ?? 0,
       taskIdsCount: taskIds.length,
       sample: goalJoins?.slice(0, 3),
     });
 
     if (taskIds.length === 0) {
-      console.debug('[fetchGoalActionsForWeek] no parent tasks linked — returning {}');
+      console.log('[fetchGoalActionsForWeek] no parent tasks linked — returning {}');
       return {};
     }
 
@@ -137,13 +137,13 @@ export async function fetchGoalActionsForWeek(
       console.error('[fetchGoalActionsForWeek] error fetching tasks:', tasksErr);
       return {};
     }
-    console.debug('[fetchGoalActionsForWeek] tasks fetched:', {
+    console.log('[fetchGoalActionsForWeek] tasks fetched:', {
       count: tasksData?.length ?? 0,
       sample: tasksData?.slice(0, 3),
     });
 
     if (!tasksData || tasksData.length === 0) {
-      console.debug('[fetchGoalActionsForWeek] 0 tasks after filtering — returning {}');
+      console.log('[fetchGoalActionsForWeek] 0 tasks after filtering — returning {}');
       return {};
     }
 
@@ -160,7 +160,7 @@ export async function fetchGoalActionsForWeek(
       console.error('[fetchGoalActionsForWeek] error fetching week plans:', weekPlansErr);
       return {};
     }
-    console.debug('[fetchGoalActionsForWeek] week plans fetched:', {
+    console.log('[fetchGoalActionsForWeek] week plans fetched:', {
       count: weekPlansData?.length ?? 0,
       sample: weekPlansData?.slice(0, 3),
     });
@@ -168,13 +168,13 @@ export async function fetchGoalActionsForWeek(
     const tasksWithWeekPlans = tasksData.filter(task =>
       (weekPlansData ?? []).some(wp => wp.task_id === task.id)
     );
-    console.debug('[fetchGoalActionsForWeek] tasks that have a week plan in this week:', {
+    console.log('[fetchGoalActionsForWeek] tasks that have a week plan in this week:', {
       count: tasksWithWeekPlans.length,
       ids: tasksWithWeekPlans.slice(0, 10).map(t => t.id),
     });
 
     if (tasksWithWeekPlans.length === 0) {
-      console.debug('[fetchGoalActionsForWeek] no tasks have a week plan for this week — returning {}');
+      console.log('[fetchGoalActionsForWeek] no tasks have a week plan for this week — returning {}');
       return {};
     }
 
@@ -192,7 +192,7 @@ export async function fetchGoalActionsForWeek(
       console.error('[fetchGoalActionsForWeek] error fetching occurrences:', occErr);
       return {};
     }
-    console.debug('[fetchGoalActionsForWeek] occurrences fetched:', {
+    console.log('[fetchGoalActionsForWeek] occurrences fetched:', {
       count: occurrenceData?.length ?? 0,
       sample: occurrenceData?.slice(0, 3),
     });
@@ -240,7 +240,7 @@ export async function fetchGoalActionsForWeek(
       grouped[goalId].push(taskWithLogs);
     }
 
-    console.debug('[fetchGoalActionsForWeek] final grouped result:', {
+    console.log('[fetchGoalActionsForWeek] final grouped result:', {
       goalBuckets: Object.keys(grouped).length,
       countsPerGoal: Object.fromEntries(
         Object.entries(grouped).map(([g, arr]) => [g, arr.length])
