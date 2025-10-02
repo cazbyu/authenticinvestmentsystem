@@ -48,11 +48,9 @@ export default function Goals() {
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   
-  // Import functions from useGoalProgress hook (but NOT fetchGoalActionsForWeek - we use the standalone one)
+  // Import functions from useGoalProgress hook (but NOT fetchGoalActionsForWeek or completion functions - we handle those locally)
   const {
     toggleTaskDay,
-    completeActionSuggestion,
-    undoActionOccurrence,
   } = useGoalProgress();
   
   // Local goals state for the selected timeline
@@ -105,24 +103,28 @@ export default function Goals() {
 
   const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
     try {
-      console.log('Toggling completion:', { actionId, date, completed });
-      
+      console.log('Toggling completion:', { actionId, date, completed, selectedTimeline });
+
+      if (!selectedTimeline) {
+        throw new Error('No timeline selected');
+      }
+
       // Optimistically update the UI immediately
       setWeekGoalActions(prevActions => {
         const updatedActions = { ...prevActions };
-        
+
         // Find the goal that contains this action
         for (const goalId in updatedActions) {
           const goalActions = updatedActions[goalId];
           const actionIndex = goalActions.findIndex(action => action.id === actionId);
-          
+
           if (actionIndex !== -1) {
             const updatedAction = { ...goalActions[actionIndex] };
             const updatedLogs = [...updatedAction.logs];
-            
+
             // Find or create the log entry for this date
             const logIndex = updatedLogs.findIndex(log => log.measured_on === date);
-            
+
             if (completed) {
               // Remove the log entry (undo completion)
               if (logIndex !== -1) {
@@ -145,44 +147,82 @@ export default function Goals() {
                 });
               }
             }
-            
+
             // Update the action with new logs and recalculate weeklyActual
             updatedAction.logs = updatedLogs;
             updatedAction.weeklyActual = Math.min(
               updatedLogs.filter(log => log.completed).length,
               updatedAction.weeklyTarget
             );
-            
+
             // Update the actions array
             updatedActions[goalId] = [
               ...goalActions.slice(0, actionIndex),
               updatedAction,
               ...goalActions.slice(actionIndex + 1)
             ];
-            
+
             break;
           }
         }
-        
+
         return updatedActions;
       });
-      
+
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       if (completed) {
-        // If currently completed, undo the completion
-        await undoActionOccurrence({ parentTaskId: actionId, whenISO: date });
+        // If currently completed, undo the completion by deleting the occurrence
+        const { error: deleteError } = await supabase
+          .from('0008-ap-tasks')
+          .delete()
+          .eq('parent_task_id', actionId)
+          .eq('due_date', date)
+          .eq('type', 'task');
+
+        if (deleteError) throw deleteError;
       } else {
-        // If not completed, mark as completed
-        await completeActionSuggestion({ parentTaskId: actionId, whenISO: date });
+        // If not completed, create a completion occurrence
+        const { data: parent } = await supabase
+          .from('0008-ap-tasks')
+          .select('id, title')
+          .eq('id', actionId)
+          .single();
+
+        if (!parent) throw new Error('Parent task not found');
+
+        const occurrencePayload: any = {
+          user_id: user.id,
+          title: parent.title,
+          type: 'task',
+          status: 'completed',
+          due_date: date,
+          completed_at: new Date().toISOString(),
+          parent_task_id: actionId,
+          is_twelve_week_goal: selectedTimeline.source === 'global',
+          ...(selectedTimeline.source === 'custom' ? { custom_timeline_id: selectedTimeline.id } : {}),
+        };
+
+        const { error: insertError } = await supabase
+          .from('0008-ap-tasks')
+          .insert(occurrencePayload);
+
+        if (insertError) throw insertError;
       }
-      
+
+      // Refresh to get updated data from server
+      await fetchWeekActions(timelineGoals);
+
       // Also refresh the authentic score
       calculateAuthenticScore();
     } catch (error) {
       console.error('Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to update completion status');
-      
+
       // Revert the optimistic update on error
-      await fetchWeekActions(timelineGoals); // Pass current goals to revert correctly
+      await fetchWeekActions(timelineGoals);
     }
   };
 
