@@ -232,8 +232,14 @@ export default function Goals() {
   } | null>(null);
 
   const handleDeleteAction = async (actionId: string, weekNumber: number) => {
-    if (!selectedTimeline) return;
+    console.log('[handleDeleteAction] Called with:', { actionId, weekNumber, selectedTimeline: !!selectedTimeline });
 
+    if (!selectedTimeline) {
+      console.log('[handleDeleteAction] No selected timeline, returning early');
+      return;
+    }
+
+    console.log('[handleDeleteAction] Showing alert dialog');
     Alert.alert(
       'Delete Action',
       'Choose how to delete this action:',
