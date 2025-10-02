@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
@@ -231,110 +231,126 @@ export default function Goals() {
     timeout: any;
   } | null>(null);
 
+  // Delete confirmation modal state
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteActionData, setDeleteActionData] = useState<{ actionId: string; weekNumber: number } | null>(null);
+
   const handleDeleteAction = async (actionId: string, weekNumber: number) => {
-    console.log('[handleDeleteAction] Called with:', { actionId, weekNumber, selectedTimeline: !!selectedTimeline });
+    if (!selectedTimeline) return;
 
-    if (!selectedTimeline) {
-      console.log('[handleDeleteAction] No selected timeline, returning early');
-      return;
-    }
-
-    console.log('[handleDeleteAction] Showing alert dialog');
-    Alert.alert(
-      'Delete Action',
-      'Choose how to delete this action:',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'This Week Only',
-          onPress: async () => {
-            try {
-              await deleteTaskWeekPlan(actionId, weekNumber, selectedTimeline as any);
-
-              // Refresh the data
-              const newGoals = await fetchTimelineGoals(selectedTimeline);
-              await fetchWeekActions(newGoals);
-
-              // Set up undo with timeout
-              const timeout = setTimeout(() => {
-                setUndoState(null);
-              }, 5000);
-
-              setUndoState({
-                taskId: actionId,
-                weekNumber,
-                deleteType: 'week',
-                timeout,
-              });
-
-              Alert.alert(
-                'Action Deleted',
-                'Action removed from this week only.',
-                [
-                  {
-                    text: 'Undo',
-                    onPress: () => handleUndoDelete(),
-                  },
-                  {
-                    text: 'OK',
-                    style: 'cancel',
-                  },
-                ]
-              );
-            } catch (error) {
-              console.error('Error deleting action for week:', error);
-              Alert.alert('Error', (error as Error).message || 'Failed to delete action');
-            }
-          },
-        },
-        {
-          text: 'All Weeks',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteTask(actionId);
-
-              // Refresh the data
-              const newGoals = await fetchTimelineGoals(selectedTimeline);
-              await fetchWeekActions(newGoals);
-
-              // Set up undo with timeout
-              const timeout = setTimeout(() => {
-                setUndoState(null);
-              }, 5000);
-
-              setUndoState({
-                taskId: actionId,
-                deleteType: 'all',
-                timeout,
-              });
-
-              Alert.alert(
-                'Action Deleted',
-                'Action removed from all weeks.',
-                [
-                  {
-                    text: 'Undo',
-                    onPress: () => handleUndoDelete(),
-                  },
-                  {
-                    text: 'OK',
-                    style: 'cancel',
-                  },
-                ]
-              );
-            } catch (error) {
-              console.error('Error deleting action:', error);
-              Alert.alert('Error', (error as Error).message || 'Failed to delete action');
-            }
-          },
-        },
-      ]
-    );
+    setDeleteActionData({ actionId, weekNumber });
+    setDeleteConfirmVisible(true);
   };
+
+  const handleConfirmDeleteWeek = async () => {
+    if (!deleteActionData || !selectedTimeline) return;
+
+    const { actionId, weekNumber } = deleteActionData;
+    setDeleteConfirmVisible(false);
+
+    try {
+      await deleteTaskWeekPlan(actionId, weekNumber, selectedTimeline as any);
+
+      // Refresh the data
+      const newGoals = await fetchTimelineGoals(selectedTimeline);
+      await fetchWeekActions(newGoals);
+
+      // Set up undo with timeout
+      const timeout = setTimeout(() => {
+        setUndoState(null);
+      }, 5000);
+
+      setUndoState({
+        taskId: actionId,
+        weekNumber,
+        deleteType: 'week',
+        timeout,
+      });
+
+      if (Platform.OS === 'web') {
+        if (window.confirm('Action removed from this week. Click OK to undo, or Cancel to confirm.')) {
+          handleUndoDelete();
+        }
+      } else {
+        Alert.alert(
+          'Action Deleted',
+          'Action removed from this week only.',
+          [
+            {
+              text: 'Undo',
+              onPress: () => handleUndoDelete(),
+            },
+            {
+              text: 'OK',
+              style: 'cancel',
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error deleting action for week:', error);
+      if (Platform.OS === 'web') {
+        window.alert((error as Error).message || 'Failed to delete action');
+      } else {
+        Alert.alert('Error', (error as Error).message || 'Failed to delete action');
+      }
+    }
+  };
+
+  const handleConfirmDeleteAll = async () => {
+    if (!deleteActionData || !selectedTimeline) return;
+
+    const { actionId } = deleteActionData;
+    setDeleteConfirmVisible(false);
+
+    try {
+      await deleteTask(actionId);
+
+      // Refresh the data
+      const newGoals = await fetchTimelineGoals(selectedTimeline);
+      await fetchWeekActions(newGoals);
+
+      // Set up undo with timeout
+      const timeout = setTimeout(() => {
+        setUndoState(null);
+      }, 5000);
+
+      setUndoState({
+        taskId: actionId,
+        deleteType: 'all',
+        timeout,
+      });
+
+      if (Platform.OS === 'web') {
+        if (window.confirm('Action removed from all weeks. Click OK to undo, or Cancel to confirm.')) {
+          handleUndoDelete();
+        }
+      } else {
+        Alert.alert(
+          'Action Deleted',
+          'Action removed from all weeks.',
+          [
+            {
+              text: 'Undo',
+              onPress: () => handleUndoDelete(),
+            },
+            {
+              text: 'OK',
+              style: 'cancel',
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error deleting action:', error);
+      if (Platform.OS === 'web') {
+        window.alert((error as Error).message || 'Failed to delete action');
+      } else {
+        Alert.alert('Error', (error as Error).message || 'Failed to delete action');
+      }
+    }
+  };
+
 
   const handleUndoDelete = async () => {
     if (!undoState || !selectedTimeline) return;
@@ -1094,6 +1110,54 @@ export default function Goals() {
           calculateAuthenticScore();
         }}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={deleteConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModal}>
+            <View style={styles.deleteModalHeader}>
+              <Text style={styles.deleteModalTitle}>Delete Action</Text>
+              <TouchableOpacity onPress={() => setDeleteConfirmVisible(false)}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.deleteModalMessage}>
+              Choose how to delete this action:
+            </Text>
+
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={styles.deleteModalButton}
+                onPress={handleConfirmDeleteWeek}
+              >
+                <Minus size={16} color="#ffffff" />
+                <Text style={styles.deleteModalButtonText}>This Week Only</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonDanger]}
+                onPress={handleConfirmDeleteAll}
+              >
+                <Minus size={16} color="#ffffff" />
+                <Text style={styles.deleteModalButtonText}>All Weeks</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteModalButtonCancel]}
+                onPress={() => setDeleteConfirmVisible(false)}
+              >
+                <Text style={styles.deleteModalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1303,6 +1367,72 @@ const styles = StyleSheet.create({
   createGoalButtonText: {
     color: '#ffffff',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  deleteModal: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  deleteModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  deleteModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  deleteModalMessage: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  deleteModalButtons: {
+    gap: 12,
+  },
+  deleteModalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0078d4',
+    paddingVertical: 14,
+    borderRadius: 8,
+    gap: 8,
+  },
+  deleteModalButtonDanger: {
+    backgroundColor: '#dc2626',
+  },
+  deleteModalButtonCancel: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+  },
+  deleteModalButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteModalButtonCancelText: {
+    color: '#374151',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

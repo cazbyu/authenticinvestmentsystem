@@ -330,14 +330,7 @@ export function GoalProgressCard({
                           {onDeleteAction && week && (
                             <TouchableOpacity
                               style={styles.deleteIconButton}
-                              onPress={() => {
-                                console.log('[GoalProgressCard] Delete icon pressed:', {
-                                  actionId: action.id,
-                                  weekNumber: week.weekNumber,
-                                  onDeleteActionDefined: !!onDeleteAction
-                                });
-                                onDeleteAction(action.id, week.weekNumber);
-                              }}
+                              onPress={() => onDeleteAction(action.id, week.weekNumber)}
                               activeOpacity={0.7}
                             >
                               <Trash2 size={16} color="#6b7280" />
