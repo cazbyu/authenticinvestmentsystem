@@ -212,10 +212,7 @@ export default function Goals() {
         if (insertError) throw insertError;
       }
 
-      // Refresh to get updated data from server
-      await fetchWeekActions(timelineGoals);
-
-      // Also refresh the authentic score
+      // Update the authentic score without refreshing
       calculateAuthenticScore();
     } catch (error) {
       console.error('Error toggling completion:', error);
