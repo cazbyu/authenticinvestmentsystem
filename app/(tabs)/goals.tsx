@@ -9,14 +9,17 @@ import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { ManageGlobalTimelinesModal } from '@/components/timelines/ManageGlobalTimelinesModal';
 import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
+import { GoalBankTabbedHeader, GoalBankTab } from '@/components/goals/GoalBankTabbedHeader';
+import { NorthStarQuickView } from '@/components/northStar/NorthStarQuickView';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useGoals } from '@/hooks/useGoals';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 import { calculateAuthenticScore } from '@/lib/taskUtils';
 import { formatLocalDate } from '@/lib/dateUtils';
-import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus, X } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus, X, Archive } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
+import { router } from 'expo-router';
 
 interface Timeline {
   id: string;
@@ -42,11 +45,15 @@ interface TimelineWeek {
   end_date: string;
 }
 export default function Goals() {
+  const [activeTab, setActiveTab] = useState<GoalBankTab>('timelines');
   const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
+
+  const [northStarData, setNorthStarData] = useState<any>(null);
+  const [loadingNorthStar, setLoadingNorthStar] = useState(false);
   
   // Import functions from useGoalProgress hook (but NOT fetchGoalActionsForWeek or completion functions - we handle those locally)
   const {
@@ -387,6 +394,7 @@ export default function Goals() {
   useEffect(() => {
     fetchAllTimelines();
     calculateAuthenticScore();
+    fetchNorthStarData();
 
     // Cleanup undo timeout on unmount
     return () => {
@@ -758,13 +766,62 @@ export default function Goals() {
     setWeekGoalActions({});
   };
 
-  const renderTimelineSelector = () => (
+  const fetchNorthStarData = async () => {
+    setLoadingNorthStar(true);
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData, error: userError } = await supabase
+        .from('0008-ap-users')
+        .select('mission_text, vision_text, vision_timeframe')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (userError) throw userError;
+
+      const { data: oneYearGoals, error: goalsError } = await supabase
+        .from('0008-ap-goals-1y')
+        .select('id, title, description, status, year_target_date, priority')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('priority', { ascending: true });
+
+      if (goalsError) throw goalsError;
+
+      setNorthStarData({
+        mission_text: userData?.mission_text || '',
+        vision_text: userData?.vision_text || '',
+        vision_timeframe: userData?.vision_timeframe || '5_year',
+        oneYearGoals: oneYearGoals || [],
+      });
+    } catch (error) {
+      console.error('Error fetching North Star data:', error);
+      setNorthStarData({
+        mission_text: '',
+        vision_text: '',
+        vision_timeframe: '5_year',
+        oneYearGoals: [],
+      });
+    } finally {
+      setLoadingNorthStar(false);
+    }
+  };
+
+  const handleNavigateToSettings = () => {
+    router.push('/settings');
+  };
+
+  const renderTimelinesTab = () => (
     <View style={styles.content}>
-      <Header 
-        title="Goal Bank" 
-        authenticScore={authenticScore}
-      />
-      
+      <View style={styles.sectionHeaderContainer}>
+        <Text style={styles.sectionHeaderTitle}>Active Timelines</Text>
+        <Text style={styles.sectionHeaderSubtitle}>
+          Select a timeline to view and manage its goals
+        </Text>
+      </View>
+
       <ScrollView style={styles.timelinesList}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -833,24 +890,43 @@ export default function Goals() {
         )}
       </ScrollView>
 
-      {/* Management buttons */}
-      <View style={styles.managementButtons}>
+      <View style={styles.bottomActions}>
         <TouchableOpacity
-          style={styles.manageButton}
-          onPress={() => setManageCustomTimelinesModalVisible(true)}
+          style={styles.archiveLink}
+          onPress={handleNavigateToSettings}
         >
-          <Edit size={16} color="#7c3aed" />
-          <Text style={styles.manageButtonText}>Manage Custom</Text>
+          <Archive size={16} color="#6b7280" />
+          <Text style={styles.archiveLinkText}>View Timeline Archive</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.manageGlobalButton}
-          onPress={() => setManageGlobalTimelinesModalVisible(true)}
-        >
-          <Users size={16} color="#0078d4" />
-          <Text style={styles.manageGlobalButtonText}>Manage Global</Text>
-        </TouchableOpacity>
+
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={styles.quickActionButton}
+            onPress={() => setManageCustomTimelinesModalVisible(true)}
+          >
+            <Edit size={16} color="#7c3aed" />
+            <Text style={styles.quickActionText}>Manage Custom</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionButton}
+            onPress={() => setManageGlobalTimelinesModalVisible(true)}
+          >
+            <Users size={16} color="#0078d4" />
+            <Text style={styles.quickActionText}>Manage Global</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+    </View>
+  );
+
+  const renderNorthStarTab = () => (
+    <View style={styles.content}>
+      <NorthStarQuickView
+        data={northStarData}
+        loading={loadingNorthStar}
+        onNavigateToSettings={handleNavigateToSettings}
+      />
     </View>
   );
 
@@ -862,15 +938,6 @@ export default function Goals() {
 
     return (
       <View style={styles.content}>
-        <Header
-          title={selectedTimeline.title || 'Timeline Goals'}
-          authenticScore={authenticScore}
-          backgroundColor={selectedTimeline.source === 'global' ? '#0078d4' : '#7c3aed'}
-          onBackPress={handleBackToTimelines}
-          daysRemaining={timelineDaysLeft?.days_left}
-          cycleProgressPercentage={timelineDaysLeft?.pct_elapsed}
-          cycleTitle={selectedTimeline.title}
-        />
 
         {/* Week Navigation */}
         {timelineWeeks.length > 0 && (
@@ -978,19 +1045,36 @@ export default function Goals() {
     );
   };
 
+  const renderMainContent = () => {
+    if (selectedTimeline) {
+      return renderSelectedTimeline();
+    }
+
+    if (activeTab === 'northstar') {
+      return renderNorthStarTab();
+    }
+
+    return renderTimelinesTab();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {selectedTimeline ? renderSelectedTimeline() : renderTimelineSelector()}
+      <GoalBankTabbedHeader
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        authenticScore={authenticScore}
+        showBackButton={!!selectedTimeline}
+        onBackPress={handleBackToTimelines}
+        timelineTitle={selectedTimeline?.title}
+        daysRemaining={timelineDaysLeft?.days_left}
+        cycleProgressPercentage={timelineDaysLeft?.pct_elapsed}
+        backgroundColor={selectedTimeline?.source === 'global' ? '#0078d4' : '#7c3aed'}
+      />
 
-      {/* FAB for creating goals - only show when not viewing a specific timeline */}
-      {!selectedTimeline && (
-        <DraggableFab onPress={() => setCreateGoalModalVisible(true)}>
-          <Plus size={24} color="#ffffff" />
-        </DraggableFab>
-      )}
+      {renderMainContent()}
 
-      {/* FAB for creating goals within selected timeline */}
-      {selectedTimeline && (
+      {/* FAB for creating goals - show when on timelines tab or viewing a timeline */}
+      {(activeTab === 'timelines' || selectedTimeline) && (
         <DraggableFab onPress={() => setCreateGoalModalVisible(true)}>
           <Plus size={24} color="#ffffff" />
         </DraggableFab>
@@ -1291,45 +1375,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  managementButtons: {
-    flexDirection: 'row',
+  sectionHeaderContainer: {
+    backgroundColor: '#ffffff',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  sectionHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  sectionHeaderSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  bottomActions: {
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  archiveLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  archiveLinkText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  quickActions: {
+    flexDirection: 'row',
     gap: 12,
   },
-  manageButton: {
+  quickActionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#7c3aed',
-    paddingVertical: 12,
+    borderColor: '#e5e7eb',
+    paddingVertical: 10,
     borderRadius: 8,
     gap: 6,
   },
-  manageButtonText: {
-    color: '#7c3aed',
-    fontSize: 14,
+  quickActionText: {
+    fontSize: 13,
     fontWeight: '600',
-  },
-  manageGlobalButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#0078d4',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  manageGlobalButtonText: {
-    color: '#0078d4',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#374151',
   },
   weekNavigation: {
     flexDirection: 'row',
