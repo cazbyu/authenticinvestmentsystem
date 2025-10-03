@@ -1,6 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Menu } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
+
+type DrawerNavigation = DrawerNavigationProp<any>;
 
 export type GoalBankTab = 'timelines' | 'northstar';
 
@@ -27,6 +32,13 @@ export function GoalBankTabbedHeader({
   cycleProgressPercentage,
   backgroundColor = '#0078d4',
 }: GoalBankTabbedHeaderProps) {
+  const navigation = useNavigation<DrawerNavigation>();
+  const router = useRouter();
+
+  const handleMenuPress = () => {
+    navigation.openDrawer();
+  };
+
   return (
     <View style={[styles.container, { backgroundColor }]}>
       <View style={styles.topRow}>
@@ -41,7 +53,17 @@ export function GoalBankTabbedHeader({
             <Text style={styles.backButtonText}>Timelines</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.pageTitle}>Goal Bank</Text>
+          <View style={styles.titleRow}>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={handleMenuPress}
+              accessibilityLabel="Open menu"
+              accessibilityRole="button"
+            >
+              <Menu size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <Text style={styles.pageTitle}>Goal Bank</Text>
+          </View>
         )}
 
         <View style={styles.scoreContainer}>
@@ -133,6 +155,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuButton: {
+    padding: 4,
   },
   backButton: {
     flexDirection: 'row',
