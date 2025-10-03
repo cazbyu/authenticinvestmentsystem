@@ -735,10 +735,6 @@ export default function Roles() {
   };
 
   const handleRolePress = useCallback((role: Role) => {
-    if (fetchInProgressRef.current || isLoadingRole || loading) {
-      return;
-    }
-
     // Cancel any pending role selection
     if (roleClickTimeout.current) {
       clearTimeout(roleClickTimeout.current);
@@ -749,18 +745,13 @@ export default function Roles() {
       fetchAbortController.current.abort();
     }
 
-    setIsLoadingRole(true);
-    setFetchState('loading-role');
-    fetchInProgressRef.current = true;
-
-    // Debounce role selection to prevent rapid switching
-    roleClickTimeout.current = setTimeout(() => {
-      setSelectedRole(role);
-      setSelectedKR(null);
-      setIsLoadingRole(false);
-      setFetchState('loading-data');
-    }, 400);
-  }, [isLoadingRole, loading]);
+    // Immediately update selected role without blocking on loading states
+    setSelectedRole(role);
+    setSelectedKR(null);
+    setIsLoadingRole(false);
+    setFetchState('loading-data');
+    fetchInProgressRef.current = false;
+  }, []);
 
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
@@ -1070,70 +1061,56 @@ export default function Roles() {
             )}
           </ScrollView>
 
-          {(keyRelationships.length > 0 || krLoading) && (
-            <View style={styles.keyRelationshipsSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Key Relationships</Text>
-                <TouchableOpacity
-                  style={styles.addKRButton}
-                  onPress={() => handleAddKR(selectedRole.id)}
-                  disabled={krLoading}
-                >
-                  <Plus size={16} color="#0078d4" />
-                  <Text style={styles.addKRButtonText}>Add KR</Text>
-                </TouchableOpacity>
+          {/* Key Relationships Section - Always visible when a role is selected */}
+          <View style={styles.keyRelationshipsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Key Relationships</Text>
+              <TouchableOpacity
+                style={styles.addKRButton}
+                onPress={() => handleAddKR(selectedRole.id)}
+                disabled={krLoading}
+              >
+                <Plus size={16} color="#0078d4" />
+                <Text style={styles.addKRButtonText}>Add KR</Text>
+              </TouchableOpacity>
+            </View>
+            {krLoading ? (
+              <View style={styles.krLoadingContainer}>
+                <Text style={styles.krLoadingText}>Loading key relationships...</Text>
               </View>
-              {krLoading ? (
-                <View style={styles.krLoadingContainer}>
-                  <Text style={styles.krLoadingText}>Loading key relationships...</Text>
+            ) : keyRelationships.length === 0 ? (
+              <View style={styles.emptyKRContainer}>
+                <Text style={styles.emptyKRText}>No key relationships yet</Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.keyRelationshipsList}>
+                  {keyRelationships.map(kr => (
+                    <TouchableOpacity
+                      key={kr.id}
+                      style={styles.keyRelationshipCard}
+                      onPress={() => setSelectedKR(kr)}
+                    >
+                      {kr.image_path && krImageUrls[kr.id] ? (
+                        <Image
+                          source={{ uri: krImageUrls[kr.id] || undefined }}
+                          style={styles.krImage}
+                          onError={(error) => {
+                            console.error('[RoleBank] Failed to load KR image:', kr.image_path, error.nativeEvent.error);
+                          }}
+                        />
+                      ) : (
+                        <View style={styles.krImagePlaceholder}>
+                          <Users size={24} color="#6b7280" />
+                        </View>
+                      )}
+                      <Text style={styles.krName} numberOfLines={2}>{kr.name}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.keyRelationshipsList}>
-                    {keyRelationships.map(kr => (
-                      <TouchableOpacity
-                        key={kr.id}
-                        style={styles.keyRelationshipCard}
-                        onPress={() => setSelectedKR(kr)}
-                      >
-                        {kr.image_path && krImageUrls[kr.id] ? (
-                          <Image
-                            source={{ uri: krImageUrls[kr.id] || undefined }}
-                            style={styles.krImage}
-                            onError={(error) => {
-                              console.error('[RoleBank] Failed to load KR image:', kr.image_path, error.nativeEvent.error);
-                            }}
-                          />
-                        ) : (
-                          <View style={styles.krImagePlaceholder}>
-                            <Users size={24} color="#6b7280" />
-                          </View>
-                        )}
-                        <Text style={styles.krName} numberOfLines={2}>{kr.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              )}
-            </View>
-          )}
-
-          {/* Show Add KR button even when no KRs exist */}
-          {keyRelationships.length === 0 && (
-            <View style={styles.keyRelationshipsSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Key Relationships</Text>
-                <TouchableOpacity
-                  style={styles.addKRButton}
-                  onPress={() => handleAddKR(selectedRole.id)}
-                >
-                  <Plus size={16} color="#0078d4" />
-                  <Text style={styles.addKRButtonText}>Add KR</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.emptyKRText}>No key relationships yet</Text>
-            </View>
-          )}
+              </ScrollView>
+            )}
+          </View>
         </View>
       );
     }
@@ -1165,12 +1142,10 @@ export default function Roles() {
                   style={[
                     styles.roleCard,
                     styles.roleCardHalf,
-                    { borderLeftColor: role.color || '#0078d4' },
-                    (isLoadingRole || loading) && styles.roleCardDisabled
+                    { borderLeftColor: role.color || '#0078d4' }
                   ]}
                   onPress={() => handleRolePress(role)}
                   activeOpacity={0.7}
-                  disabled={isLoadingRole || loading}
                 >
                   <View style={styles.roleCardContent}>
                     <View style={styles.roleCardMain}>
@@ -1486,11 +1461,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0078d4',
   },
+  emptyKRContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
   emptyKRText: {
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
-    paddingHorizontal: 16,
     fontStyle: 'italic',
   },
   krLoadingContainer: {
