@@ -40,6 +40,10 @@ interface UserGlobalTimeline {
   goals?: Array<{ id: string; status: string }>;
 }
 
+interface ActiveTimelineWithCycle extends UserGlobalTimeline {
+  isAlreadyActivated?: boolean;
+}
+
 interface ManageGlobalTimelinesModalProps {
   visible: boolean;
   onClose: () => void;
@@ -47,8 +51,8 @@ interface ManageGlobalTimelinesModalProps {
 }
 
 export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: ManageGlobalTimelinesModalProps) {
-  const [activeTimeline, setActiveTimeline] = useState<UserGlobalTimeline | null>(null);
-  const [availableCycles, setAvailableCycles] = useState<GlobalCycle[]>([]);
+  const [activeTimelines, setActiveTimelines] = useState<UserGlobalTimeline[]>([]);
+  const [availableCycles, setAvailableCycles] = useState<ActiveTimelineWithCycle[]>([]);
   const [loading, setLoading] = useState(false);
   const [activating, setActivating] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
@@ -58,6 +62,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   const [selectedWeekStartDay, setSelectedWeekStartDay] = useState<'sunday' | 'monday'>('sunday');
 
   const [showDeactivationWarning, setShowDeactivationWarning] = useState(false);
+  const [timelineToDeactivate, setTimelineToDeactivate] = useState<UserGlobalTimeline | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -101,12 +106,12 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setActiveTimeline(data);
+      setActiveTimelines(data || []);
     } catch (error) {
-      console.error('Error fetching active timeline:', error);
+      console.error('Error fetching active timelines:', error);
       Alert.alert('Error', (error as Error).message);
     }
   };
@@ -130,17 +135,58 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       if (error) throw error;
 
       const currentDate = new Date().toISOString().split('T')[0];
-      const nextCycles: GlobalCycle[] = [];
+      const availableCyclesWithStatus: ActiveTimelineWithCycle[] = [];
 
       if (cycleData) {
-        const futureCycles = cycleData
-          .filter(cycle => cycle.start_date > currentDate)
-          .slice(0, 2);
+        // Get activated cycle IDs
+        const activatedCycleIds = activeTimelines.map(t => t.global_cycle_id);
 
-        nextCycles.push(...futureCycles);
+        // Find current cycle (start_date <= today <= reflection_end)
+        const currentCycle = cycleData.find(cycle =>
+          cycle.start_date <= currentDate && currentDate <= cycle.reflection_end
+        );
+
+        if (currentCycle) {
+          availableCyclesWithStatus.push({
+            ...currentCycle,
+            isAlreadyActivated: activatedCycleIds.includes(currentCycle.id),
+            id: currentCycle.id,
+            user_id: user.id,
+            global_cycle_id: currentCycle.id,
+            start_date: currentCycle.start_date,
+            end_date: currentCycle.end_date,
+            status: 'active',
+            week_start_day: 'sunday',
+            timezone: 'UTC',
+            created_at: '',
+            updated_at: '',
+            global_cycle: currentCycle
+          } as ActiveTimelineWithCycle);
+        }
+
+        // Add next cycle (first future cycle)
+        const futureCycles = cycleData.filter(cycle => cycle.start_date > currentDate);
+        if (futureCycles.length > 0) {
+          const nextCycle = futureCycles[0];
+          availableCyclesWithStatus.push({
+            ...nextCycle,
+            isAlreadyActivated: activatedCycleIds.includes(nextCycle.id),
+            id: nextCycle.id,
+            user_id: user.id,
+            global_cycle_id: nextCycle.id,
+            start_date: nextCycle.start_date,
+            end_date: nextCycle.end_date,
+            status: 'active',
+            week_start_day: 'sunday',
+            timezone: 'UTC',
+            created_at: '',
+            updated_at: '',
+            global_cycle: nextCycle
+          } as ActiveTimelineWithCycle);
+        }
       }
 
-      setAvailableCycles(nextCycles);
+      setAvailableCycles(availableCyclesWithStatus);
     } catch (error) {
       console.error('Error fetching available cycles:', error);
       Alert.alert('Error', (error as Error).message);
@@ -150,12 +196,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   const handleActivateCycle = (cycle: GlobalCycle, weekStartDay: 'sunday' | 'monday') => {
     setSelectedCycleForActivation(cycle);
     setSelectedWeekStartDay(weekStartDay);
-
-    if (activeTimeline && activeTimeline.goals && activeTimeline.goals.length > 0) {
-      setShowActivationWarning(true);
-    } else {
-      confirmActivation();
-    }
+    // No warnings - directly activate
+    confirmActivation();
   };
 
   const confirmActivation = async () => {
@@ -186,13 +228,14 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     }
   };
 
-  const handleDeactivateTimeline = () => {
-    if (!activeTimeline) return;
+  const handleDeactivateTimeline = (timeline: UserGlobalTimeline) => {
+    if (!timeline) return;
+    setTimelineToDeactivate(timeline);
     setShowDeactivationWarning(true);
   };
 
   const confirmDeactivation = async () => {
-    if (!activeTimeline) return;
+    if (!timelineToDeactivate) return;
 
     setDeactivating(true);
     setShowDeactivationWarning(false);
@@ -201,7 +244,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       const supabase = getSupabaseClient();
 
       const { error } = await supabase.rpc('fn_deactivate_user_global_timeline', {
-        p_user_global_timeline_id: activeTimeline.id
+        p_user_global_timeline_id: timelineToDeactivate.id
       });
 
       if (error) throw error;
@@ -214,76 +257,83 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       Alert.alert('Error', (error as Error).message);
     } finally {
       setDeactivating(false);
+      setTimelineToDeactivate(null);
     }
   };
 
-  const renderActiveTimeline = () => {
-    if (!activeTimeline) {
+  const renderActiveTimelines = () => {
+    if (activeTimelines.length === 0) {
       return (
         <View style={styles.emptySection}>
           <Calendar size={48} color="#6b7280" />
-          <Text style={styles.emptyTitle}>No Active Global Timeline</Text>
+          <Text style={styles.emptyTitle}>No Active Global Timelines</Text>
           <Text style={styles.emptyText}>
-            Activate a global timeline below to start tracking your 12-week goals
+            Activate global timelines below to start tracking your 12-week goals
           </Text>
         </View>
       );
     }
 
-    const startDate = activeTimeline.start_date ? new Date(activeTimeline.start_date) : null;
-    const endDate = activeTimeline.end_date ? new Date(activeTimeline.end_date) : null;
-    let daysRemaining = 0;
-    let progress = 0;
-
-    if (startDate && endDate) {
-      const now = new Date();
-      daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      progress = Math.min(100, Math.max(0, ((now.getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())) * 100));
-    }
-
-    const displayTitle = activeTimeline.title || activeTimeline.global_cycle?.title || activeTimeline.global_cycle?.cycle_label || 'Global Timeline';
-    const goalCount = activeTimeline.goals?.filter(g => g.status === 'active').length || 0;
-
     return (
-      <View style={styles.activeTimelineCard}>
-        <View style={styles.activeTimelineHeader}>
-          <View style={styles.activeTimelineInfo}>
-            <Text style={styles.activeTimelineTitle}>{displayTitle}</Text>
-            <Text style={styles.activeTimelineDates}>
-              {activeTimeline.start_date && activeTimeline.end_date
-                ? formatDateRange(activeTimeline.start_date, activeTimeline.end_date)
-                : 'Invalid date'}
-            </Text>
-            <Text style={styles.activeTimelineStats}>
-              {goalCount} active goals • {daysRemaining} days remaining
-            </Text>
-            <Text style={styles.weekStartInfo}>
-              Week starts: {activeTimeline.week_start_day === 'sunday' ? 'Sunday' : 'Monday'}
-            </Text>
-          </View>
-        </View>
+      <View style={styles.activeTimelinesList}>
+        {activeTimelines.map((timeline) => {
+          const startDate = timeline.start_date ? new Date(timeline.start_date) : null;
+          const endDate = timeline.end_date ? new Date(timeline.end_date) : null;
+          let daysRemaining = 0;
+          let progress = 0;
 
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
-          </View>
-        </View>
+          if (startDate && endDate) {
+            const now = new Date();
+            daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+            const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            progress = Math.min(100, Math.max(0, ((now.getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())) * 100));
+          }
 
-        <TouchableOpacity
-          style={styles.deactivateButton}
-          onPress={handleDeactivateTimeline}
-          disabled={deactivating}
-        >
-          {deactivating ? (
-            <ActivityIndicator size="small" color="#dc2626" />
-          ) : (
-            <>
-              <X size={16} color="#dc2626" />
-              <Text style={styles.deactivateButtonText}>Deactivate Timeline</Text>
-            </>
-          )}
-        </TouchableOpacity>
+          const displayTitle = timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label || 'Global Timeline';
+          const goalCount = timeline.goals?.filter(g => g.status === 'active').length || 0;
+
+          return (
+            <View key={timeline.id} style={styles.activeTimelineCard}>
+              <View style={styles.activeTimelineHeader}>
+                <View style={styles.activeTimelineInfo}>
+                  <Text style={styles.activeTimelineTitle}>{displayTitle}</Text>
+                  <Text style={styles.activeTimelineDates}>
+                    {timeline.start_date && timeline.end_date
+                      ? formatDateRange(timeline.start_date, timeline.end_date)
+                      : 'Invalid date'}
+                  </Text>
+                  <Text style={styles.activeTimelineStats}>
+                    {goalCount} active goals • {daysRemaining} days remaining
+                  </Text>
+                  <Text style={styles.weekStartInfo}>
+                    Week starts: {timeline.week_start_day === 'sunday' ? 'Sunday' : 'Monday'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.deactivateButton}
+                onPress={() => handleDeactivateTimeline(timeline)}
+                disabled={deactivating}
+              >
+                {deactivating ? (
+                  <ActivityIndicator size="small" color="#dc2626" />
+                ) : (
+                  <>
+                    <X size={16} color="#dc2626" />
+                    <Text style={styles.deactivateButtonText}>Deactivate Timeline</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          );
+        })}
       </View>
     );
   };
@@ -304,37 +354,56 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     return (
       <View style={styles.availableCyclesList}>
         {availableCycles.map(cycle => {
-          const displayTitle = cycle.title || cycle.cycle_label || 'Global 12-Week Cycle';
+          const displayTitle = cycle.global_cycle?.title || cycle.global_cycle?.cycle_label || cycle.title || cycle.cycle_label || 'Global 12-Week Cycle';
+          const isActivated = cycle.isAlreadyActivated;
 
           return (
-            <View key={cycle.id} style={styles.availableCycleCard}>
+            <View key={cycle.global_cycle_id || cycle.id} style={[
+              styles.availableCycleCard,
+              isActivated && styles.activatedCycleCard
+            ]}>
               <View style={styles.cycleCardHeader}>
                 <Text style={styles.cycleTitle}>{displayTitle}</Text>
+                {isActivated && (
+                  <View style={styles.activatedBadge}>
+                    <Text style={styles.activatedBadgeText}>Activated</Text>
+                  </View>
+                )}
                 <Text style={styles.cycleDates}>
                   {formatDateRange(cycle.start_date, cycle.end_date)}
                 </Text>
               </View>
 
-              <Text style={styles.weekStartLabel}>Choose your week start day:</Text>
-              <View style={styles.weekStartOptions}>
-                <TouchableOpacity
-                  style={styles.activateOptionButton}
-                  onPress={() => handleActivateCycle(cycle, 'sunday')}
-                  disabled={activating}
-                >
-                  <Text style={styles.activateOptionText}>Sunday</Text>
-                  <ChevronRight size={16} color="#0078d4" />
-                </TouchableOpacity>
+              {!isActivated ? (
+                <>
+                  <Text style={styles.weekStartLabel}>Choose your week start day:</Text>
+                  <View style={styles.weekStartOptions}>
+                    <TouchableOpacity
+                      style={styles.activateOptionButton}
+                      onPress={() => handleActivateCycle(cycle.global_cycle || cycle, 'sunday')}
+                      disabled={activating}
+                    >
+                      <Text style={styles.activateOptionText}>Sunday</Text>
+                      <ChevronRight size={16} color="#0078d4" />
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.activateOptionButton}
-                  onPress={() => handleActivateCycle(cycle, 'monday')}
-                  disabled={activating}
-                >
-                  <Text style={styles.activateOptionText}>Monday</Text>
-                  <ChevronRight size={16} color="#0078d4" />
-                </TouchableOpacity>
-              </View>
+                    <TouchableOpacity
+                      style={styles.activateOptionButton}
+                      onPress={() => handleActivateCycle(cycle.global_cycle || cycle, 'monday')}
+                      disabled={activating}
+                    >
+                      <Text style={styles.activateOptionText}>Monday</Text>
+                      <ChevronRight size={16} color="#0078d4" />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.alreadyActivatedMessage}>
+                  <Text style={styles.alreadyActivatedText}>
+                    This cycle is already activated and appears in your Active Timelines above
+                  </Text>
+                </View>
+              )}
             </View>
           );
         })}
@@ -360,71 +429,22 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
         ) : (
           <ScrollView style={styles.content}>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Active Timeline</Text>
+              <Text style={styles.sectionTitle}>Active Timelines</Text>
               <Text style={styles.sectionSubtitle}>
-                Your currently active global 12-week timeline
+                Your currently active global 12-week timelines
               </Text>
-              {renderActiveTimeline()}
+              {renderActiveTimelines()}
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Manage Global</Text>
               <Text style={styles.sectionSubtitle}>
-                Upcoming global 12-week cycles available for activation
+                Current and upcoming global 12-week cycles available for activation
               </Text>
               {renderAvailableCycles()}
             </View>
           </ScrollView>
         )}
-
-        {/* Activation Warning Modal */}
-        <Modal
-          visible={showActivationWarning}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowActivationWarning(false)}
-        >
-          <View style={styles.warningOverlay}>
-            <View style={styles.warningModal}>
-              <View style={styles.warningHeader}>
-                <AlertTriangle size={32} color="#dc2626" />
-                <Text style={styles.warningTitle}>Warning: Data Loss</Text>
-              </View>
-
-              <Text style={styles.warningMessage}>
-                Activating a new global timeline will deactivate your current timeline and delete all associated goals and actions.
-              </Text>
-
-              <Text style={styles.warningDetails}>
-                Current timeline has {activeTimeline?.goals?.length || 0} active goals that will be permanently deleted.
-              </Text>
-
-              <View style={styles.warningButtons}>
-                <TouchableOpacity
-                  style={styles.warningCancelButton}
-                  onPress={() => {
-                    setShowActivationWarning(false);
-                    setSelectedCycleForActivation(null);
-                  }}
-                >
-                  <Text style={styles.warningCancelText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.warningConfirmButton}
-                  onPress={confirmActivation}
-                  disabled={activating}
-                >
-                  {activating ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
-                  ) : (
-                    <Text style={styles.warningConfirmText}>Activate Anyway</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
 
         {/* Deactivation Warning Modal */}
         <Modal
@@ -445,7 +465,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
               </Text>
 
               <Text style={styles.warningDetails}>
-                This timeline has {activeTimeline?.goals?.length || 0} active goals that will be permanently deleted.
+                This timeline has {timelineToDeactivate?.goals?.length || 0} active goals that will be permanently deleted.
               </Text>
 
               <View style={styles.warningButtons}>
@@ -619,6 +639,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  activeTimelinesList: {
+    gap: 12,
+  },
   availableCyclesList: {
     gap: 12,
   },
@@ -633,6 +656,36 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+  },
+  activatedCycleCard: {
+    backgroundColor: '#f0f9ff',
+    borderColor: '#0078d4',
+  },
+  activatedBadge: {
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  activatedBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  alreadyActivatedMessage: {
+    backgroundColor: '#f0f9ff',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#0078d4',
+  },
+  alreadyActivatedText: {
+    color: '#0078d4',
+    fontSize: 13,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   cycleCardHeader: {
     marginBottom: 12,
