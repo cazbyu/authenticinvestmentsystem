@@ -32,6 +32,9 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
   const [filter, setFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'all'>('month');
   const [totalBalance, setTotalBalance] = useState(0);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const fetchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const previousScopeRef = React.useRef<string>('');
 
   // --- deterministic, simple points so deposits are not 0.0 ---
   const calculateTaskPoints = (task: any) => {
@@ -64,6 +67,10 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
   };
 
   const fetchJournalEntries = async () => {
+    // Create new AbortController for this fetch
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
@@ -73,6 +80,12 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
       if (!user) {
         setEntries([]);
         setTotalBalance(0);
+        setLoading(false);
+        return;
+      }
+
+      // Check if aborted
+      if (controller.signal.aborted) {
         return;
       }
 
@@ -341,20 +354,63 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
         else current += e.amount;
       });
 
+      // Final abort check before setting state
+      if (controller.signal.aborted) {
+        return;
+      }
+
       setEntries(journalEntries);
       setTotalBalance(runningBalance);
     } catch (err: any) {
+      // Don't show errors if request was aborted
+      if (controller.signal.aborted) {
+        return;
+      }
       console.error('Error fetching journal entries:', err);
       Alert.alert('Error loading journal', err?.message ?? String(err));
       setEntries([]);
       setTotalBalance(0);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchJournalEntries();
+    // Create a stable scope key for comparison
+    const scopeKey = JSON.stringify(scope);
+
+    // Only fetch if scope actually changed
+    if (scopeKey === previousScopeRef.current && !filter && !dateRange) {
+      return;
+    }
+
+    previousScopeRef.current = scopeKey;
+
+    // Clear any pending fetch timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Abort any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Debounce the fetch to prevent rapid consecutive calls
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchJournalEntries();
+    }, 300);
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, filter, dateRange]);
 

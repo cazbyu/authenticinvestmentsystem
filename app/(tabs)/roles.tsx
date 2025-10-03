@@ -48,6 +48,7 @@ export default function Roles() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchState, setFetchState] = useState<'idle' | 'loading-role' | 'loading-data' | 'complete'>('idle');
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [krView, setKRView] = useState<'deposits' | 'ideas'>('deposits');
   const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
@@ -71,10 +72,17 @@ export default function Roles() {
   const [isLoadingRole, setIsLoadingRole] = useState(false);
   const fetchAbortController = useRef<AbortController | null>(null);
   const roleClickTimeout = useRef<NodeJS.Timeout | null>(null);
+  const previousRoleIdRef = useRef<string | null>(null);
+  const fetchInProgressRef = useRef<boolean>(false);
 
   // Memoize the scope object to prevent unnecessary re-renders
   const goalsScope = useMemo(() => {
     if (!selectedRole) return undefined;
+    // Only return new object if role ID actually changed
+    if (previousRoleIdRef.current === selectedRole.id) {
+      return goalsScope;
+    }
+    previousRoleIdRef.current = selectedRole.id;
     return { type: 'role' as const, id: selectedRole.id };
   }, [selectedRole?.id]);
 
@@ -90,6 +98,17 @@ export default function Roles() {
   // Goal progress state
   const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgressData>>({});
   const [loadingGoalProgress, setLoadingGoalProgress] = useState(false);
+
+  // Memoize scope objects for JournalView and AnalyticsView to prevent unnecessary re-fetches
+  const journalScope = useMemo(() => {
+    if (!selectedRole) return null;
+    return { type: 'role' as const, id: selectedRole.id, name: selectedRole.label };
+  }, [selectedRole?.id, selectedRole?.label]);
+
+  const krJournalScope = useMemo(() => {
+    if (!selectedKR || !selectedRole) return null;
+    return { type: 'key_relationship' as const, id: selectedKR.id, name: selectedKR.name };
+  }, [selectedKR?.id, selectedKR?.name, selectedRole?.id]);
 
   const handleJournalEntryPress = (entry: any) => {
     if (entry.source_type === 'task') {
@@ -478,23 +497,74 @@ export default function Roles() {
   }, []);
 
   useEffect(() => {
-    if (selectedRole && !isLoadingRole) {
-      fetchKeyRelationships(selectedRole.id);
-      fetchRoleTasks(selectedRole.id, activeView);
+    if (selectedRole && !isLoadingRole && !fetchInProgressRef.current) {
+      const controller = new AbortController();
+      fetchAbortController.current = controller;
+
+      const fetchRoleData = async () => {
+        try {
+          fetchInProgressRef.current = true;
+          setFetchState('loading-data');
+
+          // Fetch in sequence to avoid race conditions
+          await fetchKeyRelationships(selectedRole.id);
+          if (!controller.signal.aborted) {
+            await fetchRoleTasks(selectedRole.id, activeView);
+          }
+
+          if (!controller.signal.aborted) {
+            setFetchState('complete');
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            console.error('Error fetching role data:', error);
+            setFetchState('idle');
+          }
+        } finally {
+          fetchInProgressRef.current = false;
+        }
+      };
+
+      fetchRoleData();
+
+      return () => {
+        controller.abort();
+      };
     }
-  }, [selectedRole?.id, activeView, fetchKeyRelationships, fetchRoleTasks, isLoadingRole]);
+  }, [selectedRole?.id, activeView, isLoadingRole]);
 
   useEffect(() => {
-    if (selectedKR && !isLoadingRole) {
-      fetchKRTasks(selectedKR.id, krView);
+    if (selectedKR && !isLoadingRole && !fetchInProgressRef.current) {
+      const controller = new AbortController();
+      fetchAbortController.current = controller;
+
+      const fetchKRData = async () => {
+        try {
+          fetchInProgressRef.current = true;
+          await fetchKRTasks(selectedKR.id, krView);
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            console.error('Error fetching KR data:', error);
+          }
+        } finally {
+          fetchInProgressRef.current = false;
+        }
+      };
+
+      fetchKRData();
+
+      return () => {
+        controller.abort();
+      };
     }
-  }, [selectedKR?.id, krView, fetchKRTasks, isLoadingRole]);
+  }, [selectedKR?.id, krView, isLoadingRole]);
 
   useEffect(() => {
-    if (selectedRole && !goalsLoading && twelveWeekGoals.length > 0) {
+    if (selectedRole && !goalsLoading && twelveWeekGoals.length > 0 && fetchState === 'complete') {
+      // Only fetch goal progress after role data is fully loaded
       fetchGoalProgressData();
     }
-  }, [selectedRole?.id, goalsLoading, twelveWeekGoals, fetchGoalProgressData]);
+  }, [selectedRole?.id, goalsLoading, twelveWeekGoals.length, fetchState]);
 
   const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
@@ -654,21 +724,31 @@ export default function Roles() {
   };
 
   const handleRolePress = useCallback((role: Role) => {
-    if (isLoadingRole || loading) {
+    if (fetchInProgressRef.current || isLoadingRole || loading) {
       return;
     }
 
+    // Cancel any pending role selection
     if (roleClickTimeout.current) {
       clearTimeout(roleClickTimeout.current);
     }
 
-    setIsLoadingRole(true);
+    // Abort any in-flight requests
+    if (fetchAbortController.current) {
+      fetchAbortController.current.abort();
+    }
 
+    setIsLoadingRole(true);
+    setFetchState('loading-role');
+    fetchInProgressRef.current = true;
+
+    // Debounce role selection to prevent rapid switching
     roleClickTimeout.current = setTimeout(() => {
       setSelectedRole(role);
       setSelectedKR(null);
       setIsLoadingRole(false);
-    }, 100);
+      setFetchState('loading-data');
+    }, 400);
   }, [isLoadingRole, loading]);
 
   const handleEditRole = (role: Role) => {
@@ -813,15 +893,19 @@ export default function Roles() {
 
           <ScrollView style={styles.taskList}>
             {krJournalView === 'journal' ? (
-              <JournalView
-                scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
-                onEntryPress={handleJournalEntryPress}
-              />
+              krJournalScope && (
+                <JournalView
+                  scope={krJournalScope}
+                  onEntryPress={handleJournalEntryPress}
+                />
+              )
             ) : krJournalView === 'analytics' ? (
-              <AnalyticsView
-                scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
-              />
-            ) : loading ? (
+              krJournalScope && (
+                <AnalyticsView
+                  scope={krJournalScope}
+                />
+              )
+            ) : loading || fetchState === 'loading-data' ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
@@ -880,8 +964,8 @@ export default function Roles() {
             onBackPress={() => setSelectedRole(null)}
           />
 
-          {/* 12-Week Goals Strip */}
-          {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
+          {/* 12-Week Goals Strip - Only show when data is stable */}
+          {activeView === 'deposits' && twelveWeekGoals.length > 0 && fetchState === 'complete' && (
             <View style={styles.goalsStrip}>
               <Text style={styles.goalsStripTitle}>12-Week Goals</Text>
               {loadingGoalProgress ? (
@@ -897,7 +981,7 @@ export default function Roles() {
 
                       return (
                         <GoalProgressCard
-                          key={goal.id}
+                          key={`goal-${goal.id}-${selectedRole.id}`}
                           goal={goal}
                           progress={progress}
                           compact={true}
@@ -921,16 +1005,22 @@ export default function Roles() {
           )}
           <ScrollView style={styles.taskList}>
             {activeView === 'journal' ? (
-              <JournalView
-                scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
-                onEntryPress={handleJournalEntryPress}
-              />
+              journalScope && (
+                <JournalView
+                  scope={journalScope}
+                  onEntryPress={handleJournalEntryPress}
+                />
+              )
             ) : activeView === 'analytics' ? (
-              <AnalyticsView
-                scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
-              />
-            ) : loading ? (
-              null
+              journalScope && (
+                <AnalyticsView
+                  scope={journalScope}
+                />
+              )
+            ) : loading || fetchState === 'loading-data' ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading...</Text>
+              </View>
             ) : activeView === 'deposits' ? (
               tasks.length === 0 ? (
                 <View style={styles.emptyContainer}>
