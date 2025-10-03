@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
+import { calculateAuthenticScore as calculateScore } from '@/lib/taskUtils';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -98,7 +99,7 @@ export default function Roles() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const score = await calculateAuthenticScore(supabase, user.id);
+      const score = await calculateScore(supabase, user.id);
       setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
