@@ -49,6 +49,7 @@ export default function Roles() {
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchState, setFetchState] = useState<'idle' | 'loading-role' | 'loading-data' | 'complete'>('idle');
+  const [krLoading, setKRLoading] = useState(false);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [krView, setKRView] = useState<'deposits' | 'ideas'>('deposits');
   const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
@@ -200,10 +201,15 @@ export default function Roles() {
   };
 
   const fetchKeyRelationships = useCallback(async (roleId: string) => {
+    setKRLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setKeyRelationships([]);
+        setKRLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('0008-ap-key-relationships')
@@ -217,7 +223,9 @@ export default function Roles() {
       setSelectedKR(null);
     } catch (error) {
       console.error('Error fetching key relationships:', error);
-      Alert.alert('Error', (error as Error).message);
+      setKeyRelationships([]);
+    } finally {
+      setKRLoading(false);
     }
   }, []);
 
@@ -506,11 +514,11 @@ export default function Roles() {
           fetchInProgressRef.current = true;
           setFetchState('loading-data');
 
-          // Fetch in sequence to avoid race conditions
-          await fetchKeyRelationships(selectedRole.id);
-          if (!controller.signal.aborted) {
-            await fetchRoleTasks(selectedRole.id, activeView);
-          }
+          // Fetch in parallel for better performance
+          const krPromise = fetchKeyRelationships(selectedRole.id);
+          const tasksPromise = fetchRoleTasks(selectedRole.id, activeView);
+
+          await Promise.all([krPromise, tasksPromise]);
 
           if (!controller.signal.aborted) {
             setFetchState('complete');
@@ -518,10 +526,12 @@ export default function Roles() {
         } catch (error) {
           if (!controller.signal.aborted) {
             console.error('Error fetching role data:', error);
-            setFetchState('idle');
+            setFetchState('complete');
           }
         } finally {
-          fetchInProgressRef.current = false;
+          if (!controller.signal.aborted) {
+            fetchInProgressRef.current = false;
+          }
         }
       };
 
@@ -529,6 +539,7 @@ export default function Roles() {
 
       return () => {
         controller.abort();
+        fetchInProgressRef.current = false;
       };
     }
   }, [selectedRole?.id, activeView, isLoadingRole]);
@@ -905,7 +916,7 @@ export default function Roles() {
                   scope={krJournalScope}
                 />
               )
-            ) : loading || fetchState === 'loading-data' ? (
+            ) : (loading && fetchState === 'loading-data') ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
@@ -1017,7 +1028,7 @@ export default function Roles() {
                   scope={journalScope}
                 />
               )
-            ) : loading || fetchState === 'loading-data' ? (
+            ) : (loading && fetchState === 'loading-data') ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
@@ -1059,44 +1070,51 @@ export default function Roles() {
             )}
           </ScrollView>
 
-          {keyRelationships.length > 0 && (
+          {(keyRelationships.length > 0 || krLoading) && (
             <View style={styles.keyRelationshipsSection}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Key Relationships</Text>
                 <TouchableOpacity
                   style={styles.addKRButton}
                   onPress={() => handleAddKR(selectedRole.id)}
+                  disabled={krLoading}
                 >
                   <Plus size={16} color="#0078d4" />
                   <Text style={styles.addKRButtonText}>Add KR</Text>
                 </TouchableOpacity>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.keyRelationshipsList}>
-                  {keyRelationships.map(kr => (
-                    <TouchableOpacity
-                      key={kr.id}
-                      style={styles.keyRelationshipCard}
-                      onPress={() => setSelectedKR(kr)}
-                    >
-                      {kr.image_path && krImageUrls[kr.id] ? (
-                        <Image
-                          source={{ uri: krImageUrls[kr.id] || undefined }}
-                          style={styles.krImage}
-                          onError={(error) => {
-                            console.error('[RoleBank] Failed to load KR image:', kr.image_path, error.nativeEvent.error);
-                          }}
-                        />
-                      ) : (
-                        <View style={styles.krImagePlaceholder}>
-                          <Users size={24} color="#6b7280" />
-                        </View>
-                      )}
-                      <Text style={styles.krName} numberOfLines={2}>{kr.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+              {krLoading ? (
+                <View style={styles.krLoadingContainer}>
+                  <Text style={styles.krLoadingText}>Loading key relationships...</Text>
                 </View>
-              </ScrollView>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.keyRelationshipsList}>
+                    {keyRelationships.map(kr => (
+                      <TouchableOpacity
+                        key={kr.id}
+                        style={styles.keyRelationshipCard}
+                        onPress={() => setSelectedKR(kr)}
+                      >
+                        {kr.image_path && krImageUrls[kr.id] ? (
+                          <Image
+                            source={{ uri: krImageUrls[kr.id] || undefined }}
+                            style={styles.krImage}
+                            onError={(error) => {
+                              console.error('[RoleBank] Failed to load KR image:', kr.image_path, error.nativeEvent.error);
+                            }}
+                          />
+                        ) : (
+                          <View style={styles.krImagePlaceholder}>
+                            <Users size={24} color="#6b7280" />
+                          </View>
+                        )}
+                        <Text style={styles.krName} numberOfLines={2}>{kr.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
             </View>
           )}
 
@@ -1473,6 +1491,16 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     paddingHorizontal: 16,
+    fontStyle: 'italic',
+  },
+  krLoadingContainer: {
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  krLoadingText: {
+    fontSize: 14,
+    color: '#6b7280',
     fontStyle: 'italic',
   },
   keyRelationshipsList: {
