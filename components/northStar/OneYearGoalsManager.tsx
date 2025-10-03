@@ -103,8 +103,6 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
         user_id: user.id,
         title: formData.title.trim(),
         description: formData.description.trim() || null,
-        priority: formData.priority,
-        year_target_date: formData.targetDate || null,
         status: 'active',
       };
 
