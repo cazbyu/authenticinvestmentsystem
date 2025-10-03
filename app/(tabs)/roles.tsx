@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
@@ -68,15 +68,24 @@ export default function Roles() {
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
   const [authenticScore, setAuthenticScore] = useState(0);
   const [isCalculatingScore, setIsCalculatingScore] = useState(false);
+  const [isLoadingRole, setIsLoadingRole] = useState(false);
+  const fetchAbortController = useRef<AbortController | null>(null);
+  const roleClickTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Memoize the scope object to prevent unnecessary re-renders
+  const goalProgressScope = useMemo(() => {
+    if (!selectedRole) return undefined;
+    return { type: 'role' as const, id: selectedRole.id };
+  }, [selectedRole?.id]);
 
   // 12-Week Goals for selected role
-  const { 
-    goals: twelveWeekGoals, 
-    goalProgress, 
-    loading: goalsLoading, 
-    refreshGoals 
+  const {
+    goals: twelveWeekGoals,
+    goalProgress,
+    loading: goalsLoading,
+    refreshGoals
   } = useGoalProgress({
-    scope: selectedRole ? { type: 'role', id: selectedRole.id } : undefined
+    scope: goalProgressScope
   });
 
   const handleJournalEntryPress = (entry: any) => {
@@ -136,7 +145,7 @@ export default function Roles() {
     }
   };
 
-  const fetchKeyRelationships = async (roleId: string) => {
+  const fetchKeyRelationships = useCallback(async (roleId: string) => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -151,14 +160,16 @@ export default function Roles() {
 
       if (error) throw error;
       setKeyRelationships(data || []);
-      setSelectedKR(null); // Don't auto-select first KR
+      setSelectedKR(null);
     } catch (error) {
       console.error('Error fetching key relationships:', error);
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, []);
 
-  const fetchRoleTasks = async (roleId: string, view: 'deposits' | 'ideas' = activeView) => {
+  const fetchRoleTasks = useCallback(async (roleId: string, view: 'deposits' | 'ideas') => {
+    if (loading) return;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
@@ -283,9 +294,11 @@ export default function Roles() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading]);
 
-  const fetchKRTasks = async (krId: string, view: 'deposits' | 'ideas' = krView) => {
+  const fetchKRTasks = useCallback(async (krId: string, view: 'deposits' | 'ideas') => {
+    if (loading) return;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
@@ -414,24 +427,33 @@ export default function Roles() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading]);
 
   useEffect(() => {
     fetchRoles();
+
+    return () => {
+      if (roleClickTimeout.current) {
+        clearTimeout(roleClickTimeout.current);
+      }
+      if (fetchAbortController.current) {
+        fetchAbortController.current.abort();
+      }
+    };
   }, []);
 
   useEffect(() => {
-    if (selectedRole) {
+    if (selectedRole && !isLoadingRole) {
       fetchKeyRelationships(selectedRole.id);
       fetchRoleTasks(selectedRole.id, activeView);
     }
-  }, [selectedRole, activeView]);
+  }, [selectedRole?.id, activeView, fetchKeyRelationships, fetchRoleTasks, isLoadingRole]);
 
   useEffect(() => {
-    if (selectedKR) {
+    if (selectedKR && !isLoadingRole) {
       fetchKRTasks(selectedKR.id, krView);
     }
-  }, [selectedKR, krView]);
+  }, [selectedKR?.id, krView, fetchKRTasks, isLoadingRole]);
 
   const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
@@ -590,10 +612,23 @@ export default function Roles() {
     setEditingTask(null);
   };
 
-  const handleRolePress = (role: Role) => {
-    setSelectedRole(role);
-    setSelectedKR(null);
-  };
+  const handleRolePress = useCallback((role: Role) => {
+    if (isLoadingRole || loading) {
+      return;
+    }
+
+    if (roleClickTimeout.current) {
+      clearTimeout(roleClickTimeout.current);
+    }
+
+    setIsLoadingRole(true);
+
+    roleClickTimeout.current = setTimeout(() => {
+      setSelectedRole(role);
+      setSelectedKR(null);
+      setIsLoadingRole(false);
+    }, 100);
+  }, [isLoadingRole, loading]);
 
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
@@ -975,10 +1010,12 @@ export default function Roles() {
                   style={[
                     styles.roleCard,
                     styles.roleCardHalf,
-                    { borderLeftColor: role.color || '#0078d4' }
+                    { borderLeftColor: role.color || '#0078d4' },
+                    (isLoadingRole || loading) && styles.roleCardDisabled
                   ]}
                   onPress={() => handleRolePress(role)}
                   activeOpacity={0.7}
+                  disabled={isLoadingRole || loading}
                 >
                   <View style={styles.roleCardContent}>
                     <View style={styles.roleCardMain}>
@@ -1399,5 +1436,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  roleCardDisabled: {
+    opacity: 0.5,
   },
 });
