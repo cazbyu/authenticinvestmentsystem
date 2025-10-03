@@ -236,6 +236,9 @@ export default function Dashboard() {
 
   const handleCompleteTask = async (task: Task) => {
     try {
+      // Optimistically remove the task from the list immediately
+      setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+
       // Check if this is a recurring task linked to a timeline
       if (task.recurrence_rule && (task.user_global_timeline_id || task.custom_timeline_id)) {
         // For recurring tasks linked to timelines, create an occurrence for today
@@ -244,7 +247,6 @@ export default function Dashboard() {
           parentTaskId: task.id,
           whenISO: today,
         });
-        Alert.alert('Success', 'Action completed for today!');
       } else {
         // For non-recurring tasks or tasks not linked to timelines, mark as completed
         const supabase = getSupabaseClient();
@@ -253,27 +255,29 @@ export default function Dashboard() {
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', task.id);
         if (error) throw error;
-        Alert.alert('Success', 'Task completed!');
       }
-      fetchData();
+
+      // Refresh authentic score in background
+      refreshAuthenticScore();
     } catch (error) {
       Alert.alert('Error', (error as Error).message || 'Failed to complete action.');
+      // Revert optimistic update on error
+      fetchData();
     }
   };
 
   const handleDeleteTask = async (task: Task) => {
-    console.log('Delete task called for:', task.title);
-    // Temporary bypass of confirmation for debugging
     try {
-      console.log('Attempting to delete task:', task.id);
+      // Optimistically remove the task from the list immediately
+      setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+
       // Use the soft delete function from useGoals hook
       await deleteTask(task.id);
-      
-      console.log('Task deleted successfully');
-      fetchData();
     } catch (error) {
       console.error('Error deleting task:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to delete task');
+      // Revert optimistic update on error
+      fetchData();
     }
   };
   const handleCancelTask = async (task: Task) => {

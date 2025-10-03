@@ -189,12 +189,20 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         </View>
         <View style={styles.rightSection}>
           <View style={styles.topActionRow}>
-            <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
+            <TouchableOpacity
+              style={styles.completeButton}
+              onPress={handleComplete}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Check size={16} color="#16a34a" strokeWidth={3} />
             </TouchableOpacity>
-            
+
             {onDelete && (
-              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={handleDelete}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Trash2 size={14} color="#dc2626" />
               </TouchableOpacity>
             )}
