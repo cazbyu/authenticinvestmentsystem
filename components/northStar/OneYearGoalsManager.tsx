@@ -7,13 +7,10 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Modal,
   ActivityIndicator,
 } from 'react-native';
-import { X, Plus, Calendar, Trash2, CreditCard as Edit, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { X, Plus, Trash2, CreditCard as Edit, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Calendar as RNCalendar } from 'react-native-calendars';
-import { formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 
 interface OneYearGoal {
   id: string;
@@ -21,8 +18,6 @@ interface OneYearGoal {
   title: string;
   description?: string;
   status: string;
-  priority?: number;
-  year_target_date?: string;
   created_at: string;
   updated_at: string;
 }
@@ -41,11 +36,8 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    priority: 5,
-    targetDate: '',
   });
 
-  const [showCalendar, setShowCalendar] = useState(false);
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,7 +56,6 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -81,8 +72,6 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
     setFormData({
       title: '',
       description: '',
-      priority: 5,
-      targetDate: '',
     });
     setEditingGoal(null);
   };
@@ -143,8 +132,6 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
     setFormData({
       title: goal.title,
       description: goal.description || '',
-      priority: goal.priority || 5,
-      targetDate: goal.year_target_date || '',
     });
     setShowCreateForm(true);
   };
@@ -190,14 +177,6 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
     resetForm();
   };
 
-  const priorityLabels: Record<number, string> = {
-    1: 'Low',
-    3: 'Low-Medium',
-    5: 'Medium',
-    7: 'Medium-High',
-    10: 'High',
-  };
-
   if (showCreateForm) {
     return (
       <View style={styles.formContainer}>
@@ -236,46 +215,6 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
               maxLength={1000}
             />
           </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Target Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowCalendar(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {formData.targetDate
-                  ? parseLocalDate(formData.targetDate).toLocaleDateString('en-US', {
-                      month: 'long',
-                      year: 'numeric'
-                    })
-                  : 'Select target date (optional)'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Priority: {priorityLabels[formData.priority] || formData.priority}</Text>
-            <View style={styles.prioritySlider}>
-              {[1, 3, 5, 7, 10].map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[
-                    styles.priorityOption,
-                    formData.priority === p && styles.activePriorityOption
-                  ]}
-                  onPress={() => setFormData(prev => ({ ...prev, priority: p }))}
-                >
-                  <Text style={[
-                    styles.priorityOptionText,
-                    formData.priority === p && styles.activePriorityOptionText
-                  ]}>
-                    {p}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
         </ScrollView>
 
         <View style={styles.formActions}>
@@ -304,37 +243,6 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
             )}
           </TouchableOpacity>
         </View>
-
-        <Modal visible={showCalendar} transparent animationType="fade">
-          <View style={styles.calendarOverlay}>
-            <View style={styles.calendarContainer}>
-              <View style={styles.calendarHeader}>
-                <Text style={styles.calendarTitle}>Select Target Date</Text>
-                <TouchableOpacity onPress={() => setShowCalendar(false)}>
-                  <X size={20} color="#6b7280" />
-                </TouchableOpacity>
-              </View>
-              <RNCalendar
-                onDayPress={(day) => {
-                  setFormData(prev => ({ ...prev, targetDate: day.dateString }));
-                  setShowCalendar(false);
-                }}
-                markedDates={formData.targetDate ? {
-                  [formData.targetDate]: {
-                    selected: true,
-                    selectedColor: '#7c3aed'
-                  }
-                } : {}}
-                minDate={formatLocalDate(new Date())}
-                theme={{
-                  selectedDayBackgroundColor: '#7c3aed',
-                  todayTextColor: '#7c3aed',
-                  arrowColor: '#7c3aed',
-                }}
-              />
-            </View>
-          </View>
-        </Modal>
       </View>
     );
   }
@@ -378,22 +286,8 @@ export function OneYearGoalsManager({ onUpdate }: OneYearGoalsManagerProps) {
                 onPress={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
               >
                 <View style={styles.goalHeaderLeft}>
-                  <View style={[
-                    styles.priorityBadge,
-                    { backgroundColor: goal.priority && goal.priority >= 7 ? '#dc2626' : goal.priority && goal.priority >= 5 ? '#f59e0b' : '#6b7280' }
-                  ]}>
-                    <Text style={styles.priorityBadgeText}>{goal.priority || 5}</Text>
-                  </View>
                   <View style={styles.goalInfo}>
                     <Text style={styles.goalTitle}>{goal.title}</Text>
-                    {goal.year_target_date && (
-                      <Text style={styles.goalDate}>
-                        Target: {new Date(goal.year_target_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          year: 'numeric'
-                        })}
-                      </Text>
-                    )}
                   </View>
                 </View>
                 {expandedGoal === goal.id ? <ChevronUp size={20} color="#6b7280" /> : <ChevronDown size={20} color="#6b7280" />}
@@ -532,18 +426,6 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  priorityBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  priorityBadgeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
   goalInfo: {
     flex: 1,
   },
@@ -551,11 +433,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 2,
-  },
-  goalDate: {
-    fontSize: 12,
-    color: '#6b7280',
   },
   goalDetails: {
     padding: 16,
@@ -650,41 +527,6 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
-  dateButton: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  prioritySlider: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  priorityOption: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-  },
-  activePriorityOption: {
-    backgroundColor: '#7c3aed',
-  },
-  priorityOptionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  activePriorityOptionText: {
-    color: '#ffffff',
-  },
   formActions: {
     flexDirection: 'row',
     padding: 16,
@@ -721,34 +563,5 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  calendarOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  calendarContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  calendarTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
   },
 });

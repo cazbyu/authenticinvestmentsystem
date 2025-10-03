@@ -8,8 +8,6 @@ interface OneYearGoal {
   title: string;
   description?: string;
   status: string;
-  priority?: number;
-  year_target_date?: string;
 }
 
 interface NorthStarData {
