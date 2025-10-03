@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit, Trash2 } from 'lucide-react-native';
+import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { GoalProgress } from '@/hooks/useGoalProgress';
 import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
@@ -40,6 +40,7 @@ interface GoalProgressCardProps {
   selectedWeekNumber?: number;
   onEditAction?: (action: TaskWithLogs) => void; // New prop for editing actions
   onDeleteAction?: (actionId: string, weekNumber: number) => void; // New prop for deleting actions
+  onToggleExpanded?: () => void; // New prop for toggling collapse/expand
 }
 
 export function GoalProgressCard({
@@ -57,6 +58,7 @@ export function GoalProgressCard({
   selectedWeekNumber,
   onEditAction, // New prop
   onDeleteAction, // New prop
+  onToggleExpanded, // New prop
 }: GoalProgressCardProps) {
   const weekActions = weekActionsProp ?? [];
   const getProgressColor = (percentage: number) => {
@@ -280,31 +282,42 @@ export function GoalProgressCard({
         {/* Week-specific Actions (when week prop is provided) */}
         {shouldRenderWeekActions && week && (
           <View style={styles.weekActionsSection}>
-            <View style={styles.weekActionsHeader}>
-              {onAddAction && (
-                <TouchableOpacity
-                  style={[styles.addActionButton, { borderColor: cardColor }]}
-                  onPress={onAddAction}
-                >
-                  <Plus size={12} color={cardColor} />
-                  <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
-                </TouchableOpacity>
+            {/* Collapse/Expand Toggle */}
+            <TouchableOpacity
+              style={styles.actionsToggle}
+              onPress={onToggleExpanded}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.actionsToggleText}>
+                {weekActions.length} {weekActions.length === 1 ? 'Action' : 'Actions'}
+              </Text>
+              {expanded ? (
+                <ChevronUp size={16} color="#6b7280" />
+              ) : (
+                <ChevronDown size={16} color="#6b7280" />
               )}
-            </View>
-            
-            {loadingWeekActions ? (
-              <View style={styles.weekActionsHeader}>
-                {onAddAction && (
-                  <TouchableOpacity
-                    style={[styles.addActionButton, { borderColor: cardColor }]}
-                    onPress={onAddAction}
-                  >
-                    <Plus size={12} color={cardColor} />
-                    <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
+            </TouchableOpacity>
+
+            {expanded && (
+              <>
+                <View style={styles.weekActionsHeader}>
+                  {onAddAction && (
+                    <TouchableOpacity
+                      style={[styles.addActionButton, { borderColor: cardColor }]}
+                      onPress={onAddAction}
+                    >
+                      <Plus size={12} color={cardColor} />
+                      <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {loadingWeekActions ? (
+                  <View style={styles.loadingActions}>
+                    <ActivityIndicator size="small" color="#6b7280" />
+                    <Text style={styles.loadingActionsText}>Loading actions...</Text>
+                  </View>
+                ) : (
               <View style={styles.actionsList}>
                 {weekActions.map(action => {
                   const weekDays = generateWeekDays(week.startDate);
@@ -379,6 +392,8 @@ export function GoalProgressCard({
                   );
                 })}
               </View>
+                )}
+              </>
             )}
           </View>
         )}
@@ -585,6 +600,21 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
+  },
+  actionsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  actionsToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
   },
   weekActionsHeader: {
     flexDirection: 'row',

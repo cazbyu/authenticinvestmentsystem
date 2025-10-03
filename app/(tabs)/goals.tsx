@@ -365,6 +365,9 @@ export default function Goals() {
   const [selectedGoalForAction, setSelectedGoalForAction] = useState<any>(null);
   const [actionModalMode, setActionModalMode] = useState<'create' | 'edit'>('create');
   const [editingAction, setEditingAction] = useState<any>(null);
+
+  // Collapse/expand state for goal actions
+  const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>({});
   
   // Timeline data
   const [allTimelines, setAllTimelines] = useState<Timeline[]>([]);
@@ -411,6 +414,21 @@ export default function Goals() {
       fetchTimelineDaysLeft(selectedTimeline);
     }
   }, [selectedTimeline]);
+
+  // Initialize all goals as expanded when timeline goals are fetched
+  useEffect(() => {
+    if (timelineGoals.length > 0) {
+      const initialExpandedState: Record<string, boolean> = {};
+      timelineGoals.forEach(goal => {
+        if (expandedGoals[goal.id] === undefined) {
+          initialExpandedState[goal.id] = true;
+        }
+      });
+      if (Object.keys(initialExpandedState).length > 0) {
+        setExpandedGoals(prev => ({ ...prev, ...initialExpandedState }));
+      }
+    }
+  }, [timelineGoals]);
 
   // Set current week index when timeline weeks are loaded
   useEffect(() => {
@@ -764,6 +782,14 @@ export default function Goals() {
     setTimelineWeeks([]);
     setTimelineDaysLeft(null);
     setWeekGoalActions({});
+    setExpandedGoals({});
+  };
+
+  const toggleGoalExpanded = (goalId: string) => {
+    setExpandedGoals(prev => ({
+      ...prev,
+      [goalId]: !prev[goalId]
+    }));
   };
 
   const fetchNorthStarData = async () => {
@@ -941,34 +967,36 @@ export default function Goals() {
 
         {/* Week Navigation */}
         {timelineWeeks.length > 0 && (
-          <View style={styles.weekNavigation}>
-            <TouchableOpacity
-              style={[styles.weekNavButton, currentWeekIndex === 0 && styles.weekNavButtonDisabled]}
-              onPress={() => setCurrentWeekIndex(Math.max(0, currentWeekIndex - 1))}
-              disabled={currentWeekIndex === 0}
-            >
-              <ChevronLeft size={20} color={currentWeekIndex === 0 ? '#9ca3af' : '#0078d4'} />
-            </TouchableOpacity>
-            
-            <View style={styles.weekInfo}>
-              <Text style={styles.weekTitle}>
-                Week {currentWeek?.week_number || 1}
-              </Text>
-              {currentWeek && (
-                <Text style={styles.weekDates}>
-                  {new Date(currentWeek.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
-                  {new Date(currentWeek.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          <View style={styles.weekNavigationContainer}>
+            <View style={styles.weekNavigation}>
+              <TouchableOpacity
+                style={[styles.weekNavButton, currentWeekIndex === 0 && styles.weekNavButtonDisabled]}
+                onPress={() => setCurrentWeekIndex(Math.max(0, currentWeekIndex - 1))}
+                disabled={currentWeekIndex === 0}
+              >
+                <ChevronLeft size={20} color={currentWeekIndex === 0 ? '#9ca3af' : '#0078d4'} />
+              </TouchableOpacity>
+
+              <View style={styles.weekInfo}>
+                <Text style={styles.weekTitle}>
+                  Week {currentWeek?.week_number || 1}
                 </Text>
-              )}
+                {currentWeek && (
+                  <Text style={styles.weekDates}>
+                    {new Date(currentWeek.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
+                    {new Date(currentWeek.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.weekNavButton, currentWeekIndex === timelineWeeks.length - 1 && styles.weekNavButtonDisabled]}
+                onPress={() => setCurrentWeekIndex(Math.min(timelineWeeks.length - 1, currentWeekIndex + 1))}
+                disabled={currentWeekIndex === timelineWeeks.length - 1}
+              >
+                <ChevronRight size={20} color={currentWeekIndex === timelineWeeks.length - 1 ? '#9ca3af' : '#0078d4'} />
+              </TouchableOpacity>
             </View>
-            
-            <TouchableOpacity
-              style={[styles.weekNavButton, currentWeekIndex === timelineWeeks.length - 1 && styles.weekNavButtonDisabled]}
-              onPress={() => setCurrentWeekIndex(Math.min(timelineWeeks.length - 1, currentWeekIndex + 1))}
-              disabled={currentWeekIndex === timelineWeeks.length - 1}
-            >
-              <ChevronRight size={20} color={currentWeekIndex === timelineWeeks.length - 1 ? '#9ca3af' : '#0078d4'} />
-            </TouchableOpacity>
           </View>
         )}
 
@@ -1001,7 +1029,7 @@ export default function Goals() {
                   key={goal.id}
                   goal={goal}
                   progress={progress}
-                  expanded={true}
+                  expanded={expandedGoals[goal.id] !== false}
                   week={currentWeek ? {
                     weekNumber: currentWeek.week_number,
                     startDate: currentWeek.start_date,
@@ -1036,6 +1064,7 @@ export default function Goals() {
                   selectedWeekNumber={currentWeek?.week_number}
                   onToggleCompletion={handleToggleCompletion}
                   onDeleteAction={handleDeleteAction}
+                  onToggleExpanded={() => toggleGoalExpanded(goal.id)}
                 />
               );
             })
@@ -1435,15 +1464,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
   },
-  weekNavigation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  weekNavigationContainer: {
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  weekNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 12,
   },
   weekNavButton: {
     padding: 8,
