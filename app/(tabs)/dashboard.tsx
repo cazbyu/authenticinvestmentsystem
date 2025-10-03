@@ -33,8 +33,6 @@ export default function Dashboard() {
 
   // Import functions from useGoalProgress hook
   const {
-    completeActionSuggestion,
-    undoActionOccurrence,
     deleteTask,
   } = useGoalProgress();
   
@@ -239,17 +237,60 @@ export default function Dashboard() {
       // Optimistically remove the task from the list immediately
       setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
 
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       // Check if this is a recurring task linked to a timeline
       if (task.recurrence_rule && (task.user_global_timeline_id || task.custom_timeline_id)) {
         // For recurring tasks linked to timelines, create an occurrence for today
         const today = formatLocalDate(new Date());
-        await completeActionSuggestion({
-          parentTaskId: task.id,
-          whenISO: today,
-        });
+
+        // Create occurrence directly without using completeActionSuggestion
+        const occurrencePayload: any = {
+          user_id: user.id,
+          title: task.title,
+          type: 'task',
+          status: 'completed',
+          due_date: today,
+          completed_at: new Date().toISOString(),
+          parent_task_id: task.id,
+          is_twelve_week_goal: !!task.user_global_timeline_id,
+        };
+
+        if (task.custom_timeline_id) {
+          occurrencePayload.custom_timeline_id = task.custom_timeline_id;
+        } else if (task.user_global_timeline_id) {
+          occurrencePayload.user_global_timeline_id = task.user_global_timeline_id;
+        }
+
+        const { data: occ, error: occErr } = await supabase
+          .from('0008-ap-tasks')
+          .insert(occurrencePayload)
+          .select('id')
+          .single();
+
+        if (occErr) throw occErr;
+
+        // Copy universal joins from parent task
+        if (occ) {
+          await Promise.all([
+            supabase.rpc('ap_copy_universal_roles_to_task', {
+              from_parent_id: task.id,
+              to_task_id: occ.id,
+            }),
+            supabase.rpc('ap_copy_universal_domains_to_task', {
+              from_parent_id: task.id,
+              to_task_id: occ.id,
+            }),
+            supabase.rpc('ap_copy_universal_goals_to_task', {
+              from_parent_id: task.id,
+              to_task_id: occ.id,
+            }),
+          ]);
+        }
       } else {
         // For non-recurring tasks or tasks not linked to timelines, mark as completed
-        const supabase = getSupabaseClient();
         const { error } = await supabase
           .from('0008-ap-tasks')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
@@ -260,6 +301,7 @@ export default function Dashboard() {
       // Refresh authentic score in background
       refreshAuthenticScore();
     } catch (error) {
+      console.error('Error completing task:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to complete action.');
       // Revert optimistic update on error
       fetchData();
