@@ -217,18 +217,27 @@ export function GoalProgressCard({
               <Text style={styles.title} numberOfLines={2}>
                 {goal.title}
               </Text>
-              <Text style={styles.subtitle}>
-                {getGoalTypeLabel()}
-              </Text>
+              <View style={styles.subtitleRow}>
+                <Text style={styles.subtitle}>
+                  {getGoalTypeLabel()}
+                </Text>
+                {hasWeekContext && (
+                  <View style={styles.actionCountBadge}>
+                    <Text style={styles.actionCountText}>
+                      {weekActions.length} {weekActions.length === 1 ? 'Action' : 'Actions'}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
-          
+
           {onEdit && (
             <TouchableOpacity style={styles.editButton} onPress={onEdit}>
               <Edit size={16} color="#6b7280" />
             </TouchableOpacity>
           )}
-          
+
           {/* Individual Goal Total Score */}
           <View style={styles.goalTotalScore}>
             <Text style={[
@@ -289,7 +298,7 @@ export function GoalProgressCard({
               activeOpacity={0.7}
             >
               <Text style={styles.actionsToggleText}>
-                {weekActions.length} {weekActions.length === 1 ? 'Action' : 'Actions'}
+                {expanded ? 'Hide Actions' : 'Show Actions'}
               </Text>
               {expanded ? (
                 <ChevronUp size={16} color="#6b7280" />
@@ -497,10 +506,29 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   subtitle: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
+  },
+  actionCountBadge: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+  },
+  actionCountText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#0369a1',
   },
   addTaskButtonLarge: {
     flexDirection: 'row',
