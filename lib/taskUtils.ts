@@ -132,3 +132,84 @@ export function calculateAuthenticScoreFromTasks(
 
   return Math.round((totalDeposits - totalWithdrawals) * 10) / 10;
 }
+
+export interface GoalProgressData {
+  weeklyActual: number;
+  weeklyTarget: number;
+  overallProgress: number;
+  currentWeek: number;
+}
+
+export async function calculateGoalProgress(
+  supabase: SupabaseClient,
+  goalId: string,
+  goalType: '12week' | 'custom',
+  weeklyTarget: number = 3,
+  totalTarget: number = 36
+): Promise<GoalProgressData> {
+  try {
+    const goalTypeForJoin = goalType === '12week' ? 'twelve_wk_goal' : 'custom_goal';
+    const goalIdField = goalType === '12week' ? 'twelve_wk_goal_id' : 'custom_goal_id';
+
+    const { data: taskJoins, error: joinError } = await supabase
+      .from('0008-ap-universal-goals-join')
+      .select('parent_id')
+      .eq(goalIdField, goalId)
+      .eq('goal_type', goalTypeForJoin)
+      .eq('parent_type', 'task');
+
+    if (joinError) throw joinError;
+
+    if (!taskJoins || taskJoins.length === 0) {
+      return {
+        weeklyActual: 0,
+        weeklyTarget: weeklyTarget,
+        overallProgress: 0,
+        currentWeek: 1,
+      };
+    }
+
+    const taskIds = taskJoins.map(j => j.parent_id);
+
+    const { data: logs, error: logsError } = await supabase
+      .from('0008-ap-task-log')
+      .select('task_id, measured_on, value, completed')
+      .in('task_id', taskIds);
+
+    if (logsError) throw logsError;
+
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const thisWeekLogs = (logs || []).filter(log => {
+      const logDate = new Date(log.measured_on);
+      return logDate >= startOfWeek && logDate <= endOfWeek && log.completed;
+    });
+
+    const weeklyActual = thisWeekLogs.length;
+
+    const totalCompletedLogs = (logs || []).filter(log => log.completed).length;
+    const overallProgress = totalTarget > 0 ? Math.round((totalCompletedLogs / totalTarget) * 100) : 0;
+
+    return {
+      weeklyActual,
+      weeklyTarget,
+      overallProgress,
+      currentWeek: 1,
+    };
+  } catch (error) {
+    console.error('Error calculating goal progress:', error);
+    return {
+      weeklyActual: 0,
+      weeklyTarget: weeklyTarget,
+      overallProgress: 0,
+      currentWeek: 1,
+    };
+  }
+}

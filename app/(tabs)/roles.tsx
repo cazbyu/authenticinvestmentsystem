@@ -18,8 +18,8 @@ import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
-import { useGoalProgress } from '@/hooks/useGoalProgress';
-import { calculateAuthenticScore as calculateScore } from '@/lib/taskUtils';
+import { useGoals } from '@/hooks/useGoals';
+import { calculateAuthenticScore as calculateScore, calculateGoalProgress, GoalProgressData } from '@/lib/taskUtils';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -73,20 +73,23 @@ export default function Roles() {
   const roleClickTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Memoize the scope object to prevent unnecessary re-renders
-  const goalProgressScope = useMemo(() => {
+  const goalsScope = useMemo(() => {
     if (!selectedRole) return undefined;
     return { type: 'role' as const, id: selectedRole.id };
   }, [selectedRole?.id]);
 
   // 12-Week Goals for selected role
   const {
-    goals: twelveWeekGoals,
-    goalProgress,
+    twelveWeekGoals,
     loading: goalsLoading,
     refreshGoals
-  } = useGoalProgress({
-    scope: goalProgressScope
+  } = useGoals({
+    scope: goalsScope
   });
+
+  // Goal progress state
+  const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgressData>>({});
+  const [loadingGoalProgress, setLoadingGoalProgress] = useState(false);
 
   const handleJournalEntryPress = (entry: any) => {
     if (entry.source_type === 'task') {
@@ -120,6 +123,38 @@ export default function Roles() {
       setIsCalculatingScore(false);
     }
   };
+
+  const fetchGoalProgressData = useCallback(async () => {
+    if (!twelveWeekGoals || twelveWeekGoals.length === 0) {
+      setGoalProgress({});
+      return;
+    }
+
+    setLoadingGoalProgress(true);
+    try {
+      const supabase = getSupabaseClient();
+      const progressData: Record<string, GoalProgressData> = {};
+
+      await Promise.all(
+        twelveWeekGoals.map(async (goal) => {
+          const progress = await calculateGoalProgress(
+            supabase,
+            goal.id,
+            '12week',
+            goal.weekly_target || 3,
+            goal.total_target || 36
+          );
+          progressData[goal.id] = progress;
+        })
+      );
+
+      setGoalProgress(progressData);
+    } catch (error) {
+      console.error('Error fetching goal progress:', error);
+    } finally {
+      setLoadingGoalProgress(false);
+    }
+  }, [twelveWeekGoals]);
 
   const fetchRoles = async () => {
     try {
@@ -454,6 +489,12 @@ export default function Roles() {
       fetchKRTasks(selectedKR.id, krView);
     }
   }, [selectedKR?.id, krView, fetchKRTasks, isLoadingRole]);
+
+  useEffect(() => {
+    if (selectedRole && !goalsLoading && twelveWeekGoals.length > 0) {
+      fetchGoalProgressData();
+    }
+  }, [selectedRole?.id, goalsLoading, twelveWeekGoals, fetchGoalProgressData]);
 
   const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
@@ -843,33 +884,39 @@ export default function Roles() {
           {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
             <View style={styles.goalsStrip}>
               <Text style={styles.goalsStripTitle}>12-Week Goals</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.goalsStripContent}>
-                  {twelveWeekGoals.map(goal => {
-                    const progress = goalProgress[goal.id];
-                    if (!progress) return null;
-                    
-                    return (
-                      <GoalProgressCard
-                        key={goal.id}
-                        goal={goal}
-                        progress={progress}
-                        compact={true}
-                        onAddTask={() => {
-                          setEditingTask({
-                            type: 'task',
-                            selectedGoalIds: [goal.id],
-                            twelveWeekGoalChecked: true,
-                            countsTowardWeeklyProgress: true,
-                            selectedRoleIds: [selectedRole.id],
-                          } as any);
-                          setTaskFormVisible(true);
-                        }}
-                      />
-                    );
-                  })}
+              {loadingGoalProgress ? (
+                <View style={styles.goalsStripLoading}>
+                  <Text style={styles.goalsStripLoadingText}>Loading goals...</Text>
                 </View>
-              </ScrollView>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.goalsStripContent}>
+                    {twelveWeekGoals.map(goal => {
+                      const progress = goalProgress[goal.id];
+                      if (!progress) return null;
+
+                      return (
+                        <GoalProgressCard
+                          key={goal.id}
+                          goal={goal}
+                          progress={progress}
+                          compact={true}
+                          onAddAction={() => {
+                            setEditingTask({
+                              type: 'task',
+                              selectedGoalIds: [goal.id],
+                              twelveWeekGoalChecked: true,
+                              countsTowardWeeklyProgress: true,
+                              selectedRoleIds: [selectedRole.id],
+                            } as any);
+                            setTaskFormVisible(true);
+                          }}
+                        />
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              )}
             </View>
           )}
           <ScrollView style={styles.taskList}>
@@ -1420,6 +1467,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 12,
+  },
+  goalsStripLoading: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  goalsStripLoadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
   manageFab: {
     position: 'absolute',
