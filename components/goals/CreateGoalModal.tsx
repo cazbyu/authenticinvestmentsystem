@@ -170,6 +170,28 @@ export function CreateGoalModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
 
+      // Verify global timeline is active before creating goals
+      if (currentSelectedTimeline.source === 'global') {
+        const { data: timelineCheck, error: checkError } = await supabase
+          .from('0008-ap-user-global-timelines')
+          .select('status')
+          .eq('id', currentSelectedTimeline.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (checkError) throw checkError;
+
+        if (!timelineCheck || timelineCheck.status !== 'active') {
+          Alert.alert(
+            'Timeline Inactive',
+            'This global timeline is no longer active. Please activate a timeline before creating goals.',
+            [{ text: 'OK' }]
+          );
+          setSaving(false);
+          return;
+        }
+      }
+
       // Determine goal type based on timeline
       const goalType = currentSelectedTimeline.source === 'global' ? '12week' : 'custom';
       

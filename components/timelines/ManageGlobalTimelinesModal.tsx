@@ -5,14 +5,13 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TextInput,
   ScrollView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { X, Plus, Users, Target, Trash2, CreditCard as Edit, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { X, TriangleAlert as AlertTriangle, Calendar, TrendingUp, ChevronRight } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
-import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
+import { formatDateRange } from '@/lib/dateUtils';
 
 interface GlobalCycle {
   id: string;
@@ -22,6 +21,7 @@ interface GlobalCycle {
   end_date: string;
   reflection_end: string;
   is_active: boolean;
+  status?: string;
 }
 
 interface UserGlobalTimeline {
@@ -37,6 +37,7 @@ interface UserGlobalTimeline {
   created_at: string;
   updated_at: string;
   global_cycle?: GlobalCycle;
+  goals?: Array<{ id: string; status: string }>;
 }
 
 interface ManageGlobalTimelinesModalProps {
@@ -46,59 +47,43 @@ interface ManageGlobalTimelinesModalProps {
 }
 
 export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: ManageGlobalTimelinesModalProps) {
-  const [userGlobalTimelines, setUserGlobalTimelines] = useState<UserGlobalTimeline[]>([]);
-  const [availableGlobalCycles, setAvailableGlobalCycles] = useState<GlobalCycle[]>([]);
+  const [activeTimeline, setActiveTimeline] = useState<UserGlobalTimeline | null>(null);
+  const [availableCycles, setAvailableCycles] = useState<GlobalCycle[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingTimeline, setEditingTimeline] = useState<UserGlobalTimeline | null>(null);
+  const [activating, setActivating] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    globalCycleId: '',
-    weekStartDay: 'sunday' as 'sunday' | 'monday',
-  });
-  
-  const [saving, setSaving] = useState(false);
-  const [showGlobalCycleDropdown, setShowGlobalCycleDropdown] = useState(false);
+  const [showActivationWarning, setShowActivationWarning] = useState(false);
+  const [selectedCycleForActivation, setSelectedCycleForActivation] = useState<GlobalCycle | null>(null);
+  const [selectedWeekStartDay, setSelectedWeekStartDay] = useState<'sunday' | 'monday'>('sunday');
 
-  const isValidDateString = (d?: string) => typeof d === 'string' && d !== 'null' && !isNaN(Date.parse(d));
-  const safeParseDate = (d: string, context: string): Date | null => {
-    try {
-      if (!isValidDateString(d)) throw new Error('Invalid date');
-      const parsed = parseLocalDate(d);
-      if (isNaN(parsed.getTime())) throw new Error('Invalid date');
-      return parsed;
-    } catch (err) {
-      console.warn(`Invalid date in ${context}:`, d, err);
-      return null;
-    }
-  };
-  const safeFormatDateRange = (start: string, end: string, context: string): string => {
-    try {
-      if (!isValidDateString(start) || !isValidDateString(end)) throw new Error('Invalid date');
-      return formatDateRange(start, end);
-    } catch (err) {
-      console.warn(`Invalid date range in ${context}:`, { start, end }, err);
-      return 'Invalid date';
-    }
-  };
+  const [showDeactivationWarning, setShowDeactivationWarning] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      fetchUserGlobalTimelines();
-      fetchAvailableGlobalCycles();
+      fetchData();
     }
   }, [visible]);
 
-  const fetchUserGlobalTimelines = async () => {
+  const fetchData = async () => {
     setLoading(true);
+    try {
+      await Promise.all([
+        fetchActiveTimeline(),
+        fetchAvailableCycles()
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchActiveTimeline = async () => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch user global timelines with their linked global cycles
-      const { data: timelineData, error } = await supabase
+      const { data, error } = await supabase
         .from('0008-ap-user-global-timelines')
         .select(`
           *,
@@ -109,502 +94,383 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
             start_date,
             end_date,
             reflection_end,
-            is_active
-          ),
-          goals:0008-ap-goals-12wk(
-            id,
+            is_active,
             status
-          )
+          ),
+          goals:0008-ap-goals-12wk(id, status)
         `)
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .order('created_at', { ascending: false });
+        .maybeSingle();
 
       if (error) throw error;
-
-      setUserGlobalTimelines(timelineData || []);
+      setActiveTimeline(data);
     } catch (error) {
-      console.error('Error fetching user global timelines:', error);
-      Alert.alert('Error', (error as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAvailableGlobalCycles = async () => {
-    try {
-      const supabase = getSupabaseClient();
-      
-      // Fetch all active global cycles with reflection_end
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-
-      const { data: cycleData, error } = await supabase
-        .from("0008-ap-global-cycles")
-        .select("id, title, cycle_label, start_date, end_date, reflection_end, is_active, status")
-        .eq("status", "active")                 // current + all future
-        .gte("reflection_end", today)           // drop past cycles
-        .order("start_date", { ascending: true })
-        .limit(3);                              // current + next 2
-
-      if (error) throw error;
-
-      // Filter to show current cycle + next 2 cycles
-      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const filteredCycles: GlobalCycle[] = [];
-      
-      if (cycleData) {
-        // Find current cycle (current date between start_date and reflection_end)
-        const currentCycle = cycleData.find(cycle => 
-          currentDate >= cycle.start_date && currentDate <= cycle.reflection_end
-        );
-        
-        if (currentCycle) {
-          filteredCycles.push(currentCycle);
-        }
-        
-        // Find next cycles (start_date after current date)
-        const futureCycles = cycleData
-          .filter(cycle => cycle.start_date > currentDate)
-          .slice(0, 2); // Take only the next 2
-        
-        filteredCycles.push(...futureCycles);
-      }
-      
-      setAvailableGlobalCycles(filteredCycles);
-    } catch (error) {
-      console.error('Error fetching available global cycles:', error);
+      console.error('Error fetching active timeline:', error);
       Alert.alert('Error', (error as Error).message);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      globalCycleId: '',
-      weekStartDay: 'sunday',
-    });
-    setEditingTimeline(null);
-    setShowGlobalCycleDropdown(false);
-  };
-
-  const handleCreateTimeline = async () => {
-    if (!formData.globalCycleId) {
-      Alert.alert('Error', 'Please select a global cycle');
-      return;
-    }
-
-    setSaving(true);
+  const fetchAvailableCycles = async () => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
+      if (!user) return;
 
-      // Get the selected global cycle data
-      const selectedCycle = availableGlobalCycles.find(cycle => cycle.id === formData.globalCycleId);
-      if (!selectedCycle) throw new Error('Selected global cycle not found');
+      const today = new Date().toISOString().split('T')[0];
 
-      // Calculate adjusted dates for Monday start
-      let adjustedStartDate = selectedCycle.start_date;
-      let adjustedEndDate = selectedCycle.end_date;
-      
-      if (formData.weekStartDay === 'monday') {
-        // Add one day to both start and end dates for Monday start
-        const startDate = new Date(selectedCycle.start_date);
-        const endDate = new Date(selectedCycle.end_date);
-        startDate.setDate(startDate.getDate() + 1);
-        endDate.setDate(endDate.getDate() + 1);
-        adjustedStartDate = formatLocalDate(startDate);
-        adjustedEndDate = formatLocalDate(endDate);
+      const { data: cycleData, error } = await supabase
+        .from('0008-ap-global-cycles')
+        .select('id, title, cycle_label, start_date, end_date, reflection_end, is_active, status')
+        .eq('status', 'active')
+        .gte('reflection_end', today)
+        .order('start_date', { ascending: true })
+        .limit(10);
+
+      if (error) throw error;
+
+      const currentDate = new Date().toISOString().split('T')[0];
+      const nextCycles: GlobalCycle[] = [];
+
+      if (cycleData) {
+        const futureCycles = cycleData
+          .filter(cycle => cycle.start_date > currentDate)
+          .slice(0, 2);
+
+        nextCycles.push(...futureCycles);
       }
 
-      const timelineData = {
-        user_id: user.id,
-        global_cycle_id: formData.globalCycleId,
-        title: null,
-        start_date: adjustedStartDate,
-        end_date: adjustedEndDate,
-        status: 'active',
-        week_start_day: formData.weekStartDay,
-        timezone: 'UTC',
-      };
-
-      if (editingTimeline) {
-        // Update existing timeline
-        const { error } = await supabase
-          .from('0008-ap-user-global-timelines')
-          .update({
-            ...timelineData,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingTimeline.id);
-
-        if (error) throw error;
-        Alert.alert('Success', 'Global timeline updated successfully!');
-      } else {
-        // Create new timeline
-        const { error } = await supabase
-          .from('0008-ap-user-global-timelines')
-          .insert(timelineData);
-
-        if (error) throw error;
-        Alert.alert('Success', 'Global timeline created successfully!');
-      }
-
-      setShowCreateForm(false);
-      resetForm();
-      fetchUserGlobalTimelines();
-      onUpdate?.();
+      setAvailableCycles(nextCycles);
     } catch (error) {
-      console.error('Error saving global timeline:', error);
+      console.error('Error fetching available cycles:', error);
       Alert.alert('Error', (error as Error).message);
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handleEditTimeline = (timeline: UserGlobalTimeline) => {
-    setEditingTimeline(timeline);
-    setFormData({
-      globalCycleId: timeline.global_cycle_id,
-      weekStartDay: timeline.week_start_day as 'sunday' | 'monday',
-    });
-    setShowCreateForm(true);
+  const handleActivateCycle = (cycle: GlobalCycle, weekStartDay: 'sunday' | 'monday') => {
+    setSelectedCycleForActivation(cycle);
+    setSelectedWeekStartDay(weekStartDay);
+
+    if (activeTimeline && activeTimeline.goals && activeTimeline.goals.length > 0) {
+      setShowActivationWarning(true);
+    } else {
+      confirmActivation();
+    }
   };
 
-  const handleArchiveTimeline = async (timeline: UserGlobalTimeline) => {
-    const timelineTitle = timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label || 'this timeline';
+  const confirmActivation = async () => {
+    if (!selectedCycleForActivation) return;
 
-    Alert.alert(
-      'Archive Global Timeline',
-      `Are you sure you want to archive "${timelineTitle}"? You can restore it later from Settings.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Archive',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const supabase = getSupabaseClient();
+    setActivating(true);
+    setShowActivationWarning(false);
 
-              const { error } = await supabase
-                .from('0008-ap-user-global-timelines')
-                .update({
-                  status: 'archived',
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', timeline.id);
+    try {
+      const supabase = getSupabaseClient();
 
-              if (error) throw error;
+      const { data, error } = await supabase.rpc('fn_activate_user_global_timeline', {
+        p_global_cycle_id: selectedCycleForActivation.id,
+        p_week_start_day: selectedWeekStartDay
+      });
 
-              Alert.alert('Success', 'Global timeline archived successfully');
-              fetchUserGlobalTimelines();
-              onUpdate?.();
-            } catch (error) {
-              console.error('Error archiving global timeline:', error);
-              Alert.alert('Error', (error as Error).message);
-            }
-          }
-        }
-      ]
+      if (error) throw error;
+
+      Alert.alert('Success', 'Global timeline activated successfully!');
+      await fetchData();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error activating timeline:', error);
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setActivating(false);
+      setSelectedCycleForActivation(null);
+    }
+  };
+
+  const handleDeactivateTimeline = () => {
+    if (!activeTimeline) return;
+    setShowDeactivationWarning(true);
+  };
+
+  const confirmDeactivation = async () => {
+    if (!activeTimeline) return;
+
+    setDeactivating(true);
+    setShowDeactivationWarning(false);
+
+    try {
+      const supabase = getSupabaseClient();
+
+      const { error } = await supabase.rpc('fn_deactivate_user_global_timeline', {
+        p_user_global_timeline_id: activeTimeline.id
+      });
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Global timeline deactivated successfully!');
+      await fetchData();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error deactivating timeline:', error);
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  const renderActiveTimeline = () => {
+    if (!activeTimeline) {
+      return (
+        <View style={styles.emptySection}>
+          <Calendar size={48} color="#6b7280" />
+          <Text style={styles.emptyTitle}>No Active Global Timeline</Text>
+          <Text style={styles.emptyText}>
+            Activate a global timeline below to start tracking your 12-week goals
+          </Text>
+        </View>
+      );
+    }
+
+    const startDate = activeTimeline.start_date ? new Date(activeTimeline.start_date) : null;
+    const endDate = activeTimeline.end_date ? new Date(activeTimeline.end_date) : null;
+    let daysRemaining = 0;
+    let progress = 0;
+
+    if (startDate && endDate) {
+      const now = new Date();
+      daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      progress = Math.min(100, Math.max(0, ((now.getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())) * 100));
+    }
+
+    const displayTitle = activeTimeline.title || activeTimeline.global_cycle?.title || activeTimeline.global_cycle?.cycle_label || 'Global Timeline';
+    const goalCount = activeTimeline.goals?.filter(g => g.status === 'active').length || 0;
+
+    return (
+      <View style={styles.activeTimelineCard}>
+        <View style={styles.activeTimelineHeader}>
+          <View style={styles.activeTimelineInfo}>
+            <Text style={styles.activeTimelineTitle}>{displayTitle}</Text>
+            <Text style={styles.activeTimelineDates}>
+              {activeTimeline.start_date && activeTimeline.end_date
+                ? formatDateRange(activeTimeline.start_date, activeTimeline.end_date)
+                : 'Invalid date'}
+            </Text>
+            <Text style={styles.activeTimelineStats}>
+              {goalCount} active goals • {daysRemaining} days remaining
+            </Text>
+            <Text style={styles.weekStartInfo}>
+              Week starts: {activeTimeline.week_start_day === 'sunday' ? 'Sunday' : 'Monday'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.deactivateButton}
+          onPress={handleDeactivateTimeline}
+          disabled={deactivating}
+        >
+          {deactivating ? (
+            <ActivityIndicator size="small" color="#dc2626" />
+          ) : (
+            <>
+              <X size={16} color="#dc2626" />
+              <Text style={styles.deactivateButtonText}>Deactivate Timeline</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     );
   };
 
-  const handleStartCreate = () => {
-    resetForm();
-    setShowCreateForm(true);
-  };
-
-  const handleCancelCreate = () => {
-    setShowCreateForm(false);
-    resetForm();
-  };
-
-  const getSelectedCycleInfo = () => {
-    if (!formData.globalCycleId) return null;
-    return availableGlobalCycles.find(cycle => cycle.id === formData.globalCycleId);
-  };
-
-  const renderTimelinesList = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Global 12 Week Timelines</Text>
-        <Text style={styles.headerSubtitle}>
-          Connect to community 12-week cycles and global challenges
-        </Text>
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0078d4" />
-          <Text style={styles.loadingText}>Loading global timelines...</Text>
-        </View>
-      ) : userGlobalTimelines.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Users size={64} color="#6b7280" />
-          <Text style={styles.emptyTitle}>No Global 12 Week Timelines</Text>
+  const renderAvailableCycles = () => {
+    if (availableCycles.length === 0) {
+      return (
+        <View style={styles.emptySection}>
+          <TrendingUp size={48} color="#6b7280" />
+          <Text style={styles.emptyTitle}>No Upcoming Cycles</Text>
           <Text style={styles.emptyText}>
-            Connect to community 12-week cycles and global challenges to track goals together
+            Check back later for new global 12-week cycles
           </Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={handleStartCreate}
-          >
-            <Plus size={20} color="#ffffff" />
-            <Text style={styles.createButtonText}>Connect to Global 12 Week Timeline</Text>
-          </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.timelinesList}>
-          {userGlobalTimelines.map(timeline => {
-            const startDate = timeline.start_date ? parseLocalDate(timeline.start_date) : null;
-            const endDate = timeline.end_date ? parseLocalDate(timeline.end_date) : null;
-            let daysRemaining = 0;
-            let totalDays = 0;
-            let progress = 0;
-            if (startDate && endDate) {
-              const now = new Date();
-              daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-              totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-              progress = Math.min(100, Math.max(0, ((now.getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())) * 100));
-            }
+      );
+    }
 
-            const displayTitle = timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label || 'Global Timeline';
+    return (
+      <View style={styles.availableCyclesList}>
+        {availableCycles.map(cycle => {
+          const displayTitle = cycle.title || cycle.cycle_label || 'Global 12-Week Cycle';
 
-            return (
-              <View key={timeline.id} style={styles.timelineCard}>
-                <View style={styles.timelineHeader}>
-                  <View style={styles.timelineInfo}>
-                    <Text style={styles.timelineTitle}>{displayTitle}</Text>
-                    <Text style={styles.timelineDates}>
-                      {timeline.start_date && timeline.end_date
-                        ? formatDateRange(timeline.start_date, timeline.end_date)
-                        : 'Invalid date'}
-                    </Text>
-                    <Text style={styles.timelineStats}>
-                      {startDate && endDate
-                        ? `${timeline.goals?.length || 0} active goals • ${daysRemaining} days remaining`
-                        : 'Invalid date range'}
-                    </Text>
-
-                  </View>
-                  
-                  <View style={styles.timelineActions}>
-                    <TouchableOpacity
-                      style={styles.editTimelineButton}
-                      onPress={() => handleEditTimeline(timeline)}
-                    >
-                      <Edit size={16} color="#0078d4" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteTimelineButton}
-                      onPress={() => handleArchiveTimeline(timeline)}
-                    >
-                      <Trash2 size={16} color="#dc2626" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.timelineProgress}>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${progress}%` }
-                      ]}
-                    />
-                  </View>
-                </View>
+          return (
+            <View key={cycle.id} style={styles.availableCycleCard}>
+              <View style={styles.cycleCardHeader}>
+                <Text style={styles.cycleTitle}>{displayTitle}</Text>
+                <Text style={styles.cycleDates}>
+                  {formatDateRange(cycle.start_date, cycle.end_date)}
+                </Text>
               </View>
-            );
-          })}
-          
-          <TouchableOpacity
-            style={styles.addTimelineButton}
-            onPress={handleStartCreate}
-          >
-            <Plus size={20} color="#0078d4" />
-            <Text style={styles.addTimelineButtonText}>Connect to Another Global Timeline</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
-  );
 
-  const renderCreateForm = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.formHeader}>
-        <Text style={styles.formTitle}>
-          {editingTimeline ? 'Edit Global 12 Week Timeline' : 'Connect to Global 12 Week Timeline'}
-        </Text>
-        <Text style={styles.formSubtitle}>
-          Connect to a community 12-week cycle or global challenge
-        </Text>
-      </View>
-
-      <View style={styles.form}>
-        <View style={styles.field}>
-          <Text style={styles.label}>Select Global 12 Week Timeline *</Text>
-          <TouchableOpacity
-            style={styles.dropdown}
-            onPress={() => setShowGlobalCycleDropdown(!showGlobalCycleDropdown)}
-          >
-            <Text style={styles.dropdownText}>
-              {formData.globalCycleId 
-                ? (() => {
-                    const cycle = availableGlobalCycles.find(c => c.id === formData.globalCycleId);
-                    return cycle?.title || cycle?.cycle_label || 'Selected Cycle';
-                  })()
-                : 'Select a global 12-week timeline...'
-              }
-            </Text>
-            {showGlobalCycleDropdown ? <ChevronUp size={20} color="#6b7280" /> : <ChevronDown size={20} color="#6b7280" />}
-          </TouchableOpacity>
-          
-          {showGlobalCycleDropdown && (
-            <View style={styles.dropdownContent}>
-              {availableGlobalCycles.map(cycle => (
+              <Text style={styles.weekStartLabel}>Choose your week start day:</Text>
+              <View style={styles.weekStartOptions}>
                 <TouchableOpacity
-                  key={cycle.id}
-                  style={[
-                    styles.dropdownOption,
-                    formData.globalCycleId === cycle.id && styles.selectedDropdownOption
-                  ]}
-                  onPress={() => {
-                    setFormData(prev => ({ ...prev, globalCycleId: cycle.id }));
-                    setShowGlobalCycleDropdown(false);
-                  }}
+                  style={styles.activateOptionButton}
+                  onPress={() => handleActivateCycle(cycle, 'sunday')}
+                  disabled={activating}
                 >
-                  <View style={styles.cycleOptionContent}>
-                    <Text style={[
-                      styles.cycleOptionTitle,
-                      formData.globalCycleId === cycle.id && styles.selectedCycleOptionTitle
-                    ]}>
-                      {cycle.title || cycle.cycle_label || 'Global 12 Week Timeline'}
-                    </Text>
-                    <Text style={[
-                      styles.cycleOptionDates,
-                      formData.globalCycleId === cycle.id && styles.selectedCycleOptionDates
-                    ]}>
-                      {safeFormatDateRange(cycle.start_date, cycle.end_date, `cycle ${cycle.id}`)}
-                    </Text>
-                  </View>
+                  <Text style={styles.activateOptionText}>Sunday</Text>
+                  <ChevronRight size={16} color="#0078d4" />
                 </TouchableOpacity>
-              ))}
+
+                <TouchableOpacity
+                  style={styles.activateOptionButton}
+                  onPress={() => handleActivateCycle(cycle, 'monday')}
+                  disabled={activating}
+                >
+                  <Text style={styles.activateOptionText}>Monday</Text>
+                  <ChevronRight size={16} color="#0078d4" />
+                </TouchableOpacity>
+              </View>
             </View>
-          )}
-        </View>
-
-        {/* Show selected cycle info */}
-        {getSelectedCycleInfo() && (
-          <View style={styles.selectedCycleInfo}>
-            <Text style={styles.selectedCycleTitle}>Selected Timeline</Text>
-            <Text style={styles.selectedCycleName}>
-              {getSelectedCycleInfo()?.title || getSelectedCycleInfo()?.cycle_label}
-            </Text>
-            <Text style={styles.selectedCycleDates}>
-              {(() => {
-                const cycle = getSelectedCycleInfo();
-                if (!cycle) return '';
-                
-                // Apply Monday adjustment to display dates if selected
-                let startDate = cycle.start_date;
-                let endDate = cycle.end_date;
-                
-                if (formData.weekStartDay === 'monday') {
-                  const adjustedStart = parseLocalDate(cycle.start_date);
-                  const adjustedEnd = parseLocalDate(cycle.end_date);
-                  if (isNaN(adjustedStart.getTime()) || isNaN(adjustedEnd.getTime())) {
-                    return 'Invalid date';
-                  }
-                  adjustedStart.setDate(adjustedStart.getDate() + 1);
-                  adjustedEnd.setDate(adjustedEnd.getDate() + 1);
-                  startDate = formatLocalDate(adjustedStart);
-                  endDate = formatLocalDate(adjustedEnd);
-                }
-                
-                return formatDateRange(startDate, endDate);
-              })()}
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Week Start Day</Text>
-          <View style={styles.weekStartToggle}>
-            <TouchableOpacity
-              style={[
-                styles.weekStartOption,
-                formData.weekStartDay === 'sunday' && styles.activeWeekStartOption
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'sunday' }))}
-            >
-              <Text style={[
-                styles.weekStartOptionText,
-                formData.weekStartDay === 'sunday' && styles.activeWeekStartOptionText
-              ]}>
-                Sunday
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.weekStartOption,
-                formData.weekStartDay === 'monday' && styles.activeWeekStartOption
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'monday' }))}
-            >
-              <Text style={[
-                styles.weekStartOptionText,
-                formData.weekStartDay === 'monday' && styles.activeWeekStartOptionText
-              ]}>
-                Monday
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          );
+        })}
       </View>
-    </ScrollView>
-  );
+    );
+  };
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>
-            {showCreateForm 
-              ? (editingTimeline ? 'Edit Global Timeline' : 'Connect to Global Timeline')
-              : 'Manage Global Timelines'
-            }
-          </Text>
-          <>
-            <TouchableOpacity
-              style={[
-                styles.weekStartOption,
-                formData.weekStartDay === 'sunday' && styles.activeWeekStartOption
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'sunday' }))}
-            >
-              <Text style={[
-                styles.weekStartOptionText,
-                formData.weekStartDay === 'sunday' && styles.activeWeekStartOptionText
-              ]}>
-                Sunday
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.weekStartOption,
-                formData.weekStartDay === 'monday' && styles.activeWeekStartOption
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, weekStartDay: 'monday' }))}
-            >
-              <Text style={[
-                styles.weekStartOptionText,
-                formData.weekStartDay === 'monday' && styles.activeWeekStartOptionText
-              ]}>
-                Monday
-              </Text>
-            </TouchableOpacity>
-          </>
+          <Text style={styles.modalTitle}>Manage Global Timelines</Text>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <X size={24} color="#6b7280" />
+          </TouchableOpacity>
         </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0078d4" />
+            <Text style={styles.loadingText}>Loading timelines...</Text>
+          </View>
+        ) : (
+          <ScrollView style={styles.content}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Active Timeline</Text>
+              <Text style={styles.sectionSubtitle}>
+                Your currently active global 12-week timeline
+              </Text>
+              {renderActiveTimeline()}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Manage Global</Text>
+              <Text style={styles.sectionSubtitle}>
+                Upcoming global 12-week cycles available for activation
+              </Text>
+              {renderAvailableCycles()}
+            </View>
+          </ScrollView>
+        )}
+
+        {/* Activation Warning Modal */}
+        <Modal
+          visible={showActivationWarning}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowActivationWarning(false)}
+        >
+          <View style={styles.warningOverlay}>
+            <View style={styles.warningModal}>
+              <View style={styles.warningHeader}>
+                <AlertTriangle size={32} color="#dc2626" />
+                <Text style={styles.warningTitle}>Warning: Data Loss</Text>
+              </View>
+
+              <Text style={styles.warningMessage}>
+                Activating a new global timeline will deactivate your current timeline and delete all associated goals and actions.
+              </Text>
+
+              <Text style={styles.warningDetails}>
+                Current timeline has {activeTimeline?.goals?.length || 0} active goals that will be permanently deleted.
+              </Text>
+
+              <View style={styles.warningButtons}>
+                <TouchableOpacity
+                  style={styles.warningCancelButton}
+                  onPress={() => {
+                    setShowActivationWarning(false);
+                    setSelectedCycleForActivation(null);
+                  }}
+                >
+                  <Text style={styles.warningCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.warningConfirmButton}
+                  onPress={confirmActivation}
+                  disabled={activating}
+                >
+                  {activating ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.warningConfirmText}>Activate Anyway</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Deactivation Warning Modal */}
+        <Modal
+          visible={showDeactivationWarning}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDeactivationWarning(false)}
+        >
+          <View style={styles.warningOverlay}>
+            <View style={styles.warningModal}>
+              <View style={styles.warningHeader}>
+                <AlertTriangle size={32} color="#dc2626" />
+                <Text style={styles.warningTitle}>Warning: Data Loss</Text>
+              </View>
+
+              <Text style={styles.warningMessage}>
+                Deactivating this timeline will permanently delete all associated goals and actions.
+              </Text>
+
+              <Text style={styles.warningDetails}>
+                This timeline has {activeTimeline?.goals?.length || 0} active goals that will be permanently deleted.
+              </Text>
+
+              <View style={styles.warningButtons}>
+                <TouchableOpacity
+                  style={styles.warningCancelButton}
+                  onPress={() => setShowDeactivationWarning(false)}
+                >
+                  <Text style={styles.warningCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.warningConfirmButton}
+                  onPress={confirmDeactivation}
+                  disabled={deactivating}
+                >
+                  {deactivating ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.warningConfirmText}>Deactivate Anyway</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -632,25 +498,6 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
-  content: {
-    flex: 1,
-  },
-  header: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -662,50 +509,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
   },
-  emptyContainer: {
+  content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginTop: 16,
+  section: {
+    padding: 16,
     marginBottom: 8,
   },
-  emptyText: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
     color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
+    marginBottom: 16,
+    lineHeight: 20,
   },
-  createButton: {
-    flexDirection: 'row',
+  emptySection: {
     alignItems: 'center',
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    padding: 40,
+    backgroundColor: '#ffffff',
     borderRadius: 12,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  createButtonText: {
-    color: '#ffffff',
+  emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 12,
+    marginBottom: 4,
   },
-  timelinesList: {
-    padding: 16,
-    gap: 12,
+  emptyText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  timelineCard: {
+  activeTimelineCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
@@ -717,253 +561,169 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  timelineHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  activeTimelineHeader: {
     marginBottom: 12,
   },
-  timelineInfo: {
+  activeTimelineInfo: {
     flex: 1,
-    marginRight: 12,
   },
-  timelineTitle: {
-    fontSize: 16,
+  activeTimelineTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  timelineDates: {
+  activeTimelineDates: {
     fontSize: 14,
     color: '#0078d4',
     fontWeight: '500',
     marginBottom: 4,
   },
-  timelineStats: {
-    fontSize: 12,
+  activeTimelineStats: {
+    fontSize: 14,
     color: '#6b7280',
+    marginBottom: 4,
   },
-  timelineActions: {
-    flexDirection: 'row',
-    gap: 8,
+  weekStartInfo: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
-  editTimelineButton: {
-    padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#f0f9ff',
-    borderWidth: 1,
-    borderColor: '#0078d4',
-  },
-  deleteTimelineButton: {
-    padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#dc2626',
-  },
-  timelineProgress: {
-    marginBottom: 8,
+  progressContainer: {
+    marginBottom: 16,
   },
   progressBar: {
-    height: 6,
+    height: 8,
     backgroundColor: '#f3f4f6',
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#0078d4',
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  timelineDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-  },
-  addTimelineButton: {
+  deactivateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#0078d4',
-    borderStyle: 'dashed',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#dc2626',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
   },
-  addTimelineButtonText: {
-    color: '#0078d4',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  formHeader: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  formSubtitle: {
+  deactivateButtonText: {
+    color: '#dc2626',
     fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 20,
+    fontWeight: '600',
   },
-  form: {
+  availableCyclesList: {
+    gap: 12,
+  },
+  availableCycleCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
     padding: 16,
-  },
-  field: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1f2937',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  dropdown: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: '#1f2937',
-  },
-  dropdownContent: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 200,
+    borderColor: '#e5e7eb',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  dropdownOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+  cycleCardHeader: {
+    marginBottom: 12,
   },
-  selectedDropdownOption: {
-    backgroundColor: '#f0f9ff',
-  },
-  cycleOptionContent: {
-    flex: 1,
-  },
-  cycleOptionTitle: {
+  cycleTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 2,
-  },
-  selectedCycleOptionTitle: {
-    color: '#0078d4',
-    fontWeight: '600',
-  },
-  cycleOptionDates: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  selectedCycleOptionDates: {
-    color: '#0078d4',
-  },
-  selectedCycleInfo: {
-    backgroundColor: '#f0f9ff',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#0078d4',
-    marginBottom: 16,
-  },
-  selectedCycleTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0078d4',
     marginBottom: 4,
   },
-  selectedCycleName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 2,
-  },
-  selectedCycleDates: {
+  cycleDates: {
     fontSize: 14,
-    color: '#6b7280',
-  },
-  weekStartToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 2,
-  },
-  weekStartOption: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  activeWeekStartOption: {
-    backgroundColor: '#0078d4',
-  },
-  weekStartOptionText: {
-    fontSize: 14,
+    color: '#0078d4',
     fontWeight: '500',
+  },
+  weekStartLabel: {
+    fontSize: 12,
     color: '#6b7280',
+    marginBottom: 8,
+    fontWeight: '500',
   },
-  activeWeekStartOptionText: {
-    color: '#ffffff',
+  weekStartOptions: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  connectButton: {
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+  activateOptionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
   },
-  connectButtonText: {
-    color: '#ffffff',
+  activateOptionText: {
+    color: '#0078d4',
     fontSize: 14,
     fontWeight: '600',
   },
-  actions: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
+  warningOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
-  cancelButton: {
+  warningModal: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  warningHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  warningTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#dc2626',
+    marginTop: 8,
+  },
+  warningMessage: {
+    fontSize: 16,
+    color: '#1f2937',
+    lineHeight: 24,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  warningDetails: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 24,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  warningButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  warningCancelButton: {
     flex: 1,
     backgroundColor: '#ffffff',
     borderWidth: 1,
@@ -972,40 +732,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  cancelButtonText: {
+  warningCancelText: {
     color: '#374151',
     fontSize: 16,
     fontWeight: '600',
   },
-  saveButton: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0078d4',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#9ca3af',
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  createNewButton: {
+  warningConfirmButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0078d4',
+    backgroundColor: '#dc2626',
     paddingVertical: 12,
     borderRadius: 8,
-    gap: 8,
+    alignItems: 'center',
   },
-  createNewButtonText: {
+  warningConfirmText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
