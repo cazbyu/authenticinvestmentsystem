@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
@@ -67,6 +67,7 @@ export default function Roles() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
   const [authenticScore, setAuthenticScore] = useState(0);
+  const [isCalculatingScore, setIsCalculatingScore] = useState(false);
 
   // 12-Week Goals for selected role
   const { 
@@ -94,6 +95,9 @@ export default function Roles() {
   };
 
   const calculateAuthenticScore = async () => {
+    if (isCalculatingScore) return;
+
+    setIsCalculatingScore(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -103,6 +107,8 @@ export default function Roles() {
       setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
+    } finally {
+      setIsCalculatingScore(false);
     }
   };
 
@@ -121,9 +127,9 @@ export default function Roles() {
 
       if (error) throw error;
       setRoles(data || []);
-      
-      // Don't auto-select first role - show accounts page by default
-      await calculateAuthenticScore();
+
+      // Calculate score asynchronously without blocking
+      setTimeout(() => calculateAuthenticScore(), 0);
     } catch (error) {
       console.error('Error fetching roles:', error);
       Alert.alert('Error', (error as Error).message);
@@ -646,12 +652,35 @@ export default function Roles() {
     try {
       const supabase = getSupabaseClient();
       const { data } = supabase.storage.from(bucket).getPublicUrl(imagePath);
-      return data.publicUrl;
+      const url = data.publicUrl;
+      console.log('[RoleBank] Generated image URL:', { imagePath, bucket, url });
+      return url;
     } catch (error) {
-      console.error('Error getting image URL:', error);
+      console.error('[RoleBank] Error getting image URL:', error);
       return null;
     }
   };
+
+  // Memoize image URLs to prevent recalculating on every render
+  const roleImageUrls = useMemo(() => {
+    const urls: Record<string, string | null> = {};
+    roles.forEach(role => {
+      if (role.image_path) {
+        urls[role.id] = getImageUrl(role.image_path);
+      }
+    });
+    return urls;
+  }, [roles]);
+
+  const krImageUrls = useMemo(() => {
+    const urls: Record<string, string | null> = {};
+    keyRelationships.forEach(kr => {
+      if (kr.image_path) {
+        urls[kr.id] = getImageUrl(kr.image_path, '0008-key-relationship-images');
+      }
+    });
+    return urls;
+  }, [keyRelationships]);
 
   const renderContent = () => {
     if (selectedKR) {
@@ -673,10 +702,13 @@ export default function Roles() {
                 </View>
               </View>
               <View style={styles.headerRight}>
-                {selectedKR.image_path && (
-                  <Image 
-                    source={{ uri: getImageUrl(selectedKR.image_path, '0008-key-relationship-images') }} 
-                    style={styles.headerImage} 
+                {selectedKR.image_path && krImageUrls[selectedKR.id] && (
+                  <Image
+                    source={{ uri: krImageUrls[selectedKR.id] || undefined }}
+                    style={styles.headerImage}
+                    onError={(error) => {
+                      console.error('[RoleBank] Failed to load KR header image:', selectedKR.image_path, error.nativeEvent.error);
+                    }}
                   />
                 )}
                 <TouchableOpacity 
@@ -875,10 +907,13 @@ export default function Roles() {
                       style={styles.keyRelationshipCard}
                       onPress={() => setSelectedKR(kr)}
                     >
-                      {kr.image_path ? (
-                        <Image 
-                          source={{ uri: getImageUrl(kr.image_path, '0008-key-relationship-images') }} 
-                          style={styles.krImage} 
+                      {kr.image_path && krImageUrls[kr.id] ? (
+                        <Image
+                          source={{ uri: krImageUrls[kr.id] || undefined }}
+                          style={styles.krImage}
+                          onError={(error) => {
+                            console.error('[RoleBank] Failed to load KR image:', kr.image_path, error.nativeEvent.error);
+                          }}
                         />
                       ) : (
                         <View style={styles.krImagePlaceholder}>
@@ -947,10 +982,13 @@ export default function Roles() {
                 >
                   <View style={styles.roleCardContent}>
                     <View style={styles.roleCardMain}>
-                      {role.image_path ? (
+                      {role.image_path && roleImageUrls[role.id] ? (
                         <Image
-                          source={{ uri: getImageUrl(role.image_path) }}
+                          source={{ uri: roleImageUrls[role.id] || undefined }}
                           style={styles.roleImage}
+                          onError={(error) => {
+                            console.error('[RoleBank] Failed to load role image:', role.label, role.image_path, error.nativeEvent.error);
+                          }}
                         />
                       ) : (
                         <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
