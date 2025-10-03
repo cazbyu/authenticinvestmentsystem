@@ -56,6 +56,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   const [loading, setLoading] = useState(false);
   const [activating, setActivating] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [activatingCycleId, setActivatingCycleId] = useState<string | null>(null);
+  const [activatingWeekDay, setActivatingWeekDay] = useState<'sunday' | 'monday' | null>(null);
 
   const [showActivationWarning, setShowActivationWarning] = useState(false);
   const [selectedCycleForActivation, setSelectedCycleForActivation] = useState<GlobalCycle | null>(null);
@@ -193,11 +195,32 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     }
   };
 
-  const handleActivateCycle = (cycle: GlobalCycle, weekStartDay: 'sunday' | 'monday') => {
-    setSelectedCycleForActivation(cycle);
-    setSelectedWeekStartDay(weekStartDay);
-    // No warnings - directly activate
-    confirmActivation();
+  const handleActivateCycle = async (cycle: GlobalCycle, weekStartDay: 'sunday' | 'monday') => {
+    setActivating(true);
+    setActivatingCycleId(cycle.id);
+    setActivatingWeekDay(weekStartDay);
+
+    try {
+      const supabase = getSupabaseClient();
+
+      const { data, error } = await supabase.rpc('fn_activate_user_global_timeline', {
+        p_global_cycle_id: cycle.id,
+        p_week_start_day: weekStartDay
+      });
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Global timeline activated successfully!');
+      await fetchData();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error activating timeline:', error);
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setActivating(false);
+      setActivatingCycleId(null);
+      setActivatingWeekDay(null);
+    }
   };
 
   const confirmActivation = async () => {
@@ -383,8 +406,14 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                       onPress={() => handleActivateCycle(cycle.global_cycle || cycle, 'sunday')}
                       disabled={activating}
                     >
-                      <Text style={styles.activateOptionText}>Sunday</Text>
-                      <ChevronRight size={16} color="#0078d4" />
+                      {activating && activatingCycleId === (cycle.global_cycle_id || cycle.id) && activatingWeekDay === 'sunday' ? (
+                        <ActivityIndicator size="small" color="#0078d4" />
+                      ) : (
+                        <>
+                          <Text style={styles.activateOptionText}>Sunday</Text>
+                          <ChevronRight size={16} color="#0078d4" />
+                        </>
+                      )}
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -392,8 +421,14 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                       onPress={() => handleActivateCycle(cycle.global_cycle || cycle, 'monday')}
                       disabled={activating}
                     >
-                      <Text style={styles.activateOptionText}>Monday</Text>
-                      <ChevronRight size={16} color="#0078d4" />
+                      {activating && activatingCycleId === (cycle.global_cycle_id || cycle.id) && activatingWeekDay === 'monday' ? (
+                        <ActivityIndicator size="small" color="#0078d4" />
+                      ) : (
+                        <>
+                          <Text style={styles.activateOptionText}>Monday</Text>
+                          <ChevronRight size={16} color="#0078d4" />
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </>
