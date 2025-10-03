@@ -934,25 +934,22 @@ export default function Roles() {
           ) : (
             <View style={styles.rolesGrid}>
               {roles.map(role => (
-                <View
+                <TouchableOpacity
                   key={role.id}
                   style={[
                     styles.roleCard,
                     styles.roleCardHalf,
                     { borderLeftColor: role.color || '#0078d4' }
                   ]}
+                  onPress={() => handleRolePress(role)}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.roleCardContent}>
-                    {/* LEFT side = navigate into the Role */}
-                    <TouchableOpacity
-                      style={styles.roleCardLeft}
-                      onPress={() => handleRolePress(role)}
-                      activeOpacity={0.8}
-                    >
+                    <View style={styles.roleCardMain}>
                       {role.image_path ? (
-                        <Image 
-                          source={{ uri: getImageUrl(role.image_path) }} 
-                          style={styles.roleImage} 
+                        <Image
+                          source={{ uri: getImageUrl(role.image_path) }}
+                          style={styles.roleImage}
                         />
                       ) : (
                         <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
@@ -963,23 +960,25 @@ export default function Roles() {
                       )}
 
                       <View style={styles.roleInfo}>
-                        <Text style={styles.roleName}>{role.label}</Text>
+                        <Text style={styles.roleName} numberOfLines={2}>{role.label}</Text>
                         {role.category && (
-                          <Text style={styles.roleCategory}>{role.category}</Text>
+                          <Text style={styles.roleCategory} numberOfLines={1}>{role.category}</Text>
                         )}
                       </View>
-                    </TouchableOpacity>
+                    </View>
 
-                    {/* RIGHT side = edit role settings (image/color) */}
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.editRoleButton}
-                      onPress={() => handleEditRole(role)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleEditRole(role);
+                      }}
                       hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                     >
                       <Edit size={16} color="#6b7280" />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -1160,7 +1159,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 12,
+  },
+  roleCardMain: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
   },
   rolesGrid: {
     flexDirection: 'row',
@@ -1171,25 +1176,19 @@ const styles = StyleSheet.create({
   },
   roleCardHalf: {
     width: '48%',
-  },
-  roleCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    minHeight: 120,
   },
   roleImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   roleImagePlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
   roleImageText: {
     color: '#ffffff',
@@ -1197,20 +1196,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   roleInfo: {
-    flex: 1,
+    width: '100%',
+    alignItems: 'center',
   },
   roleName: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 2,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   roleCategory: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6b7280',
+    textAlign: 'center',
   },
   editRoleButton: {
     padding: 8,
+    position: 'absolute',
+    top: 4,
+    right: 4,
   },
   taskList: {
     flex: 1,
