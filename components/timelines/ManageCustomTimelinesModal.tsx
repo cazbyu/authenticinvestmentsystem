@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { X, Plus, Calendar, Target, Trash2, CreditCard as Edit } from 'lucide-react-native';
+import { X, Plus, Calendar, Target, Trash2, CreditCard as Edit, Archive, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Calendar as RNCalendar } from 'react-native-calendars';
 import { formatLocalDate, parseLocalDate, formatDateRange } from '@/lib/dateUtils';
@@ -73,6 +73,12 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
   const [showStartCalendar, setShowStartCalendar] = useState(false);
   const [showEndCalendar, setShowEndCalendar] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Archive and Delete confirmation states
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archiveConfirmTimeline, setArchiveConfirmTimeline] = useState<CustomTimeline | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmTimeline, setDeleteConfirmTimeline] = useState<CustomTimeline | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -190,40 +196,77 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
     setShowCreateForm(true);
   };
 
-  const handleArchiveTimeline = async (timeline: CustomTimeline) => {
-    Alert.alert(
-      'Archive Timeline',
-      `Are you sure you want to archive "${timeline.title}"? You can restore it later from Settings.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Archive',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const supabase = getSupabaseClient();
+  const handleArchiveTimeline = (timeline: CustomTimeline) => {
+    const isPastTimeline = new Date(timeline.end_date) < new Date();
 
-              const { error } = await supabase
-                .from('0008-ap-custom-timelines')
-                .update({
-                  status: 'archived',
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', timeline.id);
+    if (!isPastTimeline) {
+      Alert.alert(
+        'Cannot Archive',
+        'Only timelines that have passed their end date can be archived. This timeline is still active.'
+      );
+      return;
+    }
 
-              if (error) throw error;
+    setArchiveConfirmTimeline(timeline);
+    setShowArchiveConfirm(true);
+  };
 
-              Alert.alert('Success', 'Timeline archived successfully');
-              fetchTimelines();
-              onUpdate?.();
-            } catch (error) {
-              console.error('Error archiving timeline:', error);
-              Alert.alert('Error', (error as Error).message);
-            }
-          }
-        }
-      ]
-    );
+  const confirmArchive = async () => {
+    if (!archiveConfirmTimeline) return;
+
+    setShowArchiveConfirm(false);
+    try {
+      const supabase = getSupabaseClient();
+
+      const { error } = await supabase
+        .from('0008-ap-custom-timelines')
+        .update({
+          status: 'archived',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', archiveConfirmTimeline.id);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Timeline archived successfully');
+      fetchTimelines();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error archiving timeline:', error);
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setArchiveConfirmTimeline(null);
+    }
+  };
+
+  const handleDeleteTimeline = (timeline: CustomTimeline) => {
+    setDeleteConfirmTimeline(timeline);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmTimeline) return;
+
+    setShowDeleteConfirm(false);
+    try {
+      const supabase = getSupabaseClient();
+
+      const { error } = await supabase
+        .from('0008-ap-custom-timelines')
+        .delete()
+        .eq('id', deleteConfirmTimeline.id);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Timeline permanently deleted');
+      fetchTimelines();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error deleting timeline:', error);
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setDeleteConfirmTimeline(null);
+    }
   };
 
   const handleStartCreate = () => {
@@ -306,9 +349,17 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
                     >
                       <Edit size={16} color="#0078d4" />
                     </TouchableOpacity>
+                    {new Date(timeline.end_date) < new Date() && (
+                      <TouchableOpacity
+                        style={styles.archiveTimelineButton}
+                        onPress={() => handleArchiveTimeline(timeline)}
+                      >
+                        <Archive size={16} color="#f59e0b" />
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       style={styles.deleteTimelineButton}
-                      onPress={() => handleArchiveTimeline(timeline)}
+                      onPress={() => handleDeleteTimeline(timeline)}
                     >
                       <Trash2 size={16} color="#dc2626" />
                     </TouchableOpacity>
@@ -602,6 +653,94 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Archive Confirmation Modal */}
+        <Modal visible={showArchiveConfirm} transparent animationType="fade">
+          <View style={styles.calendarOverlay}>
+            <View style={styles.warningModal}>
+              <View style={styles.warningHeader}>
+                <Archive size={32} color="#f59e0b" />
+                <Text style={styles.warningTitle}>Archive Timeline</Text>
+              </View>
+
+              <Text style={styles.warningMessage}>
+                This timeline is past its end date. Archive it to move it out of your active timelines?
+              </Text>
+
+              {archiveConfirmTimeline && (
+                <Text style={styles.warningDetails}>
+                  Timeline: {archiveConfirmTimeline.title}
+                  {archiveConfirmTimeline.goals_count ? `\n${archiveConfirmTimeline.goals_count} goals will be archived with this timeline.` : ''}
+                </Text>
+              )}
+
+              <Text style={styles.warningNote}>
+                You can restore this timeline later from Settings → Goal Bank → Timeline Archive.
+              </Text>
+
+              <View style={styles.warningButtons}>
+                <TouchableOpacity
+                  style={styles.warningCancelButton}
+                  onPress={() => {
+                    setShowArchiveConfirm(false);
+                    setArchiveConfirmTimeline(null);
+                  }}
+                >
+                  <Text style={styles.warningCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.warningArchiveButton}
+                  onPress={confirmArchive}
+                >
+                  <Text style={styles.warningArchiveText}>Archive</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal visible={showDeleteConfirm} transparent animationType="fade">
+          <View style={styles.calendarOverlay}>
+            <View style={styles.warningModal}>
+              <View style={styles.warningHeader}>
+                <AlertTriangle size={32} color="#dc2626" />
+                <Text style={[styles.warningTitle, { color: '#dc2626' }]}>Delete Timeline</Text>
+              </View>
+
+              <Text style={styles.warningMessage}>
+                Warning: Deleting this timeline will permanently remove all associated goals and actions. This cannot be undone.
+              </Text>
+
+              {deleteConfirmTimeline && (
+                <Text style={styles.warningDetails}>
+                  Timeline: {deleteConfirmTimeline.title}
+                  {deleteConfirmTimeline.goals_count ? `\n${deleteConfirmTimeline.goals_count} goals will be permanently deleted.` : ''}
+                </Text>
+              )}
+
+              <View style={styles.warningButtons}>
+                <TouchableOpacity
+                  style={styles.warningCancelButton}
+                  onPress={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteConfirmTimeline(null);
+                  }}
+                >
+                  <Text style={styles.warningCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.warningDeleteButton}
+                  onPress={confirmDelete}
+                >
+                  <Text style={styles.warningDeleteText}>Delete Permanently</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -751,12 +890,106 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#0078d4',
   },
+  archiveTimelineButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+  },
   deleteTimelineButton: {
     padding: 8,
     borderRadius: 6,
     backgroundColor: '#fef2f2',
     borderWidth: 1,
     borderColor: '#dc2626',
+  },
+  warningModal: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  warningHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  warningTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f59e0b',
+    marginTop: 8,
+  },
+  warningMessage: {
+    fontSize: 16,
+    color: '#1f2937',
+    lineHeight: 24,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  warningDetails: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 12,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  warningNote: {
+    fontSize: 13,
+    color: '#9ca3af',
+    lineHeight: 18,
+    marginBottom: 20,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  warningButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  warningCancelButton: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  warningCancelText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  warningArchiveButton: {
+    flex: 1,
+    backgroundColor: '#f59e0b',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  warningArchiveText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  warningDeleteButton: {
+    flex: 1,
+    backgroundColor: '#dc2626',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  warningDeleteText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   timelineProgress: {
     marginBottom: 8,

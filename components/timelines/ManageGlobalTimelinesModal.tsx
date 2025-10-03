@@ -9,7 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { X, TriangleAlert as AlertTriangle, Calendar, TrendingUp, ChevronRight } from 'lucide-react-native';
+import { X, TriangleAlert as AlertTriangle, Calendar, TrendingUp, ChevronRight, Archive, Trash2 } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import { formatDateRange } from '@/lib/dateUtils';
 
@@ -58,6 +58,12 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   const [deactivating, setDeactivating] = useState(false);
   const [activatingCycleId, setActivatingCycleId] = useState<string | null>(null);
   const [activatingWeekDay, setActivatingWeekDay] = useState<'sunday' | 'monday' | null>(null);
+
+  // Archive and Delete states
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [archiveConfirmTimeline, setArchiveConfirmTimeline] = useState<UserGlobalTimeline | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmTimeline, setDeleteConfirmTimeline] = useState<UserGlobalTimeline | null>(null);
 
   const [showActivationWarning, setShowActivationWarning] = useState(false);
   const [selectedCycleForActivation, setSelectedCycleForActivation] = useState<GlobalCycle | null>(null);
@@ -257,6 +263,79 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     setShowDeactivationWarning(true);
   };
 
+  const handleArchiveTimeline = (timeline: UserGlobalTimeline) => {
+    const isPastTimeline = new Date(timeline.end_date) < new Date();
+
+    if (!isPastTimeline) {
+      Alert.alert(
+        'Cannot Archive',
+        'Only timelines that have passed their end date can be archived. This timeline is still active.'
+      );
+      return;
+    }
+
+    setArchiveConfirmTimeline(timeline);
+    setShowArchiveConfirm(true);
+  };
+
+  const confirmArchive = async () => {
+    if (!archiveConfirmTimeline) return;
+
+    setShowArchiveConfirm(false);
+    try {
+      const supabase = getSupabaseClient();
+
+      const { error } = await supabase
+        .from('0008-ap-user-global-timelines')
+        .update({
+          status: 'archived',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', archiveConfirmTimeline.id);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Timeline archived successfully');
+      await fetchData();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error archiving timeline:', error);
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setArchiveConfirmTimeline(null);
+    }
+  };
+
+  const handleDeleteTimeline = (timeline: UserGlobalTimeline) => {
+    setDeleteConfirmTimeline(timeline);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteTimeline = async () => {
+    if (!deleteConfirmTimeline) return;
+
+    setShowDeleteConfirm(false);
+    try {
+      const supabase = getSupabaseClient();
+
+      const { error } = await supabase
+        .from('0008-ap-user-global-timelines')
+        .delete()
+        .eq('id', deleteConfirmTimeline.id);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Timeline permanently deleted');
+      await fetchData();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error deleting timeline:', error);
+      Alert.alert('Error', (error as Error).message);
+    } finally {
+      setDeleteConfirmTimeline(null);
+    }
+  };
+
   const confirmDeactivation = async () => {
     if (!timelineToDeactivate) return;
 
@@ -340,20 +419,42 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={styles.deactivateButton}
-                onPress={() => handleDeactivateTimeline(timeline)}
-                disabled={deactivating}
-              >
-                {deactivating ? (
-                  <ActivityIndicator size="small" color="#dc2626" />
-                ) : (
-                  <>
-                    <X size={16} color="#dc2626" />
-                    <Text style={styles.deactivateButtonText}>Deactivate Timeline</Text>
-                  </>
+              <View style={styles.timelineButtonsContainer}>
+                {new Date(timeline.end_date) < new Date() && (
+                  <TouchableOpacity
+                    style={styles.archiveButton}
+                    onPress={() => handleArchiveTimeline(timeline)}
+                    disabled={deactivating}
+                  >
+                    <Archive size={16} color="#f59e0b" />
+                    <Text style={styles.archiveButtonText}>Archive</Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteTimeline(timeline)}
+                  disabled={deactivating}
+                >
+                  <Trash2 size={16} color="#dc2626" />
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deactivateButton}
+                  onPress={() => handleDeactivateTimeline(timeline)}
+                  disabled={deactivating}
+                >
+                  {deactivating ? (
+                    <ActivityIndicator size="small" color="#6b7280" />
+                  ) : (
+                    <>
+                      <X size={16} color="#6b7280" />
+                      <Text style={styles.deactivateButtonText}>Deactivate</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           );
         })}
@@ -526,6 +627,94 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
             </View>
           </View>
         </Modal>
+
+        {/* Archive Confirmation Modal */}
+        <Modal visible={showArchiveConfirm} transparent animationType="fade">
+          <View style={styles.warningOverlay}>
+            <View style={styles.warningModal}>
+              <View style={styles.warningHeader}>
+                <Archive size={32} color="#f59e0b" />
+                <Text style={[styles.warningTitle, { color: '#f59e0b' }]}>Archive Timeline</Text>
+              </View>
+
+              <Text style={styles.warningMessage}>
+                This timeline is past its end date. Archive it to move it out of your active timelines?
+              </Text>
+
+              {archiveConfirmTimeline && (
+                <Text style={styles.warningDetails}>
+                  Timeline: {archiveConfirmTimeline.title || archiveConfirmTimeline.global_cycle?.title || archiveConfirmTimeline.global_cycle?.cycle_label}
+                  {archiveConfirmTimeline.goals?.length ? `\n${archiveConfirmTimeline.goals.length} goals will be archived with this timeline.` : ''}
+                </Text>
+              )}
+
+              <Text style={styles.warningNote}>
+                You can restore this timeline later from Settings → Goal Bank → Timeline Archive.
+              </Text>
+
+              <View style={styles.warningButtons}>
+                <TouchableOpacity
+                  style={styles.warningCancelButton}
+                  onPress={() => {
+                    setShowArchiveConfirm(false);
+                    setArchiveConfirmTimeline(null);
+                  }}
+                >
+                  <Text style={styles.warningCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.warningArchiveButton}
+                  onPress={confirmArchive}
+                >
+                  <Text style={styles.warningArchiveText}>Archive</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal visible={showDeleteConfirm} transparent animationType="fade">
+          <View style={styles.warningOverlay}>
+            <View style={styles.warningModal}>
+              <View style={styles.warningHeader}>
+                <AlertTriangle size={32} color="#dc2626" />
+                <Text style={styles.warningTitle}>Delete Timeline</Text>
+              </View>
+
+              <Text style={styles.warningMessage}>
+                Warning: Deleting this timeline will permanently remove all associated goals and actions. This cannot be undone.
+              </Text>
+
+              {deleteConfirmTimeline && (
+                <Text style={styles.warningDetails}>
+                  Timeline: {deleteConfirmTimeline.title || deleteConfirmTimeline.global_cycle?.title || deleteConfirmTimeline.global_cycle?.cycle_label}
+                  {deleteConfirmTimeline.goals?.length ? `\n${deleteConfirmTimeline.goals.length} goals will be permanently deleted.` : ''}
+                </Text>
+              )}
+
+              <View style={styles.warningButtons}>
+                <TouchableOpacity
+                  style={styles.warningCancelButton}
+                  onPress={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteConfirmTimeline(null);
+                  }}
+                >
+                  <Text style={styles.warningCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.warningDeleteButton}
+                  onPress={confirmDeleteTimeline}
+                >
+                  <Text style={styles.warningDeleteText}>Delete Permanently</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -658,7 +847,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#0078d4',
     borderRadius: 4,
   },
-  deactivateButton: {
+  timelineButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  archiveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  archiveButtonText: {
+    color: '#f59e0b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -669,8 +881,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 6,
   },
-  deactivateButtonText: {
+  deleteButtonText: {
     color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deactivateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#9ca3af',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  deactivateButtonText: {
+    color: '#6b7280',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -833,6 +1062,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   warningConfirmText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  warningNote: {
+    fontSize: 13,
+    color: '#9ca3af',
+    lineHeight: 18,
+    marginBottom: 20,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  warningArchiveButton: {
+    flex: 1,
+    backgroundColor: '#f59e0b',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  warningArchiveText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  warningDeleteButton: {
+    flex: 1,
+    backgroundColor: '#dc2626',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  warningDeleteText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
