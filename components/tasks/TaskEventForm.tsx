@@ -260,7 +260,7 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
       endDate: initialData.end_date || formatLocalDate(new Date()),
       startTime: initialData.start_time || '',
       endTime: initialData.end_time || '',
-      withdrawalDate: initialData.withdrawal_date || formatLocalDate(new Date()),
+      withdrawalDate: initialData.withdrawn_at || formatLocalDate(new Date()),
       amount: initialData.amount?.toString() || '',
       isAnytime: initialData.is_anytime || false,
       isUrgent: initialData.is_urgent || false,
@@ -385,7 +385,7 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
           user_id: user.id,
           title: formData.title.trim(),
           amount: parseFloat(formData.amount),
-          withdrawal_date: formData.withdrawalDate,
+          withdrawn_at: formData.withdrawalDate,
           ...(mode === 'edit' && initialData?.id ? { updated_at: new Date().toISOString() } : {})
         };
 

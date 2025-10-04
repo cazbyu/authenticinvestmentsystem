@@ -21,7 +21,7 @@ interface WithdrawalFormProps {
     id?: string;
     title?: string;
     amount?: number;
-    withdrawal_date?: string;
+    withdrawn_at?: string;
     notes?: string;
     roles?: Array<{id: string; label: string}>;
     domains?: Array<{id: string; name: string}>;
@@ -66,7 +66,7 @@ export function WithdrawalForm({
         setFormData({
           title: initialData.title || '',
           amount: initialData.amount?.toString() || '',
-          withdrawalDate: initialData.withdrawal_date ? new Date(initialData.withdrawal_date) : new Date(),
+          withdrawalDate: initialData.withdrawn_at ? new Date(initialData.withdrawn_at) : new Date(),
           notes: initialData.notes || '',
           selectedRoleIds: initialData.roles?.map(r => r.id) || [],
           selectedDomainIds: initialData.domains?.map(d => d.id) || [],
