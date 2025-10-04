@@ -55,8 +55,8 @@ export default function Roles() {
   const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
 
   // Main tab navigation state
-  const [activeMainTab, setActiveMainTab] = useState<'roles' | 'manage' | 'keyrelationships'>('roles');
-  
+  const [activeMainTab, setActiveMainTab] = useState<'roles' | 'keyrelationships'>('roles');
+
   // Modal states
   const [manageRolesVisible, setManageRolesVisible] = useState(false);
   const [editRoleVisible, setEditRoleVisible] = useState(false);
@@ -792,6 +792,10 @@ export default function Roles() {
     setEditingRole(null);
   };
 
+  const handleManageRolesUpdate = () => {
+    fetchRoles();
+  };
+
   const handleKRUpdate = () => {
     if (selectedRole) {
       fetchKeyRelationships(selectedRole.id);
@@ -980,10 +984,10 @@ export default function Roles() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.customToggleButton, activeMainTab === 'manage' && styles.customActiveToggle]}
-                onPress={() => setActiveMainTab('manage')}
+                style={[styles.customToggleButton]}
+                onPress={() => setManageRolesVisible(true)}
               >
-                <Text style={[styles.customToggleText, activeMainTab === 'manage' && styles.customActiveToggleText]}>
+                <Text style={[styles.customToggleText]}>
                   Manage Roles
                 </Text>
               </TouchableOpacity>
@@ -1231,7 +1235,7 @@ export default function Roles() {
                 <Text style={styles.emptyText}>No active roles found</Text>
                 <TouchableOpacity
                   style={styles.manageButton}
-                  onPress={() => setActiveMainTab('manage')}
+                  onPress={() => setManageRolesVisible(true)}
                 >
                   <Text style={styles.manageButtonText}>Manage Roles</Text>
                 </TouchableOpacity>
@@ -1287,63 +1291,6 @@ export default function Roles() {
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </ScrollView>
-        )}
-
-        {activeMainTab === 'manage' && (
-          <ScrollView style={styles.manageContent}>
-            <View style={styles.manageHeader}>
-              <Text style={styles.manageTitle}>Manage Roles</Text>
-              <TouchableOpacity
-                style={styles.createRoleButton}
-                onPress={() => {
-                  setEditingRole(null);
-                  setEditRoleVisible(true);
-                }}
-              >
-                <Plus size={20} color="#ffffff" />
-                <Text style={styles.createRoleButtonText}>Create New Role</Text>
-              </TouchableOpacity>
-            </View>
-            {roles.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No roles found</Text>
-              </View>
-            ) : (
-              <View style={styles.manageRolesList}>
-                {roles.map(role => (
-                  <View key={role.id} style={styles.manageRoleCard}>
-                    <View style={styles.manageRoleInfo}>
-                      {role.image_path && roleImageUrls[role.id] ? (
-                        <Image
-                          source={{ uri: roleImageUrls[role.id] || undefined }}
-                          style={styles.manageRoleImage}
-                        />
-                      ) : (
-                        <View style={[styles.manageRoleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
-                          <Text style={styles.manageRoleImageText}>
-                            {role.label.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      <View style={styles.manageRoleDetails}>
-                        <Text style={styles.manageRoleName}>{role.label}</Text>
-                        {role.category && (
-                          <Text style={styles.manageRoleCategory}>{role.category}</Text>
-                        )}
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.manageRoleEditButton}
-                      onPress={() => handleEditRole(role)}
-                    >
-                      <Edit size={18} color="#0078d4" />
-                      <Text style={styles.manageRoleEditText}>Edit</Text>
-                    </TouchableOpacity>
-                  </View>
                 ))}
               </View>
             )}
@@ -1444,6 +1391,11 @@ export default function Roles() {
       </DraggableFab>
 
       {/* Modals */}
+      <ManageRolesModal
+        visible={manageRolesVisible}
+        onClose={() => setManageRolesVisible(false)}
+        onUpdate={handleManageRolesUpdate}
+      />
 
       <EditRoleModal
         visible={editRoleVisible}
@@ -1916,104 +1868,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   customActiveSingleButtonText: {
-    color: '#0078d4',
-  },
-  // Manage Roles tab styles
-  manageContent: {
-    flex: 1,
-    padding: 16,
-  },
-  manageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  manageTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  createRoleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0078d4',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  createRoleButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  manageRolesList: {
-    gap: 12,
-  },
-  manageRoleCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  manageRoleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  manageRoleImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  manageRoleImagePlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  manageRoleImageText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  manageRoleDetails: {
-    flex: 1,
-  },
-  manageRoleName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  manageRoleCategory: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  manageRoleEditButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#f0f9ff',
-    borderWidth: 1,
-    borderColor: '#0078d4',
-  },
-  manageRoleEditText: {
-    fontSize: 14,
-    fontWeight: '600',
     color: '#0078d4',
   },
   // Key Relationships tab styles
