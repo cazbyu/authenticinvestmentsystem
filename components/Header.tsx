@@ -173,6 +173,7 @@ const styles = StyleSheet.create({
   titleSection: {
     alignItems: 'center',
     flex: 1,
+    justifyContent: 'center',
     position: 'relative',
   },
   title: {
@@ -186,6 +187,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     opacity: 0.9,
+    display: 'none',
   },
   editButton: {
     position: 'absolute',

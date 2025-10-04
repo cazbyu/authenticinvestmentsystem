@@ -19,7 +19,7 @@ export default function LandingPage() {
       <View style={styles.navContainer}>
         <View style={styles.logo}>
           <Brain size={28} color="#0078d4" />
-          <Text style={styles.logoText}>Authentic Intelligence</Text>
+          <Text style={styles.logoText}>Authentic Investments</Text>
         </View>
         
         <View style={styles.navTabs}>
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1f2937',
   },

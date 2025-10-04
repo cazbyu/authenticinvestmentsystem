@@ -160,9 +160,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+    justifyContent: 'center',
+    position: 'relative',
   },
   menuButton: {
     padding: 4,
+    position: 'absolute',
+    left: 0,
   },
   backButton: {
     flexDirection: 'row',
@@ -175,7 +180,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   pageTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '700',
     color: '#ffffff',
   },
@@ -216,25 +221,24 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    padding: 4,
-    borderRadius: 10,
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginLeft: 48,
   },
   tab: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   activeTab: {
     backgroundColor: '#ffffff',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
   activeTabText: {
     color: '#0078d4',
