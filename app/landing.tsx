@@ -56,7 +56,7 @@ export default function LandingPage() {
       <View style={styles.hero}>
         <View style={styles.heroContent}>
           <Text style={styles.heroTagline}>
-            Authentic Intelligence
+            Authentic Investments
           </Text>
           <Text style={styles.heroSubtitle}>
             Invest in What Matters
@@ -130,12 +130,12 @@ export default function LandingPage() {
   const renderAbout = () => (
     <ScrollView style={styles.content}>
       <View style={styles.aboutSection}>
-        <Text style={styles.sectionTitle}>About Authentic Intelligence</Text>
+        <Text style={styles.sectionTitle}>About Authentic Investments</Text>
         
         <View style={styles.aboutContent}>
           <Text style={styles.aboutText}>
-            Authentic Intelligence represents a new paradigm in personal development 
-            and life management. We believe that true success comes from making 
+            Authentic Investments represents a new paradigm in personal development
+            and life management. We believe that true success comes from making
             intentional investments in what matters most.
           </Text>
           
