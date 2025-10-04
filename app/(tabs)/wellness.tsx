@@ -10,7 +10,7 @@ import { JournalView } from '@/components/journal/JournalView';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
+import { Plus, Heart, CreditCard as Edit, UserX, Ban, Menu } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
@@ -32,6 +32,9 @@ export default function Wellness() {
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
+
+  // Main tab navigation state
+  const [activeMainTab, setActiveMainTab] = useState<'domains' | 'manage'>('domains');
   
   // Modal states
   const [taskFormVisible, setTaskFormVisible] = useState(false);
@@ -387,19 +390,93 @@ export default function Wellness() {
     return colors[domainName] || '#6b7280';
   };
 
+  // Render custom header
+  const renderWellnessBankHeader = () => {
+    if (selectedDomain) {
+      // Individual domain detail header
+      return (
+        <View style={[styles.customHeader, { backgroundColor: getDomainColor(selectedDomain.name) }]}>
+          <View style={styles.customHeaderTop}>
+            <TouchableOpacity
+              style={styles.customBackButton}
+              onPress={() => setSelectedDomain(null)}
+            >
+              <Text style={styles.customBackButtonText}>← Back to Wellness Bank</Text>
+            </TouchableOpacity>
+            <View style={styles.customHeaderCenter}>
+              <Text style={styles.customHeaderTitle}>{selectedDomain.name}</Text>
+            </View>
+            <View style={styles.customScoreContainer}>
+              <Text style={styles.customScoreLabel}>Authentic Score</Text>
+              <Text style={styles.customScoreValue}>{authenticScore}</Text>
+            </View>
+          </View>
+          <View style={styles.customHeaderBottom}>
+            <View style={styles.customToggleGroup}>
+              {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
+                <TouchableOpacity
+                  key={view}
+                  style={[styles.customToggleButton, activeView === view && styles.customActiveToggle]}
+                  onPress={() => handleViewChange(view)}
+                >
+                  <Text style={[styles.customToggleText, activeView === view && styles.customActiveToggleText]}>
+                    {view.charAt(0).toUpperCase() + view.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // Main Wellness Bank header with tabs
+    return (
+      <View style={styles.customHeader}>
+        <View style={styles.customHeaderTop}>
+          <TouchableOpacity
+            style={styles.customMenuButton}
+            onPress={() => navigation.openDrawer()}
+          >
+            <Menu size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={styles.customHeaderCenter}>
+            <Text style={styles.customHeaderTitle}>Wellness Bank</Text>
+          </View>
+          <View style={styles.customScoreContainer}>
+            <Text style={styles.customScoreLabel}>Authentic Score</Text>
+            <Text style={styles.customScoreValue}>{authenticScore}</Text>
+          </View>
+        </View>
+        <View style={styles.customHeaderBottom}>
+          <View style={styles.customMainToggleGroup}>
+            <TouchableOpacity
+              style={[styles.customToggleButton, activeMainTab === 'domains' && styles.customActiveToggle]}
+              onPress={() => setActiveMainTab('domains')}
+            >
+              <Text style={[styles.customToggleText, activeMainTab === 'domains' && styles.customActiveToggleText]}>
+                Domains
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.customToggleButton, activeMainTab === 'manage' && styles.customActiveToggle]}
+              onPress={() => setActiveMainTab('manage')}
+            >
+              <Text style={[styles.customToggleText, activeMainTab === 'manage' && styles.customActiveToggleText]}>
+                Manage Domains
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderContent = () => {
     if (selectedDomain) {
       // Domain view
       return (
         <View style={styles.content}>
-          <Header
-            title={selectedDomain.name}
-            activeView={activeView}
-            onViewChange={handleViewChange}
-            authenticScore={authenticScore}
-            backgroundColor={getDomainColor(selectedDomain.name)}
-            onBackPress={() => setSelectedDomain(null)}
-          />
 
           {/* 12-Week Goals Section */}
           {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
@@ -484,55 +561,68 @@ export default function Wellness() {
       );
     }
 
-    // Domains list view
+    // Main Wellness Bank view with tabs
     return (
       <View style={styles.content}>
-        <Header 
-          title="Wellness Bank" 
-          authenticScore={authenticScore}
-        />
-        
-        <ScrollView style={styles.domainsList}>
-          {domains.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No domains found</Text>
-            </View>
-          ) : (
-            <View style={styles.domainsGrid}>
-              {domains.map(domain => (
-                <TouchableOpacity
-                  key={domain.id}
-                  style={[
-                    styles.domainCard,
-                    { borderLeftColor: getDomainColor(domain.name) }
-                  ]}
-                  onPress={() => handleDomainPress(domain)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.domainCardContent}>
-                    <View style={[styles.domainIcon, { backgroundColor: getDomainColor(domain.name) }]}>
-                      <Heart size={24} color="#ffffff" />
+        {activeMainTab === 'domains' && (
+          <ScrollView style={styles.domainsList}>
+            {domains.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No domains found</Text>
+              </View>
+            ) : (
+              <View style={styles.domainsGrid}>
+                {domains.map(domain => (
+                  <TouchableOpacity
+                    key={domain.id}
+                    style={[
+                      styles.domainCard,
+                      { borderLeftColor: getDomainColor(domain.name) }
+                    ]}
+                    onPress={() => handleDomainPress(domain)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.domainCardContent}>
+                      <View style={[styles.domainIcon, { backgroundColor: getDomainColor(domain.name) }]}>
+                        <Heart size={24} color="#ffffff" />
+                      </View>
+                      <View style={styles.domainInfo}>
+                        <Text style={styles.domainName}>{domain.name}</Text>
+                        {domain.description && (
+                          <Text style={styles.domainDescription} numberOfLines={2}>
+                            {domain.description}
+                          </Text>
+                        )}
+                      </View>
                     </View>
-                    <View style={styles.domainInfo}>
-                      <Text style={styles.domainName}>{domain.name}</Text>
-                      {domain.description && (
-                        <Text style={styles.domainDescription} numberOfLines={2}>
-                          {domain.description}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {activeMainTab === 'manage' && (
+          <ScrollView style={styles.manageContent}>
+            <View style={styles.manageHeader}>
+              <Text style={styles.manageTitle}>Manage Wellness Domains</Text>
             </View>
-          )}
-        </ScrollView>
+            <View style={styles.managePlaceholder}>
+              <Heart size={48} color="#9ca3af" />
+              <Text style={styles.managePlaceholderTitle}>Domain Management Coming Soon</Text>
+              <Text style={styles.managePlaceholderText}>
+                Future updates will allow you to customize domain names, add custom domains, and set priorities.
+              </Text>
+            </View>
+          </ScrollView>
+        )}
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {renderWellnessBankHeader()}
       {renderContent()}
 
       <DraggableFab onPress={() => setTaskFormVisible(true)}>
@@ -666,5 +756,119 @@ const styles = StyleSheet.create({
   goalsList: {
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  // Custom header styles
+  customHeader: {
+    backgroundColor: '#0078d4',
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  customHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  customMenuButton: {
+    padding: 4,
+  },
+  customBackButton: {
+    paddingVertical: 4,
+  },
+  customBackButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  customHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  customHeaderTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  customScoreContainer: {
+    alignItems: 'flex-end',
+  },
+  customScoreLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 2,
+  },
+  customScoreValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  customHeaderBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customMainToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  customActiveToggle: {
+    backgroundColor: '#ffffff',
+  },
+  customToggleText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  customActiveToggleText: {
+    color: '#0078d4',
+  },
+  // Manage Domains tab styles
+  manageContent: {
+    flex: 1,
+    padding: 16,
+  },
+  manageHeader: {
+    marginBottom: 20,
+  },
+  manageTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  managePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  managePlaceholderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  managePlaceholderText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

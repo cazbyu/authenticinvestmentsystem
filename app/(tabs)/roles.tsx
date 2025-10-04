@@ -14,7 +14,7 @@ import { EditKRModal } from '@/components/settings/EditKRModal';
 import { JournalView } from '@/components/journal/JournalView';
 import { getSupabaseClient } from '@/lib/supabase';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
-import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
+import { Plus, Users, CreditCard as Edit, UserX, Ban, Menu } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
@@ -53,6 +53,9 @@ export default function Roles() {
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [krView, setKRView] = useState<'deposits' | 'ideas'>('deposits');
   const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
+
+  // Main tab navigation state
+  const [activeMainTab, setActiveMainTab] = useState<'roles' | 'manage' | 'keyrelationships'>('roles');
   
   // Modal states
   const [manageRolesVisible, setManageRolesVisible] = useState(false);
@@ -491,8 +494,28 @@ export default function Roles() {
     }
   }, [loading]);
 
+  const fetchAllKeyRelationships = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (error) throw error;
+      setKeyRelationships(data || []);
+    } catch (error) {
+      console.error('Error fetching all key relationships:', error);
+    }
+  };
+
   useEffect(() => {
     fetchRoles();
+    fetchAllKeyRelationships();
 
     return () => {
       if (roleClickTimeout.current) {
@@ -773,6 +796,7 @@ export default function Roles() {
     if (selectedRole) {
       fetchKeyRelationships(selectedRole.id);
     }
+    fetchAllKeyRelationships();
     setEditKRVisible(false);
     setEditingKR(null);
   };
@@ -795,8 +819,15 @@ export default function Roles() {
 
       if (error) throw error;
 
+      // Find and set the selected role
+      const role = roles.find(r => r.id === roleId);
+      if (role && !selectedRole) {
+        setSelectedRole(role);
+      }
+
       // Refresh KRs and open edit modal for the new one
       await fetchKeyRelationships(roleId);
+      await fetchAllKeyRelationships();
       setEditingKR(data);
       setEditKRVisible(true);
     } catch (error) {
@@ -840,58 +871,142 @@ export default function Roles() {
     return urls;
   }, [keyRelationships]);
 
-  const renderContent = () => {
+  // Render custom header
+  const renderRoleBankHeader = () => {
     if (selectedKR) {
-      // Key Relationship view
+      // Key Relationship detail header
       return (
-        <View style={styles.content}>
-          <View style={[styles.header, { backgroundColor: selectedRole?.color || '#0078d4' }]}>
-            <View style={styles.headerContent}>
-              <View style={styles.headerLeft}>
-                <TouchableOpacity 
-                  style={styles.backButton}
-                  onPress={() => setSelectedKR(null)}
-                >
-                  <Text style={styles.backButtonText}>← Back to Role</Text>
-                </TouchableOpacity>
-                <View style={styles.headerInfo}>
-                  <Text style={styles.headerTitle}>{selectedKR.name}</Text>
-                  <Text style={styles.headerSubtitle}>Key Relationship in {selectedRole?.label}</Text>
-                </View>
-              </View>
-              <View style={styles.headerRight}>
-                {selectedKR.image_path && krImageUrls[selectedKR.id] && (
-                  <Image
-                    source={{ uri: krImageUrls[selectedKR.id] || undefined }}
-                    style={styles.headerImage}
-                    onError={(error) => {
-                      console.error('[RoleBank] Failed to load KR header image:', selectedKR.image_path, error.nativeEvent.error);
-                    }}
-                  />
-                )}
-                <TouchableOpacity 
-                  style={styles.editButton}
-                  onPress={() => handleEditKR(selectedKR)}
-                >
-                  <Edit size={20} color="#ffffff" />
-                </TouchableOpacity>
-              </View>
+        <View style={[styles.customHeader, { backgroundColor: selectedRole?.color || '#0078d4' }]}>
+          <View style={styles.customHeaderTop}>
+            <TouchableOpacity
+              style={styles.customBackButton}
+              onPress={() => setSelectedKR(null)}
+            >
+              <Text style={styles.customBackButtonText}>← Back to Role</Text>
+            </TouchableOpacity>
+            <View style={styles.customHeaderCenter}>
+              <Text style={styles.customHeaderTitle}>{selectedKR.name}</Text>
+              <Text style={styles.customHeaderSubtitle}>Key Relationship in {selectedRole?.label}</Text>
             </View>
-            
-            <View style={styles.toggleContainer}>
+            <View style={styles.customScoreContainer}>
+              <Text style={styles.customScoreLabel}>Authentic Score</Text>
+              <Text style={styles.customScoreValue}>{authenticScore}</Text>
+            </View>
+          </View>
+          <View style={styles.customHeaderBottom}>
+            <View style={styles.customToggleGroup}>
               {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
                 <TouchableOpacity
                   key={view}
-                  style={[styles.toggleButton, krJournalView === view && styles.activeToggle]}
+                  style={[styles.customToggleButton, krJournalView === view && styles.customActiveToggle]}
                   onPress={() => handleKRJournalViewChange(view)}
                 >
-                  <Text style={[styles.toggleText, krJournalView === view && styles.activeToggleText]}>
+                  <Text style={[styles.customToggleText, krJournalView === view && styles.customActiveToggleText]}>
                     {view.charAt(0).toUpperCase() + view.slice(1)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
+        </View>
+      );
+    }
+
+    if (selectedRole) {
+      // Individual role detail header
+      return (
+        <View style={[styles.customHeader, { backgroundColor: selectedRole.color || '#0078d4' }]}>
+          <View style={styles.customHeaderTop}>
+            <TouchableOpacity
+              style={styles.customBackButton}
+              onPress={() => setSelectedRole(null)}
+            >
+              <Text style={styles.customBackButtonText}>← Back to Role Bank</Text>
+            </TouchableOpacity>
+            <View style={styles.customHeaderCenter}>
+              <Text style={styles.customHeaderTitle}>{selectedRole.label}</Text>
+            </View>
+            <View style={styles.customScoreContainer}>
+              <Text style={styles.customScoreLabel}>Authentic Score</Text>
+              <Text style={styles.customScoreValue}>{authenticScore}</Text>
+            </View>
+          </View>
+          <View style={styles.customHeaderBottom}>
+            <View style={styles.customToggleGroup}>
+              {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
+                <TouchableOpacity
+                  key={view}
+                  style={[styles.customToggleButton, activeView === view && styles.customActiveToggle]}
+                  onPress={() => handleViewChange(view)}
+                >
+                  <Text style={[styles.customToggleText, activeView === view && styles.customActiveToggleText]}>
+                    {view.charAt(0).toUpperCase() + view.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // Main Role Bank header with tabs
+    return (
+      <View style={styles.customHeader}>
+        <View style={styles.customHeaderTop}>
+          <TouchableOpacity
+            style={styles.customMenuButton}
+            onPress={() => navigation.openDrawer()}
+          >
+            <Menu size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={styles.customHeaderCenter}>
+            <Text style={styles.customHeaderTitle}>Role Bank</Text>
+          </View>
+          <View style={styles.customScoreContainer}>
+            <Text style={styles.customScoreLabel}>Authentic Score</Text>
+            <Text style={styles.customScoreValue}>{authenticScore}</Text>
+          </View>
+        </View>
+        <View style={styles.customHeaderBottom}>
+          <View style={styles.customMainTabsContainer}>
+            <View style={styles.customMainToggleGroup}>
+              <TouchableOpacity
+                style={[styles.customToggleButton, activeMainTab === 'roles' && styles.customActiveToggle]}
+                onPress={() => setActiveMainTab('roles')}
+              >
+                <Text style={[styles.customToggleText, activeMainTab === 'roles' && styles.customActiveToggleText]}>
+                  Roles
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.customToggleButton, activeMainTab === 'manage' && styles.customActiveToggle]}
+                onPress={() => setActiveMainTab('manage')}
+              >
+                <Text style={[styles.customToggleText, activeMainTab === 'manage' && styles.customActiveToggleText]}>
+                  Manage Roles
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.customSingleButton, activeMainTab === 'keyrelationships' && styles.customActiveSingleButton]}
+              onPress={() => setActiveMainTab('keyrelationships')}
+            >
+              <Text style={[styles.customSingleButtonText, activeMainTab === 'keyrelationships' && styles.customActiveSingleButtonText]}>
+                Key Relationships
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderContent = () => {
+    if (selectedKR) {
+      // Key Relationship view
+      return (
+        <View style={styles.content}>
 
           <ScrollView style={styles.taskList}>
             {krJournalView === 'journal' ? (
@@ -956,15 +1071,6 @@ export default function Roles() {
       // Role view
       return (
         <View style={styles.content}>
-          <Header
-            title={selectedRole.label}
-            activeView={activeView}
-            onViewChange={handleViewChange}
-            authenticScore={authenticScore}
-            backgroundColor={selectedRole.color}
-            onEditPress={() => handleEditRole(selectedRole)}
-            onBackPress={() => setSelectedRole(null)}
-          />
 
           {/* 12-Week Goals Strip - Only show when data is stable */}
           {activeView === 'deposits' && twelveWeekGoals.length > 0 && fetchState === 'complete' && (
@@ -1115,106 +1221,229 @@ export default function Roles() {
       );
     }
 
-    // Roles list view
+    // Main Role Bank view with tabs
     return (
       <View style={styles.content}>
-        <Header 
-          title="Role Bank" 
-          authenticScore={authenticScore}
-        />
-        
-        <ScrollView style={styles.rolesList}>
-          {roles.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No active roles found</Text>
-              <TouchableOpacity 
-                style={styles.manageButton}
-                onPress={() => setManageRolesVisible(true)}
+        {activeMainTab === 'roles' && (
+          <ScrollView style={styles.rolesList}>
+            {roles.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No active roles found</Text>
+                <TouchableOpacity
+                  style={styles.manageButton}
+                  onPress={() => setActiveMainTab('manage')}
+                >
+                  <Text style={styles.manageButtonText}>Manage Roles</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.rolesGrid}>
+                {roles.map(role => (
+                  <TouchableOpacity
+                    key={role.id}
+                    style={[
+                      styles.roleCard,
+                      styles.roleCardHalf,
+                      { borderLeftColor: role.color || '#0078d4' }
+                    ]}
+                    onPress={() => handleRolePress(role)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.roleCardContent}>
+                      <View style={styles.roleCardMain}>
+                        {role.image_path && roleImageUrls[role.id] ? (
+                          <Image
+                            source={{ uri: roleImageUrls[role.id] || undefined }}
+                            style={styles.roleImage}
+                            onError={(error) => {
+                              console.error('[RoleBank] Failed to load role image:', role.label, role.image_path, error.nativeEvent.error);
+                            }}
+                          />
+                        ) : (
+                          <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
+                            <Text style={styles.roleImageText}>
+                              {role.label.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={styles.roleInfo}>
+                          <Text style={styles.roleName} numberOfLines={2}>{role.label}</Text>
+                          {role.category && (
+                            <Text style={styles.roleCategory} numberOfLines={1}>{role.category}</Text>
+                          )}
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.editRoleButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleEditRole(role);
+                        }}
+                        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                      >
+                        <Edit size={16} color="#6b7280" />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {activeMainTab === 'manage' && (
+          <ScrollView style={styles.manageContent}>
+            <View style={styles.manageHeader}>
+              <Text style={styles.manageTitle}>Manage Roles</Text>
+              <TouchableOpacity
+                style={styles.createRoleButton}
+                onPress={() => {
+                  setEditingRole(null);
+                  setEditRoleVisible(true);
+                }}
               >
-                <Text style={styles.manageButtonText}>Manage Roles</Text>
+                <Plus size={20} color="#ffffff" />
+                <Text style={styles.createRoleButtonText}>Create New Role</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <View style={styles.rolesGrid}>
-              {roles.map(role => (
-                <TouchableOpacity
-                  key={role.id}
-                  style={[
-                    styles.roleCard,
-                    styles.roleCardHalf,
-                    { borderLeftColor: role.color || '#0078d4' }
-                  ]}
-                  onPress={() => handleRolePress(role)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.roleCardContent}>
-                    <View style={styles.roleCardMain}>
+            {roles.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No roles found</Text>
+              </View>
+            ) : (
+              <View style={styles.manageRolesList}>
+                {roles.map(role => (
+                  <View key={role.id} style={styles.manageRoleCard}>
+                    <View style={styles.manageRoleInfo}>
                       {role.image_path && roleImageUrls[role.id] ? (
                         <Image
                           source={{ uri: roleImageUrls[role.id] || undefined }}
-                          style={styles.roleImage}
-                          onError={(error) => {
-                            console.error('[RoleBank] Failed to load role image:', role.label, role.image_path, error.nativeEvent.error);
-                          }}
+                          style={styles.manageRoleImage}
                         />
                       ) : (
-                        <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
-                          <Text style={styles.roleImageText}>
+                        <View style={[styles.manageRoleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
+                          <Text style={styles.manageRoleImageText}>
                             {role.label.charAt(0).toUpperCase()}
                           </Text>
                         </View>
                       )}
-
-                      <View style={styles.roleInfo}>
-                        <Text style={styles.roleName} numberOfLines={2}>{role.label}</Text>
+                      <View style={styles.manageRoleDetails}>
+                        <Text style={styles.manageRoleName}>{role.label}</Text>
                         {role.category && (
-                          <Text style={styles.roleCategory} numberOfLines={1}>{role.category}</Text>
+                          <Text style={styles.manageRoleCategory}>{role.category}</Text>
                         )}
                       </View>
                     </View>
-
                     <TouchableOpacity
-                      style={styles.editRoleButton}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleEditRole(role);
-                      }}
-                      hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                      style={styles.manageRoleEditButton}
+                      onPress={() => handleEditRole(role)}
                     >
-                      <Edit size={16} color="#6b7280" />
+                      <Edit size={18} color="#0078d4" />
+                      <Text style={styles.manageRoleEditText}>Edit</Text>
                     </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </ScrollView>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
 
+        {activeMainTab === 'keyrelationships' && (
+          <ScrollView style={styles.krContent}>
+            <View style={styles.krHeader}>
+              <Text style={styles.krTitle}>All Key Relationships</Text>
+              <Text style={styles.krSubtitle}>Organized by role</Text>
+            </View>
+            {roles.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No roles found. Create roles first to add key relationships.</Text>
+              </View>
+            ) : (
+              <View style={styles.krList}>
+                {roles.map(role => {
+                  const roleKRs = keyRelationships.filter(kr => kr.role_id === role.id);
+                  return (
+                    <View key={role.id} style={styles.krRoleSection}>
+                      <View style={styles.krRoleHeader}>
+                        <View style={[styles.krRoleIndicator, { backgroundColor: role.color || '#0078d4' }]} />
+                        <Text style={styles.krRoleName}>{role.label}</Text>
+                        <TouchableOpacity
+                          style={styles.krAddButton}
+                          onPress={() => handleAddKR(role.id)}
+                        >
+                          <Plus size={16} color="#0078d4" />
+                          <Text style={styles.krAddButtonText}>Add KR</Text>
+                        </TouchableOpacity>
+                      </View>
+                      {roleKRs.length === 0 ? (
+                        <View style={styles.krEmptySection}>
+                          <Text style={styles.krEmptyText}>No key relationships yet</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.krItems}>
+                          {roleKRs.map(kr => (
+                            <TouchableOpacity
+                              key={kr.id}
+                              style={styles.krItem}
+                              onPress={() => {
+                                setSelectedRole(role);
+                                setSelectedKR(kr);
+                              }}
+                            >
+                              {kr.image_path && krImageUrls[kr.id] ? (
+                                <Image
+                                  source={{ uri: krImageUrls[kr.id] || undefined }}
+                                  style={styles.krItemImage}
+                                />
+                              ) : (
+                                <View style={styles.krItemImagePlaceholder}>
+                                  <Users size={20} color="#6b7280" />
+                                </View>
+                              )}
+                              <View style={styles.krItemInfo}>
+                                <Text style={styles.krItemName}>{kr.name}</Text>
+                                {kr.description && (
+                                  <Text style={styles.krItemDescription} numberOfLines={1}>
+                                    {kr.description}
+                                  </Text>
+                                )}
+                              </View>
+                              <TouchableOpacity
+                                style={styles.krItemEditButton}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  handleEditKR(kr);
+                                }}
+                              >
+                                <Edit size={16} color="#6b7280" />
+                              </TouchableOpacity>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        )}
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {renderRoleBankHeader()}
       {renderContent()}
 
       <DraggableFab onPress={() => setTaskFormVisible(true)}>
         <Plus size={24} color="#ffffff" />
       </DraggableFab>
 
-      <TouchableOpacity 
-        style={styles.manageFab} 
-        onPress={() => setManageRolesVisible(true)}
-      >
-        <Users size={20} color="#ffffff" />
-      </TouchableOpacity>
-
       {/* Modals */}
-      <ManageRolesModal
-        visible={manageRolesVisible}
-        onClose={() => setManageRolesVisible(false)}
-        onUpdate={fetchRoles}
-      />
 
       <EditRoleModal
         visible={editRoleVisible}
@@ -1575,23 +1804,331 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontStyle: 'italic',
   },
-  manageFab: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6b7280',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   roleCardDisabled: {
     opacity: 0.5,
+  },
+  // Custom header styles
+  customHeader: {
+    backgroundColor: '#0078d4',
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  customHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  customMenuButton: {
+    padding: 4,
+  },
+  customBackButton: {
+    paddingVertical: 4,
+  },
+  customBackButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  customHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  customHeaderTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  customHeaderSubtitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    opacity: 0.9,
+  },
+  customScoreContainer: {
+    alignItems: 'flex-end',
+  },
+  customScoreLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 2,
+  },
+  customScoreValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  customHeaderBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customMainTabsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  customMainToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  customActiveToggle: {
+    backgroundColor: '#ffffff',
+  },
+  customToggleText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  customActiveToggleText: {
+    color: '#0078d4',
+  },
+  customSingleButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+  },
+  customActiveSingleButton: {
+    backgroundColor: '#ffffff',
+  },
+  customSingleButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  customActiveSingleButtonText: {
+    color: '#0078d4',
+  },
+  // Manage Roles tab styles
+  manageContent: {
+    flex: 1,
+    padding: 16,
+  },
+  manageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  manageTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  createRoleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0078d4',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  createRoleButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  manageRolesList: {
+    gap: 12,
+  },
+  manageRoleCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  manageRoleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  manageRoleImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  manageRoleImagePlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  manageRoleImageText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  manageRoleDetails: {
+    flex: 1,
+  },
+  manageRoleName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  manageRoleCategory: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  manageRoleEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+  },
+  manageRoleEditText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0078d4',
+  },
+  // Key Relationships tab styles
+  krContent: {
+    flex: 1,
+    padding: 16,
+  },
+  krHeader: {
+    marginBottom: 20,
+  },
+  krTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  krSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  krList: {
+    gap: 20,
+  },
+  krRoleSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  krRoleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  krRoleIndicator: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+  },
+  krRoleName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+  },
+  krAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+  },
+  krAddButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078d4',
+  },
+  krEmptySection: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  krEmptyText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  krItems: {
+    gap: 8,
+  },
+  krItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    gap: 12,
+  },
+  krItemImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  krItemImagePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  krItemInfo: {
+    flex: 1,
+  },
+  krItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  krItemDescription: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  krItemEditButton: {
+    padding: 8,
   },
 });
