@@ -217,18 +217,30 @@ export function GoalProgressCard({
               <Text style={styles.title} numberOfLines={2}>
                 {goal.title}
               </Text>
-              <View style={styles.subtitleRow}>
+              <TouchableOpacity
+                style={styles.subtitleRow}
+                onPress={hasWeekContext ? onToggleExpanded : undefined}
+                activeOpacity={hasWeekContext ? 0.7 : 1}
+              >
                 <Text style={styles.subtitle}>
                   {getGoalTypeLabel()}
                 </Text>
                 {hasWeekContext && (
-                  <View style={styles.actionCountBadge}>
-                    <Text style={styles.actionCountText}>
+                  <>
+                    <Text style={styles.subtitleDot}> • </Text>
+                    <Text style={styles.subtitle}>
                       {weekActions.length} {weekActions.length === 1 ? 'Action' : 'Actions'}
                     </Text>
-                  </View>
+                    {onToggleExpanded && (
+                      expanded ? (
+                        <ChevronUp size={14} color="#6b7280" style={styles.chevronIcon} />
+                      ) : (
+                        <ChevronDown size={14} color="#6b7280" style={styles.chevronIcon} />
+                      )
+                    )}
+                  </>
                 )}
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -289,44 +301,26 @@ export function GoalProgressCard({
         )}
 
         {/* Week-specific Actions (when week prop is provided) */}
-        {shouldRenderWeekActions && week && (
+        {shouldRenderWeekActions && week && expanded && (
           <View style={styles.weekActionsSection}>
-            {/* Collapse/Expand Toggle */}
-            <TouchableOpacity
-              style={styles.actionsToggle}
-              onPress={onToggleExpanded}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionsToggleText}>
-                {expanded ? 'Hide Actions' : 'Show Actions'}
-              </Text>
-              {expanded ? (
-                <ChevronUp size={16} color="#6b7280" />
-              ) : (
-                <ChevronDown size={16} color="#6b7280" />
+            <View style={styles.weekActionsHeader}>
+              {onAddAction && (
+                <TouchableOpacity
+                  style={[styles.addActionButton, { borderColor: cardColor }]}
+                  onPress={onAddAction}
+                >
+                  <Plus size={12} color={cardColor} />
+                  <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
 
-            {expanded && (
-              <>
-                <View style={styles.weekActionsHeader}>
-                  {onAddAction && (
-                    <TouchableOpacity
-                      style={[styles.addActionButton, { borderColor: cardColor }]}
-                      onPress={onAddAction}
-                    >
-                      <Plus size={12} color={cardColor} />
-                      <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {loadingWeekActions ? (
-                  <View style={styles.loadingActions}>
-                    <ActivityIndicator size="small" color="#6b7280" />
-                    <Text style={styles.loadingActionsText}>Loading actions...</Text>
-                  </View>
-                ) : (
+            {loadingWeekActions ? (
+              <View style={styles.loadingActions}>
+                <ActivityIndicator size="small" color="#6b7280" />
+                <Text style={styles.loadingActionsText}>Loading actions...</Text>
+              </View>
+            ) : (
               <View style={styles.actionsList}>
                 {weekActions.map(action => {
                   const weekDays = generateWeekDays(week.startDate);
@@ -360,7 +354,7 @@ export function GoalProgressCard({
                           )}
                         </View>
                       </View>
-                      
+
                       {/* Day labels above circles for this action */}
                       <View style={styles.dayLabelsRow}>
                         {weekDays.map(day => (
@@ -369,13 +363,13 @@ export function GoalProgressCard({
                           </Text>
                         ))}
                       </View>
-                      
+
                       <View style={styles.dayDots}>
                         {weekDays.map(day => {
                            const hasLog = action.logs.some(
                              log => log.measured_on === day.date && log.completed
                            );
-                            
+
                            return (
                              <TouchableOpacity
                                key={day.date}
@@ -401,8 +395,6 @@ export function GoalProgressCard({
                   );
                 })}
               </View>
-                )}
-              </>
             )}
           </View>
         )}
@@ -509,26 +501,20 @@ const styles = StyleSheet.create({
   subtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
+    gap: 4,
   },
   subtitle: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
   },
-  actionCountBadge: {
-    backgroundColor: '#e0f2fe',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#bae6fd',
+  subtitleDot: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
   },
-  actionCountText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#0369a1',
+  chevronIcon: {
+    marginLeft: 4,
   },
   addTaskButtonLarge: {
     flexDirection: 'row',
@@ -628,21 +614,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f3f4f6',
-  },
-  actionsToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    marginBottom: 8,
-  },
-  actionsToggleText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
   },
   weekActionsHeader: {
     flexDirection: 'row',
