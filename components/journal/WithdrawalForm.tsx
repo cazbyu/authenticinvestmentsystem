@@ -139,7 +139,7 @@ export function WithdrawalForm({
         user_id: user.id,
         title: formData.title.trim(),
         amount: parseFloat(formData.amount),
-        withdrawal_date: formData.withdrawalDate.toISOString().split('T')[0],
+        withdrawn_at: formData.withdrawalDate.toISOString(),
         updated_at: new Date().toISOString(),
       };
 
