@@ -127,13 +127,11 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
           <View style={styles.taskHeader}>
             <Text style={styles.taskTitle} numberOfLines={2}>
   {task.title}
+  {task.weeklyTargetCount && task.weeklyTargetCount > 0 && (
+    <Text style={styles.completionCounter}> ({task.weeklyCompletedCount || 0} of {task.weeklyTargetCount})</Text>
+  )}
   {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
 </Text>
-            {task.weeklyTargetCount && task.weeklyTargetCount > 0 && (
-              <Text style={styles.completionCounter}>
-                {task.weeklyCompletedCount || 0} of {task.weeklyTargetCount}
-              </Text>
-            )}
           </View>
           <View style={styles.taskBody}>
             <View style={styles.leftSection}>
@@ -191,28 +189,17 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
                   </View>
                 </View>
               )}
-              {task.goals && task.goals.length > 0 && (
-                <View style={styles.tagRow}>
-                  <Text style={styles.tagRowLabel}>Goals:</Text>
-                  <View style={styles.tagContainer}>
-                    {task.goals.slice(0, 2).map((goal) => (
-                      <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
-                        <Text style={styles.pillTagText}>{goal.title}</Text>
-                      </View>
-                    ))}
-                    {task.goals.length > 2 && (
-                      <View style={[styles.pillTag, styles.morePillTag]}>
-                        <Text style={styles.pillTagText}>+{task.goals.length - 2}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              )}
             </View>
           </View>
         </View>
         <View style={styles.rightSection}>
           <View style={styles.topActionRow}>
+            <View style={styles.statusIcons}>
+              {task.has_notes && <FileText size={12} color="#6b7280" />}
+              {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
+              {task.has_delegates && <Users size={12} color="#6b7280" />}
+            </View>
+
             <TouchableOpacity
               style={styles.completeButton}
               onPress={handleComplete}
@@ -230,12 +217,6 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
                 <Trash2 size={14} color="#dc2626" />
               </TouchableOpacity>
             )}
-            
-            <View style={styles.statusIcons}>
-              {task.has_notes && <FileText size={12} color="#6b7280" />}
-              {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
-              {task.has_delegates && <Users size={12} color="#6b7280" />}
-            </View>
           </View>
           
           <Text style={styles.scoreText}>+{points}</Text>
@@ -266,9 +247,6 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
       },
       taskHeader: {
         marginBottom: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
       },
       taskTitle: {
         fontSize: 16,
@@ -279,9 +257,8 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
       },
       completionCounter: {
         fontSize: 14,
-        fontWeight: '600',
-        color: '#0078d4',
-        marginLeft: 8,
+        color: '#6b7280',
+        fontWeight: '400',
       },
       dueDate: {
         fontSize: 14,
