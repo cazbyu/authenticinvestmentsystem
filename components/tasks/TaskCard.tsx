@@ -22,12 +22,14 @@ export interface Task {
   is_twelve_week_goal?: boolean;
   roles?: Array<{id: string; label: string}>;
   domains?: Array<{id: string; name: string}>;
-  goals?: Array<{id: string; title: string}>;
+  goals?: Array<{id: string; title: string; goal_type?: string}>;
   has_notes?: boolean;
   has_attachments?: boolean;
   has_delegates?: boolean;
-  logs?: Array<{ log_date: string; completed: boolean }>; // Added for GoalProgressCard
+  logs?: Array<{ log_date: string; completed: boolean }>;
   keyRelationships?: Array<{id: string; name: string}>;
+  weeklyCompletedCount?: number;
+  weeklyTargetCount?: number;
 }
 
 // Props for the TaskCard component
@@ -127,6 +129,11 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
   {task.title}
   {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
 </Text>
+            {task.weeklyTargetCount && task.weeklyTargetCount > 0 && (
+              <Text style={styles.completionCounter}>
+                {task.weeklyCompletedCount || 0} of {task.weeklyTargetCount}
+              </Text>
+            )}
           </View>
           <View style={styles.taskBody}>
             <View style={styles.leftSection}>
@@ -179,6 +186,23 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
                     {task.goals.length > 3 && (
                       <View style={[styles.pillTag, styles.morePillTag]}>
                         <Text style={styles.pillTagText}>+{task.goals.length - 3}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+              {task.goals && task.goals.length > 0 && (
+                <View style={styles.tagRow}>
+                  <Text style={styles.tagRowLabel}>Goals:</Text>
+                  <View style={styles.tagContainer}>
+                    {task.goals.slice(0, 2).map((goal) => (
+                      <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
+                        <Text style={styles.pillTagText}>{goal.title}</Text>
+                      </View>
+                    ))}
+                    {task.goals.length > 2 && (
+                      <View style={[styles.pillTag, styles.morePillTag]}>
+                        <Text style={styles.pillTagText}>+{task.goals.length - 2}</Text>
                       </View>
                     )}
                   </View>
@@ -242,12 +266,22 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
       },
       taskHeader: {
         marginBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
       },
       taskTitle: {
         fontSize: 16,
         fontWeight: '600',
         color: '#1f2937',
         lineHeight: 22,
+        flex: 1,
+      },
+      completionCounter: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0078d4',
+        marginLeft: 8,
       },
       dueDate: {
         fontSize: 14,
@@ -314,7 +348,7 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         borderColor: '#fdba74',
       },
       goalPillTag: {
-        backgroundColor: '#bfdbfe',
+        backgroundColor: '#dbeafe',
         borderColor: '#93c5fd',
       },
       morePillTag: {
