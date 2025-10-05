@@ -47,8 +47,6 @@ interface CreateGoalModalProps {
   createTwelveWeekGoal: (goalData: {
     title: string;
     description?: string;
-    weekly_target?: number;
-    total_target?: number;
   }) => Promise<any>;
   createCustomGoal: (goalData: {
     title: string;
@@ -74,8 +72,6 @@ export function CreateGoalModal({
     title: '',
     description: '',
     notes: '',
-    weeklyTarget: '3',
-    totalTarget: '100',
     selectedRoleIds: [] as string[],
     selectedDomainIds: [] as string[],
     selectedKeyRelationshipIds: [] as string[],
@@ -134,8 +130,6 @@ export function CreateGoalModal({
       title: '',
       description: '',
       notes: '',
-      weeklyTarget: '3',
-      totalTarget: '100',
       selectedRoleIds: [],
       selectedDomainIds: [],
       selectedKeyRelationshipIds: [],
@@ -201,15 +195,11 @@ export function CreateGoalModal({
         goalData = await createTwelveWeekGoal({
           title: formData.title,
           description: formData.description,
-          weekly_target: parseInt(formData.weeklyTarget) || 3,
-          total_target: parseInt(formData.totalTarget) || 36,
         });
       } else {
         goalData = await createCustomGoal({
           title: formData.title,
           description: formData.description,
-          weekly_target: parseInt(formData.weeklyTarget) || 3,
-          total_target: parseInt(formData.totalTarget) || 100,
         }, currentSelectedTimeline);
       }
 
@@ -352,8 +342,8 @@ export function CreateGoalModal({
               {/* Timeline Pill Buttons */}
               <View style={styles.field}>
                 <Text style={styles.label}>Timeline *(Select One)</Text>
-                <ScrollView 
-                  horizontal 
+                <ScrollView
+                  horizontal
                   showsHorizontalScrollIndicator={false}
                   style={styles.timelinePillsContainer}
                   contentContainerStyle={styles.timelinePillsContent}
@@ -361,7 +351,7 @@ export function CreateGoalModal({
                   {allTimelines.map(timeline => {
                     const isSelected = currentSelectedTimeline?.id === timeline.id;
                     const pillColor = timeline.source === 'global' ? '#0078d4' : '#7c3aed';
-                    
+
                     return (
                       <TouchableOpacity
                         key={timeline.id}
@@ -385,30 +375,41 @@ export function CreateGoalModal({
                 </ScrollView>
               </View>
 
-              {/* Weekly Target */}
+              {/* Description */}
               <View style={styles.field}>
-                <Text style={styles.label}>Weekly Target</Text>
+                <Text style={styles.label}>Description</Text>
                 <TextInput
-                  style={styles.input}
-                  value={formData.weeklyTarget}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, weeklyTarget: text }))}
-                  placeholder="3"
+                  style={[styles.input, styles.textArea]}
+                  value={formData.description}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+                  placeholder="Describe your goal and why it matters..."
                   placeholderTextColor="#9ca3af"
-                  keyboardType="numeric"
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
                 />
               </View>
 
-              {/* Total Target */}
+              {/* Wellness Domains */}
               <View style={styles.field}>
-                <Text style={styles.label}>Total Target</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.totalTarget}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, totalTarget: text }))}
-                  placeholder={currentSelectedTimeline?.source === 'global' ? '36' : '100'}
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="numeric"
-                />
+                <Text style={styles.label}>Wellness Domains</Text>
+                <View style={styles.checkboxContainer}>
+                  {allDomains.map(domain => {
+                    const isSelected = formData.selectedDomainIds.includes(domain.id);
+                    return (
+                      <TouchableOpacity
+                        key={domain.id}
+                        style={styles.checkboxRowGrid}
+                        onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
+                      >
+                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
+                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkboxLabelGrid}>{domain.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               {/* Active Roles */}
@@ -456,43 +457,6 @@ export function CreateGoalModal({
                   </View>
                 </View>
               )}
-
-              {/* Wellness Domains */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Wellness Domains</Text>
-                <View style={styles.checkboxContainer}>
-                  {allDomains.map(domain => {
-                    const isSelected = formData.selectedDomainIds.includes(domain.id);
-                    return (
-                      <TouchableOpacity
-                        key={domain.id}
-                        style={styles.checkboxRowGrid}
-                        onPress={() => handleMultiSelect('selectedDomainIds', domain.id)}
-                      >
-                        <View style={[styles.checkbox, isSelected && styles.checkedBox]}>
-                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                        </View>
-                        <Text style={styles.checkboxLabelGrid}>{domain.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Description */}
-              <View style={styles.field}>
-                <Text style={styles.label}>Description</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={formData.description}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-                  placeholder="Describe your goal and why it matters..."
-                  placeholderTextColor="#9ca3af"
-                  multiline
-                  numberOfLines={3}
-                  maxLength={500}
-                />
-              </View>
 
               {/* Notes */}
               <View style={styles.field}>
