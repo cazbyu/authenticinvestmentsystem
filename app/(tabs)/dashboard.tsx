@@ -44,12 +44,25 @@ export default function Dashboard() {
       if (!user) return;
 
       if (activeView === 'deposits') {
-        // Fetch tasks/events
+        // Calculate current week boundaries
+        const today = new Date();
+        const todayStr = formatLocalDate(today);
+        const dayOfWeek = today.getDay(); // 0=Sunday, 6=Saturday
+        const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1);
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() + mondayOffset);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        const weekStartStr = formatLocalDate(weekStart);
+        const weekEndStr = formatLocalDate(weekEnd);
+
+        // Fetch parent tasks (both standalone and timeline-based actions)
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
           .select('*, user_global_timeline_id, custom_timeline_id')
           .eq('user_id', user.id)
           .is('deleted_at', null)
+          .is('parent_task_id', null)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event']);
 
@@ -61,30 +74,93 @@ export default function Dashboard() {
           return;
         }
 
-        // Filter out recurring tasks that have been completed today
-        const today = formatLocalDate(new Date());
-        const recurringTaskIds = tasksData
-          .filter(task => task.recurrence_rule && (task.user_global_timeline_id || task.custom_timeline_id))
-          .map(task => task.id);
+        // Separate standalone tasks from timeline-based actions
+        const standaloneTasks = tasksData.filter(task =>
+          !task.user_global_timeline_id && !task.custom_timeline_id
+        );
 
-        let completedTodayTaskIds: string[] = [];
-        if (recurringTaskIds.length > 0) {
-          const { data: completedToday, error: completedError } = await supabase
+        const timelineBasedTasks = tasksData.filter(task =>
+          task.user_global_timeline_id || task.custom_timeline_id
+        );
+
+        // For timeline-based tasks, check if they have week plans for current week
+        let tasksWithCurrentWeek: any[] = [];
+        if (timelineBasedTasks.length > 0) {
+          const timelineTaskIds = timelineBasedTasks.map(t => t.id);
+
+          // Fetch week plans and find current week number
+          const { data: weekPlans, error: weekPlansError } = await supabase
+            .from('0008-ap-task-week-plan')
+            .select('task_id, week_number, target_days, user_global_timeline_id, user_custom_timeline_id')
+            .in('task_id', timelineTaskIds);
+
+          if (weekPlansError) throw weekPlansError;
+
+          // Map task IDs to their current week plans
+          const taskWeekData = new Map();
+          for (const plan of weekPlans || []) {
+            if (!taskWeekData.has(plan.task_id)) {
+              taskWeekData.set(plan.task_id, []);
+            }
+            taskWeekData.get(plan.task_id).push(plan);
+          }
+
+          // TODO: Calculate current week number based on timeline start date
+          // For now, include all timeline-based tasks with week plans
+          tasksWithCurrentWeek = timelineBasedTasks.filter(task =>
+            taskWeekData.has(task.id) && taskWeekData.get(task.id).length > 0
+          ).map(task => ({
+            ...task,
+            weekPlans: taskWeekData.get(task.id),
+            currentWeekPlan: taskWeekData.get(task.id)[0], // Use first plan for now
+          }));
+        }
+
+        // Combine standalone and timeline-based tasks
+        const allTasks = [...standaloneTasks, ...tasksWithCurrentWeek];
+
+        if (allTasks.length === 0) {
+          setTasks([]);
+          setDepositIdeas([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch completion counts for timeline-based actions this week
+        const timelineTaskIdsWithWeek = tasksWithCurrentWeek.map(t => t.id);
+        let completionCounts = new Map();
+
+        if (timelineTaskIdsWithWeek.length > 0) {
+          const { data: completions, error: completionsError } = await supabase
             .from('0008-ap-tasks')
             .select('parent_task_id')
-            .in('parent_task_id', recurringTaskIds)
-            .eq('due_date', today)
+            .in('parent_task_id', timelineTaskIdsWithWeek)
+            .gte('due_date', weekStartStr)
+            .lte('due_date', weekEndStr)
             .eq('status', 'completed');
 
-          if (completedError) {
-            console.error('Error fetching completed occurrences:', completedError);
-          } else {
-            completedTodayTaskIds = (completedToday || []).map(occ => occ.parent_task_id);
+          if (!completionsError && completions) {
+            for (const completion of completions) {
+              const count = completionCounts.get(completion.parent_task_id) || 0;
+              completionCounts.set(completion.parent_task_id, count + 1);
+            }
           }
         }
 
-        // Filter out tasks that have been completed today
-        const currentTasks = tasksData.filter(task => !completedTodayTaskIds.includes(task.id));
+        // Filter out timeline-based actions that have reached weekly target
+        const currentTasks = allTasks.filter(task => {
+          if (!task.currentWeekPlan) return true; // Keep standalone tasks
+
+          const completedCount = completionCounts.get(task.id) || 0;
+          const targetDays = task.currentWeekPlan.target_days;
+
+          // Only show if not yet complete for the week
+          return completedCount < targetDays;
+        }).map(task => ({
+          ...task,
+          weeklyCompletedCount: completionCounts.get(task.id) || 0,
+          weeklyTargetCount: task.currentWeekPlan?.target_days || 0,
+        }));
 
         if (currentTasks.length === 0) {
           setTasks([]);
@@ -104,7 +180,7 @@ export default function Dashboard() {
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal_type, twelve_wk_goal:0008-ap-goals-12wk(id, title), custom_goal:0008-ap-goals-custom(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
@@ -119,16 +195,26 @@ export default function Dashboard() {
 
         const transformedTasks = currentTasks.map(task => {
           // Derive timeline information for recurring tasks
-          const timeline_id = task.custom_timeline_id || null;
-          const timeline_source = task.is_twelve_week_goal ? 'global' : 'custom';
-          
+          const timeline_id = task.custom_timeline_id || task.user_global_timeline_id || null;
+          const timeline_source = task.user_global_timeline_id ? 'global' : 'custom';
+
+          // Transform polymorphic goals
+          const taskGoals = goalsData?.filter(g => g.parent_id === task.id).map(g => {
+            if (g.goal_type === 'twelve_wk_goal' && g.twelve_wk_goal) {
+              return { ...g.twelve_wk_goal, goal_type: '12week' };
+            } else if (g.goal_type === 'custom_goal' && g.custom_goal) {
+              return { ...g.custom_goal, goal_type: 'custom' };
+            }
+            return null;
+          }).filter(Boolean) || [];
+
           return {
             ...task,
             timeline_id,
             timeline_source,
             roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
             domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-            goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
+            goals: taskGoals,
             keyRelationships: keyRelationshipsData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
             has_notes: notesData?.some(n => n.parent_id === task.id),
             has_delegates: delegatesData?.some(d => d.parent_id === task.id),
