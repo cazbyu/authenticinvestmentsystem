@@ -306,11 +306,19 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
             }
           }
 
+          const rolesByW = groupByParentId(wRoles);
+          const domainsByW = groupByParentId(wDomains);
+          const keyRelsByW = groupByParentId(wKeyRels);
           const notesByW = groupByParentId(wNotes);
 
           for (const w of withdrawalsData) {
             if (!allowedWids.has(w.id)) continue;
 
+            const roles = (rolesByW.get(w.id) ?? []).map((r: any) => r.role).filter(Boolean);
+            const domains = (domainsByW.get(w.id) ?? []).map((d: any) => d.domain).filter(Boolean);
+            const keyRelationships = (keyRelsByW.get(w.id) ?? [])
+              .map((k: any) => k.key_relationship)
+              .filter(Boolean);
             const notes = (notesByW.get(w.id) ?? []).map((n: any) => n.note).filter(Boolean);
             const amountNum = parseFloat(String(w.amount ?? 0)) || 0;
 
@@ -324,7 +332,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
               has_notes: notes.length > 0,
               source_id: w.id,
               source_type: 'withdrawal',
-              source_data: { ...w, notes },
+              source_data: { ...w, roles, domains, keyRelationships, notes },
             });
           }
         }

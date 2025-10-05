@@ -132,6 +132,7 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
   const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [existingNotes, setExistingNotes] = useState<Array<{id: string; content: string; created_at: string}>>([]);
 
   // Calendar state
   const [showCalendar, setShowCalendar] = useState(false);
@@ -252,6 +253,18 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
   const loadInitialData = () => {
     if (!initialData) return;
 
+    // Handle notes - can be string or array of note objects
+    let notesArray: Array<{id: string; content: string; created_at: string}> = [];
+    let notesString = '';
+
+    if (Array.isArray(initialData.notes)) {
+      notesArray = initialData.notes;
+    } else if (typeof initialData.notes === 'string') {
+      notesString = initialData.notes;
+    }
+
+    setExistingNotes(notesArray);
+
     setFormData({
       type: initialData.type || 'task',
       title: initialData.title || '',
@@ -272,7 +285,7 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
       selectedDomainIds: initialData.domains?.map((d: any) => d.id) || [],
       selectedKeyRelationshipIds: initialData.keyRelationships?.map((kr: any) => kr.id) || [],
       selectedGoalIds: initialData.goals?.map((g: any) => g.id) || [],
-      notes: initialData.notes || '',
+      notes: notesString,
       recurrenceRule: initialData.recurrence_rule || undefined,
     });
   };
@@ -1192,11 +1205,35 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
           {/* Notes */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.text }]}>Notes</Text>
+
+            {/* Display existing notes in stacked format */}
+            {existingNotes.length > 0 && (
+              <View style={styles.existingNotesContainer}>
+                {existingNotes.map((note) => (
+                  <View key={note.id} style={styles.existingNoteItem}>
+                    <Text style={[styles.existingNoteContent, { color: colors.text }]}>{note.content}</Text>
+                    <Text style={[styles.existingNoteDate, { color: colors.textSecondary }]}>
+                      {new Date(note.created_at).toLocaleDateString('en-US', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                      })} ({new Date(note.created_at).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })})
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Add new note */}
             <TextInput
               style={[styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
               value={formData.notes}
               onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))}
-              placeholder="Add notes..."
+              placeholder={existingNotes.length > 0 ? "Add another note..." : "Add notes..."}
               placeholderTextColor={colors.textSecondary}
               multiline
               numberOfLines={3}
@@ -1597,5 +1634,25 @@ const styles = StyleSheet.create({
   },
   dayOfWeekSelector: {
     alignItems: 'center',
+  },
+  existingNotesContainer: {
+    marginBottom: 12,
+  },
+  existingNoteItem: {
+    backgroundColor: '#f1f5f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0078d4',
+  },
+  existingNoteContent: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  existingNoteDate: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 });
