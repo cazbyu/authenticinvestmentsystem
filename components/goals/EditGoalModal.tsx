@@ -21,8 +21,9 @@ interface KeyRelationship { id: string; name: string; role_id: string; }
 interface EditGoalModalProps {
   visible: boolean;
   onClose: () => void;
-  onUpdate: () => void; // Callback to refresh data in parent
+  onUpdate: () => void;
   goal: TwelveWeekGoal | null;
+  deleteGoal: (goalId: string, goalType: '12week' | 'custom') => Promise<void>;
 }
 
 export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: EditGoalModalProps) {
@@ -144,15 +145,24 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
       return;
     }
 
+    console.log('[EditGoalModal] Saving goal:', {
+      id: goal.id,
+      title: title.trim(),
+      goal_type: goal.goal_type
+    });
+
     setSaving(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
 
-      // 1. Update main goal data
+      // 1. Update main goal data - use correct table based on goal type
+      const tableName = goal.goal_type === '12week' ? '0008-ap-goals-12wk' : '0008-ap-goals-custom';
+      console.log('[EditGoalModal] Updating table:', tableName);
+
       const { error: goalUpdateError } = await supabase
-        .from('0008-ap-goals-12wk')
+        .from(tableName)
         .update({
           title: title.trim(),
           description: description.trim() || null,
@@ -160,18 +170,27 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
         })
         .eq('id', goal.id);
 
-      if (goalUpdateError) throw goalUpdateError;
+      if (goalUpdateError) {
+        console.error('[EditGoalModal] Goal update error:', goalUpdateError);
+        throw goalUpdateError;
+      }
+      console.log('[EditGoalModal] Goal updated successfully');
 
       // 2. Handle Joins (Roles, Domains, Key Relationships)
       const updateJoins = async (
-        tableName: string, 
-        parentIdField: string, 
-        childIdField: string, 
-        currentLinkedIds: string[], 
+        tableName: string,
+        parentIdField: string,
+        childIdField: string,
+        currentLinkedIds: string[],
         newLinkedIds: string[]
       ) => {
         const toAdd = newLinkedIds.filter(id => !currentLinkedIds.includes(id));
         const toRemove = currentLinkedIds.filter(id => !newLinkedIds.includes(id));
+
+        console.log('[EditGoalModal] Updating joins for', tableName, ':', {
+          toAdd: toAdd.length,
+          toRemove: toRemove.length
+        });
 
         if (toRemove.length > 0) {
           const { error } = await supabase
@@ -183,9 +202,10 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
         }
 
         if (toAdd.length > 0) {
+          const parentType = goal.goal_type === '12week' ? 'goal' : 'custom_goal';
           const inserts = toAdd.map(id => ({
             parent_id: goal.id,
-            parent_type: 'goal',
+            parent_type: parentType,
             [childIdField]: id,
             user_id: user.id,
           }));
@@ -197,10 +217,13 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
       };
 
       // Fetch current joins for comparison
+      const parentType = goal.goal_type === '12week' ? 'goal' : 'custom_goal';
+      console.log('[EditGoalModal] Fetching current joins with parent_type:', parentType);
+
       const [{ data: currentRolesJoins }, { data: currentDomainsJoins }, { data: currentKRsJoins }] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('role_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-domains-join').select('domain_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-key-relationships-join').select('key_relationship_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
+        supabase.from('0008-ap-universal-roles-join').select('role_id').eq('parent_id', goal.id).eq('parent_type', parentType),
+        supabase.from('0008-ap-universal-domains-join').select('domain_id').eq('parent_id', goal.id).eq('parent_type', parentType),
+        supabase.from('0008-ap-universal-key-relationships-join').select('key_relationship_id').eq('parent_id', goal.id).eq('parent_type', parentType),
       ]);
 
       const currentRoleIds = currentRolesJoins?.map(j => j.role_id) || [];
@@ -215,19 +238,22 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
 
       // 3. Add new note if provided
       if (newNoteText.trim()) {
+        console.log('[EditGoalModal] Adding new note');
         const { data: newNote, error: newNoteError } = await supabase
-          .from('0008-ap-notes') 
+          .from('0008-ap-notes')
           .insert({ user_id: user.id, content: newNoteText.trim() })
           .select('id')
           .single();
         if (newNoteError) throw newNoteError;
 
+        const noteParentType = goal.goal_type === '12week' ? 'goal' : 'custom_goal';
         const { error: noteJoinError } = await supabase
           .from('0008-ap-universal-notes-join')
-          .insert({ parent_id: goal.id, parent_type: 'goal', note_id: newNote.id, user_id: user.id });
+          .insert({ parent_id: goal.id, parent_type: noteParentType, note_id: newNote.id, user_id: user.id });
         if (noteJoinError) throw noteJoinError;
       }
 
+      console.log('[EditGoalModal] Goal save completed successfully');
       Alert.alert('Success', 'Goal updated successfully!');
       onUpdate();
       onClose();
@@ -282,7 +308,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Edit 12-Week Goal</Text>
+            <Text style={styles.headerTitle}>Edit Goal</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={24} color="#1f2937" />
             </TouchableOpacity>
