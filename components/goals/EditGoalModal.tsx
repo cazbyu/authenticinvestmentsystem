@@ -64,13 +64,33 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: 
 
   const loadGoalData = async () => {
     if (!goal) return;
+
+    console.log('[EditGoalModal] Loading goal data:', {
+      id: goal.id,
+      title: goal.title,
+      goal_type: goal.goal_type,
+      roles: goal.roles,
+      domains: goal.domains,
+      keyRelationships: goal.keyRelationships
+    });
+
     setTitle(goal.title);
     setDescription(goal.description || '');
-    
+
     // Load existing associations
-    setSelectedRoleIds(goal.roles?.map(r => r.id) || []);
-    setSelectedDomainIds(goal.domains?.map(d => d.id) || []);
-    setSelectedKeyRelationshipIds(goal.keyRelationships?.map(kr => kr.id) || []);
+    const roleIds = goal.roles?.map(r => r.id) || [];
+    const domainIds = goal.domains?.map(d => d.id) || [];
+    const krIds = goal.keyRelationships?.map(kr => kr.id) || [];
+
+    console.log('[EditGoalModal] Setting selected IDs:', {
+      roleIds,
+      domainIds,
+      krIds
+    });
+
+    setSelectedRoleIds(roleIds);
+    setSelectedDomainIds(domainIds);
+    setSelectedKeyRelationshipIds(krIds);
   };
 
   const fetchOptions = async () => {

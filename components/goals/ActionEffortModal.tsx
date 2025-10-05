@@ -148,9 +148,28 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
 
     // Pre-select inherited items from goal
     if (goal) {
-      setSelectedRoleIds(goal.roles?.map(r => r.id) || []);
-      setSelectedDomainIds(goal.domains?.map(d => d.id) || []);
-      setSelectedKeyRelationshipIds(goal.keyRelationships?.map(kr => kr.id) || []);
+      console.log('[ActionEffortModal] Pre-filling from goal:', {
+        goal_id: goal.id,
+        goal_title: goal.title,
+        goal_type: goal.goal_type,
+        roles: goal.roles,
+        domains: goal.domains,
+        keyRelationships: goal.keyRelationships
+      });
+
+      const roleIds = goal.roles?.map(r => r.id) || [];
+      const domainIds = goal.domains?.map(d => d.id) || [];
+      const krIds = goal.keyRelationships?.map(kr => kr.id) || [];
+
+      console.log('[ActionEffortModal] Setting selected IDs:', {
+        roleIds,
+        domainIds,
+        krIds
+      });
+
+      setSelectedRoleIds(roleIds);
+      setSelectedDomainIds(domainIds);
+      setSelectedKeyRelationshipIds(krIds);
     } else {
       setSelectedRoleIds([]);
       setSelectedDomainIds([]);

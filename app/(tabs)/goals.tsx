@@ -701,6 +701,9 @@ export default function Goals() {
 
       const goalIds = goalsData.map(g => g.id);
 
+      console.log('[fetchTimelineGoals] Fetching associations for goal IDs:', goalIds);
+      console.log('[fetchTimelineGoals] Timeline source:', timeline.source);
+
       const [
         { data: rolesData, error: rolesError },
         { data: domainsData, error: domainsError },
@@ -711,14 +714,31 @@ export default function Goals() {
         supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', goalIds).in('parent_type', ['goal', 'custom_goal'])
       ]);
 
+      console.log('[fetchTimelineGoals] Roles data:', rolesData);
+      console.log('[fetchTimelineGoals] Domains data:', domainsData);
+      console.log('[fetchTimelineGoals] Key Relationships data:', krData);
+
       if (rolesError || domainsError || krError) throw rolesError || domainsError || krError;
 
-      const goalsWithData = goalsData.map(goal => ({
-        ...goal,
-        roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
-        domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
-        keyRelationships: krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [],
-      }));
+      const goalsWithData = goalsData.map(goal => {
+        const goalRoles = rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [];
+        const goalDomains = domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [];
+        const goalKRs = krData?.filter(kr => kr.parent_id === goal.id).map(kr => kr.key_relationship).filter(Boolean) || [];
+
+        console.log(`[fetchTimelineGoals] Goal ${goal.id} (${goal.title}):`, {
+          goal_type: goal.goal_type,
+          roles: goalRoles.length,
+          domains: goalDomains.length,
+          keyRelationships: goalKRs.length
+        });
+
+        return {
+          ...goal,
+          roles: goalRoles,
+          domains: goalDomains,
+          keyRelationships: goalKRs,
+        };
+      });
 
       setTimelineGoals(goalsWithData);
       setTimelineGoalProgress({});
