@@ -384,8 +384,8 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
         const withdrawalPayload = {
           user_id: user.id,
           title: formData.title.trim(),
-          amount: parseFloat(formData.amount),
-          withdrawn_at: formData.withdrawalDate,
+          amount: parseFloat(formData.amount) || 0,
+          withdrawn_at: new Date(formData.withdrawalDate + 'T12:00:00').toISOString(),
           ...(mode === 'edit' && initialData?.id ? { updated_at: new Date().toISOString() } : {})
         };
 
@@ -745,16 +745,20 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
           {/* Type Selector */}
           {renderTypeSelector()}
 
-          {/* Switches Row */}
-          <View style={styles.switchesRow}>
-            {renderSwitchField('Urgent', formData.isUrgent, (value) => setFormData(prev => ({ ...prev, isUrgent: value })))}
-            {renderSwitchField('Important', formData.isImportant, (value) => setFormData(prev => ({ ...prev, isImportant: value })))}
-          </View>
+          {/* Switches Row - Only for task and event types */}
+          {(formData.type === 'task' || formData.type === 'event') && (
+            <>
+              <View style={styles.switchesRow}>
+                {renderSwitchField('Urgent', formData.isUrgent, (value) => setFormData(prev => ({ ...prev, isUrgent: value })))}
+                {renderSwitchField('Important', formData.isImportant, (value) => setFormData(prev => ({ ...prev, isImportant: value })))}
+              </View>
 
-          <View style={styles.switchesRow}>
-            {renderSwitchField('Authentic Deposit', formData.isAuthenticDeposit, (value) => setFormData(prev => ({ ...prev, isAuthenticDeposit: value })))}
-            {renderSwitchField('Goal', formData.isGoal, (value) => setFormData(prev => ({ ...prev, isGoal: value })))}
-          </View>
+              <View style={styles.switchesRow}>
+                {renderSwitchField('Authentic Deposit', formData.isAuthenticDeposit, (value) => setFormData(prev => ({ ...prev, isAuthenticDeposit: value })))}
+                {renderSwitchField('Goal', formData.isGoal, (value) => setFormData(prev => ({ ...prev, isGoal: value })))}
+              </View>
+            </>
+          )}
 
           {/* Goal picker (shows when Goal toggle ON) */}
           {formData.isGoal && (
