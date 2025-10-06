@@ -90,11 +90,22 @@ export default function SettingsScreen() {
         setProfile(data);
 
         if (data.profile_image) {
-          const { data: signed } = await supabase
-            .storage
-            .from('0008-ap-profile-images')
-            .createSignedUrl(data.profile_image, 60 * 60);
-          setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+          try {
+            const { data: signed, error: signError } = await supabase
+              .storage
+              .from('0008-ap-profile-images')
+              .createSignedUrl(data.profile_image, 60 * 60);
+
+            if (signError) {
+              console.error('Error creating signed URL:', signError);
+              setProfileImageUrl(null);
+            } else {
+              setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+            }
+          } catch (imageError) {
+            console.error('Error loading profile image:', imageError);
+            setProfileImageUrl(null);
+          }
         } else {
           setProfileImageUrl(null);
         }
@@ -224,9 +235,13 @@ export default function SettingsScreen() {
         .upload(fileName, blob, { contentType, upsert: true });
       if (uploadError) throw uploadError;
 
-      const { data: signed } = await supabase.storage
+      const { data: signed, error: signError } = await supabase.storage
         .from('0008-ap-profile-images')
         .createSignedUrl(fileName, 60 * 60);
+
+      if (signError) {
+        console.error('Error creating signed URL after upload:', signError);
+      }
 
       await updateProfile({ profile_image: fileName });
       setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
@@ -262,10 +277,21 @@ export default function SettingsScreen() {
       setProfile(prev => ({ ...prev, ...updates }));
 
       if (updates.profile_image) {
-        const { data: signed } = await supabase.storage
-          .from('0008-ap-profile-images')
-          .createSignedUrl(updates.profile_image, 60 * 60);
-        setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+        try {
+          const { data: signed, error: signError } = await supabase.storage
+            .from('0008-ap-profile-images')
+            .createSignedUrl(updates.profile_image, 60 * 60);
+
+          if (signError) {
+            console.error('Error creating signed URL in updateProfile:', signError);
+            setProfileImageUrl(null);
+          } else {
+            setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+          }
+        } catch (imageError) {
+          console.error('Error loading updated profile image:', imageError);
+          setProfileImageUrl(null);
+        }
       }
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -591,7 +617,9 @@ export default function SettingsScreen() {
               <Text style={styles.closeModalButton}>Done</Text>
             </TouchableOpacity>
           </View>
-          <NorthStarEditor onUpdate={() => {}} />
+          <NorthStarEditor onUpdate={() => {
+            console.log('[Settings] North Star data updated');
+          }} />
         </SafeAreaView>
       </Modal>
 
