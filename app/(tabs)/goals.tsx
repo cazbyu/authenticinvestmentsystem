@@ -8,6 +8,7 @@ import { EditGoalModal } from '@/components/goals/EditGoalModal';
 import ActionEffortModal from '@/components/goals/ActionEffortModal';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { ManageGlobalTimelinesModal } from '@/components/timelines/ManageGlobalTimelinesModal';
+import { ManageTimelinesView } from '@/components/timelines/ManageTimelinesView';
 import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { GoalBankTabbedHeader, GoalBankTab } from '@/components/goals/GoalBankTabbedHeader';
 import { NorthStarQuickView } from '@/components/northStar/NorthStarQuickView';
@@ -17,7 +18,7 @@ import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 import { calculateAuthenticScore } from '@/lib/taskUtils';
 import { formatLocalDate } from '@/lib/dateUtils';
-import { Plus, ChevronLeft, ChevronRight, Target, Users, CreditCard as Edit, Minus, X, Archive } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, Target, Users, Minus, X } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
 import { router } from 'expo-router';
 
@@ -945,34 +946,6 @@ export default function Goals() {
           </View>
         )}
       </ScrollView>
-
-      <View style={styles.bottomActions}>
-        <TouchableOpacity
-          style={styles.archiveLink}
-          onPress={handleNavigateToSettings}
-        >
-          <Archive size={16} color="#6b7280" />
-          <Text style={styles.archiveLinkText}>View Timeline Archive</Text>
-        </TouchableOpacity>
-
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.quickActionButton}
-            onPress={() => setManageCustomTimelinesModalVisible(true)}
-          >
-            <Edit size={16} color="#7c3aed" />
-            <Text style={styles.quickActionText}>Manage Custom</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionButton}
-            onPress={() => setManageGlobalTimelinesModalVisible(true)}
-          >
-            <Users size={16} color="#0078d4" />
-            <Text style={styles.quickActionText}>Manage Global</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
     </View>
   );
 
@@ -984,6 +957,17 @@ export default function Goals() {
         onNavigateToSettings={handleNavigateToSettings}
       />
     </View>
+  );
+
+  const renderManageTab = () => (
+    <ManageTimelinesView
+      onUpdate={() => {
+        fetchAllTimelines();
+        if (selectedTimeline) {
+          fetchTimelineGoals(selectedTimeline);
+        }
+      }}
+    />
   );
 
   const renderSelectedTimeline = () => {
@@ -1115,6 +1099,10 @@ export default function Goals() {
 
     if (activeTab === 'northstar') {
       return renderNorthStarTab();
+    }
+
+    if (activeTab === 'manage') {
+      return renderManageTab();
     }
 
     return renderTimelinesTab();
@@ -1457,47 +1445,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     lineHeight: 20,
-  },
-  bottomActions: {
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  archiveLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  archiveLinkText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  quickActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  quickActionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
   },
   weekNavigationContainer: {
     backgroundColor: '#ffffff',

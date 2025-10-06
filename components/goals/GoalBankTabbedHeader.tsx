@@ -7,7 +7,7 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
-export type GoalBankTab = 'timelines' | 'northstar';
+export type GoalBankTab = 'timelines' | 'northstar' | 'manage';
 
 interface GoalBankTabbedHeaderProps {
   activeTab: GoalBankTab;
@@ -134,6 +134,26 @@ export function GoalBankTabbedHeader({
               ]}
             >
               North Star
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'manage' && styles.activeTab,
+            ]}
+            onPress={() => onTabChange('manage')}
+            accessibilityLabel="Manage Timelines tab"
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === 'manage' }}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'manage' && styles.activeTabText,
+              ]}
+            >
+              Manage Timelines
             </Text>
           </TouchableOpacity>
         </View>
