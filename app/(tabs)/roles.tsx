@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoals } from '@/hooks/useGoals';
-import { calculateAuthenticScore as calculateScore, calculateGoalProgress, GoalProgressData } from '@/lib/taskUtils';
+import { calculateAuthenticScore as calculateScore, calculateAuthenticScoreForRole, calculateGoalProgress, GoalProgressData } from '@/lib/taskUtils';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -129,7 +129,7 @@ export default function Roles() {
     }
   };
 
-  const calculateAuthenticScore = async () => {
+  const calculateAuthenticScore = async (roleId?: string) => {
     if (isCalculatingScore) return;
 
     setIsCalculatingScore(true);
@@ -138,7 +138,12 @@ export default function Roles() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const score = await calculateScore(supabase, user.id);
+      let score: number;
+      if (roleId) {
+        score = await calculateAuthenticScoreForRole(supabase, user.id, roleId);
+      } else {
+        score = await calculateScore(supabase, user.id);
+      }
       setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
@@ -540,8 +545,9 @@ export default function Roles() {
           // Fetch in parallel for better performance
           const krPromise = fetchKeyRelationships(selectedRole.id);
           const tasksPromise = fetchRoleTasks(selectedRole.id, activeView);
+          const scorePromise = calculateAuthenticScore(selectedRole.id);
 
-          await Promise.all([krPromise, tasksPromise]);
+          await Promise.all([krPromise, tasksPromise, scorePromise]);
 
           if (!controller.signal.aborted) {
             setFetchState('complete');
@@ -564,6 +570,9 @@ export default function Roles() {
         controller.abort();
         fetchInProgressRef.current = false;
       };
+    } else if (!selectedRole && !isLoadingRole) {
+      // When no role is selected, show total authentic score
+      calculateAuthenticScore();
     }
   }, [selectedRole?.id, activeView, isLoadingRole]);
 

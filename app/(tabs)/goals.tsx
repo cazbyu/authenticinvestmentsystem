@@ -17,7 +17,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { useGoals } from '@/hooks/useGoals';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
-import { calculateAuthenticScore } from '@/lib/taskUtils';
+import { calculateAuthenticScore, calculateTotalGoalProgress } from '@/lib/taskUtils';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, Minus, X } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
@@ -67,6 +67,7 @@ export default function Goals() {
   // Local goals state for the selected timeline
   const [timelineGoals, setTimelineGoals] = useState<any[]>([]);
   const [timelineGoalProgress, setTimelineGoalProgress] = useState<Record<string, any>>({});
+  const [totalGoalProgress, setTotalGoalProgress] = useState<Record<string, { totalActual: number; totalTarget: number; percentage: number }>>({});
 
   // MODIFIED: This function now accepts the goals array directly to avoid using stale state.
   const fetchWeekActions = async (goalsToFetch: any[]) => {
@@ -105,10 +106,40 @@ export default function Goals() {
     }
   };
 
+  const fetchTotalGoalProgress = async (goals: any[]) => {
+    if (!selectedTimeline || goals.length === 0) {
+      setTotalGoalProgress({});
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+      const progressMap: Record<string, { totalActual: number; totalTarget: number; percentage: number }> = {};
+
+      await Promise.all(
+        goals.map(async (goal) => {
+          const result = await calculateTotalGoalProgress(
+            supabase,
+            goal.id,
+            goal.goal_type,
+            selectedTimeline
+          );
+          progressMap[goal.id] = result;
+        })
+      );
+
+      setTotalGoalProgress(progressMap);
+    } catch (error) {
+      console.error('[fetchTotalGoalProgress] Error:', error);
+      setTotalGoalProgress({});
+    }
+  };
+
   // MODIFIED: The useEffect now passes the state variable `timelineGoals` to the updated fetchWeekActions.
   useEffect(() => {
     if (selectedTimeline && timelineWeeks.length > 0 && timelineGoals.length > 0) {
       fetchWeekActions(timelineGoals);
+      fetchTotalGoalProgress(timelineGoals);
     }
   }, [selectedTimeline, currentWeekIndex, timelineGoals]);
 
@@ -262,8 +293,11 @@ export default function Goals() {
         }
       }
 
-      // Update the authentic score without refreshing
+      // Update the authentic score and total goal progress without refreshing
       calculateAuthenticScore();
+      if (selectedTimeline) {
+        fetchTotalGoalProgress(timelineGoals);
+      }
     } catch (error) {
       console.error('Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to update completion status');
@@ -1082,6 +1116,7 @@ export default function Goals() {
             </View>
           ) : (
             timelineGoals.map(goal => {
+              const totalProgress = totalGoalProgress[goal.id] || { totalActual: 0, totalTarget: 0, percentage: 0 };
               const progress = timelineGoalProgress[goal.id] || {
                 currentWeek: currentWeek?.week_number || 1,
                 daysRemaining: timelineDaysLeft?.days_left || 0,
@@ -1089,9 +1124,11 @@ export default function Goals() {
                 weeklyTarget: goal.weekly_target || 0,
                 overallActual: 0,
                 overallTarget: goal.total_target || 0,
-                overallProgress: 0,
+                overallProgress: totalProgress.percentage,
+                totalActual: totalProgress.totalActual,
+                totalTarget: totalProgress.totalTarget,
               };
-              
+
               return (
                 <GoalProgressCard
                   key={goal.id}
@@ -1227,7 +1264,8 @@ export default function Goals() {
             console.log('[Goals] Timeline goals fetched, count:', newGoals.length);
             console.log('[Goals] Fetching week actions for goals:', newGoals.map(g => g.id));
             await fetchWeekActions(newGoals);
-            console.log('[Goals] Week actions fetch completed');
+            await fetchTotalGoalProgress(newGoals);
+            console.log('[Goals] Week actions and total progress fetch completed');
           }
         }}
         goal={actionModalMode === 'create' ? selectedGoalForAction : editingActionGoal}

@@ -135,11 +135,183 @@ export function calculateAuthenticScoreFromTasks(
   return Math.round((totalDeposits - totalWithdrawals) * 10) / 10;
 }
 
+//
+// Calculate Authentic Score filtered by a specific role
+//
+export async function calculateAuthenticScoreForRole(
+  supabase: SupabaseClient,
+  userId: string,
+  roleId: string
+): Promise<number> {
+  try {
+    console.log('[AuthenticScoreForRole] Starting calculation for user:', userId, 'role:', roleId);
+
+    // 1. Completed tasks (deposits)
+    const { data: tasksData, error: tasksErr } = await supabase
+      .from('0008-ap-tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .not('completed_at', 'is', null);
+
+    if (tasksErr) throw tasksErr;
+    if (!tasksData || tasksData.length === 0) {
+      console.log('[AuthenticScoreForRole] No completed tasks found.');
+      return 0;
+    }
+
+    const taskIds = tasksData.map(t => t.id);
+
+    // 2. Roles + Domains via join tables
+    const [{ data: rolesData, error: rolesErr }, { data: domainsData, error: domainsErr }] =
+      await Promise.all([
+        supabase
+          .from('0008-ap-universal-roles-join')
+          .select('parent_id, role:0008-ap-roles(id, label)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
+        supabase
+          .from('0008-ap-universal-domains-join')
+          .select('parent_id, domain:0008-ap-domains(id, name)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
+      ]);
+
+    if (rolesErr) throw rolesErr;
+    if (domainsErr) throw domainsErr;
+
+    // 3. Filter tasks that have the specified role
+    const roleTaskIds = rolesData?.filter(r => r.role?.id === roleId).map(r => r.parent_id) || [];
+    const filteredTasks = tasksData.filter(task => roleTaskIds.includes(task.id));
+
+    // 4. Calculate deposits for filtered tasks
+    let totalDeposits = 0;
+    for (const task of filteredTasks) {
+      const roles =
+        rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) ?? [];
+      const domains =
+        domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) ?? [];
+
+      const pts = calculateTaskPoints(task, roles, domains, []);
+      totalDeposits += pts;
+    }
+
+    // 5. Withdrawals (all withdrawals are counted, not filtered by role)
+    const { data: withdrawalsData, error: withdrawalsErr } = await supabase
+      .from('0008-ap-withdrawals')
+      .select('amount')
+      .eq('user_id', userId);
+
+    if (withdrawalsErr) throw withdrawalsErr;
+
+    const totalWithdrawals =
+      withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
+
+    console.log('[AuthenticScoreForRole] Deposits:', totalDeposits);
+    console.log('[AuthenticScoreForRole] Withdrawals:', totalWithdrawals);
+
+    const finalScore = Math.round((totalDeposits - totalWithdrawals) * 10) / 10;
+    console.log('[AuthenticScoreForRole] Final Score:', finalScore);
+
+    return finalScore;
+  } catch (err) {
+    console.error('Error calculating authentic score for role:', err);
+    return 0;
+  }
+}
+
+//
+// Calculate Authentic Score filtered by a specific domain
+//
+export async function calculateAuthenticScoreForDomain(
+  supabase: SupabaseClient,
+  userId: string,
+  domainId: string
+): Promise<number> {
+  try {
+    console.log('[AuthenticScoreForDomain] Starting calculation for user:', userId, 'domain:', domainId);
+
+    // 1. Completed tasks (deposits)
+    const { data: tasksData, error: tasksErr } = await supabase
+      .from('0008-ap-tasks')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .not('completed_at', 'is', null);
+
+    if (tasksErr) throw tasksErr;
+    if (!tasksData || tasksData.length === 0) {
+      console.log('[AuthenticScoreForDomain] No completed tasks found.');
+      return 0;
+    }
+
+    const taskIds = tasksData.map(t => t.id);
+
+    // 2. Roles + Domains via join tables
+    const [{ data: rolesData, error: rolesErr }, { data: domainsData, error: domainsErr }] =
+      await Promise.all([
+        supabase
+          .from('0008-ap-universal-roles-join')
+          .select('parent_id, role:0008-ap-roles(id, label)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
+        supabase
+          .from('0008-ap-universal-domains-join')
+          .select('parent_id, domain:0008-ap-domains(id, name)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
+      ]);
+
+    if (rolesErr) throw rolesErr;
+    if (domainsErr) throw domainsErr;
+
+    // 3. Filter tasks that have the specified domain
+    const domainTaskIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
+    const filteredTasks = tasksData.filter(task => domainTaskIds.includes(task.id));
+
+    // 4. Calculate deposits for filtered tasks
+    let totalDeposits = 0;
+    for (const task of filteredTasks) {
+      const roles =
+        rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) ?? [];
+      const domains =
+        domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) ?? [];
+
+      const pts = calculateTaskPoints(task, roles, domains, []);
+      totalDeposits += pts;
+    }
+
+    // 5. Withdrawals (all withdrawals are counted, not filtered by domain)
+    const { data: withdrawalsData, error: withdrawalsErr } = await supabase
+      .from('0008-ap-withdrawals')
+      .select('amount')
+      .eq('user_id', userId);
+
+    if (withdrawalsErr) throw withdrawalsErr;
+
+    const totalWithdrawals =
+      withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
+
+    console.log('[AuthenticScoreForDomain] Deposits:', totalDeposits);
+    console.log('[AuthenticScoreForDomain] Withdrawals:', totalWithdrawals);
+
+    const finalScore = Math.round((totalDeposits - totalWithdrawals) * 10) / 10;
+    console.log('[AuthenticScoreForDomain] Final Score:', finalScore);
+
+    return finalScore;
+  } catch (err) {
+    console.error('Error calculating authentic score for domain:', err);
+    return 0;
+  }
+}
+
 export interface GoalProgressData {
   weeklyActual: number;
   weeklyTarget: number;
   overallProgress: number;
   currentWeek: number;
+  totalActual?: number;
+  totalTarget?: number;
 }
 
 export async function calculateGoalProgress(
@@ -213,6 +385,116 @@ export async function calculateGoalProgress(
       overallProgress: 0,
       currentWeek: 1,
     };
+  }
+}
+
+/**
+ * Calculate total goal progress across ALL weeks in a timeline
+ * This provides the cumulative completion percentage for a goal
+ */
+export async function calculateTotalGoalProgress(
+  supabase: SupabaseClient,
+  goalId: string,
+  goalType: '12week' | 'custom',
+  timeline: { id: string; source: 'global' | 'custom' }
+): Promise<{ totalActual: number; totalTarget: number; percentage: number }> {
+  try {
+    const goalTypeForJoin = goalType === '12week' ? 'twelve_wk_goal' : 'custom_goal';
+    const goalIdField = goalType === '12week' ? 'twelve_wk_goal_id' : 'custom_goal_id';
+
+    // 1. Get all tasks linked to this goal
+    const { data: taskJoins, error: joinError } = await supabase
+      .from('0008-ap-universal-goals-join')
+      .select('parent_id')
+      .eq(goalIdField, goalId)
+      .eq('goal_type', goalTypeForJoin)
+      .eq('parent_type', 'task');
+
+    if (joinError) throw joinError;
+
+    if (!taskJoins || taskJoins.length === 0) {
+      return { totalActual: 0, totalTarget: 0, percentage: 0 };
+    }
+
+    const taskIds = taskJoins.map(j => j.parent_id);
+
+    // 2. Get all week plans for these tasks in the timeline
+    const timelineIdField = timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id';
+
+    const { data: weekPlans, error: weekPlansError } = await supabase
+      .from('0008-ap-task-week-plan')
+      .select('task_id, week_number, target_days')
+      .in('task_id', taskIds)
+      .eq(timelineIdField, timeline.id)
+      .is('deleted_at', null);
+
+    if (weekPlansError) throw weekPlansError;
+
+    if (!weekPlans || weekPlans.length === 0) {
+      return { totalActual: 0, totalTarget: 0, percentage: 0 };
+    }
+
+    // Calculate total target across all weeks
+    const totalTarget = weekPlans.reduce((sum, plan) => sum + (plan.target_days || 0), 0);
+
+    // 3. Get all completed occurrences for these tasks
+    const { data: completedOccurrences, error: occurrencesError } = await supabase
+      .from('0008-ap-tasks')
+      .select('parent_task_id, due_date')
+      .in('parent_task_id', taskIds)
+      .eq('status', 'completed')
+      .is('deleted_at', null);
+
+    if (occurrencesError) throw occurrencesError;
+
+    // Count total actual completions (capped per task per week by target_days)
+    let totalActual = 0;
+
+    // Group occurrences by task and week
+    const occurrencesByTaskAndWeek: Record<string, Record<number, number>> = {};
+
+    for (const occ of completedOccurrences || []) {
+      // Find which week this occurrence belongs to based on week plans
+      const taskWeekPlans = weekPlans.filter(wp => wp.task_id === occ.parent_task_id);
+
+      for (const weekPlan of taskWeekPlans) {
+        if (!occurrencesByTaskAndWeek[occ.parent_task_id]) {
+          occurrencesByTaskAndWeek[occ.parent_task_id] = {};
+        }
+        if (!occurrencesByTaskAndWeek[occ.parent_task_id][weekPlan.week_number]) {
+          occurrencesByTaskAndWeek[occ.parent_task_id][weekPlan.week_number] = 0;
+        }
+        // Count this occurrence for this week (will be capped later)
+        occurrencesByTaskAndWeek[occ.parent_task_id][weekPlan.week_number]++;
+      }
+    }
+
+    // Cap each week's actual by its target and sum them up
+    for (const weekPlan of weekPlans) {
+      const taskId = weekPlan.task_id;
+      const weekNumber = weekPlan.week_number;
+      const target = weekPlan.target_days || 0;
+      const actual = occurrencesByTaskAndWeek[taskId]?.[weekNumber] || 0;
+      const cappedActual = Math.min(actual, target);
+      totalActual += cappedActual;
+    }
+
+    const percentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+
+    console.log('[calculateTotalGoalProgress]', {
+      goalId,
+      goalType,
+      taskCount: taskIds.length,
+      weekPlansCount: weekPlans.length,
+      totalTarget,
+      totalActual,
+      percentage
+    });
+
+    return { totalActual, totalTarget, percentage };
+  } catch (error) {
+    console.error('Error calculating total goal progress:', error);
+    return { totalActual: 0, totalTarget: 0, percentage: 0 };
   }
 }
 

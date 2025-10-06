@@ -16,7 +16,7 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { DraggableFab } from '@/components/DraggableFab';
-import { calculateAuthenticScore as calculateAuthenticScoreUtil } from '@/lib/taskUtils';
+import { calculateAuthenticScore as calculateAuthenticScoreUtil, calculateAuthenticScoreForDomain } from '@/lib/taskUtils';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -67,14 +67,14 @@ export default function Wellness() {
     scope: goalProgressScope
   });
 
-  const fetchAuthenticScore = useCallback(async (forceRefresh = false) => {
+  const fetchAuthenticScore = useCallback(async (forceRefresh = false, domainId?: string) => {
     // Cancel any in-flight score calculation
     if (scoreAbortControllerRef.current) {
       scoreAbortControllerRef.current.abort();
     }
 
     // Use cached score if available and less than 5 minutes old
-    if (!forceRefresh && authenticScoreCache.current) {
+    if (!forceRefresh && !domainId && authenticScoreCache.current) {
       const cacheAge = Date.now() - authenticScoreCache.current.timestamp;
       if (cacheAge < 5 * 60 * 1000) {
         setAuthenticScore(authenticScoreCache.current.score);
@@ -90,11 +90,18 @@ export default function Wellness() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || controller.signal.aborted) return;
 
-      const score = await calculateAuthenticScoreUtil(supabase, user.id);
+      let score: number;
+      if (domainId) {
+        score = await calculateAuthenticScoreForDomain(supabase, user.id, domainId);
+      } else {
+        score = await calculateAuthenticScoreUtil(supabase, user.id);
+      }
 
       if (!controller.signal.aborted) {
         setAuthenticScore(score);
-        authenticScoreCache.current = { score, timestamp: Date.now() };
+        if (!domainId) {
+          authenticScoreCache.current = { score, timestamp: Date.now() };
+        }
       }
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -294,8 +301,15 @@ export default function Wellness() {
   }, [fetchDomains]);
 
   useEffect(() => {
-    if (selectedDomain && (activeView === 'deposits' || activeView === 'ideas')) {
-      fetchDomainTasks(selectedDomain.id, activeView);
+    if (selectedDomain) {
+      if (activeView === 'deposits' || activeView === 'ideas') {
+        fetchDomainTasks(selectedDomain.id, activeView);
+      }
+      // Calculate domain-specific score
+      fetchAuthenticScore(true, selectedDomain.id);
+    } else {
+      // Calculate total score when no domain is selected
+      fetchAuthenticScore(false);
     }
 
     // Cleanup on unmount
@@ -307,7 +321,7 @@ export default function Wellness() {
         scoreAbortControllerRef.current.abort();
       }
     };
-  }, [selectedDomain, activeView, fetchDomainTasks]);
+  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScore]);
 
   const handleViewChange = useCallback((view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
