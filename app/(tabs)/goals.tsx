@@ -910,15 +910,26 @@ export default function Goals() {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+
+      console.log('[fetchNorthStarData] Starting fetch, user:', user?.id);
+
+      if (!user) {
+        console.log('[fetchNorthStarData] No user found');
+        return;
+      }
 
       const { data: userData, error: userError } = await supabase
         .from('0008-ap-users')
-        .select('mission_text, vision_text, vision_timeframe')
-        .eq('user_id', user.id)
+        .select('mission_text, vision_text')
+        .eq('id', user.id)
         .maybeSingle();
 
-      if (userError) throw userError;
+      console.log('[fetchNorthStarData] User data query result:', { userData, userError });
+
+      if (userError) {
+        console.error('[fetchNorthStarData] Error fetching user data:', userError);
+        throw userError;
+      }
 
       const { data: oneYearGoals, error: goalsError } = await supabase
         .from('0008-ap-goals-1y')
@@ -927,16 +938,29 @@ export default function Goals() {
         .eq('status', 'active')
         .order('priority', { ascending: true });
 
-      if (goalsError) throw goalsError;
+      console.log('[fetchNorthStarData] Goals query result:', { goalsCount: oneYearGoals?.length, goalsError });
 
-      setNorthStarData({
+      if (goalsError) {
+        console.error('[fetchNorthStarData] Error fetching goals:', goalsError);
+        throw goalsError;
+      }
+
+      const northStarResult = {
         mission_text: userData?.mission_text || '',
         vision_text: userData?.vision_text || '',
-        vision_timeframe: userData?.vision_timeframe || '5_year',
+        vision_timeframe: '5_year',
         oneYearGoals: oneYearGoals || [],
+      };
+
+      console.log('[fetchNorthStarData] Setting North Star data:', {
+        hasMission: !!northStarResult.mission_text,
+        hasVision: !!northStarResult.vision_text,
+        goalsCount: northStarResult.oneYearGoals.length
       });
+
+      setNorthStarData(northStarResult);
     } catch (error) {
-      console.error('Error fetching North Star data:', error);
+      console.error('[fetchNorthStarData] Caught error:', error);
       setNorthStarData({
         mission_text: '',
         vision_text: '',
