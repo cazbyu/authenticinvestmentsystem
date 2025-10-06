@@ -18,7 +18,7 @@ import { useGoals } from '@/hooks/useGoals';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 import { calculateAuthenticScore, calculateTotalGoalProgress } from '@/lib/taskUtils';
-import { formatLocalDate } from '@/lib/dateUtils';
+import { formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, Minus, X } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
 import { router } from 'expo-router';
@@ -53,6 +53,12 @@ export default function Goals() {
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
+
+  // Helper function to format dates without timezone shift
+  const formatDateDisplay = (dateString: string): string => {
+    const date = parseLocalDate(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const [northStarData, setNorthStarData] = useState<any>(null);
   const [loadingNorthStar, setLoadingNorthStar] = useState(false);
@@ -1020,11 +1026,10 @@ export default function Goals() {
                 <Text style={styles.timelineStats}>
                   {timeline.goalCount || 0} goals • {timeline.daysRemaining || 0} days left
                 </Text>
-                
+
                 {timeline.start_date && timeline.end_date && (
                   <Text style={styles.timelineDates}>
-                    {new Date(timeline.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
-                    {new Date(timeline.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {formatDateDisplay(timeline.start_date)} - {formatDateDisplay(timeline.end_date)}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1085,8 +1090,7 @@ export default function Goals() {
                 </Text>
                 {currentWeek && (
                   <Text style={styles.weekDates}>
-                    {new Date(currentWeek.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
-                    {new Date(currentWeek.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {formatDateDisplay(currentWeek.start_date)} - {formatDateDisplay(currentWeek.end_date)}
                   </Text>
                 )}
               </View>
