@@ -63,7 +63,8 @@ export default function Dashboard() {
           .eq('user_id', user.id)
           .is('deleted_at', null)
           .is('parent_task_id', null)
-          .not('status', 'in', '(completed,cancelled)')
+          .neq('status', 'completed')
+          .neq('status', 'cancelled')
           .in('type', ['task', 'event']);
 
         if (tasksError) throw tasksError;
@@ -180,7 +181,7 @@ export default function Dashboard() {
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal_type, twelve_wk_goal:0008-ap-goals-12wk(id, title), custom_goal:0008-ap-goals-custom(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
+          supabase.from('0008-ap-universal-goals-join').select('parent_id, goal_type, twelve_wk_goal:0008-ap-goals-12wk(id, title, status), custom_goal:0008-ap-goals-custom(id, title, status)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-delegates-join').select('parent_id, delegate_id').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
@@ -201,9 +202,21 @@ export default function Dashboard() {
           // Transform polymorphic goals
           const taskGoals = goalsData?.filter(g => g.parent_id === task.id).map(g => {
             if (g.goal_type === 'twelve_wk_goal' && g.twelve_wk_goal) {
-              return { ...g.twelve_wk_goal, goal_type: '12week' };
+              const goal = g.twelve_wk_goal;
+              if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+                return { id: 'deleted', title: 'Goal no longer available', goal_type: 'deleted', status: 'deleted' };
+              }
+              return { ...goal, goal_type: '12week' };
             } else if (g.goal_type === 'custom_goal' && g.custom_goal) {
-              return { ...g.custom_goal, goal_type: 'custom' };
+              const goal = g.custom_goal;
+              if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+                return { id: 'deleted', title: 'Goal no longer available', goal_type: 'deleted', status: 'deleted' };
+              }
+              return { ...goal, goal_type: 'custom' };
+            } else if (g.goal_type === 'twelve_wk_goal' && !g.twelve_wk_goal) {
+              return { id: 'deleted', title: 'Goal no longer available', goal_type: 'deleted', status: 'deleted' };
+            } else if (g.goal_type === 'custom_goal' && !g.custom_goal) {
+              return { id: 'deleted', title: 'Goal no longer available', goal_type: 'deleted', status: 'deleted' };
             }
             return null;
           }).filter(Boolean) || [];
@@ -228,8 +241,8 @@ export default function Dashboard() {
         else if (sortOption === 'title') sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
         else if (sortOption === 'authentic_points') {
           sortedTasks.sort((a, b) => {
-            const pointsA = calculateTaskPoints(a, a.roles, a.domains);
-            const pointsB = calculateTaskPoints(b, b.roles, b.domains);
+            const pointsA = calculateTaskPoints(a, a.roles, a.domains, a.goals);
+            const pointsB = calculateTaskPoints(b, b.roles, b.domains, b.goals);
             return pointsB - pointsA; // Highest points first
           });
         }

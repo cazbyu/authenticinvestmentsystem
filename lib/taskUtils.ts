@@ -7,7 +7,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 export function calculateTaskPoints(
   task: any,
   roles: any[] = [],
-  domains: any[] = []
+  domains: any[] = [],
+  goals: any[] = []
 ): number {
   let points = 0;
 
@@ -24,8 +25,9 @@ export function calculateTaskPoints(
   else if (task.is_urgent && !task.is_important) points += 1;
   else points += 0.5;
 
-  // Linked to 12-week goal bonus
-  if (task.is_twelve_week_goal) points += 2;
+  // Linked to active goal bonus (exclude archived/cancelled goals)
+  const activeGoals = (goals || []).filter(g => g.goal_type !== 'deleted' && g.status !== 'archived' && g.status !== 'cancelled');
+  if (activeGoals.length > 0 && task.is_twelve_week_goal) points += 2;
 
   return Math.round(points * 10) / 10;
 }
@@ -82,7 +84,7 @@ export async function calculateAuthenticScore(
       const domains =
         domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) ?? [];
 
-      const pts = calculateTaskPoints(task, roles, domains);
+      const pts = calculateTaskPoints(task, roles, domains, []);
       totalDeposits += pts;
 
     }
@@ -121,7 +123,7 @@ export function calculateAuthenticScoreFromTasks(
   let totalDeposits = 0;
 
   (tasks ?? []).forEach((task: any) => {
-    const pts = calculateTaskPoints(task, task.roles ?? [], task.domains ?? []);
+    const pts = calculateTaskPoints(task, task.roles ?? [], task.domains ?? [], task.goals ?? []);
     totalDeposits += pts;
   });
 

@@ -67,7 +67,10 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
     else if (!task.is_urgent && task.is_important) points += 3;
     else if (task.is_urgent && !task.is_important) points += 1;
     else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
+
+    const activeGoals = (task.goals || []).filter((g: any) => g.goal_type !== 'deleted' && g.status !== 'archived' && g.status !== 'cancelled');
+    if (activeGoals.length > 0 && task.is_twelve_week_goal) points += 2;
+
     return Math.round(points * 10) / 10;
   };
 
@@ -177,7 +180,7 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
                   <Text style={styles.tagRowLabel}>Goals:</Text>
                   <View style={styles.tagContainer}>
                     {task.goals.slice(0, 3).map((goal, index) => (
-                      <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
+                      <View key={goal.id} style={[styles.pillTag, goal.goal_type === 'deleted' ? styles.deletedGoalPillTag : styles.goalPillTag]}>
                         <Text style={styles.pillTagText}>{goal.title}</Text>
                       </View>
                     ))}
@@ -327,6 +330,10 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
       goalPillTag: {
         backgroundColor: '#dbeafe',
         borderColor: '#93c5fd',
+      },
+      deletedGoalPillTag: {
+        backgroundColor: '#f3f4f6',
+        borderColor: '#d1d5db',
       },
       morePillTag: {
         backgroundColor: '#f3f4f6',
