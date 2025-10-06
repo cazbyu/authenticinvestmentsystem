@@ -587,9 +587,8 @@ export default function Wellness() {
                         setEditingTask({
                           type: 'task',
                           selectedGoalIds: [goal.id],
-                          twelveWeekGoalChecked: true,
-                          countsTowardWeeklyProgress: true,
-                          selectedDomainIds: [selectedDomain.id],
+                          isGoal: true,
+                          selectedDomainIds: selectedDomain ? [selectedDomain.id] : [],
                         } as any);
                         setTaskFormVisible(true);
                       }}
@@ -716,7 +715,15 @@ export default function Wellness() {
       {renderWellnessBankHeader()}
       {renderContent()}
 
-      <DraggableFab onPress={() => setTaskFormVisible(true)}>
+      <DraggableFab onPress={() => {
+        if (selectedDomain) {
+          setEditingTask({
+            type: 'task',
+            selectedDomainIds: [selectedDomain.id],
+          } as any);
+        }
+        setTaskFormVisible(true);
+      }}>
         <Plus size={24} color="#ffffff" />
       </DraggableFab>
 
