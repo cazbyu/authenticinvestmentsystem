@@ -16,6 +16,7 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { DraggableFab } from '@/components/DraggableFab';
+import { calculateAuthenticScore as calculateAuthenticScoreUtil } from '@/lib/taskUtils';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -26,6 +27,7 @@ interface Domain {
 }
 
 export default function Wellness() {
+  const navigation = useNavigation<DrawerNavigation>();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -46,6 +48,7 @@ export default function Wellness() {
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [authenticScore, setAuthenticScore] = useState(0);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   // 12-Week Goals for selected domain
   const { 
@@ -57,13 +60,13 @@ export default function Wellness() {
     scope: selectedDomain ? { type: 'domain', id: selectedDomain.id } : undefined
   });
 
-  const calculateAuthenticScore = async () => {
+  const fetchAuthenticScore = async () => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const score = await calculateAuthenticScore(supabase, user.id);
+      const score = await calculateAuthenticScoreUtil(supabase, user.id);
       setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
@@ -80,7 +83,7 @@ export default function Wellness() {
 
       if (error) throw error;
       setDomains(data || []);
-      await calculateAuthenticScore();
+      await fetchAuthenticScore();
     } catch (error) {
       console.error('Error fetching domains:', error);
       Alert.alert('Error', (error as Error).message);
@@ -88,21 +91,60 @@ export default function Wellness() {
   };
 
   const fetchDomainTasks = async (domainId: string, view: 'deposits' | 'ideas' = activeView) => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this fetch
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Check if aborted
+      if (controller.signal.aborted) {
+        return;
+      }
+
       if (view === 'deposits') {
-        // Fetch all tasks/events for this user first
+        // First, get task IDs that belong to this domain
+        const { data: domainTaskJoins, error: domainJoinError } = await supabase
+          .from('0008-ap-universal-domains-join')
+          .select('parent_id')
+          .eq('parent_type', 'task')
+          .eq('domain_id', domainId);
+
+        if (domainJoinError) throw domainJoinError;
+
+        if (!domainTaskJoins || domainTaskJoins.length === 0) {
+          setTasks([]);
+          setDepositIdeas([]);
+          setLoading(false);
+          return;
+        }
+
+        const domainTaskIds = domainTaskJoins.map(j => j.parent_id);
+
+        // Check if aborted
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        // Fetch only tasks that belong to this domain
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
           .select('*, custom_timeline_id')
           .eq('user_id', user.id)
+          .in('id', domainTaskIds)
           .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
-          .in('type', ['task', 'event']);
+          .in('type', ['task', 'event'])
+          .limit(100);
 
         if (tasksError) throw tasksError;
 
@@ -110,6 +152,11 @@ export default function Wellness() {
           setTasks([]);
           setDepositIdeas([]);
           setLoading(false);
+          return;
+        }
+
+        // Check if aborted
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -138,11 +185,12 @@ export default function Wellness() {
         if (delegatesError) throw delegatesError;
         if (keyRelationshipsError) throw keyRelationshipsError;
 
-        // Filter tasks that have the selected domain
-        const domainTaskIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
-        const filteredTasks = tasksData.filter(task => domainTaskIds.includes(task.id));
+        // Check if aborted before processing
+        if (controller.signal.aborted) {
+          return;
+        }
 
-        const transformedTasks = filteredTasks.map(task => ({
+        const transformedTasks = tasksData.map(task => ({
           ...task,
           roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
@@ -157,13 +205,38 @@ export default function Wellness() {
         setDepositIdeas([]);
 
       } else {
-        // Fetch all deposit ideas for this user first
+        // First, get deposit idea IDs that belong to this domain
+        const { data: domainIdeaJoins, error: domainIdeaJoinError } = await supabase
+          .from('0008-ap-universal-domains-join')
+          .select('parent_id')
+          .eq('parent_type', 'depositIdea')
+          .eq('domain_id', domainId);
+
+        if (domainIdeaJoinError) throw domainIdeaJoinError;
+
+        if (!domainIdeaJoins || domainIdeaJoins.length === 0) {
+          setDepositIdeas([]);
+          setTasks([]);
+          setLoading(false);
+          return;
+        }
+
+        const domainIdeaIds = domainIdeaJoins.map(j => j.parent_id);
+
+        // Check if aborted
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        // Fetch only deposit ideas that belong to this domain
         const { data: depositIdeasData, error: depositIdeasError } = await supabase
           .from('0008-ap-deposit-ideas')
           .select('*')
           .eq('user_id', user.id)
+          .in('id', domainIdeaIds)
           .eq('archived', false)
-          .is('activated_task_id', null);
+          .is('activated_task_id', null)
+          .limit(100);
 
         if (depositIdeasError) throw depositIdeasError;
 
@@ -171,6 +244,11 @@ export default function Wellness() {
           setDepositIdeas([]);
           setTasks([]);
           setLoading(false);
+          return;
+        }
+
+        // Check if aborted
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -193,11 +271,12 @@ export default function Wellness() {
         if (krError) throw krError;
         if (notesError) throw notesError;
 
-        // Filter deposit ideas that have the selected domain
-        const domainDepositIdeaIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
-        const filteredDepositIdeas = depositIdeasData.filter(di => domainDepositIdeaIds.includes(di.id));
+        // Check if aborted before processing
+        if (controller.signal.aborted) {
+          return;
+        }
 
-        const transformedDepositIdeas = filteredDepositIdeas.map(di => ({
+        const transformedDepositIdeas = depositIdeasData.map(di => ({
           ...di,
           roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
@@ -211,10 +290,16 @@ export default function Wellness() {
       }
 
     } catch (error) {
+      // Don't show errors if request was aborted
+      if (controller.signal.aborted) {
+        return;
+      }
       console.error(`Error fetching domain ${view}:`, error);
       Alert.alert('Error', (error as Error).message);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -226,6 +311,13 @@ export default function Wellness() {
     if (selectedDomain && (activeView === 'deposits' || activeView === 'ideas')) {
       fetchDomainTasks(selectedDomain.id, activeView);
     }
+
+    // Cleanup on unmount
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [selectedDomain, activeView]);
 
   const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
