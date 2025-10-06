@@ -300,7 +300,7 @@ export default function Goals() {
       }
 
       // Update the authentic score and total goal progress without refreshing
-      calculateAuthenticScore();
+      fetchAuthenticScore();
       if (selectedTimeline) {
         fetchTotalGoalProgress(timelineGoals);
       }
@@ -480,7 +480,7 @@ export default function Goals() {
 
   useEffect(() => {
     fetchAllTimelines();
-    calculateAuthenticScore();
+    fetchAuthenticScore();
     fetchNorthStarData();
 
     // Cleanup undo timeout on unmount
@@ -544,7 +544,7 @@ export default function Goals() {
     return currentWeekIndex;
   };
 
-  const calculateAuthenticScore = async () => {
+  const fetchAuthenticScore = async () => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -1307,7 +1307,7 @@ export default function Goals() {
         onClose={() => setWithdrawalFormVisible(false)}
         onSubmitSuccess={() => {
           setWithdrawalFormVisible(false);
-          calculateAuthenticScore();
+          fetchAuthenticScore();
         }}
       />
 
