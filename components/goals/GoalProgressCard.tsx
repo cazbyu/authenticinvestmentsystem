@@ -328,20 +328,25 @@ export function GoalProgressCard({
                   return (
                     <View key={action.id} style={styles.actionItem}>
                       <View style={styles.actionHeader}>
-                        <TouchableOpacity
-                          style={styles.actionTitleContainer}
-                          onPress={onEditAction ? () => onEditAction(action) : undefined}
-                          activeOpacity={onEditAction ? 0.7 : 1}
-                        >
+                        <View style={styles.actionTitleContainer}>
                           <Text style={styles.actionTitle} numberOfLines={1}>
                             {action.title}
                           </Text>
-                        </TouchableOpacity>
+                        </View>
                         <View style={styles.actionHeaderRight}>
                           {action.input_kind === 'count' && (
                             <Text style={styles.actionCount}>
                               {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
                             </Text>
+                          )}
+                          {onEditAction && (
+                            <TouchableOpacity
+                              style={styles.editActionButton}
+                              onPress={() => onEditAction(action)}
+                              activeOpacity={0.7}
+                            >
+                              <Edit size={14} color="#0078d4" />
+                            </TouchableOpacity>
                           )}
                           {onDeleteAction && week && (
                             <TouchableOpacity
@@ -688,6 +693,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#6b7280',
+  },
+  editActionButton: {
+    padding: 4,
+    borderRadius: 4,
   },
   deleteIconButton: {
     padding: 4,

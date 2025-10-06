@@ -179,26 +179,42 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
 
   const loadInitialData = () => {
     if (!initialData) return;
-    
+
+    console.log('[ActionEffortModal] Loading initial data:', initialData);
+
     setTitle(initialData.title || '');
     setNotes(''); // Notes would need to be fetched separately if needed
-    
+
     // Parse recurrence rule to set frequency
     if (initialData.recurrence_rule) {
       const rule = initialData.recurrence_rule;
+      console.log('[ActionEffortModal] Parsing recurrence rule:', rule);
+
       if (rule.includes('FREQ=DAILY')) {
         setRecurrenceType('daily');
       } else if (rule.includes('FREQ=WEEKLY') && rule.includes('BYDAY=')) {
         const byDayMatch = rule.match(/BYDAY=([^;]+)/);
         if (byDayMatch) {
           const days = byDayMatch[1].split(',');
-          const dayMap = { 'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6 };
+          const dayMap: Record<string, number> = { 'SU': 0, 'MO': 1, 'TU': 2, 'WE': 3, 'TH': 4, 'FR': 5, 'SA': 6 };
           const selectedDays = days.map(day => dayMap[day]).filter(d => d !== undefined);
-          
+
+          console.log('[ActionEffortModal] Parsed days:', selectedDays);
+
           if (selectedDays.length === 7) {
             setRecurrenceType('daily');
+          } else if (selectedDays.length === 6 && !selectedDays.includes(0)) {
+            setRecurrenceType('6days');
           } else if (selectedDays.length === 5 && selectedDays.every(d => d >= 1 && d <= 5)) {
             setRecurrenceType('5days');
+          } else if (selectedDays.length === 4) {
+            setRecurrenceType('4days');
+          } else if (selectedDays.length === 3) {
+            setRecurrenceType('3days');
+          } else if (selectedDays.length === 2) {
+            setRecurrenceType('2days');
+          } else if (selectedDays.length === 1) {
+            setRecurrenceType('1day');
           } else {
             setRecurrenceType('custom');
             setSelectedCustomDays(selectedDays);
@@ -206,14 +222,26 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
         }
       }
     }
-    
+
     // Load existing associations
-    setSelectedRoleIds(initialData.roles?.map(r => r.id) || []);
-    setSelectedDomainIds(initialData.domains?.map(d => d.id) || []);
-    setSelectedKeyRelationshipIds(initialData.keyRelationships?.map(kr => kr.id) || []);
-    
-    // Load selected weeks from week plans (would need to be passed in initialData)
-    setSelectedWeeks(initialData.selectedWeeks || []);
+    const roleIds = initialData.roles?.map(r => r.id) || [];
+    const domainIds = initialData.domains?.map(d => d.id) || [];
+    const krIds = initialData.keyRelationships?.map(kr => kr.id) || [];
+
+    console.log('[ActionEffortModal] Loading associations:', {
+      roleIds,
+      domainIds,
+      krIds
+    });
+
+    setSelectedRoleIds(roleIds);
+    setSelectedDomainIds(domainIds);
+    setSelectedKeyRelationshipIds(krIds);
+
+    // Load selected weeks from week plans
+    const weeks = initialData.selectedWeeks || [];
+    console.log('[ActionEffortModal] Loading selected weeks:', weeks);
+    setSelectedWeeks(weeks);
   };
   const handleMultiSelect = (field: 'roles' | 'domains' | 'keyRelationships', id: string) => {
     let setter: React.Dispatch<React.SetStateAction<string[]>>;
@@ -427,7 +455,9 @@ const ActionEffortModal: React.FC<ActionEffortModalProps> = ({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Add Action Effort</Text>
+          <Text style={styles.headerTitle}>
+            {mode === 'edit' ? 'Edit Action' : 'Add Action Effort'}
+          </Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <X size={24} color="#1f2937" />
           </TouchableOpacity>

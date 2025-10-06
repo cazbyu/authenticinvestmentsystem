@@ -365,6 +365,7 @@ export default function Goals() {
   const [selectedGoalForAction, setSelectedGoalForAction] = useState<any>(null);
   const [actionModalMode, setActionModalMode] = useState<'create' | 'edit'>('create');
   const [editingAction, setEditingAction] = useState<any>(null);
+  const [editingActionGoal, setEditingActionGoal] = useState<any>(null);
 
   // Collapse/expand state for goal actions
   const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>({});
@@ -812,6 +813,15 @@ export default function Goals() {
     }));
   };
 
+  const handleEditAction = (action: any, goal: any) => {
+    console.log('[handleEditAction] Editing action:', action);
+    console.log('[handleEditAction] Goal:', goal);
+    setEditingAction(action);
+    setEditingActionGoal(goal);
+    setActionModalMode('edit');
+    setActionEffortModalVisible(true);
+  };
+
   const fetchNorthStarData = async () => {
     setLoadingNorthStar(true);
     try {
@@ -1075,6 +1085,9 @@ export default function Goals() {
                     }
 
                     setSelectedGoalForAction(goal);
+                    setActionModalMode('create');
+                    setEditingAction(null);
+                    setEditingActionGoal(null);
                     setActionEffortModalVisible(true);
                   }}
                   onEdit={() => {
@@ -1083,6 +1096,7 @@ export default function Goals() {
                   }}
                   selectedWeekNumber={currentWeek?.week_number}
                   onToggleCompletion={handleToggleCompletion}
+                  onEditAction={(action) => handleEditAction(action, goal)}
                   onDeleteAction={handleDeleteAction}
                   onToggleExpanded={() => toggleGoalExpanded(goal.id)}
                 />
@@ -1162,6 +1176,7 @@ export default function Goals() {
           console.log('[Goals] ActionEffortModal onClose - starting refresh');
           setActionEffortModalVisible(false);
           setEditingAction(null);
+          setEditingActionGoal(null);
           setActionModalMode('create');
           // MODIFIED: This logic now chains the fetches to prevent race conditions.
           if (selectedTimeline) {
@@ -1173,7 +1188,7 @@ export default function Goals() {
             console.log('[Goals] Week actions fetch completed');
           }
         }}
-        goal={actionModalMode === 'create' ? selectedGoalForAction : editingAction?.goal}
+        goal={actionModalMode === 'create' ? selectedGoalForAction : editingActionGoal}
         cycleWeeks={timelineWeeks}
         timeline={selectedTimeline}
         createTaskWithWeekPlan={createTaskWithWeekPlan}
