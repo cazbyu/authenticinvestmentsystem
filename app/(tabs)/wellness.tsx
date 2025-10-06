@@ -143,26 +143,14 @@ export default function Wellness() {
       }
 
       if (view === 'deposits') {
-        // Add debug logging
-        console.log('Fetching deposits for domain:', domainId);
-
-        // Optimized: Combine the join lookup and task fetch in a single query using inner join
+        // Fetch all tasks/events for this user first
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-          .select(`
-            *,
-            custom_timeline_id,
-            0008-ap-universal-domains-join!inner(domain_id)
-          `)
+          .select('*, custom_timeline_id')
           .eq('user_id', user.id)
-          .eq('0008-ap-universal-domains-join.domain_id', domainId)
-          .eq('0008-ap-universal-domains-join.parent_type', 'task')
           .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
-          .in('type', ['task', 'event'])
-          .limit(100);
-
-        console.log('Tasks query result:', { tasksData, tasksError, count: tasksData?.length });
+          .in('type', ['task', 'event']);
 
         if (tasksError) throw tasksError;
 
@@ -180,7 +168,6 @@ export default function Wellness() {
 
         const taskIds = tasksData.map(t => t.id);
 
-        // Optimized: Fetch only essential metadata, removed duplicate key relationships query
         const [
           { data: rolesData, error: rolesError },
           { data: domainsData, error: domainsError },
@@ -206,7 +193,11 @@ export default function Wellness() {
           return;
         }
 
-        const transformedTasks = tasksData.map(task => ({
+        // Filter tasks that have the selected domain
+        const domainTaskIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
+        const filteredTasks = tasksData.filter(task => domainTaskIds.includes(task.id));
+
+        const transformedTasks = filteredTasks.map(task => ({
           ...task,
           roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
@@ -221,19 +212,13 @@ export default function Wellness() {
         setDepositIdeas([]);
 
       } else {
-        // Optimized: Combine join lookup and deposit ideas fetch in single query
+        // Fetch all deposit ideas for this user first
         const { data: depositIdeasData, error: depositIdeasError } = await supabase
           .from('0008-ap-deposit-ideas')
-          .select(`
-            *,
-            0008-ap-universal-domains-join!inner(domain_id)
-          `)
+          .select('*')
           .eq('user_id', user.id)
-          .eq('0008-ap-universal-domains-join.domain_id', domainId)
-          .eq('0008-ap-universal-domains-join.parent_type', 'depositIdea')
           .eq('archived', false)
-          .is('activated_task_id', null)
-          .limit(100);
+          .is('activated_task_id', null);
 
         if (depositIdeasError) throw depositIdeasError;
 
@@ -273,7 +258,11 @@ export default function Wellness() {
           return;
         }
 
-        const transformedDepositIdeas = depositIdeasData.map(di => ({
+        // Filter deposit ideas that have the selected domain
+        const domainDepositIdeaIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
+        const filteredDepositIdeas = depositIdeasData.filter(di => domainDepositIdeaIds.includes(di.id));
+
+        const transformedDepositIdeas = filteredDepositIdeas.map(di => ({
           ...di,
           roles: rolesData?.filter(r => r.parent_id === di.id).map(r => r.role).filter(Boolean) || [],
           domains: domainsData?.filter(d => d.parent_id === di.id).map(d => d.domain).filter(Boolean) || [],
