@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,10 @@ import { OneYearGoalsManager } from './OneYearGoalsManager';
 
 interface NorthStarEditorProps {
   onUpdate?: () => void;
+  initialSection?: 'mission' | 'vision' | 'goals';
 }
 
-export function NorthStarEditor({ onUpdate }: NorthStarEditorProps) {
+export function NorthStarEditor({ onUpdate, initialSection = 'mission' }: NorthStarEditorProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [missionText, setMissionText] = useState('');
@@ -26,9 +27,41 @@ export function NorthStarEditor({ onUpdate }: NorthStarEditorProps) {
   const [showMissionPrompts, setShowMissionPrompts] = useState(false);
   const [showVisionPrompts, setShowVisionPrompts] = useState(false);
 
+  const scrollViewRef = useRef<ScrollView>(null);
+  const missionSectionRef = useRef<View>(null);
+  const visionSectionRef = useRef<View>(null);
+  const goalsSectionRef = useRef<View>(null);
+
   useEffect(() => {
     fetchNorthStarData();
   }, []);
+
+  useEffect(() => {
+    if (!loading && initialSection) {
+      setTimeout(() => {
+        scrollToSection(initialSection);
+      }, 300);
+    }
+  }, [loading, initialSection]);
+
+  const scrollToSection = (section: 'mission' | 'vision' | 'goals') => {
+    const refs = {
+      mission: missionSectionRef,
+      vision: visionSectionRef,
+      goals: goalsSectionRef,
+    };
+
+    const targetRef = refs[section];
+    if (targetRef.current && scrollViewRef.current) {
+      targetRef.current.measureLayout(
+        scrollViewRef.current as any,
+        (x, y) => {
+          scrollViewRef.current?.scrollTo({ y: y - 20, animated: true });
+        },
+        () => {}
+      );
+    }
+  };
 
   const fetchNorthStarData = async () => {
     setLoading(true);
@@ -116,9 +149,9 @@ export function NorthStarEditor({ onUpdate }: NorthStarEditorProps) {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView ref={scrollViewRef} style={styles.container}>
       {/* Mission Statement Section */}
-      <View style={styles.section}>
+      <View ref={missionSectionRef} style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
             <FileText size={24} color="#0078d4" />
@@ -163,7 +196,7 @@ export function NorthStarEditor({ onUpdate }: NorthStarEditorProps) {
       </View>
 
       {/* 5-Year Vision Section */}
-      <View style={styles.section}>
+      <View ref={visionSectionRef} style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
             <TrendingUp size={24} color="#16a34a" />
@@ -236,7 +269,7 @@ export function NorthStarEditor({ onUpdate }: NorthStarEditorProps) {
       </View>
 
       {/* 1-Year Goals Section */}
-      <View style={styles.goalsSection}>
+      <View ref={goalsSectionRef} style={styles.goalsSection}>
         <OneYearGoalsManager onUpdate={onUpdate} />
       </View>
     </ScrollView>

@@ -20,10 +20,13 @@ interface NorthStarData {
 interface NorthStarQuickViewProps {
   data: NorthStarData | null;
   loading?: boolean;
-  onNavigateToSettings: () => void;
+  onNavigateToSettings?: () => void;
+  onEditMission?: () => void;
+  onEditVision?: () => void;
+  onEditGoals?: () => void;
 }
 
-export function NorthStarQuickView({ data, loading, onNavigateToSettings }: NorthStarQuickViewProps) {
+export function NorthStarQuickView({ data, loading, onNavigateToSettings, onEditMission, onEditVision, onEditGoals }: NorthStarQuickViewProps) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -54,7 +57,7 @@ export function NorthStarQuickView({ data, loading, onNavigateToSettings }: Nort
               <FileText size={20} color="#0078d4" />
               <Text style={styles.cardTitle}>Mission Statement</Text>
             </View>
-            <TouchableOpacity onPress={onNavigateToSettings} style={styles.editButton}>
+            <TouchableOpacity onPress={onEditMission || onNavigateToSettings} style={styles.editButton}>
               <ExternalLink size={16} color="#6b7280" />
               <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
@@ -69,7 +72,7 @@ export function NorthStarQuickView({ data, loading, onNavigateToSettings }: Nort
               <Text style={styles.emptyStateText}>
                 Define your personal mission statement - your core purpose, values, and the impact you want to make.
               </Text>
-              <TouchableOpacity onPress={onNavigateToSettings} style={styles.getStartedButton}>
+              <TouchableOpacity onPress={onEditMission || onNavigateToSettings} style={styles.getStartedButton}>
                 <Text style={styles.getStartedButtonText}>Get Started</Text>
               </TouchableOpacity>
             </View>
@@ -85,7 +88,7 @@ export function NorthStarQuickView({ data, loading, onNavigateToSettings }: Nort
                 {data?.vision_timeframe === '5_year' ? '5-Year Vision' : 'Vision Statement'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onNavigateToSettings} style={styles.editButton}>
+            <TouchableOpacity onPress={onEditVision || onNavigateToSettings} style={styles.editButton}>
               <ExternalLink size={16} color="#6b7280" />
               <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
@@ -100,7 +103,7 @@ export function NorthStarQuickView({ data, loading, onNavigateToSettings }: Nort
               <Text style={styles.emptyStateText}>
                 Envision your ideal future across personal growth, career, relationships, and lifestyle in 5 years.
               </Text>
-              <TouchableOpacity onPress={onNavigateToSettings} style={styles.getStartedButton}>
+              <TouchableOpacity onPress={onEditVision || onNavigateToSettings} style={styles.getStartedButton}>
                 <Text style={styles.getStartedButtonText}>Get Started</Text>
               </TouchableOpacity>
             </View>
@@ -114,7 +117,7 @@ export function NorthStarQuickView({ data, loading, onNavigateToSettings }: Nort
               <Target size={20} color="#7c3aed" />
               <Text style={styles.cardTitle}>1-Year Goals</Text>
             </View>
-            <TouchableOpacity onPress={onNavigateToSettings} style={styles.editButton}>
+            <TouchableOpacity onPress={onEditGoals || onNavigateToSettings} style={styles.editButton}>
               <ExternalLink size={16} color="#6b7280" />
               <Text style={styles.editButtonText}>Manage</Text>
             </TouchableOpacity>
@@ -143,7 +146,7 @@ export function NorthStarQuickView({ data, loading, onNavigateToSettings }: Nort
                 </View>
               ))}
               {activeGoals.length > 5 && (
-                <TouchableOpacity onPress={onNavigateToSettings} style={styles.viewMoreButton}>
+                <TouchableOpacity onPress={onEditGoals || onNavigateToSettings} style={styles.viewMoreButton}>
                   <Text style={styles.viewMoreText}>
                     +{activeGoals.length - 5} more goals
                   </Text>
@@ -155,7 +158,7 @@ export function NorthStarQuickView({ data, loading, onNavigateToSettings }: Nort
               <Text style={styles.emptyStateText}>
                 Set your top 3-5 goals for the next year that bridge your vision and daily actions.
               </Text>
-              <TouchableOpacity onPress={onNavigateToSettings} style={styles.getStartedButton}>
+              <TouchableOpacity onPress={onEditGoals || onNavigateToSettings} style={styles.getStartedButton}>
                 <Text style={styles.getStartedButtonText}>Add Goals</Text>
               </TouchableOpacity>
             </View>

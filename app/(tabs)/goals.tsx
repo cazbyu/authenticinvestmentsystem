@@ -12,6 +12,7 @@ import { ManageTimelinesView } from '@/components/timelines/ManageTimelinesView'
 import { WithdrawalForm } from '@/components/journal/WithdrawalForm';
 import { GoalBankTabbedHeader, GoalBankTab } from '@/components/goals/GoalBankTabbedHeader';
 import { NorthStarQuickView } from '@/components/northStar/NorthStarQuickView';
+import { NorthStarEditor } from '@/components/northStar/NorthStarEditor';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useGoals } from '@/hooks/useGoals';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
@@ -55,6 +56,8 @@ export default function Goals() {
 
   const [northStarData, setNorthStarData] = useState<any>(null);
   const [loadingNorthStar, setLoadingNorthStar] = useState(false);
+  const [northStarEditorVisible, setNorthStarEditorVisible] = useState(false);
+  const [northStarInitialSection, setNorthStarInitialSection] = useState<'mission' | 'vision' | 'goals'>('mission');
   
   // Import functions from useGoalProgress hook (but NOT fetchGoalActionsForWeek or completion functions - we handle those locally)
   const {
@@ -870,6 +873,16 @@ export default function Goals() {
     router.push('/settings');
   };
 
+  const handleOpenNorthStarEditor = (section: 'mission' | 'vision' | 'goals' = 'mission') => {
+    setNorthStarInitialSection(section);
+    setNorthStarEditorVisible(true);
+  };
+
+  const handleCloseNorthStarEditor = () => {
+    setNorthStarEditorVisible(false);
+    fetchNorthStarData();
+  };
+
   const renderTimelinesTab = () => (
     <View style={styles.content}>
       <View style={styles.sectionHeaderContainer}>
@@ -954,7 +967,9 @@ export default function Goals() {
       <NorthStarQuickView
         data={northStarData}
         loading={loadingNorthStar}
-        onNavigateToSettings={handleNavigateToSettings}
+        onEditMission={() => handleOpenNorthStarEditor('mission')}
+        onEditVision={() => handleOpenNorthStarEditor('vision')}
+        onEditGoals={() => handleOpenNorthStarEditor('goals')}
       />
     </View>
   );
@@ -1304,6 +1319,22 @@ export default function Goals() {
           </View>
         </View>
       </Modal>
+
+      {/* North Star Editor Modal */}
+      <Modal visible={northStarEditorVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>North Star</Text>
+            <TouchableOpacity onPress={handleCloseNorthStarEditor}>
+              <Text style={styles.closeModalButton}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <NorthStarEditor
+            onUpdate={handleCloseNorthStarEditor}
+            initialSection={northStarInitialSection}
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1562,5 +1593,28 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  closeModalButton: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0078d4',
   },
 });
