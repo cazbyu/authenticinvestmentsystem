@@ -92,56 +92,50 @@ export function Header({
         )}
       </View>
       
-      {/* Bottom section with toggle and sort */}
+      {/* Bottom section with unified tab bar */}
       {(activeView && onViewChange) && (
         <View style={styles.bottomSection}>
-          {/* Always show both toggle groups */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* Deposits / Ideas */}
-            <View style={[styles.toggleContainer, { marginRight: 8 }]}>
-              <TouchableOpacity
-                style={[styles.toggleButton, activeView === 'deposits' && styles.activeToggle]}
-                onPress={() => onViewChange && onViewChange('deposits')}
-              >
-                <Text style={[styles.toggleText, activeView === 'deposits' && styles.activeToggleText]}>
-                  Deposits
-                </Text>
-              </TouchableOpacity>
+          {/* Unified tab container */}
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[styles.toggleButton, activeView === 'deposits' && styles.activeToggle]}
+              onPress={() => onViewChange && onViewChange('deposits')}
+            >
+              <Text style={[styles.toggleText, activeView === 'deposits' && styles.activeToggleText]}>
+                Deposits
+              </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.toggleButton, activeView === 'ideas' && styles.activeToggle]}
-                onPress={() => onViewChange && onViewChange('ideas')}
-              >
-                <Text style={[styles.toggleText, activeView === 'ideas' && styles.activeToggleText]}>
-                  Ideas
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.toggleButton, activeView === 'ideas' && styles.activeToggle]}
+              onPress={() => onViewChange && onViewChange('ideas')}
+            >
+              <Text style={[styles.toggleText, activeView === 'ideas' && styles.activeToggleText]}>
+                Ideas
+              </Text>
+            </TouchableOpacity>
 
-            {/* Journal / Analytics - Updated to include Analytics */}
-            <View style={styles.journalButtonsContainer}>
-              <TouchableOpacity
-                style={[styles.journalButton, activeView === 'journal' && styles.activeJournalButton, { minWidth: 70 }]}
-                onPress={() => onViewChange && onViewChange('journal')}
-              >
-                <Text style={[styles.journalButtonText, activeView === 'journal' && styles.activeJournalButtonText]}>
-                  Journal
-                </Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, activeView === 'journal' && styles.activeToggle]}
+              onPress={() => onViewChange && onViewChange('journal')}
+            >
+              <Text style={[styles.toggleText, activeView === 'journal' && styles.activeToggleText]}>
+                Journal
+              </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.journalButton, activeView === 'analytics' && styles.activeJournalButton, { minWidth: 70 }]}
-                onPress={() => onViewChange && onViewChange('analytics')}
-              >
-                <Text style={[styles.journalButtonText, activeView === 'analytics' && styles.activeJournalButtonText]}>
-                  Analytics
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.toggleButton, activeView === 'analytics' && styles.activeToggle]}
+              onPress={() => onViewChange && onViewChange('analytics')}
+            >
+              <Text style={[styles.toggleText, activeView === 'analytics' && styles.activeToggleText]}>
+                Analytics
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          
-          {/* Updated Sort Button to look like a toggle */}
+
+          {/* Sort Button */}
           {onSortPress && (
             <TouchableOpacity style={styles.sortButton} onPress={onSortPress}>
               <Text style={styles.toggleText}>Sort</Text>
@@ -253,25 +247,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
     padding: 2,
-    minWidth: 120,
-    flex: 0,
-  },
-  journalButtonsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    minWidth: 200,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flex: 0,
-    marginLeft: 16,
+    gap: 0,
+    flex: 1,
+    maxWidth: 500,
   },
   toggleButton: {
-    paddingHorizontal: 12,
     paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 14,
-    minWidth: 60,
     alignItems: 'center',
     justifyContent: 'center',
+    flex: 1,
+    minWidth: 70,
   },
   activeToggle: {
     backgroundColor: '#ffffff',
@@ -283,25 +270,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   activeToggleText: {
-    color: '#0078d4',
-  },
-  journalButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  activeJournalButton: {
-    backgroundColor: '#ffffff',
-  },
-  journalButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  activeJournalButtonText: {
     color: '#0078d4',
   },
   sortButton: {
