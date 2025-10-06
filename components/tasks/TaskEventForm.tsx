@@ -151,7 +151,7 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
 
   useEffect(() => {
     fetchFormData();
-    if (mode === 'edit' && initialData) {
+    if (initialData) {
       loadInitialData();
     }
   }, [mode, initialData]);
@@ -265,7 +265,8 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
 
     setExistingNotes(notesArray);
 
-    setFormData({
+    // Build formData, handling both edit mode (with id) and create mode (pre-fill only)
+    const newFormData: FormData = {
       type: initialData.type || 'task',
       title: initialData.title || '',
       dueDate: initialData.due_date || formatLocalDate(new Date()),
@@ -281,13 +282,15 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
       isAuthenticDeposit: initialData.is_authentic_deposit || false,
       isGoal: initialData.is_twelve_week_goal || false,
       hasRepeat: !!initialData.recurrence_rule,
-      selectedRoleIds: initialData.roles?.map((r: any) => r.id) || [],
-      selectedDomainIds: initialData.domains?.map((d: any) => d.id) || [],
-      selectedKeyRelationshipIds: initialData.keyRelationships?.map((kr: any) => kr.id) || [],
-      selectedGoalIds: initialData.goals?.map((g: any) => g.id) || [],
+      selectedRoleIds: initialData.roles?.map((r: any) => r.id) || initialData.selectedRoleIds || [],
+      selectedDomainIds: initialData.domains?.map((d: any) => d.id) || initialData.selectedDomainIds || [],
+      selectedKeyRelationshipIds: initialData.keyRelationships?.map((kr: any) => kr.id) || initialData.selectedKeyRelationshipIds || [],
+      selectedGoalIds: initialData.goals?.map((g: any) => g.id) || initialData.selectedGoalIds || [],
       notes: notesString,
       recurrenceRule: initialData.recurrence_rule || undefined,
-    });
+    };
+
+    setFormData(newFormData);
   };
 
   const handleCalendarOpen = (mode: 'due' | 'start' | 'end' | 'withdrawal') => {
@@ -722,7 +725,7 @@ export default function TaskEventForm({ mode, initialData, onSubmitSuccess, onCl
           <X size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {mode === 'edit' ? 'Edit' : 'New'} {formData.type === 'depositIdea' ? 'Item' : formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}
+          {initialData?.id ? 'Edit' : 'New'} {formData.type === 'depositIdea' ? 'Item' : formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}
         </Text>
         <TouchableOpacity
           style={[

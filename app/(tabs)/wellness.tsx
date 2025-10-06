@@ -143,6 +143,9 @@ export default function Wellness() {
       }
 
       if (view === 'deposits') {
+        // Add debug logging
+        console.log('Fetching deposits for domain:', domainId);
+
         // Optimized: Combine the join lookup and task fetch in a single query using inner join
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
@@ -158,6 +161,8 @@ export default function Wellness() {
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event'])
           .limit(100);
+
+        console.log('Tasks query result:', { tasksData, tasksError, count: tasksData?.length });
 
         if (tasksError) throw tasksError;
 
@@ -721,8 +726,11 @@ export default function Wellness() {
             type: 'task',
             selectedDomainIds: [selectedDomain.id],
           } as any);
+          setTaskFormVisible(true);
+        } else {
+          setEditingTask(null);
+          setTaskFormVisible(true);
         }
-        setTaskFormVisible(true);
       }}>
         <Plus size={24} color="#ffffff" />
       </DraggableFab>
@@ -730,7 +738,7 @@ export default function Wellness() {
       {/* Modals */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskEventForm
-          mode={editingTask ? "edit" : "create"}
+          mode={editingTask?.id ? "edit" : "create"}
           initialData={editingTask || undefined}
           onSubmitSuccess={handleFormSubmitSuccess}
           onClose={handleFormClose}
