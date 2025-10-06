@@ -333,25 +333,62 @@ export default function Dashboard() {
 
   const handleCompleteTask = async (task: Task) => {
     try {
-      // Optimistically remove the task from the list immediately
-      setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       // Check if this is a recurring task linked to a timeline
       if (task.recurrence_rule && (task.user_global_timeline_id || task.custom_timeline_id)) {
-        // For recurring tasks linked to timelines, create an occurrence for today
-        const today = formatLocalDate(new Date());
+        // Calculate current week boundaries
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1);
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() + mondayOffset);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        const weekStartStr = formatLocalDate(weekStart);
+        const weekEndStr = formatLocalDate(weekEnd);
 
-        // Create occurrence directly without using completeActionSuggestion
+        // Get all completed dates for this task in the current week
+        const { getWeekCompletionStatus } = await import('@/lib/taskUtils');
+        const completedDates = await getWeekCompletionStatus(supabase, task.id, weekStartStr, weekEndStr);
+
+        // Use backward-fill logic to find the next date to complete
+        const { getMostRecentIncompleteDate } = await import('@/lib/dateUtils');
+        const dateToComplete = getMostRecentIncompleteDate(completedDates, weekStartStr, weekEndStr);
+
+        if (!dateToComplete) {
+          // All dates up to today are already complete
+          console.log('[handleCompleteTask] All dates in current week are already complete');
+          // Optimistically remove the task from the list
+          setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+          Alert.alert('Complete', 'All available completions for this week are done!');
+          return;
+        }
+
+        // Check if occurrence already exists for this date (safety check)
+        const { checkOccurrenceExists } = await import('@/lib/taskUtils');
+        const occurrenceExists = await checkOccurrenceExists(supabase, task.id, dateToComplete);
+
+        if (occurrenceExists) {
+          console.log('[handleCompleteTask] Occurrence already exists for date:', dateToComplete);
+          // Optimistically remove the task from the list if weekly target reached
+          const weeklyCompleted = completedDates.length;
+          const weeklyTarget = task.weeklyTargetCount || 0;
+          if (weeklyCompleted >= weeklyTarget) {
+            setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+          }
+          return;
+        }
+
+        // Create occurrence for the backward-fill date
         const occurrencePayload: any = {
           user_id: user.id,
           title: task.title,
           type: 'task',
           status: 'completed',
-          due_date: today,
+          due_date: dateToComplete,
           completed_at: new Date().toISOString(),
           parent_task_id: task.id,
           is_twelve_week_goal: !!task.user_global_timeline_id,
@@ -369,7 +406,16 @@ export default function Dashboard() {
           .select('id')
           .single();
 
-        if (occErr) throw occErr;
+        if (occErr) {
+          // Handle duplicate key constraint error
+          if (occErr.code === '23505') {
+            console.log('[handleCompleteTask] Duplicate occurrence prevented by database constraint');
+            // Refresh data to sync UI
+            fetchData();
+            return;
+          }
+          throw occErr;
+        }
 
         // Copy universal joins from parent task
         if (occ) {
@@ -388,8 +434,23 @@ export default function Dashboard() {
             }),
           ]);
         }
+
+        // Check if we've reached the weekly target and should remove from dashboard
+        const newCompletedCount = completedDates.length + 1;
+        const weeklyTarget = task.weeklyTargetCount || 0;
+
+        if (newCompletedCount >= weeklyTarget) {
+          // Optimistically remove the task from the list
+          setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+        } else {
+          // Just refresh to update the counter
+          fetchData();
+        }
       } else {
         // For non-recurring tasks or tasks not linked to timelines, mark as completed
+        // Optimistically remove the task from the list immediately
+        setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+
         const { error } = await supabase
           .from('0008-ap-tasks')
           .update({ status: 'completed', completed_at: new Date().toISOString() })

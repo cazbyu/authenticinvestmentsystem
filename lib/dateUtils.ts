@@ -210,6 +210,85 @@ export function getAvailableWeekStarts(weekStartDay: 'sunday' | 'monday' = 'sund
       label
     });
   }
-  
+
   return weeks;
+}
+
+/**
+ * Returns an array of all dates between start and end (inclusive)
+ */
+export function getWeekDatesArray(weekStart: string, weekEnd: string): string[] {
+  if (!isValidISODate(weekStart) || !isValidISODate(weekEnd)) {
+    return [];
+  }
+
+  const dates: string[] = [];
+  const start = parseLocalDate(weekStart);
+  const end = parseLocalDate(weekEnd);
+
+  const current = new Date(start);
+  while (current <= end) {
+    dates.push(formatLocalDate(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+}
+
+/**
+ * Finds the most recent incomplete date working backwards from today
+ * Returns null if all dates in the week are complete or if today is not in the week
+ */
+export function getMostRecentIncompleteDate(
+  completedDates: string[],
+  weekStart: string,
+  weekEnd: string
+): string | null {
+  const today = formatLocalDate(new Date());
+  const weekDates = getWeekDatesArray(weekStart, weekEnd);
+
+  // Check if today is within the week range
+  if (!weekDates.includes(today)) {
+    return null;
+  }
+
+  // Work backwards from today to find the first incomplete date
+  for (let i = weekDates.length - 1; i >= 0; i--) {
+    const date = weekDates[i];
+
+    // Stop checking dates after today
+    if (date > today) {
+      continue;
+    }
+
+    // If this date is not completed, return it
+    if (!completedDates.includes(date)) {
+      return date;
+    }
+
+    // If we reach today and it's complete, all dates up to today are complete
+    if (date === today) {
+      break;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Checks if a date is in the current week
+ */
+export function isDateInCurrentWeek(date: string, weekStartDay: 'sunday' | 'monday' = 'sunday'): boolean {
+  if (!isValidISODate(date)) {
+    return false;
+  }
+
+  const today = new Date();
+  const weekStart = getWeekStart(today, weekStartDay);
+  const weekEnd = getWeekEnd(today, weekStartDay);
+
+  const weekStartStr = formatLocalDate(weekStart);
+  const weekEndStr = formatLocalDate(weekEnd);
+
+  return date >= weekStartStr && date <= weekEndStr;
 }

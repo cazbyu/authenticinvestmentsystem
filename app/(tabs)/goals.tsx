@@ -120,29 +120,77 @@ export default function Goals() {
         throw new Error('No timeline selected');
       }
 
-      // Optimistically update the UI immediately
-      setWeekGoalActions(prevActions => {
-        const updatedActions = { ...prevActions };
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-        // Find the goal that contains this action
-        for (const goalId in updatedActions) {
-          const goalActions = updatedActions[goalId];
-          const actionIndex = goalActions.findIndex(action => action.id === actionId);
+      if (completed) {
+        // If currently completed, undo the completion by deleting the occurrence
+        // Optimistically update the UI immediately
+        setWeekGoalActions(prevActions => {
+          const updatedActions = { ...prevActions };
 
-          if (actionIndex !== -1) {
-            const updatedAction = { ...goalActions[actionIndex] };
-            const updatedLogs = [...updatedAction.logs];
+          for (const goalId in updatedActions) {
+            const goalActions = updatedActions[goalId];
+            const actionIndex = goalActions.findIndex(action => action.id === actionId);
 
-            // Find or create the log entry for this date
-            const logIndex = updatedLogs.findIndex(log => log.measured_on === date);
+            if (actionIndex !== -1) {
+              const updatedAction = { ...goalActions[actionIndex] };
+              const updatedLogs = updatedAction.logs.filter(log => log.measured_on !== date);
 
-            if (completed) {
-              // Remove the log entry (undo completion)
-              if (logIndex !== -1) {
-                updatedLogs.splice(logIndex, 1);
-              }
-            } else {
-              // Add or update the log entry (mark as completed)
+              updatedAction.logs = updatedLogs;
+              updatedAction.weeklyActual = Math.min(
+                updatedLogs.filter(log => log.completed).length,
+                updatedAction.weeklyTarget
+              );
+
+              updatedActions[goalId] = [
+                ...goalActions.slice(0, actionIndex),
+                updatedAction,
+                ...goalActions.slice(actionIndex + 1)
+              ];
+
+              break;
+            }
+          }
+
+          return updatedActions;
+        });
+
+        const { error: deleteError } = await supabase
+          .from('0008-ap-tasks')
+          .delete()
+          .eq('parent_task_id', actionId)
+          .eq('due_date', date)
+          .eq('type', 'task');
+
+        if (deleteError) throw deleteError;
+      } else {
+        // If not completed, check if occurrence already exists (safety check)
+        const { checkOccurrenceExists } = await import('@/lib/taskUtils');
+        const occurrenceExists = await checkOccurrenceExists(supabase, actionId, date);
+
+        if (occurrenceExists) {
+          console.log('[handleToggleCompletion] Occurrence already exists for date:', date);
+          // Refresh to sync UI
+          await fetchWeekActions(timelineGoals);
+          return;
+        }
+
+        // Optimistically update the UI immediately
+        setWeekGoalActions(prevActions => {
+          const updatedActions = { ...prevActions };
+
+          for (const goalId in updatedActions) {
+            const goalActions = updatedActions[goalId];
+            const actionIndex = goalActions.findIndex(action => action.id === actionId);
+
+            if (actionIndex !== -1) {
+              const updatedAction = { ...goalActions[actionIndex] };
+              const updatedLogs = [...updatedAction.logs];
+
+              const logIndex = updatedLogs.findIndex(log => log.measured_on === date);
+
               if (logIndex !== -1) {
                 updatedLogs[logIndex] = { ...updatedLogs[logIndex], completed: true };
               } else {
@@ -157,45 +205,27 @@ export default function Goals() {
                   created_at: new Date().toISOString(),
                 });
               }
+
+              updatedAction.logs = updatedLogs;
+              updatedAction.weeklyActual = Math.min(
+                updatedLogs.filter(log => log.completed).length,
+                updatedAction.weeklyTarget
+              );
+
+              updatedActions[goalId] = [
+                ...goalActions.slice(0, actionIndex),
+                updatedAction,
+                ...goalActions.slice(actionIndex + 1)
+              ];
+
+              break;
             }
-
-            // Update the action with new logs and recalculate weeklyActual
-            updatedAction.logs = updatedLogs;
-            updatedAction.weeklyActual = Math.min(
-              updatedLogs.filter(log => log.completed).length,
-              updatedAction.weeklyTarget
-            );
-
-            // Update the actions array
-            updatedActions[goalId] = [
-              ...goalActions.slice(0, actionIndex),
-              updatedAction,
-              ...goalActions.slice(actionIndex + 1)
-            ];
-
-            break;
           }
-        }
 
-        return updatedActions;
-      });
+          return updatedActions;
+        });
 
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      if (completed) {
-        // If currently completed, undo the completion by deleting the occurrence
-        const { error: deleteError } = await supabase
-          .from('0008-ap-tasks')
-          .delete()
-          .eq('parent_task_id', actionId)
-          .eq('due_date', date)
-          .eq('type', 'task');
-
-        if (deleteError) throw deleteError;
-      } else {
-        // If not completed, create a completion occurrence
+        // Create a completion occurrence
         const { data: parent } = await supabase
           .from('0008-ap-tasks')
           .select('id, title')
@@ -220,7 +250,16 @@ export default function Goals() {
           .from('0008-ap-tasks')
           .insert(occurrencePayload);
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          // Handle duplicate key constraint error
+          if (insertError.code === '23505') {
+            console.log('[handleToggleCompletion] Duplicate occurrence prevented by database constraint');
+            // Refresh to sync UI
+            await fetchWeekActions(timelineGoals);
+            return;
+          }
+          throw insertError;
+        }
       }
 
       // Update the authentic score without refreshing

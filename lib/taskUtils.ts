@@ -215,3 +215,64 @@ export async function calculateGoalProgress(
     };
   }
 }
+
+/**
+ * Checks if a completion occurrence already exists for a specific parent task and date
+ */
+export async function checkOccurrenceExists(
+  supabase: SupabaseClient,
+  parentTaskId: string,
+  dueDate: string
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('0008-ap-tasks')
+      .select('id')
+      .eq('parent_task_id', parentTaskId)
+      .eq('due_date', dueDate)
+      .eq('status', 'completed')
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[checkOccurrenceExists] Error:', error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error('[checkOccurrenceExists] Unexpected error:', error);
+    return false;
+  }
+}
+
+/**
+ * Gets all completed dates for a parent task within a week range
+ */
+export async function getWeekCompletionStatus(
+  supabase: SupabaseClient,
+  parentTaskId: string,
+  weekStart: string,
+  weekEnd: string
+): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('0008-ap-tasks')
+      .select('due_date')
+      .eq('parent_task_id', parentTaskId)
+      .eq('status', 'completed')
+      .gte('due_date', weekStart)
+      .lte('due_date', weekEnd)
+      .is('deleted_at', null);
+
+    if (error) {
+      console.error('[getWeekCompletionStatus] Error:', error);
+      return [];
+    }
+
+    return (data || []).map(item => item.due_date);
+  } catch (error) {
+    console.error('[getWeekCompletionStatus] Unexpected error:', error);
+    return [];
+  }
+}
