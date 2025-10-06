@@ -437,7 +437,29 @@ export async function calculateTotalGoalProgress(
     // Calculate total target across all weeks
     const totalTarget = weekPlans.reduce((sum, plan) => sum + (plan.target_days || 0), 0);
 
-    // 3. Get all completed occurrences for these tasks
+    // 3. Get timeline weeks with date boundaries to match occurrences to specific weeks
+    const { data: timelineWeeks, error: weeksError } = await supabase
+      .from('v_unified_timeline_weeks')
+      .select('week_number, week_start, week_end')
+      .eq('timeline_id', timeline.id)
+      .eq('source', timeline.source)
+      .order('week_number', { ascending: true });
+
+    if (weeksError) throw weeksError;
+
+    if (!timelineWeeks || timelineWeeks.length === 0) {
+      console.log('[calculateTotalGoalProgress] No timeline weeks found');
+      return { totalActual: 0, totalTarget: 0, percentage: 0 };
+    }
+
+    // Get current date to filter out future weeks
+    const today = new Date().toISOString().split('T')[0];
+    const currentWeekNumber = timelineWeeks.find(w => w.week_start <= today && w.week_end >= today)?.week_number;
+    const maxWeekNumber = currentWeekNumber || timelineWeeks[timelineWeeks.length - 1].week_number;
+
+    console.log('[calculateTotalGoalProgress] Today:', today, 'Current week:', currentWeekNumber, 'Max week:', maxWeekNumber);
+
+    // 4. Get all completed occurrences for these tasks
     const { data: completedOccurrences, error: occurrencesError } = await supabase
       .from('0008-ap-tasks')
       .select('parent_task_id, due_date')
@@ -447,48 +469,95 @@ export async function calculateTotalGoalProgress(
 
     if (occurrencesError) throw occurrencesError;
 
+    console.log('[calculateTotalGoalProgress] Total occurrences retrieved:', completedOccurrences?.length || 0);
+
     // Count total actual completions (capped per task per week by target_days)
     let totalActual = 0;
 
-    // Group occurrences by task and week
+    // Group occurrences by task and week based on due_date matching to week boundaries
     const occurrencesByTaskAndWeek: Record<string, Record<number, number>> = {};
 
     for (const occ of completedOccurrences || []) {
-      // Find which week this occurrence belongs to based on week plans
-      const taskWeekPlans = weekPlans.filter(wp => wp.task_id === occ.parent_task_id);
+      // Find which week this occurrence belongs to based on its due_date
+      const matchingWeek = timelineWeeks.find(w =>
+        occ.due_date >= w.week_start && occ.due_date <= w.week_end
+      );
 
-      for (const weekPlan of taskWeekPlans) {
-        if (!occurrencesByTaskAndWeek[occ.parent_task_id]) {
-          occurrencesByTaskAndWeek[occ.parent_task_id] = {};
-        }
-        if (!occurrencesByTaskAndWeek[occ.parent_task_id][weekPlan.week_number]) {
-          occurrencesByTaskAndWeek[occ.parent_task_id][weekPlan.week_number] = 0;
-        }
-        // Count this occurrence for this week (will be capped later)
-        occurrencesByTaskAndWeek[occ.parent_task_id][weekPlan.week_number]++;
+      if (!matchingWeek) {
+        console.log('[calculateTotalGoalProgress] Occurrence outside timeline range:', occ.due_date);
+        continue;
       }
+
+      // Skip future weeks (only count up to current week)
+      if (matchingWeek.week_number > maxWeekNumber) {
+        console.log('[calculateTotalGoalProgress] Skipping future week:', matchingWeek.week_number);
+        continue;
+      }
+
+      // Check if this task has a week plan entry for this week
+      const hasWeekPlan = weekPlans.some(
+        wp => wp.task_id === occ.parent_task_id && wp.week_number === matchingWeek.week_number
+      );
+
+      if (!hasWeekPlan) {
+        console.log('[calculateTotalGoalProgress] No week plan for task:', occ.parent_task_id, 'week:', matchingWeek.week_number);
+        continue;
+      }
+
+      // Initialize counters if needed
+      if (!occurrencesByTaskAndWeek[occ.parent_task_id]) {
+        occurrencesByTaskAndWeek[occ.parent_task_id] = {};
+      }
+      if (!occurrencesByTaskAndWeek[occ.parent_task_id][matchingWeek.week_number]) {
+        occurrencesByTaskAndWeek[occ.parent_task_id][matchingWeek.week_number] = 0;
+      }
+
+      // Count this occurrence for the specific week it belongs to
+      occurrencesByTaskAndWeek[occ.parent_task_id][matchingWeek.week_number]++;
+      console.log('[calculateTotalGoalProgress] Counted occurrence:', {
+        taskId: occ.parent_task_id,
+        dueDate: occ.due_date,
+        weekNumber: matchingWeek.week_number,
+        count: occurrencesByTaskAndWeek[occ.parent_task_id][matchingWeek.week_number]
+      });
     }
 
     // Cap each week's actual by its target and sum them up
     for (const weekPlan of weekPlans) {
+      // Skip future weeks
+      if (weekPlan.week_number > maxWeekNumber) {
+        continue;
+      }
+
       const taskId = weekPlan.task_id;
       const weekNumber = weekPlan.week_number;
       const target = weekPlan.target_days || 0;
       const actual = occurrencesByTaskAndWeek[taskId]?.[weekNumber] || 0;
       const cappedActual = Math.min(actual, target);
+
+      console.log('[calculateTotalGoalProgress] Week plan:', {
+        taskId,
+        weekNumber,
+        target,
+        actual,
+        cappedActual
+      });
+
       totalActual += cappedActual;
     }
 
     const percentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
 
-    console.log('[calculateTotalGoalProgress]', {
+    console.log('[calculateTotalGoalProgress] FINAL RESULT:', {
       goalId,
       goalType,
       taskCount: taskIds.length,
       weekPlansCount: weekPlans.length,
+      occurrencesCount: completedOccurrences?.length || 0,
       totalTarget,
       totalActual,
-      percentage
+      percentage: `${percentage}%`,
+      calculationBreakdown: `${totalActual} completed out of ${totalTarget} target = ${percentage}%`
     });
 
     return { totalActual, totalTarget, percentage };
