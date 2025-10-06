@@ -434,9 +434,6 @@ export async function calculateTotalGoalProgress(
       return { totalActual: 0, totalTarget: 0, percentage: 0 };
     }
 
-    // Calculate total target across all weeks
-    const totalTarget = weekPlans.reduce((sum, plan) => sum + (plan.target_days || 0), 0);
-
     // 3. Get timeline weeks with date boundaries to match occurrences to specific weeks
     const { data: timelineWeeks, error: weeksError } = await supabase
       .from('v_unified_timeline_weeks')
@@ -473,6 +470,7 @@ export async function calculateTotalGoalProgress(
 
     // Count total actual completions (capped per task per week by target_days)
     let totalActual = 0;
+    let totalTarget = 0;
 
     // Group occurrences by task and week based on due_date matching to week boundaries
     const occurrencesByTaskAndWeek: Record<string, Record<number, number>> = {};
@@ -523,6 +521,7 @@ export async function calculateTotalGoalProgress(
     }
 
     // Cap each week's actual by its target and sum them up
+    // Also calculate totalTarget only for weeks up to and including the current week
     for (const weekPlan of weekPlans) {
       // Skip future weeks
       if (weekPlan.week_number > maxWeekNumber) {
@@ -544,6 +543,7 @@ export async function calculateTotalGoalProgress(
       });
 
       totalActual += cappedActual;
+      totalTarget += target;
     }
 
     const percentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
@@ -553,11 +553,12 @@ export async function calculateTotalGoalProgress(
       goalType,
       taskCount: taskIds.length,
       weekPlansCount: weekPlans.length,
+      weeksIncluded: `1-${maxWeekNumber}`,
       occurrencesCount: completedOccurrences?.length || 0,
       totalTarget,
       totalActual,
       percentage: `${percentage}%`,
-      calculationBreakdown: `${totalActual} completed out of ${totalTarget} target = ${percentage}%`
+      calculationBreakdown: `${totalActual} completed out of ${totalTarget} target (weeks 1-${maxWeekNumber}) = ${percentage}%`
     });
 
     return { totalActual, totalTarget, percentage };
