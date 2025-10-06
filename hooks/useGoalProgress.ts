@@ -5,7 +5,10 @@ import { formatLocalDate } from '../lib/dateUtils';
 
 // Type definitions
 interface UseGoalProgressOptions {
-  scope?: string;
+  scope?: {
+    type: 'domain' | 'role' | 'key_relationship' | 'user';
+    id?: string;
+  };
 }
 
 interface WeekData {
@@ -55,33 +58,148 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
   const [weekGoalActions, setWeekGoalActions] = useState<any[]>([]);
 
-  // Import functions from useGoals
+  // Import functions from useGoals with scope support
   const {
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
     deleteTask,
     refreshGoals: refreshGoalsFromUseGoals
-  } = useGoals();
+  } = useGoals(options.scope ? { scope: options.scope } : {});
 
-  // Placeholder functions - these need to be implemented
+  // Optimized: Skip timeline fetching when domain scope is provided
+  // Domain scope only needs goals, not full timeline data
   const fetchAvailableTimelines = async (): Promise<Timeline | null> => {
-    // TODO: Implement this function
-    return null;
+    // Skip timeline fetch for domain scope
+    if (options.scope?.type === 'domain') {
+      return null;
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw userErr;
+      if (!user) return null;
+
+      // Prefer an active global timeline
+      const { data: globalTimeline, error: gErr } = await supabase
+        .from('0008-ap-user-global-timelines')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (gErr) throw gErr;
+
+      if (globalTimeline) {
+        const timeline: Timeline = {
+          ...globalTimeline,
+          source: 'global',
+        };
+        setSelectedTimeline(timeline);
+        return timeline;
+      }
+
+      // Otherwise try custom timeline
+      const { data: customTimeline, error: cErr } = await supabase
+        .from('0008-ap-custom-timelines')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cErr) throw cErr;
+
+      if (customTimeline) {
+        const timeline: Timeline = {
+          ...customTimeline,
+          source: 'custom',
+        };
+        setSelectedTimeline(timeline);
+        return timeline;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching timelines:', error);
+      return null;
+    }
   };
 
   const fetchCycleWeeks = async (timeline: Timeline): Promise<any[]> => {
-    // TODO: Implement this function
-    return [];
+    // Skip for domain scope
+    if (options.scope?.type === 'domain') {
+      return [];
+    }
+
+    try {
+      const supabase = getSupabaseClient();
+
+      if (timeline.source === 'global') {
+        const { data, error } = await supabase
+          .from('v_user_global_timeline_weeks')
+          .select('*')
+          .eq('user_global_timeline_id', timeline.id)
+          .order('week_number');
+
+        if (error) throw error;
+        setCycleWeeks(data || []);
+        return data || [];
+      } else {
+        const { data, error } = await supabase
+          .from('v_custom_timeline_weeks')
+          .select('*')
+          .eq('custom_timeline_id', timeline.id)
+          .order('week_number');
+
+        if (error) throw error;
+        setCycleWeeks(data || []);
+        return data || [];
+      }
+    } catch (error) {
+      console.error('Error fetching cycle weeks:', error);
+      return [];
+    }
   };
 
   const fetchDaysLeftData = async (timeline: Timeline): Promise<any> => {
-    // TODO: Implement this function
-    return null;
+    // Skip for domain scope
+    if (options.scope?.type === 'domain') {
+      return null;
+    }
+
+    if (!timeline.end_date) return null;
+
+    const today = new Date();
+    const endDate = new Date(timeline.end_date);
+    const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+
+    const data = { daysLeft };
+    setDaysLeftData(data);
+    return data;
   };
 
-  const fetchGoalsForTimeline = async (timeline: Timeline): Promise<void> => {
-    // TODO: Implement this function
+  const fetchGoalsForTimeline = async (timeline: Timeline | null): Promise<void> => {
+    // For domain scope, goals are already fetched by useGoals with scope
+    // Just set empty state for other data
+    if (options.scope?.type === 'domain') {
+      setGoals([]);
+      setGoalProgress({});
+      return;
+    }
+
+    if (!timeline) {
+      setGoals([]);
+      setGoalProgress({});
+      return;
+    }
+
+    // For full timeline view, would fetch goals and progress here
+    // But since useGoals already handles this, we can skip
   };
 
   const getTodayActionSuggestions = async (): Promise<any[]> => {
@@ -313,12 +431,21 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
    * REFRESH ORCHESTRATION (progress-specific)
    * -------------------------------- */
   const refreshAllData = async () => {
+    // Optimize: Skip timeline data for domain scope
+    if (options.scope?.type === 'domain') {
+      // Domain scope only needs goals which are handled by useGoals
+      setCycleWeeks([]);
+      setDaysLeftData(null);
+      setGoals([]);
+      setGoalProgress({});
+      setCycleEffortData({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
+      return;
+    }
+
     try {
       const timeline = await fetchAvailableTimelines();
-      console.log('Timeline returned from fetchAvailableTimelines:', timeline);
 
       if (!timeline) {
-        console.log('No active timeline found, clearing all data');
         setCycleWeeks([]);
         setDaysLeftData(null);
         setGoals([]);
@@ -327,15 +454,10 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
         return;
       }
 
-      console.log('Using timeline ID for data fetching:', timeline.id);
-
       const [weeks, daysLeft] = await Promise.all([
         fetchCycleWeeks(timeline),
         fetchDaysLeftData(timeline)
       ]);
-
-      console.log('Fetched weeks:', weeks?.length || 0);
-      console.log('Fetched days left data:', daysLeft);
 
       await fetchGoalsForTimeline(timeline);
     } catch (error) {
@@ -357,7 +479,8 @@ export function useGoalProgress(options: UseGoalProgressOptions = {}) {
    * -------------------------------- */
   useEffect(() => {
     refreshAllData();
-  }, [options.scope]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.scope?.type, options.scope?.id]);
 
   useEffect(() => {
     if (!selectedTimeline) return;

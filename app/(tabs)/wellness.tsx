@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
@@ -48,32 +48,62 @@ export default function Wellness() {
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [authenticScore, setAuthenticScore] = useState(0);
-  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const scoreAbortControllerRef = useRef<AbortController | null>(null);
+  const authenticScoreCache = useRef<{ score: number; timestamp: number } | null>(null);
 
-  // 12-Week Goals for selected domain
-  const { 
-    goals: twelveWeekGoals, 
-    goalProgress, 
-    loading: goalsLoading, 
-    refreshGoals 
+  // 12-Week Goals for selected domain (only fetch when domain is selected)
+  const goalProgressScope = useMemo(() =>
+    selectedDomain ? { type: 'domain' as const, id: selectedDomain.id } : undefined,
+    [selectedDomain?.id]
+  );
+
+  const {
+    goals: twelveWeekGoals,
+    goalProgress,
+    loading: goalsLoading,
+    refreshGoals
   } = useGoalProgress({
-    scope: selectedDomain ? { type: 'domain', id: selectedDomain.id } : undefined
+    scope: goalProgressScope
   });
 
-  const fetchAuthenticScore = async () => {
+  const fetchAuthenticScore = useCallback(async (forceRefresh = false) => {
+    // Cancel any in-flight score calculation
+    if (scoreAbortControllerRef.current) {
+      scoreAbortControllerRef.current.abort();
+    }
+
+    // Use cached score if available and less than 5 minutes old
+    if (!forceRefresh && authenticScoreCache.current) {
+      const cacheAge = Date.now() - authenticScoreCache.current.timestamp;
+      if (cacheAge < 5 * 60 * 1000) {
+        setAuthenticScore(authenticScoreCache.current.score);
+        return;
+      }
+    }
+
+    const controller = new AbortController();
+    scoreAbortControllerRef.current = controller;
+
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || controller.signal.aborted) return;
 
       const score = await calculateAuthenticScoreUtil(supabase, user.id);
-      setAuthenticScore(score);
-    } catch (error) {
-      console.error('Error calculating authentic score:', error);
-    }
-  };
 
-  const fetchDomains = async () => {
+      if (!controller.signal.aborted) {
+        setAuthenticScore(score);
+        authenticScoreCache.current = { score, timestamp: Date.now() };
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error('Error calculating authentic score:', error);
+      }
+    }
+  }, []);
+
+  const fetchDomains = useCallback(async () => {
     try {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
@@ -83,14 +113,15 @@ export default function Wellness() {
 
       if (error) throw error;
       setDomains(data || []);
-      await fetchAuthenticScore();
+      // Fetch score in background without blocking
+      fetchAuthenticScore(false);
     } catch (error) {
       console.error('Error fetching domains:', error);
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [fetchAuthenticScore]);
 
-  const fetchDomainTasks = async (domainId: string, view: 'deposits' | 'ideas' = activeView) => {
+  const fetchDomainTasks = useCallback(async (domainId: string, view: 'deposits' | 'ideas' = activeView) => {
     // Cancel any in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -112,35 +143,17 @@ export default function Wellness() {
       }
 
       if (view === 'deposits') {
-        // First, get task IDs that belong to this domain
-        const { data: domainTaskJoins, error: domainJoinError } = await supabase
-          .from('0008-ap-universal-domains-join')
-          .select('parent_id')
-          .eq('parent_type', 'task')
-          .eq('domain_id', domainId);
-
-        if (domainJoinError) throw domainJoinError;
-
-        if (!domainTaskJoins || domainTaskJoins.length === 0) {
-          setTasks([]);
-          setDepositIdeas([]);
-          setLoading(false);
-          return;
-        }
-
-        const domainTaskIds = domainTaskJoins.map(j => j.parent_id);
-
-        // Check if aborted
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        // Fetch only tasks that belong to this domain
+        // Optimized: Combine the join lookup and task fetch in a single query using inner join
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-          .select('*, custom_timeline_id')
+          .select(`
+            *,
+            custom_timeline_id,
+            0008-ap-universal-domains-join!inner(domain_id)
+          `)
           .eq('user_id', user.id)
-          .in('id', domainTaskIds)
+          .eq('0008-ap-universal-domains-join.domain_id', domainId)
+          .eq('0008-ap-universal-domains-join.parent_type', 'task')
           .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event'])
@@ -162,19 +175,18 @@ export default function Wellness() {
 
         const taskIds = tasksData.map(t => t.id);
 
+        // Optimized: Fetch only essential metadata, removed duplicate key relationships query
         const [
           { data: rolesData, error: rolesError },
           { data: domainsData, error: domainsError },
           { data: goalsData, error: goalsError },
           { data: notesData, error: notesError },
-          { data: delegatesData, error: delegatesError },
           { data: keyRelationshipsData, error: keyRelationshipsError }
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
         ]);
 
@@ -182,7 +194,6 @@ export default function Wellness() {
         if (domainsError) throw domainsError;
         if (goalsError) throw goalsError;
         if (notesError) throw notesError;
-        if (delegatesError) throw delegatesError;
         if (keyRelationshipsError) throw keyRelationshipsError;
 
         // Check if aborted before processing
@@ -197,7 +208,7 @@ export default function Wellness() {
           goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
           keyRelationships: keyRelationshipsData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
           has_notes: notesData?.some(n => n.parent_id === task.id),
-          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+          has_delegates: false,
           has_attachments: false,
         }));
 
@@ -205,35 +216,16 @@ export default function Wellness() {
         setDepositIdeas([]);
 
       } else {
-        // First, get deposit idea IDs that belong to this domain
-        const { data: domainIdeaJoins, error: domainIdeaJoinError } = await supabase
-          .from('0008-ap-universal-domains-join')
-          .select('parent_id')
-          .eq('parent_type', 'depositIdea')
-          .eq('domain_id', domainId);
-
-        if (domainIdeaJoinError) throw domainIdeaJoinError;
-
-        if (!domainIdeaJoins || domainIdeaJoins.length === 0) {
-          setDepositIdeas([]);
-          setTasks([]);
-          setLoading(false);
-          return;
-        }
-
-        const domainIdeaIds = domainIdeaJoins.map(j => j.parent_id);
-
-        // Check if aborted
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        // Fetch only deposit ideas that belong to this domain
+        // Optimized: Combine join lookup and deposit ideas fetch in single query
         const { data: depositIdeasData, error: depositIdeasError } = await supabase
           .from('0008-ap-deposit-ideas')
-          .select('*')
+          .select(`
+            *,
+            0008-ap-universal-domains-join!inner(domain_id)
+          `)
           .eq('user_id', user.id)
-          .in('id', domainIdeaIds)
+          .eq('0008-ap-universal-domains-join.domain_id', domainId)
+          .eq('0008-ap-universal-domains-join.parent_type', 'depositIdea')
           .eq('archived', false)
           .is('activated_task_id', null)
           .limit(100);
@@ -301,11 +293,11 @@ export default function Wellness() {
         setLoading(false);
       }
     }
-  };
+  }, [activeView]);
 
   useEffect(() => {
     fetchDomains();
-  }, []);
+  }, [fetchDomains]);
 
   useEffect(() => {
     if (selectedDomain && (activeView === 'deposits' || activeView === 'ideas')) {
@@ -317,17 +309,20 @@ export default function Wellness() {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      if (scoreAbortControllerRef.current) {
+        scoreAbortControllerRef.current.abort();
+      }
     };
-  }, [selectedDomain, activeView]);
+  }, [selectedDomain, activeView, fetchDomainTasks]);
 
-  const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
+  const handleViewChange = useCallback((view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
     if (selectedDomain && (view === 'deposits' || view === 'ideas')) {
       fetchDomainTasks(selectedDomain.id, view);
     }
-  };
+  }, [selectedDomain, fetchDomainTasks]);
 
-  const handleCompleteTask = async (taskId: string) => {
+  const handleCompleteTask = useCallback(async (taskId: string) => {
     try {
       const supabase = getSupabaseClient();
       const { error } = await supabase
@@ -336,16 +331,18 @@ export default function Wellness() {
         .eq('id', taskId);
 
       if (error) throw error;
-      
+
       if (selectedDomain) {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
+      // Refresh score after task completion
+      fetchAuthenticScore(true);
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScore]);
 
-  const handleUpdateDepositIdea = async (depositIdea: any) => {
+  const handleUpdateDepositIdea = useCallback((depositIdea: any) => {
     const editData = {
       ...depositIdea,
       type: 'depositIdea'
@@ -353,9 +350,9 @@ export default function Wellness() {
     setEditingTask(editData);
     setDepositIdeaDetailVisible(false);
     setTaskFormVisible(true);
-  };
+  }, []);
 
-  const handleCancelDepositIdea = async (depositIdea: any) => {
+  const handleCancelDepositIdea = useCallback(async (depositIdea: any) => {
     try {
       const supabase = getSupabaseClient();
       const { error } = await supabase
@@ -368,16 +365,16 @@ export default function Wellness() {
         .eq('id', depositIdea.id);
 
       if (error) throw error;
-      
+
       if (selectedDomain) {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [selectedDomain, activeView, fetchDomainTasks]);
 
-  const handleActivateDepositIdea = async (depositIdea: any) => {
+  const handleActivateDepositIdea = useCallback(async (depositIdea: any) => {
     try {
       // For now, just open the form to create a task based on the deposit idea
       const editData = {
@@ -393,29 +390,29 @@ export default function Wellness() {
     } catch (error) {
       Alert.alert('Error', (error as Error).message || 'Failed to activate deposit idea.');
     }
-  };
-  const handleTaskDoublePress = (task: Task) => {
+  }, []);
+  const handleTaskDoublePress = useCallback((task: Task) => {
     setSelectedTask(task);
     setTaskDetailVisible(true);
-  };
+  }, []);
 
-  const handleDepositIdeaDoublePress = (depositIdea: any) => {
+  const handleDepositIdeaDoublePress = useCallback((depositIdea: any) => {
     setSelectedDepositIdea(depositIdea);
     setDepositIdeaDetailVisible(true);
-  };
+  }, []);
 
-  const handleUpdateTask = (task: Task) => {
+  const handleUpdateTask = useCallback((task: Task) => {
     setEditingTask(task);
     setTaskDetailVisible(false);
     setTimeout(() => setTaskFormVisible(true), 100);
-  };
+  }, []);
 
-  const handleDelegateTask = (task: Task) => {
+  const handleDelegateTask = useCallback((task: Task) => {
     Alert.alert('Delegate', 'Delegation functionality coming soon!');
     setTaskDetailVisible(false);
-  };
+  }, []);
 
-  const handleCancelTask = async (task: Task) => {
+  const handleCancelTask = useCallback(async (task: Task) => {
     try {
       const supabase = getSupabaseClient();
       const { error } = await supabase
@@ -426,34 +423,36 @@ export default function Wellness() {
       if (error) throw error;
       Alert.alert('Success', 'Task has been cancelled');
       setTaskDetailVisible(false);
-      
+
       if (selectedDomain) {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [selectedDomain, activeView, fetchDomainTasks]);
 
-  const handleFormSubmitSuccess = () => {
+  const handleFormSubmitSuccess = useCallback(() => {
     setTaskFormVisible(false);
     setEditingTask(null);
     if (selectedDomain) {
       fetchDomainTasks(selectedDomain.id, activeView);
     }
     refreshGoals();
-  };
+    // Refresh score after task creation/update
+    fetchAuthenticScore(true);
+  }, [selectedDomain, activeView, fetchDomainTasks, refreshGoals, fetchAuthenticScore]);
 
-  const handleFormClose = () => {
+  const handleFormClose = useCallback(() => {
     setTaskFormVisible(false);
     setEditingTask(null);
-  };
+  }, []);
 
-  const handleDomainPress = (domain: Domain) => {
+  const handleDomainPress = useCallback((domain: Domain) => {
     setSelectedDomain(domain);
-  };
+  }, []);
 
-  const handleJournalEntryPress = (entry: any) => {
+  const handleJournalEntryPress = useCallback((entry: any) => {
     if (entry.source_type === 'task') {
       setSelectedTask(entry.source_data);
       setTaskDetailVisible(true);
@@ -466,10 +465,10 @@ export default function Wellness() {
       setEditingTask(editData);
       setTaskFormVisible(true);
     }
-  };
+  }, []);
 
-  const getDomainColor = (domainName: string) => {
-    const colors = {
+  const getDomainColor = useCallback((domainName: string) => {
+    const colors: Record<string, string> = {
       'Community': '#7c3aed',
       'Financial': '#059669',
       'Physical': '#16a34a',
@@ -480,7 +479,7 @@ export default function Wellness() {
       'Spiritual': '#7c3aed',
     };
     return colors[domainName] || '#6b7280';
-  };
+  }, []);
 
   // Render custom header
   const renderWellnessBankHeader = () => {
