@@ -915,7 +915,7 @@ export default function Goals() {
       const { data: userData, error: userError } = await supabase
         .from('0008-ap-users')
         .select('mission_text, vision_text, vision_timeframe')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (userError) throw userError;
