@@ -515,19 +515,27 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
 const [sliceViewportH, setSliceViewportH] = useState(0);
 const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
-    // Auto-scroll to current time position (always, regardless of date)
+    // Auto-scroll logic: scroll to current time for daily view of today, otherwise scroll to top (midnight)
     useEffect(() => {
       if (sliceHasScrolledToNow) return;
       if (!sliceScrollRef.current || sliceViewportH <= 0) return;
 
-      const now = new Date();
-      const minutes = now.getHours() * 60 + now.getMinutes();
-      const currentTimeY = minutes * MINUTE_HEIGHT;
+      const isToday = date === ymdLocal();
+      const isDailyView = viewMode === 'daily';
       const contentH = 24 * 60 * MINUTE_HEIGHT;
 
-      let targetY = currentTimeY - sliceViewportH / 2;
-      if (targetY < 0) targetY = 0;
-      if (targetY > contentH - sliceViewportH) targetY = Math.max(0, contentH - sliceViewportH);
+      let targetY = 0; // Default to midnight (top)
+
+      // Only scroll to current time if viewing today in daily mode
+      if (isToday && isDailyView) {
+        const now = new Date();
+        const minutes = now.getHours() * 60 + now.getMinutes();
+        const currentTimeY = minutes * MINUTE_HEIGHT;
+
+        targetY = currentTimeY - sliceViewportH / 2;
+        if (targetY < 0) targetY = 0;
+        if (targetY > contentH - sliceViewportH) targetY = Math.max(0, contentH - sliceViewportH);
+      }
 
       const cancel = InteractionManager.runAfterInteractions(() => {
         requestAnimationFrame(() => {
@@ -607,8 +615,8 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
                 <View style={styles.hourLine} />
                 <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
                 <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
-                <Text style={[styles.hourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
-                  {hour === 0 ? '12:30 AM' : hour < 12 ? `${hour}:30 AM` : hour === 12 ? '12:30 PM' : `${hour - 12}:30 PM`}
+                <Text style={[styles.halfHourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
+                  :30
                 </Text>
                 <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
               </View>
@@ -751,8 +759,8 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
                   {/* 15-minute increment lines - more visible */}
                   <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
                   <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
-                  <Text style={[styles.hourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
-                    {hour === 0 ? '12:30 AM' : hour < 12 ? `${hour}:30 AM` : hour === 12 ? '12:30 PM' : `${hour - 12}:30 PM`}
+                  <Text style={[styles.halfHourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
+                    :30
                   </Text>
                   <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
                 </View>
@@ -1178,6 +1186,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
+  },
+  halfHourLabel: {
+    width: 60,
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'right',
+    paddingRight: 8,
+    position: 'absolute',
+    left: 0,
+    marginTop: -6,
   },
   hourLine: {
     position: 'absolute',
