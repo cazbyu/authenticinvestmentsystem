@@ -26,7 +26,6 @@ export function InfoTooltip({
   position = 'bottom',
 }: InfoTooltipProps) {
   const [visible, setVisible] = useState(false);
-  const [hoverVisible, setHoverVisible] = useState(false);
   const [iconLayout, setIconLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   const handleIconPress = (event: any) => {
@@ -49,41 +48,17 @@ export function InfoTooltip({
     setVisible(false);
   };
 
-  const handleMouseEnter = () => {
-    if (Platform.OS === 'web') {
-      setHoverVisible(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (Platform.OS === 'web') {
-      setHoverVisible(false);
-    }
-  };
-
   return (
     <>
-      <View
-        style={styles.tooltipWrapper}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+      <TouchableOpacity
+        onPress={handleIconPress}
+        style={styles.iconButton}
+        accessibilityLabel="Show information"
+        accessibilityRole="button"
+        accessibilityHint="Tap to view additional information"
       >
-        <TouchableOpacity
-          onPress={handleIconPress}
-          style={styles.iconButton}
-          accessibilityLabel="Show information"
-          accessibilityRole="button"
-          accessibilityHint="Tap to view additional information"
-        >
-          <HelpCircle size={iconSize} color={iconColor} />
-        </TouchableOpacity>
-
-        {Platform.OS === 'web' && hoverVisible && (
-          <View style={[styles.hoverTooltip, { maxWidth }]}>
-            <Text style={styles.hoverTooltipText}>{content}</Text>
-          </View>
-        )}
-      </View>
+        <HelpCircle size={iconSize} color={iconColor} />
+      </TouchableOpacity>
 
       <Modal
         visible={visible}
@@ -121,38 +96,11 @@ export function InfoTooltip({
   );
 }
 
-
 const styles = StyleSheet.create({
-  tooltipWrapper: {
-    position: 'relative',
-  },
   iconButton: {
     padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  hoverTooltip: {
-    position: 'absolute',
-    top: '100%',
-    left: '50%',
-    transform: [{ translateX: '-50%' }],
-    marginTop: 8,
-    backgroundColor: '#1f2937',
-    borderRadius: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1000,
-    minWidth: 200,
-  },
-  hoverTooltipText: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#ffffff',
-    textAlign: 'left',
   },
   overlay: {
     flex: 1,
