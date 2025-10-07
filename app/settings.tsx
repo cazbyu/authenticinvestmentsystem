@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Header } from '@/components/Header';
 import { ManageRolesModal } from '@/components/settings/ManageRolesModal';
 import { ArchivedTimelinesView } from '@/components/settings/ArchivedTimelinesView';
+import { LinkedAccountsManager } from '@/components/settings/LinkedAccountsManager';
 import { NorthStarEditor } from '@/components/northStar/NorthStarEditor';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -460,7 +461,7 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.settingButton}
             onPress={() => setIsRolesModalVisible(true)}
           >
@@ -470,6 +471,11 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.settingButton}>
             <Text style={[styles.settingButtonText, { color: colors.primary }]}>Export Data</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Linked Accounts Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <LinkedAccountsManager />
         </View>
 
         {/* North Star Section */}
