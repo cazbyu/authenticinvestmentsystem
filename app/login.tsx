@@ -106,16 +106,17 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.content}>
-          <Text style={styles.title}>
-            {isSignUp ? 'Create Account' : 'Welcome Back'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isSignUp
-              ? 'Sign up to start your authentic investment journey'
-              : 'Sign in to continue your authentic investment journey'
-            }
-          </Text>
+        <View style={styles.formWrapper}>
+          <View style={styles.content}>
+            <Text style={styles.title}>
+              {isSignUp ? 'Create Account' : 'Welcome Back'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isSignUp
+                ? 'Sign up to start your authentic investment journey'
+                : 'Sign in to continue your authentic investment journey'
+              }
+            </Text>
 
           <TouchableOpacity
             style={styles.googleButton}
@@ -214,6 +215,7 @@ export default function LoginScreen() {
               }
             </Text>
           </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -228,9 +230,15 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formWrapper: {
+    width: '100%',
+    maxWidth: 450,
+    paddingHorizontal: 24,
   },
   content: {
-    padding: 24,
+    paddingVertical: 24,
   },
   title: {
     fontSize: 28,
