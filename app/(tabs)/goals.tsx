@@ -993,7 +993,7 @@ export default function Goals() {
                 onPress={() => setManageGlobalTimelinesModalVisible(true)}
               >
                 <Users size={20} color="#ffffff" />
-                <Text style={styles.createGlobalTimelineButtonText}>Global Timeline</Text>
+                <Text style={styles.createGlobalTimelineButtonText}>12-Week Goals</Text>
               </TouchableOpacity>
             </View>
           </View>
