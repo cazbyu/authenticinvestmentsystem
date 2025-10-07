@@ -515,11 +515,9 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
 const [sliceViewportH, setSliceViewportH] = useState(0);
 const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
-    // Auto-scroll to current time when viewing today
+    // Auto-scroll to current time position (always, regardless of date)
     useEffect(() => {
-      const isToday = date === ymdLocal();
-
-      if (!isToday || sliceHasScrolledToNow) return;
+      if (sliceHasScrolledToNow) return;
       if (!sliceScrollRef.current || sliceViewportH <= 0) return;
 
       const now = new Date();
@@ -609,6 +607,9 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
                 <View style={styles.hourLine} />
                 <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
                 <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
+                <Text style={[styles.hourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
+                  {hour === 0 ? '12:30 AM' : hour < 12 ? `${hour}:30 AM` : hour === 12 ? '12:30 PM' : `${hour - 12}:30 PM`}
+                </Text>
                 <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
               </View>
             ))}
@@ -746,10 +747,13 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
                     {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                   </Text>
                   <View style={styles.hourLine} />
-                  
+
                   {/* 15-minute increment lines - more visible */}
                   <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
                   <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
+                  <Text style={[styles.hourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
+                    {hour === 0 ? '12:30 AM' : hour < 12 ? `${hour}:30 AM` : hour === 12 ? '12:30 PM' : `${hour - 12}:30 PM`}
+                  </Text>
                   <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
                 </View>
               ))}
