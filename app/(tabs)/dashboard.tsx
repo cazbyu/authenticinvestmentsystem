@@ -16,6 +16,7 @@ import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { DraggableFab } from '@/components/DraggableFab';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
+import { handleActionCompletion } from '@/lib/completionHandler';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
@@ -367,83 +368,32 @@ export default function Dashboard() {
           return;
         }
 
-        // Check if occurrence already exists for this date (safety check)
-        const { checkOccurrenceExists } = await import('@/lib/taskUtils');
-        const occurrenceExists = await checkOccurrenceExists(supabase, task.id, dateToComplete);
+        // Optimistically remove the task from the list
+        setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
 
-        if (occurrenceExists) {
-          console.log('[handleCompleteTask] Occurrence already exists for date:', dateToComplete);
-          // Optimistically remove the task from the list if weekly target reached
-          const weeklyCompleted = completedDates.length;
-          const weeklyTarget = task.weeklyTargetCount || 0;
-          if (weeklyCompleted >= weeklyTarget) {
-            setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-          }
-          return;
+        // Determine timeline info
+        const timeline = task.custom_timeline_id
+          ? { id: task.custom_timeline_id, source: 'custom' as const }
+          : task.user_global_timeline_id
+            ? { id: task.user_global_timeline_id, source: 'global' as const }
+            : null;
+
+        // Use the shared completion handler
+        const result = await handleActionCompletion(
+          supabase,
+          user.id,
+          task.id,
+          dateToComplete,
+          timeline,
+          task.weeklyTargetCount
+        );
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to complete action');
         }
 
-        // Create occurrence for the backward-fill date
-        const occurrencePayload: any = {
-          user_id: user.id,
-          title: task.title,
-          type: 'task',
-          status: 'completed',
-          due_date: dateToComplete,
-          completed_at: new Date().toISOString(),
-          parent_task_id: task.id,
-          is_twelve_week_goal: !!task.user_global_timeline_id,
-        };
-
-        if (task.custom_timeline_id) {
-          occurrencePayload.custom_timeline_id = task.custom_timeline_id;
-        } else if (task.user_global_timeline_id) {
-          occurrencePayload.user_global_timeline_id = task.user_global_timeline_id;
-        }
-
-        const { data: occ, error: occErr } = await supabase
-          .from('0008-ap-tasks')
-          .insert(occurrencePayload)
-          .select('id')
-          .single();
-
-        if (occErr) {
-          // Handle duplicate key constraint error
-          if (occErr.code === '23505') {
-            console.log('[handleCompleteTask] Duplicate occurrence prevented by database constraint');
-            // Refresh data to sync UI
-            fetchData();
-            return;
-          }
-          throw occErr;
-        }
-
-        // Copy universal joins from parent task
-        if (occ) {
-          await Promise.all([
-            supabase.rpc('ap_copy_universal_roles_to_task', {
-              from_parent_id: task.id,
-              to_task_id: occ.id,
-            }),
-            supabase.rpc('ap_copy_universal_domains_to_task', {
-              from_parent_id: task.id,
-              to_task_id: occ.id,
-            }),
-            supabase.rpc('ap_copy_universal_goals_to_task', {
-              from_parent_id: task.id,
-              to_task_id: occ.id,
-            }),
-          ]);
-        }
-
-        // Check if we've reached the weekly target and should remove from dashboard
-        const newCompletedCount = completedDates.length + 1;
-        const weeklyTarget = task.weeklyTargetCount || 0;
-
-        if (newCompletedCount >= weeklyTarget) {
-          // Optimistically remove the task from the list
-          setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-        } else {
-          // Just refresh to update the counter
+        // If the action shouldn't be removed (not yet at target), re-add it to the list
+        if (!result.shouldRemoveFromUI) {
           fetchData();
         }
       } else {

@@ -19,6 +19,7 @@ import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 import { calculateAuthenticScore, calculateTotalGoalProgress } from '@/lib/taskUtils';
 import { formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
+import { handleActionCompletion, handleActionUncompletion } from '@/lib/completionHandler';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, Minus, X } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
 import { router } from 'expo-router';
@@ -162,7 +163,6 @@ export default function Goals() {
       if (!user) throw new Error('Not authenticated');
 
       if (completed) {
-        // If currently completed, undo the completion by deleting the occurrence
         // Optimistically update the UI immediately
         setWeekGoalActions(prevActions => {
           const updatedActions = { ...prevActions };
@@ -194,24 +194,20 @@ export default function Goals() {
           return updatedActions;
         });
 
-        const { error: deleteError } = await supabase
-          .from('0008-ap-tasks')
-          .delete()
-          .eq('parent_task_id', actionId)
-          .eq('due_date', date)
-          .eq('type', 'task');
+        const result = await handleActionUncompletion(supabase, actionId, date);
 
-        if (deleteError) throw deleteError;
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to uncomplete action');
+        }
       } else {
-        // If not completed, check if occurrence already exists (safety check)
-        const { checkOccurrenceExists } = await import('@/lib/taskUtils');
-        const occurrenceExists = await checkOccurrenceExists(supabase, actionId, date);
-
-        if (occurrenceExists) {
-          console.log('[handleToggleCompletion] Occurrence already exists for date:', date);
-          // Refresh to sync UI
-          await fetchWeekActions(timelineGoals);
-          return;
+        // Find the weekly target for this action to pass to the completion handler
+        let weeklyTarget = 0;
+        for (const goalId in weekGoalActions) {
+          const action = weekGoalActions[goalId]?.find(a => a.id === actionId);
+          if (action) {
+            weeklyTarget = action.weeklyTarget;
+            break;
+          }
         }
 
         // Optimistically update the UI immediately
@@ -262,40 +258,27 @@ export default function Goals() {
           return updatedActions;
         });
 
-        // Create a completion occurrence
-        const { data: parent } = await supabase
-          .from('0008-ap-tasks')
-          .select('id, title')
-          .eq('id', actionId)
-          .single();
+        const result = await handleActionCompletion(
+          supabase,
+          user.id,
+          actionId,
+          date,
+          selectedTimeline,
+          weeklyTarget
+        );
 
-        if (!parent) throw new Error('Parent task not found');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to complete action');
+        }
 
-        const occurrencePayload: any = {
-          user_id: user.id,
-          title: parent.title,
-          type: 'task',
-          status: 'completed',
-          due_date: date,
-          completed_at: new Date().toISOString(),
-          parent_task_id: actionId,
-          is_twelve_week_goal: selectedTimeline.source === 'global',
-          ...(selectedTimeline.source === 'custom' ? { custom_timeline_id: selectedTimeline.id } : {}),
-        };
-
-        const { error: insertError } = await supabase
-          .from('0008-ap-tasks')
-          .insert(occurrencePayload);
-
-        if (insertError) {
-          // Handle duplicate key constraint error
-          if (insertError.code === '23505') {
-            console.log('[handleToggleCompletion] Duplicate occurrence prevented by database constraint');
-            // Refresh to sync UI
-            await fetchWeekActions(timelineGoals);
-            return;
-          }
-          throw insertError;
+        if (result.shouldRemoveFromUI) {
+          setWeekGoalActions(prevActions => {
+            const updatedActions = { ...prevActions };
+            for (const goalId in updatedActions) {
+              updatedActions[goalId] = updatedActions[goalId].filter(a => a.id !== actionId);
+            }
+            return updatedActions;
+          });
         }
       }
 
