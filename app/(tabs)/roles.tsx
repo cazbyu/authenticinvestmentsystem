@@ -20,7 +20,6 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoals } from '@/hooks/useGoals';
 import { calculateAuthenticScore as calculateScore, calculateAuthenticScoreForRole, calculateGoalProgress, GoalProgressData } from '@/lib/taskUtils';
-import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -42,7 +41,6 @@ interface KeyRelationship {
 
 export default function Roles() {
   const navigation = useNavigation<DrawerNavigation>();
-  const { authenticScore, refreshScoreForRole } = useAuthenticScore();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
@@ -66,14 +64,14 @@ export default function Roles() {
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [taskDetailVisible, setTaskDetailVisible] = useState(false);
   const [depositIdeaDetailVisible, setDepositIdeaDetailVisible] = useState(false);
-
+  
   // Selected items
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
-  const [roleAuthenticScore, setRoleAuthenticScore] = useState(0);
+  const [authenticScore, setAuthenticScore] = useState(0);
   const [isCalculatingScore, setIsCalculatingScore] = useState(false);
   const [isLoadingRole, setIsLoadingRole] = useState(false);
   const fetchAbortController = useRef<AbortController | null>(null);
@@ -131,18 +129,22 @@ export default function Roles() {
     }
   };
 
-  const calculateAuthenticScoreLocal = async (roleId?: string) => {
+  const calculateAuthenticScore = async (roleId?: string) => {
     if (isCalculatingScore) return;
 
     setIsCalculatingScore(true);
     try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       let score: number;
       if (roleId) {
-        score = await refreshScoreForRole(roleId, true);
+        score = await calculateAuthenticScoreForRole(supabase, user.id, roleId);
       } else {
-        score = authenticScore;
+        score = await calculateScore(supabase, user.id);
       }
-      setRoleAuthenticScore(score);
+      setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
     } finally {
@@ -199,7 +201,7 @@ export default function Roles() {
       setRoles(data || []);
 
       // Calculate score asynchronously without blocking
-      setTimeout(() => calculateAuthenticScoreLocal(), 0);
+      setTimeout(() => calculateAuthenticScore(), 0);
     } catch (error) {
       console.error('Error fetching roles:', error);
       Alert.alert('Error', (error as Error).message);
@@ -543,7 +545,7 @@ export default function Roles() {
           // Fetch in parallel for better performance
           const krPromise = fetchKeyRelationships(selectedRole.id);
           const tasksPromise = fetchRoleTasks(selectedRole.id, activeView);
-          const scorePromise = calculateAuthenticScoreLocal(selectedRole.id);
+          const scorePromise = calculateAuthenticScore(selectedRole.id);
 
           await Promise.all([krPromise, tasksPromise, scorePromise]);
 
@@ -570,7 +572,7 @@ export default function Roles() {
       };
     } else if (!selectedRole && !isLoadingRole) {
       // When no role is selected, show total authentic score
-      calculateAuthenticScoreLocal();
+      calculateAuthenticScore();
     }
   }, [selectedRole?.id, activeView, isLoadingRole]);
 

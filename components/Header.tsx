@@ -4,7 +4,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { Menu, ArrowUpDown, ChevronLeft, CreditCard as Edit } from 'lucide-react-native';
-import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -22,14 +21,14 @@ interface HeaderProps {
   cycleTitle?: string;
 }
 
-export function Header({
-  title,
-  activeView,
-  onViewChange,
-  onSortPress,
-  authenticScore: propAuthenticScore,
-  onBackPress,
-  backgroundColor,
+export function Header({ 
+  title, 
+  activeView, 
+  onViewChange, 
+  onSortPress, 
+  authenticScore = 85, 
+  onBackPress, 
+  backgroundColor, 
   onEditPress,
   daysRemaining,
   cycleProgressPercentage,
@@ -38,10 +37,6 @@ export function Header({
   const navigation = useNavigation<DrawerNavigation>();
   const router = useRouter();
   const canGoBack = router.canGoBack();
-  const { authenticScore: contextAuthenticScore } = useAuthenticScore();
-
-  // Use prop if provided (for role/domain-specific scores), otherwise use context
-  const displayScore = propAuthenticScore ?? contextAuthenticScore;
 
   const handleLeftButtonPress = () => {
     if (onBackPress) {
@@ -75,7 +70,7 @@ export function Header({
         
         <View style={styles.scoreContainer}>
           <Text style={styles.scoreLabel}>Authentic Total Score</Text>
-          <Text style={styles.scoreValue}>{displayScore}</Text>
+          <Text style={styles.scoreValue}>{authenticScore}</Text>
         </View>
         
         {/* Cycle Progress Section */}

@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { SideMenu } from '@/components/SideMenu';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { AuthenticScoreProvider } from '@/contexts/AuthenticScoreContext';
 import '@/lib/calendarLocale';
 
 console.log('ENTRY: file loaded');
@@ -16,8 +15,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <AuthenticScoreProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <Drawer
           drawerContent={() => <SideMenu />}
           screenOptions={{
@@ -35,8 +33,7 @@ export default function RootLayout() {
           <Drawer.Screen name="+not-found" />
         </Drawer>
         <StatusBar style="auto" />
-        </GestureHandlerRootView>
-      </AuthenticScoreProvider>
+      </GestureHandlerRootView>
     </ThemeProvider>
   );
 }
