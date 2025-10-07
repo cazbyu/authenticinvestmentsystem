@@ -569,8 +569,15 @@ export default function Goals() {
       const { data: globalData, error: globalError } = await supabase
         .from('0008-ap-user-global-timelines')
         .select(`
-          *,
-          global_cycle:0008-ap-global-cycles(
+          id,
+          user_id,
+          global_cycle_id,
+          status,
+          week_start_day,
+          activated_at,
+          created_at,
+          updated_at,
+          global_cycle:0008-ap-global-cycles!inner(
             id,
             title,
             cycle_label,
@@ -590,9 +597,9 @@ export default function Goals() {
           timelines.push({
             id: timeline.id,
             source: 'global',
-            title: timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label,
-            start_date: timeline.start_date,
-            end_date: timeline.end_date,
+            title: timeline.global_cycle?.title || timeline.global_cycle?.cycle_label || 'Global Timeline',
+            start_date: timeline.global_cycle?.start_date || '',
+            end_date: timeline.global_cycle?.end_date || '',
             global_cycle_id: timeline.global_cycle_id ?? timeline.global_cycle?.id,
             global_cycle: timeline.global_cycle || null,
           });
