@@ -504,6 +504,11 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
     currentTimeString: string;
   }> =
 ({ date, height = 0.5, viewMode, currentTimePosition: propCurrentTimePosition, currentTimeString: propCurrentTimeString }) => {
+    // Normalize date at the top of the component for consistent comparison throughout
+    const today = formatLocalDate(new Date());
+    const normalizedDate = date.split('T')[0]; // Strip any time component
+    const isToday = normalizedDate === today;
+
     // Local ref/height for this embedded grid so it scrolls independently
     const sliceScrollRef = useRef<ScrollView>(null);
 const [sliceViewportH, setSliceViewportH] = useState(0);
@@ -513,11 +518,6 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
     useEffect(() => {
       if (sliceHasScrolledToNow) return;
       if (!sliceScrollRef.current || sliceViewportH <= 0) return;
-
-      const today = formatLocalDate(new Date());
-      // Normalize both dates to ensure consistent comparison
-      const normalizedDate = date.split('T')[0]; // Strip any time component
-      const isToday = normalizedDate === today;
       const isDailyView = viewMode === 'daily';
       const contentH = 24 * 60 * MINUTE_HEIGHT;
 
@@ -650,7 +650,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
             })}
 
             {/* Optional: show now-line only if this slice is "today" */}
-            {date === formatLocalDate(new Date()) && (
+            {isToday && (
               <View style={[styles.currentTimeLine, { top: propCurrentTimePosition }]}>
                 <View style={styles.currentTimeDot} />
                 <View style={styles.currentTimeLineBar} />
