@@ -86,9 +86,9 @@ export default function CalendarScreen() {
       const totalMinutes = hours * 60 + minutes;
       setCurrentTimePosition(totalMinutes * MINUTE_HEIGHT);
       setCurrentTimeString(now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
+        hour: 'numeric',
         minute: '2-digit',
-        hour12: false
+        hour12: true
       }));
     };
 
@@ -312,10 +312,10 @@ export default function CalendarScreen() {
 
   const formatTime = (timeString: string) => {
     const date = new Date(timeString);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
     });
   };
 
@@ -604,14 +604,14 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
             {hours.map(hour => (
               <View key={hour} style={[styles.hourSlot, { height: HOUR_HEIGHT }]}>
                 <Text style={styles.hourLabel}>
-                  {String(hour).padStart(2, '0')}:00
+                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                 </Text>
                 <View style={styles.hourLine} />
                 <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
                 <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
                 <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
               </View>
-            )))
+            ))}
 
             {/* Timed events with overlap layout */}
             {eventsWithLayout.map((event, idx) => {
@@ -743,16 +743,16 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
               {hours.map(hour => (
                 <View key={hour} style={[styles.hourSlot, { height: HOUR_HEIGHT }]}>
                   <Text style={styles.hourLabel}>
-                    {String(hour).padStart(2, '0')}:00
+                    {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
                   </Text>
                   <View style={styles.hourLine} />
-
+                  
                   {/* 15-minute increment lines - more visible */}
                   <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
                   <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
                   <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
                 </View>
-              ))
+              ))}
               
               {/* Timed events with absolute positioning */}
               {eventsWithLayout.map((event, idx) => {
