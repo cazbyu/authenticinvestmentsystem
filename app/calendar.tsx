@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, FlatList, Modal, InteractionManager } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { Header } from '@/components/Header';
 import { TaskCard, Task } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
-import { CalendarEventDisplay } from '@/components/calendar/CalendarEventDisplay';
+import { HourlyCalendarGrid } from '@/components/calendar/HourlyCalendarGrid';
 import { getSupabaseClient } from '@/lib/supabase';
-import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
 import { expandEventsWithRecurrence, expandEventsForDate } from '@/lib/recurrenceUtils';
 import { getVisibleWindow } from '@/lib/recurrenceUtils';
 import { formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
@@ -51,14 +51,8 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
-  const hoursScrollRef = React.useRef<ScrollView>(null);
-  const [hoursViewportH, setHoursViewportH] = useState(0);
-  const [hasScrolledToNow, setHasScrolledToNow] = useState(false);
   const [currentTimePosition, setCurrentTimePosition] = useState(0);
   const [currentTimeString, setCurrentTimeString] = useState('');
-  const timeGridRef = useRef<View>(null);
-  const [timeGridWidth, setTimeGridWidth] = useState(0);
-  const [allDayHeight, setAllDayHeight] = useState(0);
   
   // Modal states
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
@@ -92,36 +86,6 @@ export default function CalendarScreen() {
     return () => clearInterval(timeInterval);
   }, []);
 
-  // Auto-scroll to current time when viewing today in daily mode
-  useEffect(() => {
-    const isDaily = viewMode === 'daily';
-    const isToday = selectedDate === formatLocalDate(new Date());
-
-    if (!isDaily || !isToday || hasScrolledToNow) return;
-    if (!hoursScrollRef.current || hoursViewportH <= 0) return;
-
-    const now = new Date();
-    const minutes = now.getHours() * 60 + now.getMinutes();
-    const currentTimeY = minutes * MINUTE_HEIGHT;
-    const contentH = 24 * 60 * MINUTE_HEIGHT;
-
-    let targetY = currentTimeY - hoursViewportH / 2;
-    if (targetY < 0) targetY = 0;
-    if (targetY > contentH - hoursViewportH) targetY = Math.max(0, contentH - hoursViewportH);
-
-    const cancel = InteractionManager.runAfterInteractions(() => {
-      requestAnimationFrame(() => {
-        hoursScrollRef.current?.scrollTo({ y: targetY, animated: false });
-        setHasScrolledToNow(true);
-      });
-    });
-
-    return () => cancel && (cancel as any).done === false && (cancel as any).cancel?.();
-  }, [viewMode, selectedDate, hoursViewportH, hasScrolledToNow]);
-
-  useEffect(() => {
-    setHasScrolledToNow(false);
-  }, [viewMode, selectedDate]);
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
     let points = 0;
@@ -407,78 +371,6 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
     return week;
   };
 
-  // Overlap detection and column assignment algorithm
-  const calculateEventLayout = (events: Task[]) => {
-    if (events.length === 0) return [];
-
-    // Sort events by start time
-    const sortedEvents = [...events].sort((a, b) => {
-      const aStart = getTimeInMinutes(a.start_time!);
-      const bStart = getTimeInMinutes(b.start_time!);
-      return aStart - bStart;
-    });
-
-    const eventsWithLayout = sortedEvents.map(event => ({
-      ...event,
-      startMinutes: getTimeInMinutes(event.start_time!),
-      endMinutes: getTimeInMinutes(event.end_time!),
-      column: 0,
-      maxColumns: 1,
-    }));
-
-    // Assign columns using greedy algorithm
-    const columns: number[] = []; // Track end time of last event in each column
-
-    for (const event of eventsWithLayout) {
-      // Find first available column
-      let assignedColumn = -1;
-      for (let i = 0; i < columns.length; i++) {
-        if (columns[i] <= event.startMinutes) {
-          assignedColumn = i;
-          break;
-        }
-      }
-
-      if (assignedColumn === -1) {
-        // Create new column
-        assignedColumn = columns.length;
-        columns.push(event.endMinutes);
-      } else {
-        // Use existing column
-        columns[assignedColumn] = event.endMinutes;
-      }
-
-      event.column = assignedColumn;
-    }
-
-    // Calculate max overlapping columns for each event
-    for (const event of eventsWithLayout) {
-      let maxOverlaps = 1;
-      
-      // Find all events that overlap with this event
-      const overlappingEvents = eventsWithLayout.filter(other => 
-        other !== event &&
-        other.startMinutes < event.endMinutes &&
-        other.endMinutes > event.startMinutes
-      );
-
-      // Include the current event in the count
-      const allOverlappingEvents = [event, ...overlappingEvents];
-      
-      // Find the maximum column number among overlapping events + 1
-      maxOverlaps = Math.max(...allOverlappingEvents.map(e => e.column)) + 1;
-      
-      event.maxColumns = maxOverlaps;
-    }
-
-    return eventsWithLayout;
-  };
-
-  // Helper function to convert time string to minutes from midnight
-  const getTimeInMinutes = (timeString: string) => {
-    const date = new Date(timeString);
-    return date.getHours() * 60 + date.getMinutes();
-  };
 
   const navigateDate = (direction: 'prev' | 'next') => {
     const newDate = new Date(currentDate);
@@ -495,207 +387,15 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
     setSelectedDate(formatLocalDate(newDate));
   };
 
-  // Mini daily view used inside Weekly/Monthly: tasks/all-day on top, time grid below.
-  const DailySlice: React.FC<{
-    date: string;
-    height?: number;
-    viewMode?: 'daily' | 'weekly' | 'monthly';
-    currentTimePosition: number;
-    currentTimeString: string;
-  }> =
-({ date, height = 0.5, viewMode, currentTimePosition: propCurrentTimePosition, currentTimeString: propCurrentTimeString }) => {
-    // Normalize date at the top of the component for consistent comparison throughout
-    const today = formatLocalDate(new Date());
-    const normalizedDate = date.split('T')[0]; // Strip any time component
-    const isToday = normalizedDate === today;
-
-    // Local ref/height for this embedded grid so it scrolls independently
-    const sliceScrollRef = useRef<ScrollView>(null);
-const [sliceViewportH, setSliceViewportH] = useState(0);
-const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
-
-    // Auto-scroll logic: scroll to current time for daily view of today, otherwise scroll to 8 AM
-    useEffect(() => {
-      if (sliceHasScrolledToNow) return;
-      if (!sliceScrollRef.current || sliceViewportH <= 0) return;
-      const isDailyView = viewMode === 'daily';
-      const contentH = 24 * 60 * MINUTE_HEIGHT;
-
-      let targetY = 0;
-
-      // Only scroll to current time if viewing today
-      if (isToday) {
-        const now = new Date();
-        const minutes = now.getHours() * 60 + now.getMinutes();
-        const currentTimeY = minutes * MINUTE_HEIGHT;
-
-        targetY = currentTimeY - sliceViewportH / 2;
-        if (targetY < 0) targetY = 0;
-        if (targetY > contentH - sliceViewportH) targetY = Math.max(0, contentH - sliceViewportH);
-      } else {
-        // For Weekly and Monthly views, scroll to 8 AM
-        const eightAM = 8 * 60 * MINUTE_HEIGHT;
-        targetY = eightAM;
-        if (targetY > contentH - sliceViewportH) targetY = Math.max(0, contentH - sliceViewportH);
-      }
-
-      const cancel = InteractionManager.runAfterInteractions(() => {
-        requestAnimationFrame(() => {
-          sliceScrollRef.current?.scrollTo({ y: targetY, animated: false });
-          setSliceHasScrolledToNow(true);
-        });
-      });
-
-      return () => cancel && (cancel as any).done === false && (cancel as any).cancel?.();
-    }, [date, sliceViewportH, sliceHasScrolledToNow, viewMode]);
-
-    // Reset scroll state when date or viewMode changes
-    useEffect(() => {
-      setSliceHasScrolledToNow(false);
-    }, [date, viewMode]);
-
-    // Constants consistent with main daily grid
-    const HOUR_HEIGHT = 60 * MINUTE_HEIGHT;
-    const COLUMN_GUTTER = 4;
-
-    // Get expanded events for this specific date (includes recurring instances)
-    const expandedTasks = expandEventsForDate(tasks, date);
-    
-    // All-day / untimed for the given date
-    const allDayItems = expandedTasks.filter(task => 
-      !task.start_time || !task.end_time || task.is_all_day
-    );
-
-    // Timed events for absolute positioning
-    const timedEvents = expandedTasks.filter(task => 
-      task.start_time && task.end_time && !task.is_all_day
-    );
-
-    const eventsWithLayout = calculateEventLayout(timedEvents);
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-
-    return (
-      <View style={{ flex: 1, minHeight: 240, height: `${height * 100}%` }}>
-        {/* All-day header */}
-        {allDayItems.length > 0 && (
-          <View style={styles.allDaySection}>
-            <Text style={styles.allDayLabel}>All Day</Text>
-            <View style={styles.allDayEvents}>
-              {uniqByIdAndDate(allDayItems).map((task, idx) => (
-  <TaskCard
-    key={`${task.id}-${task.start_date || task.due_date || date}-${task.type || 'task'}-${idx}`}
-    task={task}
-    onComplete={handleCompleteTask}
-    onDoublePress={handleTaskDoublePress}
-  />
-))}
-
-            </View>
-          </View>
-        )}
-
-        {/* Time grid */}
-        <ScrollView
-          ref={sliceScrollRef}
-          onLayout={(e) => setSliceViewportH(e.nativeEvent.layout.height)}
-          style={styles.hoursScrollView}
-          showsVerticalScrollIndicator
-        >
-          <View
-            style={[styles.timeGrid, { height: 24 * HOUR_HEIGHT }]}
-            onLayout={(event) => {
-              const { width } = event.nativeEvent.layout;
-              setTimeGridWidth(width - 70); // re-use same label width logic
-            }}
-          >
-            {/* Hour markers */}
-            {hours.map(hour => (
-              <View key={hour} style={[styles.hourSlot, { height: HOUR_HEIGHT }]}>
-                <Text style={styles.hourLabel}>
-                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
-                </Text>
-                <View style={styles.hourLine} />
-                <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
-                <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
-                <Text style={[styles.halfHourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
-                  :30
-                </Text>
-                <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
-              </View>
-            ))}
-
-            {/* Timed events with overlap layout */}
-            {eventsWithLayout.map((event, idx) => {
-              const top = event.startMinutes * MINUTE_HEIGHT;
-              const heightPx = Math.max((event.endMinutes - event.startMinutes) * MINUTE_HEIGHT, 30);
-              const availableWidth = timeGridWidth > 0 ? timeGridWidth - 16 : 200;
-              const colWidth = (availableWidth - (event.maxColumns - 1) * COLUMN_GUTTER) / event.maxColumns;
-              const leftOffset = event.column * (colWidth + COLUMN_GUTTER);
-
-              return (
-                <CalendarEventDisplay
-      key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${date}-${event.type}-${idx}`}
-      task={event}
-      onDoublePress={handleTaskDoublePress}
-                  style={{
-                    position: 'absolute',
-                    top,
-                    height: heightPx,
-                    left: 70 + leftOffset,
-                    width: colWidth,
-                    zIndex: 1,
-                  }}
-                />
-              );
-            })}
-
-            {/* Optional: show now-line only if this slice is "today" */}
-            {isToday && (
-              <View style={[styles.currentTimeLine, { top: propCurrentTimePosition }]}>
-                <View style={styles.currentTimeDot} />
-                <View style={styles.currentTimeLineBar} />
-                <View style={styles.currentTimeLabel}>
-                  <Text style={styles.currentTimeLabelText}>
-                    {propCurrentTimeString}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      </View>
-    );
-  };
 
   const renderDailyView = () => {
-    // Get expanded tasks for the selected date (includes recurring instances)
-    // Expand events (recurring) AND include same-day "Anytime" tasks
-const expandedEvents = expandEventsForDate(tasks, selectedDate);
-const anytimeTasks = tasks.filter(t =>
-  (t.type === 'task') &&
-  (t.due_date === selectedDate) &&
-  (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time))
-);
-const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
-    
-    // Constants for time grid layout
-    const HOUR_HEIGHT = 60 * MINUTE_HEIGHT; // 90 pixels per hour
-    const COLUMN_GUTTER = 4; // pixels between columns
-    
-    // Get events with specific times for absolute positioning
-    const timedEvents = expandedTasks.filter(task => 
-      task.start_time && task.end_time && !task.is_all_day
+    const expandedEvents = expandEventsForDate(tasks, selectedDate);
+    const anytimeTasks = tasks.filter(t =>
+      (t.type === 'task') &&
+      (t.due_date === selectedDate) &&
+      (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time))
     );
-    
-    // Calculate layout for overlapping events
-    const eventsWithLayout = calculateEventLayout(timedEvents);
-    
-    // Get all-day events and tasks without specific times
-    const allDayItems = expandedTasks.filter(task => 
-      !task.start_time || !task.end_time || task.is_all_day
-    );
-
-    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
 
     return (
       <View style={styles.dailyViewContainer}>
@@ -712,108 +412,15 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
         </View>
 
         <View style={styles.dailyContent}>
-          {/* All-day events and tasks without specific times */}
-          {allDayItems.length > 0 && (
-            <View 
-              style={styles.allDaySection}
-              onLayout={(event) => {
-                const { height } = event.nativeEvent.layout;
-                setAllDayHeight(height);
-              }}
-            >
-              <Text style={styles.allDayLabel}>All Day</Text>
-              <View style={styles.allDayEvents}>
-                {allDayItems.map((task, idx) => (
-  <TaskCard
-    key={`${task.id}-${task.start_date || task.due_date || selectedDate}-${idx}`}
-                    task={task}
-                    onComplete={handleCompleteTask}
-                    onDoublePress={handleTaskDoublePress}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
-          
-          {/* Time grid with hour slots */}
-          <ScrollView
-            ref={hoursScrollRef}
-            onLayout={(e) => setHoursViewportH(e.nativeEvent.layout.height)}
-            style={styles.hoursScrollView}
-            showsVerticalScrollIndicator={true}
-          >
-            <View 
-              ref={timeGridRef}
-              style={[styles.timeGrid, { height: 24 * HOUR_HEIGHT }]}
-              onLayout={(event) => {
-                const { width } = event.nativeEvent.layout;
-                setTimeGridWidth(width - 70); // Subtract hour label width
-              }}
-            >
-              {/* Hour markers */}
-              {hours.map(hour => (
-                <View key={hour} style={[styles.hourSlot, { height: HOUR_HEIGHT }]}>
-                  <Text style={styles.hourLabel}>
-                    {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
-                  </Text>
-                  <View style={styles.hourLine} />
-
-                  {/* 15-minute increment lines - more visible */}
-                  <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.25 }]} />
-                  <View style={[styles.halfHourLine, { top: HOUR_HEIGHT * 0.5 }]} />
-                  <Text style={[styles.halfHourLabel, { top: HOUR_HEIGHT * 0.5 }]}>
-                    :30
-                  </Text>
-                  <View style={[styles.quarterHourLine, { top: HOUR_HEIGHT * 0.75 }]} />
-                </View>
-              ))}
-              
-              {/* Timed events with absolute positioning */}
-              {eventsWithLayout.map((event, idx) => {
-  const top = event.startMinutes * MINUTE_HEIGHT;
-  const height = Math.max((event.endMinutes - event.startMinutes) * MINUTE_HEIGHT, 30); // Minimum 30px height
-                
-                // Calculate width and left position for overlapping events
-                const availableWidth = timeGridWidth > 0 ? timeGridWidth - 16 : 200; // Fallback width
-                const columnWidth = (availableWidth - (event.maxColumns - 1) * COLUMN_GUTTER) / event.maxColumns;
-                const leftOffset = event.column * (columnWidth + COLUMN_GUTTER);
-                
-                return (
-                  <CalendarEventDisplay
-      key={`${event.id}-${event.start_time || ''}-${event.end_time || ''}-${selectedDate}-${idx}`}
-      task={event}
-      onDoublePress={handleTaskDoublePress}
-                    style={{
-                      position: 'absolute',
-                      top,
-                      height,
-                      left: 70 + leftOffset, // Account for hour label width + column offset
-                      width: columnWidth,
-                      zIndex: 1,
-                    }}
-                  />
-                );
-              })}
-              
-              {/* Current time indicator - only show for today */}
-              {selectedDate === formatLocalDate(new Date()) && (
-                <View
-                  style={[
-                    styles.currentTimeLine,
-                    { top: currentTimePosition }
-                  ]}
-                >
-                  <View style={styles.currentTimeDot} />
-                  <View style={styles.currentTimeLineBar} />
-                  <View style={styles.currentTimeLabel}>
-                    <Text style={styles.currentTimeLabelText}>
-                      {currentTimeString}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          </ScrollView>
+          <HourlyCalendarGrid
+            selectedDate={selectedDate}
+            expandedTasks={expandedTasks}
+            currentTimePosition={currentTimePosition}
+            currentTimeString={currentTimeString}
+            onCompleteTask={handleCompleteTask}
+            onTaskDoublePress={handleTaskDoublePress}
+            viewMode="daily"
+          />
         </View>
       </View>
     );
@@ -903,18 +510,25 @@ const dayEvents = expandedTasks.map(task => ({
           })}
         </View>
 
-        {/* Selected day details */}
         <View style={styles.selectedDayDetails}>
           <Text style={styles.selectedDayTitle}>
             {formatDateForDisplay(selectedDate)}
           </Text>
-          {/* Bottom half: embedded daily slice for the selected day */}
-          <DailySlice
-            date={selectedDate}
-            height={0.5}
-            viewMode="weekly"
+          <HourlyCalendarGrid
+            selectedDate={selectedDate}
+            expandedTasks={uniqByIdAndDate([
+              ...expandEventsForDate(tasks, selectedDate),
+              ...tasks.filter(t =>
+                (t.type === 'task') &&
+                (t.due_date === selectedDate) &&
+                (t.is_all_day || t.is_anytime || (!t.start_time && !t.end_time))
+              )
+            ])}
             currentTimePosition={currentTimePosition}
             currentTimeString={currentTimeString}
+            onCompleteTask={handleCompleteTask}
+            onTaskDoublePress={handleTaskDoublePress}
+            viewMode="weekly"
           />
         </View>
       </View>
@@ -959,13 +573,14 @@ const dayEvents = expandedTasks.map(task => ({
           <Text style={styles.selectedDateLabel}>
             {formatDateForDisplay(selectedDate)}
           </Text>
-          {/* Bottom half: embedded daily slice for the selected date */}
-          <DailySlice
-            date={selectedDate}
-            height={0.5}
-            viewMode="monthly"
+          <HourlyCalendarGrid
+            selectedDate={selectedDate}
+            expandedTasks={expandEventsForDate(tasks, selectedDate)}
             currentTimePosition={currentTimePosition}
             currentTimeString={currentTimeString}
+            onCompleteTask={handleCompleteTask}
+            onTaskDoublePress={handleTaskDoublePress}
+            viewMode="monthly"
           />
         </View>
       </View>
