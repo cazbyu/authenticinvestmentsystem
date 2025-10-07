@@ -96,7 +96,12 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('[ManageGlobalTimelinesModal] No authenticated user found');
+        return;
+      }
+
+      console.log('[ManageGlobalTimelinesModal] Fetching active timelines for user:', user.id);
 
       const { data, error } = await supabase
         .from('0008-ap-user-global-timelines')
@@ -125,10 +130,16 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
+      console.log('[ManageGlobalTimelinesModal] Active timelines query result:', {
+        count: data?.length || 0,
+        error: error,
+        timelines: data?.map(t => ({ id: t.id, cycle_id: t.global_cycle_id, title: t.global_cycle?.title }))
+      });
+
       if (error) throw error;
       setActiveTimelines(data || []);
     } catch (error) {
-      console.error('Error fetching active timelines:', error);
+      console.error('[ManageGlobalTimelinesModal] Error fetching active timelines:', error);
       Alert.alert('Error', (error as Error).message);
     }
   };
@@ -474,25 +485,47 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   const handleWeekStartSelection = async (weekStartDay: 'sunday' | 'monday') => {
     if (!selectedCycleToActivate) return;
 
+    console.log('[ManageGlobalTimelinesModal] Starting timeline activation');
+    console.log('[ManageGlobalTimelinesModal] Cycle ID:', selectedCycleToActivate.id);
+    console.log('[ManageGlobalTimelinesModal] Week start day:', weekStartDay);
+
     setActivating(true);
     setShowWeekStartModal(false);
 
     try {
       const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[ManageGlobalTimelinesModal] Current user ID:', user?.id);
 
+      console.log('[ManageGlobalTimelinesModal] Calling fn_activate_user_global_timeline...');
       const { data, error } = await supabase.rpc('fn_activate_user_global_timeline', {
         p_global_cycle_id: selectedCycleToActivate.id,
         p_week_start_day: weekStartDay
       });
 
-      if (error) throw error;
+      console.log('[ManageGlobalTimelinesModal] RPC Response:', { data, error });
+
+      if (error) {
+        console.error('[ManageGlobalTimelinesModal] RPC Error:', error);
+        throw error;
+      }
+
+      console.log('[ManageGlobalTimelinesModal] Timeline activated successfully. New timeline ID:', data);
 
       Alert.alert('Success', 'Global timeline activated successfully!');
+
+      console.log('[ManageGlobalTimelinesModal] Refreshing timeline data...');
       await fetchData();
+      console.log('[ManageGlobalTimelinesModal] Calling onUpdate callback...');
       onUpdate?.();
+      console.log('[ManageGlobalTimelinesModal] Activation complete');
     } catch (error) {
-      console.error('Error activating timeline:', error);
-      Alert.alert('Error', (error as Error).message);
+      console.error('[ManageGlobalTimelinesModal] Error activating timeline:', error);
+      console.error('[ManageGlobalTimelinesModal] Error details:', JSON.stringify(error, null, 2));
+      Alert.alert(
+        'Activation Error',
+        `Failed to activate timeline: ${(error as Error).message}\n\nPlease try again or contact support if the problem persists.`
+      );
     } finally {
       setActivating(false);
       setSelectedCycleToActivate(null);

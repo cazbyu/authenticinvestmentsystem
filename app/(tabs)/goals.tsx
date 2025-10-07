@@ -530,14 +530,20 @@ export default function Goals() {
 
 
   const fetchAllTimelines = async () => {
+    console.log('[Goals] fetchAllTimelines called');
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('[Goals] No authenticated user found');
+        return;
+      }
 
+      console.log('[Goals] Fetching timelines for user:', user.id);
       const timelines: Timeline[] = [];
 
       // Fetch custom timelines
+      console.log('[Goals] Querying custom timelines...');
       const { data: customData, error: customError } = await supabase
         .from('0008-ap-custom-timelines')
         .select('*')
@@ -545,7 +551,7 @@ export default function Goals() {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      console.log('Custom timelines query result:', {
+      console.log('[Goals] Custom timelines query result:', {
         data: customData,
         error: customError,
         count: customData?.length || 0
@@ -563,9 +569,11 @@ export default function Goals() {
             timeline_type: timeline.timeline_type,
           });
         });
+        console.log('[Goals] Added', customData.length, 'custom timelines');
       }
 
       // Fetch global timelines
+      console.log('[Goals] Querying global timelines...');
       const { data: globalData, error: globalError } = await supabase
         .from('0008-ap-user-global-timelines')
         .select(`
@@ -590,6 +598,17 @@ export default function Goals() {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
+      console.log('[Goals] Global timelines query result:', {
+        data: globalData,
+        error: globalError,
+        count: globalData?.length || 0,
+        timelines: globalData?.map(t => ({
+          id: t.id,
+          cycle_id: t.global_cycle_id,
+          title: t.global_cycle?.title || t.global_cycle?.cycle_label
+        }))
+      });
+
       if (globalError) throw globalError;
 
       if (globalData) {
@@ -604,24 +623,27 @@ export default function Goals() {
             global_cycle: timeline.global_cycle || null,
           });
         });
+        console.log('[Goals] Added', globalData.length, 'global timelines');
       }
 
+      console.log('[Goals] Total timelines:', timelines.length);
       setAllTimelines(timelines);
 
-      // 🔍 Debug log each hydrated timeline
-      console.log("DEBUG: hydrated timelines:", timelines.map(t => ({
+      console.log('[Goals] Hydrated timelines:', timelines.map(t => ({
         id: t.id,
         source: t.source,
         title: t.title,
         start_date: t.start_date,
         end_date: t.end_date
       })));
-      
+
       // Fetch goal counts for each timeline
+      console.log('[Goals] Fetching goal counts...');
       await fetchTimelinesWithGoalCounts(timelines);
+      console.log('[Goals] fetchAllTimelines complete');
 
     } catch (error) {
-      console.error('Error fetching timelines:', error);
+      console.error('[Goals] Error fetching timelines:', error);
       Alert.alert('Error', (error as Error).message);
     }
   };
@@ -1286,22 +1308,28 @@ export default function Goals() {
       <ManageCustomTimelinesModal
         visible={manageCustomTimelinesModalVisible}
         onClose={() => setManageCustomTimelinesModalVisible(false)}
-        onUpdate={() => {
-          fetchAllTimelines();
+        onUpdate={async () => {
+          console.log('[Goals] ManageCustomTimelinesModal onUpdate called');
+          await fetchAllTimelines();
           if (selectedTimeline) {
-            fetchTimelineGoals(selectedTimeline);
+            console.log('[Goals] Refreshing selected timeline goals');
+            await fetchTimelineGoals(selectedTimeline);
           }
+          console.log('[Goals] Custom timeline update complete');
         }}
       />
 
       <ManageGlobalTimelinesModal
         visible={manageGlobalTimelinesModalVisible}
         onClose={() => setManageGlobalTimelinesModalVisible(false)}
-        onUpdate={() => {
-          fetchAllTimelines();
+        onUpdate={async () => {
+          console.log('[Goals] ManageGlobalTimelinesModal onUpdate called');
+          await fetchAllTimelines();
           if (selectedTimeline) {
-            fetchTimelineGoals(selectedTimeline);
+            console.log('[Goals] Refreshing selected timeline goals');
+            await fetchTimelineGoals(selectedTimeline);
           }
+          console.log('[Goals] Global timeline update complete');
         }}
       />
 

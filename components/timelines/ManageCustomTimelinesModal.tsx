@@ -91,7 +91,12 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('[ManageCustomTimelinesModal] No authenticated user found');
+        return;
+      }
+
+      console.log('[ManageCustomTimelinesModal] Fetching custom timelines for user:', user.id);
 
       // Fetch custom timelines with goal counts
       const { data: timelineData, error } = await supabase
@@ -100,6 +105,12 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
+
+      console.log('[ManageCustomTimelinesModal] Custom timelines query result:', {
+        count: timelineData?.length || 0,
+        error: error,
+        timelines: timelineData?.map(t => ({ id: t.id, title: t.title, start: t.start_date, end: t.end_date }))
+      });
 
       if (error) throw error;
 
@@ -110,7 +121,7 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
 
       setTimelines(timelinesWithCounts);
     } catch (error) {
-      console.error('Error fetching custom timelines:', error);
+      console.error('[ManageCustomTimelinesModal] Error fetching custom timelines:', error);
       Alert.alert('Error', (error as Error).message);
     } finally {
       setLoading(false);
@@ -136,11 +147,20 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
       return;
     }
 
+    console.log('[ManageCustomTimelinesModal] Starting timeline save');
+    console.log('[ManageCustomTimelinesModal] Form data:', formData);
+    console.log('[ManageCustomTimelinesModal] Editing existing:', !!editingTimeline);
+
     setSaving(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
+      if (!user) {
+        console.error('[ManageCustomTimelinesModal] No authenticated user found');
+        throw new Error('User not found');
+      }
+
+      console.log('[ManageCustomTimelinesModal] Current user ID:', user.id);
 
       const timelineData = {
         user_id: user.id,
@@ -151,8 +171,11 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
         status: 'active',
       };
 
+      console.log('[ManageCustomTimelinesModal] Timeline data to save:', timelineData);
+
       if (editingTimeline) {
         // Update existing timeline
+        console.log('[ManageCustomTimelinesModal] Updating timeline ID:', editingTimeline.id);
         const { error } = await supabase
           .from('0008-ap-custom-timelines')
           .update({
@@ -161,25 +184,44 @@ export function ManageCustomTimelinesModal({ visible, onClose, onUpdate }: Manag
           })
           .eq('id', editingTimeline.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('[ManageCustomTimelinesModal] Update error:', error);
+          throw error;
+        }
+        console.log('[ManageCustomTimelinesModal] Timeline updated successfully');
         Alert.alert('Success', 'Timeline updated successfully!');
       } else {
         // Create new timeline
-        const { error } = await supabase
+        console.log('[ManageCustomTimelinesModal] Creating new timeline...');
+        const { data: insertData, error } = await supabase
           .from('0008-ap-custom-timelines')
-          .insert(timelineData);
+          .insert(timelineData)
+          .select();
 
-        if (error) throw error;
+        console.log('[ManageCustomTimelinesModal] Insert result:', { data: insertData, error });
+
+        if (error) {
+          console.error('[ManageCustomTimelinesModal] Insert error:', error);
+          throw error;
+        }
+        console.log('[ManageCustomTimelinesModal] Timeline created successfully. ID:', insertData?.[0]?.id);
         Alert.alert('Success', 'Custom timeline created successfully!');
       }
 
       setShowCreateForm(false);
       resetForm();
-      fetchTimelines();
+      console.log('[ManageCustomTimelinesModal] Refreshing timelines list...');
+      await fetchTimelines();
+      console.log('[ManageCustomTimelinesModal] Calling onUpdate callback...');
       onUpdate?.();
+      console.log('[ManageCustomTimelinesModal] Save complete');
     } catch (error) {
-      console.error('Error saving timeline:', error);
-      Alert.alert('Error', (error as Error).message);
+      console.error('[ManageCustomTimelinesModal] Error saving timeline:', error);
+      console.error('[ManageCustomTimelinesModal] Error details:', JSON.stringify(error, null, 2));
+      Alert.alert(
+        'Save Error',
+        `Failed to save timeline: ${(error as Error).message}\n\nPlease try again or contact support if the problem persists.`
+      );
     } finally {
       setSaving(false);
     }
