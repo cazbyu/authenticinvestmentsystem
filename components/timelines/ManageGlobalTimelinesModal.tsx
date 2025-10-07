@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { X, TriangleAlert as AlertTriangle, Calendar, TrendingUp, ChevronRight, Archive, Trash2 } from 'lucide-react-native';
-import { InfoTooltip } from '@/components/InfoTooltip';
 import { getSupabaseClient } from '@/lib/supabase';
 import { formatDateRange } from '@/lib/dateUtils';
 
@@ -552,15 +551,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.modalHeader}>
-          <View style={styles.modalTitleContainer}>
-            <Text style={styles.modalTitle}>Manage Standardized 12 Week Timelines</Text>
-            <InfoTooltip
-              content="These 12 Week timelines are synchronized to align with the standard year. Each goal-setting period is built with 12 weeks of action and 1 week of reflection and preparation for the next 12 week period."
-              iconSize={20}
-              iconColor="#6b7280"
-              maxWidth={320}
-            />
-          </View>
+          <Text style={styles.modalTitle}>Manage Global Timelines</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <X size={24} color="#6b7280" />
           </TouchableOpacity>
@@ -582,9 +573,9 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Available Timelines</Text>
+              <Text style={styles.sectionTitle}>Manage Global</Text>
               <Text style={styles.sectionSubtitle}>
-                Current and upcoming standardized 12-week cycles available for activation
+                Current and upcoming global 12-week cycles available for activation
               </Text>
               {renderAvailableCycles()}
             </View>
@@ -743,18 +734,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
     backgroundColor: '#ffffff',
   },
-  modalTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    marginRight: 12,
-  },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    flexShrink: 1,
   },
   closeButton: {
     padding: 4,
