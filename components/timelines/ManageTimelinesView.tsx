@@ -55,7 +55,7 @@ export function ManageTimelinesView({ onUpdate }: ManageTimelinesViewProps) {
           setShowGlobalModal(true);
           setShowCustomModal(false);
         }}
-        accessibilityLabel="Manage Global Timelines"
+        accessibilityLabel="Manage Standardized 12 Week Timelines"
         accessibilityRole="tab"
         accessibilityState={{ selected: activeSubTab === 'global' }}
       >
@@ -65,7 +65,7 @@ export function ManageTimelinesView({ onUpdate }: ManageTimelinesViewProps) {
             activeSubTab === 'global' && styles.activeSubTabText,
           ]}
         >
-          Manage Global
+          12 Week Timelines
         </Text>
       </TouchableOpacity>
 

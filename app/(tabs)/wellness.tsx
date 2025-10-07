@@ -17,6 +17,7 @@ import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { DraggableFab } from '@/components/DraggableFab';
 import { calculateAuthenticScore as calculateAuthenticScoreUtil, calculateAuthenticScoreForDomain } from '@/lib/taskUtils';
+import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -28,6 +29,7 @@ interface Domain {
 
 export default function Wellness() {
   const navigation = useNavigation<DrawerNavigation>();
+  const { authenticScore, refreshScoreForDomain } = useAuthenticScore();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -37,20 +39,19 @@ export default function Wellness() {
 
   // Main tab navigation state
   const [activeMainTab, setActiveMainTab] = useState<'domains' | 'manage'>('domains');
-  
+
   // Modal states
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [taskDetailVisible, setTaskDetailVisible] = useState(false);
   const [depositIdeaDetailVisible, setDepositIdeaDetailVisible] = useState(false);
-  
+
   // Selected items
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [authenticScore, setAuthenticScore] = useState(0);
+  const [domainAuthenticScore, setDomainAuthenticScore] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const scoreAbortControllerRef = useRef<AbortController | null>(null);
-  const authenticScoreCache = useRef<{ score: number; timestamp: number } | null>(null);
 
   // 12-Week Goals for selected domain (only fetch when domain is selected)
   const goalProgressScope = useMemo(() =>
@@ -67,48 +68,32 @@ export default function Wellness() {
     scope: goalProgressScope
   });
 
-  const fetchAuthenticScore = useCallback(async (forceRefresh = false, domainId?: string) => {
+  const fetchAuthenticScoreLocal = useCallback(async (forceRefresh = false, domainId?: string) => {
     // Cancel any in-flight score calculation
     if (scoreAbortControllerRef.current) {
       scoreAbortControllerRef.current.abort();
-    }
-
-    // Use cached score if available and less than 5 minutes old
-    if (!forceRefresh && !domainId && authenticScoreCache.current) {
-      const cacheAge = Date.now() - authenticScoreCache.current.timestamp;
-      if (cacheAge < 5 * 60 * 1000) {
-        setAuthenticScore(authenticScoreCache.current.score);
-        return;
-      }
     }
 
     const controller = new AbortController();
     scoreAbortControllerRef.current = controller;
 
     try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || controller.signal.aborted) return;
-
       let score: number;
       if (domainId) {
-        score = await calculateAuthenticScoreForDomain(supabase, user.id, domainId);
+        score = await refreshScoreForDomain(domainId, forceRefresh);
       } else {
-        score = await calculateAuthenticScoreUtil(supabase, user.id);
+        score = authenticScore;
       }
 
       if (!controller.signal.aborted) {
-        setAuthenticScore(score);
-        if (!domainId) {
-          authenticScoreCache.current = { score, timestamp: Date.now() };
-        }
+        setDomainAuthenticScore(score);
       }
     } catch (error) {
       if (!controller.signal.aborted) {
         console.error('Error calculating authentic score:', error);
       }
     }
-  }, []);
+  }, [authenticScore, refreshScoreForDomain]);
 
   const fetchDomains = useCallback(async () => {
     try {
@@ -121,12 +106,12 @@ export default function Wellness() {
       if (error) throw error;
       setDomains(data || []);
       // Fetch score in background without blocking
-      fetchAuthenticScore(false);
+      fetchAuthenticScoreLocal(false);
     } catch (error) {
       console.error('Error fetching domains:', error);
       Alert.alert('Error', (error as Error).message);
     }
-  }, [fetchAuthenticScore]);
+  }, [fetchAuthenticScoreLocal]);
 
   const fetchDomainTasks = useCallback(async (domainId: string, view: 'deposits' | 'ideas' = activeView) => {
     // Cancel any in-flight request
@@ -306,10 +291,10 @@ export default function Wellness() {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
       // Calculate domain-specific score
-      fetchAuthenticScore(true, selectedDomain.id);
+      fetchAuthenticScoreLocal(true, selectedDomain.id);
     } else {
       // Calculate total score when no domain is selected
-      fetchAuthenticScore(false);
+      fetchAuthenticScoreLocal(false);
     }
 
     // Cleanup on unmount
@@ -321,7 +306,7 @@ export default function Wellness() {
         scoreAbortControllerRef.current.abort();
       }
     };
-  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScore]);
+  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScoreLocal]);
 
   const handleViewChange = useCallback((view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
@@ -344,11 +329,11 @@ export default function Wellness() {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
       // Refresh score after task completion
-      fetchAuthenticScore(true);
+      fetchAuthenticScoreLocal(true);
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     }
-  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScore]);
+  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScoreLocal]);
 
   const handleUpdateDepositIdea = useCallback((depositIdea: any) => {
     const editData = {
@@ -448,8 +433,8 @@ export default function Wellness() {
     }
     refreshGoals();
     // Refresh score after task creation/update
-    fetchAuthenticScore(true);
-  }, [selectedDomain, activeView, fetchDomainTasks, refreshGoals, fetchAuthenticScore]);
+    fetchAuthenticScoreLocal(true);
+  }, [selectedDomain, activeView, fetchDomainTasks, refreshGoals, fetchAuthenticScoreLocal]);
 
   const handleFormClose = useCallback(() => {
     setTaskFormVisible(false);
