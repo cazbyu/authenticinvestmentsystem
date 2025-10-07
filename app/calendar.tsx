@@ -11,17 +11,11 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react-native';
 import { expandEventsWithRecurrence, expandEventsForDate } from '@/lib/recurrenceUtils';
 import { getVisibleWindow } from '@/lib/recurrenceUtils';
+import { formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 import { DraggableFab } from '@/components/DraggableFab';
 
 // Constants
 const MINUTE_HEIGHT = 1.5;
-
-const ymdLocal = (d = new Date()) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
 
 // Ensure no duplicate instances when merging arrays (e.g., expanded events + "Anytime" tasks)
 const uniqByIdAndDate = <T extends { id: string; start_date?: string; due_date?: string; occurrence_date?: string }>(arr: T[]) => {
@@ -50,7 +44,7 @@ interface CalendarEvent {
 }
 
 export default function CalendarScreen() {
-  const [selectedDate, setSelectedDate] = useState(ymdLocal());
+  const [selectedDate, setSelectedDate] = useState(formatLocalDate(new Date()));
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -101,7 +95,7 @@ export default function CalendarScreen() {
   // Auto-scroll to current time when viewing today in daily mode
   useEffect(() => {
     const isDaily = viewMode === 'daily';
-    const isToday = selectedDate === ymdLocal();
+    const isToday = selectedDate === formatLocalDate(new Date());
 
     if (!isDaily || !isToday || hasScrolledToNow) return;
     if (!hoursScrollRef.current || hoursViewportH <= 0) return;
@@ -498,7 +492,7 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
     }
     
     setCurrentDate(newDate);
-    setSelectedDate(ymdLocal(newDate));
+    setSelectedDate(formatLocalDate(newDate));
   };
 
   // Mini daily view used inside Weekly/Monthly: tasks/all-day on top, time grid below.
@@ -520,7 +514,10 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
       if (sliceHasScrolledToNow) return;
       if (!sliceScrollRef.current || sliceViewportH <= 0) return;
 
-      const isToday = date === ymdLocal();
+      const today = formatLocalDate(new Date());
+      // Normalize both dates to ensure consistent comparison
+      const normalizedDate = date.split('T')[0]; // Strip any time component
+      const isToday = normalizedDate === today;
       const isDailyView = viewMode === 'daily';
       const contentH = 24 * 60 * MINUTE_HEIGHT;
 
@@ -653,7 +650,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
             })}
 
             {/* Optional: show now-line only if this slice is "today" */}
-            {date === ymdLocal() && (
+            {date === formatLocalDate(new Date()) && (
               <View style={[styles.currentTimeLine, { top: propCurrentTimePosition }]}>
                 <View style={styles.currentTimeDot} />
                 <View style={styles.currentTimeLineBar} />
@@ -799,7 +796,7 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
               })}
               
               {/* Current time indicator - only show for today */}
-              {selectedDate === ymdLocal() && (
+              {selectedDate === formatLocalDate(new Date()) && (
                 <View
                   style={[
                     styles.currentTimeLine,
@@ -842,7 +839,7 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
 
         <View style={styles.weekGrid}>
           {weekDates.map((date, index) => {
-            const dateString = ymdLocal(date);
+            const dateString = formatLocalDate(date);
             const expandedEvents = expandEventsForDate(tasks, dateString);
 const anytimeTasks = tasks.filter(t =>
   (t.type === 'task') &&
@@ -862,7 +859,7 @@ const dayEvents = expandedTasks.map(task => ({
               color: task.roleColor,
               isAllDay: task.is_all_day || task.is_anytime || (!task.start_time && !task.end_time),
             }));
-            const isToday = dateString === ymdLocal();
+            const isToday = dateString === formatLocalDate(new Date());
             const isSelected = dateString === selectedDate;
 
             return (
@@ -928,7 +925,11 @@ const dayEvents = expandedTasks.map(task => ({
     return (
       <View style={styles.monthlyView}>
         <Calendar
-          onDayPress={(day) => setSelectedDate(day.dateString)}
+          onDayPress={(day) => {
+            // Ensure date is in consistent local format
+            const date = parseLocalDate(day.dateString);
+            setSelectedDate(formatLocalDate(date));
+          }}
           markedDates={getMarkedDates()}
           theme={{
             backgroundColor: '#ffffff',
