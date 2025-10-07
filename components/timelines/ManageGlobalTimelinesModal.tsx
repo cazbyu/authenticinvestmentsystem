@@ -480,7 +480,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
       <View style={styles.availableCyclesList}>
         {availableCycles.map(cycle => {
           const displayTitle = cycle.global_cycle?.title || cycle.global_cycle?.cycle_label || cycle.title || cycle.cycle_label || 'Global 12-Week Cycle';
-          const isActivated = cycle.isAlreadyActivated;
+          const isActivated = cycle.isAlreadyActivated === true;
 
           return (
             <View key={cycle.global_cycle_id || cycle.id} style={[
@@ -582,7 +582,15 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Available Timelines</Text>
+              <View style={styles.sectionTitleContainer}>
+                <Text style={styles.sectionTitle}>Available Timelines</Text>
+                <InfoTooltip
+                  content="To activate a timeline, select your preferred week start day (Sunday or Monday) by tapping one of the buttons below each timeline. You can have multiple active timelines running simultaneously."
+                  iconSize={18}
+                  iconColor="#6b7280"
+                  maxWidth={320}
+                />
+              </View>
               <Text style={styles.sectionSubtitle}>
                 Current and upcoming standardized 12-week cycles available for activation
               </Text>
@@ -777,11 +785,16 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 14,
