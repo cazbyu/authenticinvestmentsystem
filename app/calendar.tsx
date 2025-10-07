@@ -515,7 +515,7 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
 const [sliceViewportH, setSliceViewportH] = useState(0);
 const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
-    // Auto-scroll logic: scroll to current time for daily view of today, otherwise scroll to top (midnight)
+    // Auto-scroll logic: scroll to current time for daily view of today, otherwise scroll to 8 AM
     useEffect(() => {
       if (sliceHasScrolledToNow) return;
       if (!sliceScrollRef.current || sliceViewportH <= 0) return;
@@ -524,7 +524,7 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
       const isDailyView = viewMode === 'daily';
       const contentH = 24 * 60 * MINUTE_HEIGHT;
 
-      let targetY = 0; // Default to midnight (top)
+      let targetY = 0;
 
       // Only scroll to current time if viewing today in daily mode
       if (isToday && isDailyView) {
@@ -534,6 +534,11 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
         targetY = currentTimeY - sliceViewportH / 2;
         if (targetY < 0) targetY = 0;
+        if (targetY > contentH - sliceViewportH) targetY = Math.max(0, contentH - sliceViewportH);
+      } else {
+        // For Weekly and Monthly views, scroll to 8 AM
+        const eightAM = 8 * 60 * MINUTE_HEIGHT;
+        targetY = eightAM;
         if (targetY > contentH - sliceViewportH) targetY = Math.max(0, contentH - sliceViewportH);
       }
 
@@ -1182,10 +1187,9 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'right',
     paddingRight: 8,
-    paddingTop: 4,
     position: 'absolute',
     left: 0,
-    top: 0,
+    top: -6,
   },
   halfHourLabel: {
     width: 60,
@@ -1195,7 +1199,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     position: 'absolute',
     left: 0,
-    marginTop: -6,
+    top: -6,
   },
   hourLine: {
     position: 'absolute',
