@@ -527,12 +527,12 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
       });
 
       return () => cancel && (cancel as any).done === false && (cancel as any).cancel?.();
-    }, [date, sliceViewportH, sliceHasScrolledToNow]);
+    }, [date, sliceViewportH, sliceHasScrolledToNow, viewMode]);
 
-    // Reset scroll state when date changes
+    // Reset scroll state when date or viewMode changes
     useEffect(() => {
       setSliceHasScrolledToNow(false);
-    }, [date]);
+    }, [date, viewMode]);
 
     // Constants consistent with main daily grid
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT;
