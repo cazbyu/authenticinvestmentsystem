@@ -61,6 +61,7 @@ export default function CalendarScreen() {
   const [hoursViewportH, setHoursViewportH] = useState(0);
   const [hasScrolledToNow, setHasScrolledToNow] = useState(false);
   const [currentTimePosition, setCurrentTimePosition] = useState(0);
+  const [currentTimeString, setCurrentTimeString] = useState('');
   const timeGridRef = useRef<View>(null);
   const [timeGridWidth, setTimeGridWidth] = useState(0);
   const [allDayHeight, setAllDayHeight] = useState(0);
@@ -84,6 +85,11 @@ export default function CalendarScreen() {
       const minutes = now.getMinutes();
       const totalMinutes = hours * 60 + minutes;
       setCurrentTimePosition(totalMinutes * MINUTE_HEIGHT);
+      setCurrentTimeString(now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }));
     };
 
     updateCurrentTime();
@@ -496,8 +502,14 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
   };
 
   // Mini daily view used inside Weekly/Monthly: tasks/all-day on top, time grid below.
-  const DailySlice: React.FC<{ date: string; height?: number; viewMode?: 'daily' | 'weekly' | 'monthly' }> =
-({ date, height = 0.5, viewMode }) => {
+  const DailySlice: React.FC<{
+    date: string;
+    height?: number;
+    viewMode?: 'daily' | 'weekly' | 'monthly';
+    currentTimePosition: number;
+    currentTimeString: string;
+  }> =
+({ date, height = 0.5, viewMode, currentTimePosition: propCurrentTimePosition, currentTimeString: propCurrentTimeString }) => {
     // Local ref/height for this embedded grid so it scrolls independently
     const sliceScrollRef = useRef<ScrollView>(null);
 const [sliceViewportH, setSliceViewportH] = useState(0);
@@ -628,12 +640,12 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
             {/* Optional: show now-line only if this slice is "today" */}
             {date === ymdLocal() && (
-              <View style={[styles.currentTimeLine, { top: currentTimePosition }]}>
+              <View style={[styles.currentTimeLine, { top: propCurrentTimePosition }]}>
                 <View style={styles.currentTimeDot} />
                 <View style={styles.currentTimeLineBar} />
                 <View style={styles.currentTimeLabel}>
                   <Text style={styles.currentTimeLabelText}>
-                    {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    {propCurrentTimeString}
                   </Text>
                 </View>
               </View>
@@ -771,7 +783,7 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
               
               {/* Current time indicator - only show for today */}
               {selectedDate === ymdLocal() && (
-                <View 
+                <View
                   style={[
                     styles.currentTimeLine,
                     { top: currentTimePosition }
@@ -781,11 +793,7 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
                   <View style={styles.currentTimeLineBar} />
                   <View style={styles.currentTimeLabel}>
                     <Text style={styles.currentTimeLabelText}>
-                      {new Date().toLocaleTimeString('en-US', { 
-                        hour: 'numeric', 
-                        minute: '2-digit', 
-                        hour12: true 
-                      })}
+                      {currentTimeString}
                     </Text>
                   </View>
                 </View>
@@ -887,7 +895,13 @@ const dayEvents = expandedTasks.map(task => ({
             {formatDateForDisplay(selectedDate)}
           </Text>
           {/* Bottom half: embedded daily slice for the selected day */}
-          <DailySlice date={selectedDate} height={0.5} viewMode="weekly" />
+          <DailySlice
+            date={selectedDate}
+            height={0.5}
+            viewMode="weekly"
+            currentTimePosition={currentTimePosition}
+            currentTimeString={currentTimeString}
+          />
         </View>
       </View>
     );
@@ -928,7 +942,13 @@ const dayEvents = expandedTasks.map(task => ({
             {formatDateForDisplay(selectedDate)}
           </Text>
           {/* Bottom half: embedded daily slice for the selected date */}
-          <DailySlice date={selectedDate} height={0.5} viewMode="monthly" />
+          <DailySlice
+            date={selectedDate}
+            height={0.5}
+            viewMode="monthly"
+            currentTimePosition={currentTimePosition}
+            currentTimeString={currentTimeString}
+          />
         </View>
       </View>
     );
