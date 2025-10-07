@@ -681,7 +681,7 @@ const expandedTasks = uniqByIdAndDate([...expandedEvents, ...anytimeTasks]);
             <ChevronLeft size={24} color="#0078d4" />
           </TouchableOpacity>
           <Text style={styles.dailyTitle}>
-            {formatDateForDisplay(currentDate.toISOString().split('T')[0])}
+            {formatDateForDisplay(selectedDate)}
           </Text>
           <TouchableOpacity onPress={() => navigateDate('next')}>
             <ChevronRight size={24} color="#0078d4" />
