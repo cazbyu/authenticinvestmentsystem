@@ -503,6 +503,36 @@ const expandedTasks = uniqByIdAndDate([...expandedRecurring, ...anytimeMonthly])
 const [sliceViewportH, setSliceViewportH] = useState(0);
 const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
+    // Auto-scroll to current time when viewing today
+    useEffect(() => {
+      const isToday = date === ymdLocal();
+
+      if (!isToday || sliceHasScrolledToNow) return;
+      if (!sliceScrollRef.current || sliceViewportH <= 0) return;
+
+      const now = new Date();
+      const minutes = now.getHours() * 60 + now.getMinutes();
+      const currentTimeY = minutes * MINUTE_HEIGHT;
+      const contentH = 24 * 60 * MINUTE_HEIGHT;
+
+      let targetY = currentTimeY - sliceViewportH / 2;
+      if (targetY < 0) targetY = 0;
+      if (targetY > contentH - sliceViewportH) targetY = Math.max(0, contentH - sliceViewportH);
+
+      const cancel = InteractionManager.runAfterInteractions(() => {
+        requestAnimationFrame(() => {
+          sliceScrollRef.current?.scrollTo({ y: targetY, animated: false });
+          setSliceHasScrolledToNow(true);
+        });
+      });
+
+      return () => cancel && (cancel as any).done === false && (cancel as any).cancel?.();
+    }, [date, sliceViewportH, sliceHasScrolledToNow]);
+
+    // Reset scroll state when date changes
+    useEffect(() => {
+      setSliceHasScrolledToNow(false);
+    }, [date]);
 
     // Constants consistent with main daily grid
     const HOUR_HEIGHT = 60 * MINUTE_HEIGHT;
