@@ -29,12 +29,15 @@ interface UserGlobalTimeline {
   id: string;
   user_id: string;
   global_cycle_id: string;
+  title?: string;
+  start_date: string;
+  end_date: string;
   status: string;
   week_start_day: string;
-  activated_at: string;
+  timezone: string;
   created_at: string;
   updated_at: string;
-  global_cycle: GlobalCycle;
+  global_cycle?: GlobalCycle;
   goals?: Array<{ id: string; status: string }>;
 }
 
@@ -96,25 +99,13 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('[ManageGlobalTimelinesModal] No authenticated user found');
-        return;
-      }
-
-      console.log('[ManageGlobalTimelinesModal] Fetching active timelines for user:', user.id);
+      if (!user) return;
 
       const { data, error } = await supabase
         .from('0008-ap-user-global-timelines')
         .select(`
-          id,
-          user_id,
-          global_cycle_id,
-          status,
-          week_start_day,
-          activated_at,
-          created_at,
-          updated_at,
-          global_cycle:0008-ap-global-cycles!inner(
+          *,
+          global_cycle:0008-ap-global-cycles(
             id,
             title,
             cycle_label,
@@ -130,16 +121,10 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      console.log('[ManageGlobalTimelinesModal] Active timelines query result:', {
-        count: data?.length || 0,
-        error: error,
-        timelines: data?.map(t => ({ id: t.id, cycle_id: t.global_cycle_id, title: t.global_cycle?.title }))
-      });
-
       if (error) throw error;
       setActiveTimelines(data || []);
     } catch (error) {
-      console.error('[ManageGlobalTimelinesModal] Error fetching active timelines:', error);
+      console.error('Error fetching active timelines:', error);
       Alert.alert('Error', (error as Error).message);
     }
   };
@@ -179,9 +164,11 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
             id: currentCycle.id,
             user_id: user.id,
             global_cycle_id: currentCycle.id,
+            start_date: currentCycle.start_date,
+            end_date: currentCycle.end_date,
             status: 'active',
             week_start_day: 'sunday',
-            activated_at: '',
+            timezone: 'UTC',
             created_at: '',
             updated_at: '',
             global_cycle: currentCycle
@@ -199,9 +186,11 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
             id: cycle.id,
             user_id: user.id,
             global_cycle_id: cycle.id,
+            start_date: cycle.start_date,
+            end_date: cycle.end_date,
             status: 'active',
             week_start_day: 'sunday',
-            activated_at: '',
+            timezone: 'UTC',
             created_at: '',
             updated_at: '',
             global_cycle: cycle
@@ -279,7 +268,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   };
 
   const handleArchiveTimeline = (timeline: UserGlobalTimeline) => {
-    const isPastTimeline = timeline.global_cycle?.end_date ? new Date(timeline.global_cycle.end_date) < new Date() : false;
+    const isPastTimeline = new Date(timeline.end_date) < new Date();
 
     if (!isPastTimeline) {
       Alert.alert(
@@ -394,8 +383,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
     return (
       <View style={styles.activeTimelinesList}>
         {activeTimelines.map((timeline) => {
-          const startDate = timeline.global_cycle?.start_date ? new Date(timeline.global_cycle.start_date) : null;
-          const endDate = timeline.global_cycle?.end_date ? new Date(timeline.global_cycle.end_date) : null;
+          const startDate = timeline.start_date ? new Date(timeline.start_date) : null;
+          const endDate = timeline.end_date ? new Date(timeline.end_date) : null;
           let daysRemaining = 0;
           let progress = 0;
 
@@ -406,7 +395,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
             progress = Math.min(100, Math.max(0, ((now.getTime() - startDate.getTime()) / (endDate.getTime() - startDate.getTime())) * 100));
           }
 
-          const displayTitle = timeline.global_cycle?.title || timeline.global_cycle?.cycle_label || 'Global Timeline';
+          const displayTitle = timeline.title || timeline.global_cycle?.title || timeline.global_cycle?.cycle_label || 'Global Timeline';
           const goalCount = timeline.goals?.filter(g => g.status === 'active').length || 0;
 
           return (
@@ -415,8 +404,8 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                 <View style={styles.activeTimelineInfo}>
                   <Text style={styles.activeTimelineTitle}>{displayTitle}</Text>
                   <Text style={styles.activeTimelineDates}>
-                    {timeline.global_cycle?.start_date && timeline.global_cycle?.end_date
-                      ? formatDateRange(timeline.global_cycle.start_date, timeline.global_cycle.end_date)
+                    {timeline.start_date && timeline.end_date
+                      ? formatDateRange(timeline.start_date, timeline.end_date)
                       : 'Invalid date'}
                   </Text>
                   <Text style={styles.activeTimelineStats}>
@@ -435,7 +424,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
               </View>
 
               <View style={styles.timelineButtonsContainer}>
-                {timeline.global_cycle?.end_date && new Date(timeline.global_cycle.end_date) < new Date() && (
+                {new Date(timeline.end_date) < new Date() && (
                   <TouchableOpacity
                     style={styles.archiveButton}
                     onPress={() => handleArchiveTimeline(timeline)}
@@ -485,47 +474,25 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
   const handleWeekStartSelection = async (weekStartDay: 'sunday' | 'monday') => {
     if (!selectedCycleToActivate) return;
 
-    console.log('[ManageGlobalTimelinesModal] Starting timeline activation');
-    console.log('[ManageGlobalTimelinesModal] Cycle ID:', selectedCycleToActivate.id);
-    console.log('[ManageGlobalTimelinesModal] Week start day:', weekStartDay);
-
     setActivating(true);
     setShowWeekStartModal(false);
 
     try {
       const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('[ManageGlobalTimelinesModal] Current user ID:', user?.id);
 
-      console.log('[ManageGlobalTimelinesModal] Calling fn_activate_user_global_timeline...');
       const { data, error } = await supabase.rpc('fn_activate_user_global_timeline', {
         p_global_cycle_id: selectedCycleToActivate.id,
         p_week_start_day: weekStartDay
       });
 
-      console.log('[ManageGlobalTimelinesModal] RPC Response:', { data, error });
-
-      if (error) {
-        console.error('[ManageGlobalTimelinesModal] RPC Error:', error);
-        throw error;
-      }
-
-      console.log('[ManageGlobalTimelinesModal] Timeline activated successfully. New timeline ID:', data);
+      if (error) throw error;
 
       Alert.alert('Success', 'Global timeline activated successfully!');
-
-      console.log('[ManageGlobalTimelinesModal] Refreshing timeline data...');
       await fetchData();
-      console.log('[ManageGlobalTimelinesModal] Calling onUpdate callback...');
       onUpdate?.();
-      console.log('[ManageGlobalTimelinesModal] Activation complete');
     } catch (error) {
-      console.error('[ManageGlobalTimelinesModal] Error activating timeline:', error);
-      console.error('[ManageGlobalTimelinesModal] Error details:', JSON.stringify(error, null, 2));
-      Alert.alert(
-        'Activation Error',
-        `Failed to activate timeline: ${(error as Error).message}\n\nPlease try again or contact support if the problem persists.`
-      );
+      console.error('Error activating timeline:', error);
+      Alert.alert('Error', (error as Error).message);
     } finally {
       setActivating(false);
       setSelectedCycleToActivate(null);
@@ -572,10 +539,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
                   </View>
                 )}
                 <Text style={styles.cycleDates}>
-                  {formatDateRange(
-                    cycle.global_cycle?.start_date || cycle.start_date,
-                    cycle.global_cycle?.end_date || cycle.end_date
-                  )}
+                  {formatDateRange(cycle.start_date, cycle.end_date)}
                 </Text>
               </View>
 
@@ -717,7 +681,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
 
               {archiveConfirmTimeline && (
                 <Text style={styles.warningDetails}>
-                  Timeline: {archiveConfirmTimeline.global_cycle?.title || archiveConfirmTimeline.global_cycle?.cycle_label}
+                  Timeline: {archiveConfirmTimeline.title || archiveConfirmTimeline.global_cycle?.title || archiveConfirmTimeline.global_cycle?.cycle_label}
                   {archiveConfirmTimeline.goals?.length ? `\n${archiveConfirmTimeline.goals.length} goals will be archived with this timeline.` : ''}
                 </Text>
               )}
@@ -763,7 +727,7 @@ export function ManageGlobalTimelinesModal({ visible, onClose, onUpdate }: Manag
 
               {deleteConfirmTimeline && (
                 <Text style={styles.warningDetails}>
-                  Timeline: {deleteConfirmTimeline.global_cycle?.title || deleteConfirmTimeline.global_cycle?.cycle_label}
+                  Timeline: {deleteConfirmTimeline.title || deleteConfirmTimeline.global_cycle?.title || deleteConfirmTimeline.global_cycle?.cycle_label}
                   {deleteConfirmTimeline.goals?.length ? `\n${deleteConfirmTimeline.goals.length} goals will be permanently deleted.` : ''}
                 </Text>
               )}
@@ -855,7 +819,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     backgroundColor: '#ffffff',
-    overflow: 'visible',
   },
   modalTitleContainer: {
     flexDirection: 'row',
@@ -863,7 +826,6 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1,
     marginRight: 12,
-    overflow: 'visible',
   },
   modalTitle: {
     fontSize: 18,
@@ -891,14 +853,12 @@ const styles = StyleSheet.create({
   section: {
     padding: 16,
     marginBottom: 8,
-    overflow: 'visible',
   },
   sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
-    overflow: 'visible',
   },
   sectionTitle: {
     fontSize: 20,

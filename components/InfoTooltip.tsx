@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   Modal,
   Pressable,
   Platform,
-  Dimensions,
 } from 'react-native';
 import { HelpCircle } from 'lucide-react-native';
 
@@ -29,8 +28,6 @@ export function InfoTooltip({
   const [visible, setVisible] = useState(false);
   const [hoverVisible, setHoverVisible] = useState(false);
   const [iconLayout, setIconLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<{ left?: number; right?: number; transform?: any[] }>({});
-  const iconRef = useRef<any>(null);
 
   const handleIconPress = (event: any) => {
     if (Platform.OS === 'web') {
@@ -54,46 +51,7 @@ export function InfoTooltip({
 
   const handleMouseEnter = () => {
     if (Platform.OS === 'web') {
-      calculateTooltipPosition();
       setHoverVisible(true);
-    }
-  };
-
-  const calculateTooltipPosition = () => {
-    if (Platform.OS === 'web' && iconRef.current) {
-      try {
-        const iconElement = iconRef.current;
-        const rect = iconElement.getBoundingClientRect();
-        const screenWidth = Dimensions.get('window').width;
-
-        const iconCenterX = rect.left + rect.width / 2;
-        const tooltipHalfWidth = maxWidth / 2;
-
-        const spaceOnRight = screenWidth - iconCenterX;
-        const spaceOnLeft = iconCenterX;
-
-        if (spaceOnRight >= tooltipHalfWidth + 20 && spaceOnLeft >= tooltipHalfWidth + 20) {
-          setTooltipPosition({
-            left: '50%',
-            transform: [{ translateX: '-50%' }],
-          });
-        } else if (spaceOnRight < tooltipHalfWidth + 20) {
-          setTooltipPosition({
-            right: 0,
-            transform: [],
-          });
-        } else {
-          setTooltipPosition({
-            left: 0,
-            transform: [],
-          });
-        }
-      } catch (error) {
-        setTooltipPosition({
-          left: '50%',
-          transform: [{ translateX: '-50%' }],
-        });
-      }
     }
   };
 
@@ -106,7 +64,6 @@ export function InfoTooltip({
   return (
     <>
       <View
-        ref={iconRef}
         style={styles.tooltipWrapper}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -122,7 +79,7 @@ export function InfoTooltip({
         </TouchableOpacity>
 
         {Platform.OS === 'web' && hoverVisible && (
-          <View style={[styles.hoverTooltip, { maxWidth, ...tooltipPosition }]}>
+          <View style={[styles.hoverTooltip, { maxWidth }]}>
             <Text style={styles.hoverTooltipText}>{content}</Text>
           </View>
         )}
@@ -177,6 +134,8 @@ const styles = StyleSheet.create({
   hoverTooltip: {
     position: 'absolute',
     top: '100%',
+    left: '50%',
+    transform: [{ translateX: '-50%' }],
     marginTop: 8,
     backgroundColor: '#1f2937',
     borderRadius: 8,
@@ -186,7 +145,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    zIndex: 10000,
+    zIndex: 1000,
     minWidth: 200,
   },
   hoverTooltipText: {

@@ -23,8 +23,6 @@ interface ArchivedTimeline {
   global_cycle?: {
     title?: string;
     cycle_label?: string;
-    start_date: string;
-    end_date: string;
   };
 }
 
@@ -77,19 +75,10 @@ export function ArchivedTimelinesView({ onUpdate }: ArchivedTimelinesViewProps) 
       const { data: globalData, error: globalError } = await supabase
         .from('0008-ap-user-global-timelines')
         .select(`
-          id,
-          user_id,
-          global_cycle_id,
-          status,
-          week_start_day,
-          activated_at,
-          created_at,
-          updated_at,
-          global_cycle:0008-ap-global-cycles!inner(
+          *,
+          global_cycle:0008-ap-global-cycles(
             title,
-            cycle_label,
-            start_date,
-            end_date
+            cycle_label
           ),
           goals:0008-ap-goals-12wk(id, status)
         `)
@@ -102,9 +91,9 @@ export function ArchivedTimelinesView({ onUpdate }: ArchivedTimelinesViewProps) 
       const globalTimelinesData: ArchivedTimeline[] = (globalData || []).map(tl => ({
         id: tl.id,
         source: 'global' as const,
-        title: tl.global_cycle?.title || tl.global_cycle?.cycle_label,
-        start_date: tl.global_cycle?.start_date || '',
-        end_date: tl.global_cycle?.end_date || '',
+        title: tl.title,
+        start_date: tl.start_date,
+        end_date: tl.end_date,
         updated_at: tl.updated_at,
         goal_count: tl.goals?.length || 0,
         global_cycle: tl.global_cycle,

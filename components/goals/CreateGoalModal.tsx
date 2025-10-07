@@ -89,21 +89,13 @@ export function CreateGoalModal({
 
   useEffect(() => {
     if (visible) {
-      console.log('[CreateGoalModal] Modal opened');
-      console.log('[CreateGoalModal] Available timelines:', allTimelines.length);
-      console.log('[CreateGoalModal] Timeline details:', allTimelines.map(t => ({
-        id: t.id,
-        source: t.source,
-        title: t.title
-      })));
-      console.log('[CreateGoalModal] Selected timeline:', selectedTimeline?.id, selectedTimeline?.title);
       fetchData();
       // Set the initial timeline selection based on the prop
       setCurrentSelectedTimeline(selectedTimeline);
     } else {
       resetForm();
     }
-  }, [visible, selectedTimeline, allTimelines]);
+  }, [visible, selectedTimeline]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -350,48 +342,37 @@ export function CreateGoalModal({
               {/* Timeline Pill Buttons */}
               <View style={styles.field}>
                 <Text style={styles.label}>Timeline *(Select One)</Text>
-                {allTimelines.length === 0 ? (
-                  <View style={styles.noTimelinesMessage}>
-                    <Text style={styles.noTimelinesText}>
-                      No active timelines available. Please create or activate a timeline first.
-                    </Text>
-                  </View>
-                ) : (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.timelinePillsContainer}
-                    contentContainerStyle={styles.timelinePillsContent}
-                  >
-                    {allTimelines.map(timeline => {
-                      const isSelected = currentSelectedTimeline?.id === timeline.id;
-                      const pillColor = timeline.source === 'global' ? '#0078d4' : '#7c3aed';
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.timelinePillsContainer}
+                  contentContainerStyle={styles.timelinePillsContent}
+                >
+                  {allTimelines.map(timeline => {
+                    const isSelected = currentSelectedTimeline?.id === timeline.id;
+                    const pillColor = timeline.source === 'global' ? '#0078d4' : '#7c3aed';
 
-                      return (
-                        <TouchableOpacity
-                          key={timeline.id}
-                          style={[
-                            styles.timelinePill,
-                            isSelected && { backgroundColor: pillColor },
-                            !isSelected && { borderColor: pillColor }
-                          ]}
-                          onPress={() => {
-                            console.log('[CreateGoalModal] Timeline selected:', timeline.id, timeline.title);
-                            setCurrentSelectedTimeline(timeline);
-                          }}
-                        >
-                          <Text style={[
-                            styles.timelinePillText,
-                            isSelected && styles.timelinePillTextSelected,
-                            !isSelected && { color: pillColor }
-                          ]}>
-                            {timeline.title || 'Untitled Timeline'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                )}
+                    return (
+                      <TouchableOpacity
+                        key={timeline.id}
+                        style={[
+                          styles.timelinePill,
+                          isSelected && { backgroundColor: pillColor },
+                          !isSelected && { borderColor: pillColor }
+                        ]}
+                        onPress={() => setCurrentSelectedTimeline(timeline)}
+                      >
+                        <Text style={[
+                          styles.timelinePillText,
+                          isSelected && styles.timelinePillTextSelected,
+                          !isSelected && { color: pillColor }
+                        ]}>
+                          {timeline.title || 'Untitled Timeline'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
 
               {/* Description */}
@@ -640,18 +621,5 @@ const styles = StyleSheet.create({
     color: '#1f2937',
     flex: 1,
     lineHeight: 14,
-  },
-  noTimelinesMessage: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    borderRadius: 8,
-    padding: 12,
-  },
-  noTimelinesText: {
-    fontSize: 14,
-    color: '#dc2626',
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });
