@@ -526,8 +526,8 @@ const [sliceHasScrolledToNow, setSliceHasScrolledToNow] = useState(false);
 
       let targetY = 0;
 
-      // Only scroll to current time if viewing today in daily mode
-      if (isToday && isDailyView) {
+      // Only scroll to current time if viewing today
+      if (isToday) {
         const now = new Date();
         const minutes = now.getHours() * 60 + now.getMinutes();
         const currentTimeY = minutes * MINUTE_HEIGHT;
