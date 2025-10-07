@@ -855,6 +855,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
     backgroundColor: '#ffffff',
+    overflow: 'visible',
   },
   modalTitleContainer: {
     flexDirection: 'row',
@@ -862,6 +863,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1,
     marginRight: 12,
+    overflow: 'visible',
   },
   modalTitle: {
     fontSize: 18,
@@ -889,12 +891,14 @@ const styles = StyleSheet.create({
   section: {
     padding: 16,
     marginBottom: 8,
+    overflow: 'visible',
   },
   sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
+    overflow: 'visible',
   },
   sectionTitle: {
     fontSize: 20,
