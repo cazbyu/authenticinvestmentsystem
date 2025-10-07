@@ -17,9 +17,11 @@ import { DraggableFab } from '@/components/DraggableFab';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { handleActionCompletion } from '@/lib/completionHandler';
+import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 // --- Main Dashboard Screen Component ---
 export default function Dashboard() {
+  const { authenticScore, refreshScore } = useAuthenticScore();
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [sortOption, setSortOption] = useState('due_date');
   const [isSortModalVisible, setIsSortModalVisible] = useState(false);
@@ -30,7 +32,6 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [authenticScore, setAuthenticScore] = useState(0);
 
   // Import functions from useGoalProgress hook
   const {
@@ -305,7 +306,7 @@ export default function Dashboard() {
       }
 
       // Calculate authentic score (total balance) for header
-      await refreshAuthenticScore();
+      await refreshScore();
 
     } catch (error) {
       console.error(`Error fetching ${activeView}:`, error);
@@ -315,18 +316,6 @@ export default function Dashboard() {
     }
   };
 
- const refreshAuthenticScore = async () => {
-  try {
-    const supabase = getSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const score = await calculateScoreUtil(supabase, user.id);
-    setAuthenticScore(score);
-  } catch (error) {
-    console.error('Error calculating authentic score:', error);
-  }
- };
 
   useEffect(() => {
     fetchData();
@@ -408,8 +397,8 @@ export default function Dashboard() {
         if (error) throw error;
       }
 
-      // Refresh authentic score in background
-      refreshAuthenticScore();
+      // Refresh authentic score in background with force refresh
+      refreshScore(true);
     } catch (error) {
       console.error('Error completing task:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to complete action.');

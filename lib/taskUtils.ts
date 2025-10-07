@@ -26,8 +26,9 @@ export function calculateTaskPoints(
   else points += 0.5;
 
   // Linked to active goal bonus (exclude archived/cancelled goals)
+  // Award +2 bonus for any active goal (12-week OR custom)
   const activeGoals = (goals || []).filter(g => g.goal_type !== 'deleted' && g.status !== 'archived' && g.status !== 'cancelled');
-  if (activeGoals.length > 0 && task.is_twelve_week_goal) points += 2;
+  if (activeGoals.length > 0) points += 2;
 
   return Math.round(points * 10) / 10;
 }

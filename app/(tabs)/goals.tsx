@@ -23,6 +23,7 @@ import { handleActionCompletion, handleActionUncompletion } from '@/lib/completi
 import { Plus, ChevronLeft, ChevronRight, Target, Users, Minus, X } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
 import { router } from 'expo-router';
+import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 interface Timeline {
   id: string;
@@ -48,12 +49,12 @@ interface TimelineWeek {
   end_date: string;
 }
 export default function Goals() {
+  const { authenticScore, refreshScore } = useAuthenticScore();
   const [activeTab, setActiveTab] = useState<GoalBankTab>('timelines');
   const [selectedTimeline, setSelectedTimeline] = useState<Timeline | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weekGoalActions, setWeekGoalActions] = useState<Record<string, any[]>>({});
   const [loadingWeekActions, setLoadingWeekActions] = useState(false);
-  const [authenticScore, setAuthenticScore] = useState(0);
 
   // Helper function to format dates without timezone shift
   const formatDateDisplay = (dateString: string): string => {
@@ -283,7 +284,7 @@ export default function Goals() {
       }
 
       // Update the authentic score and total goal progress without refreshing
-      fetchAuthenticScore();
+      await refreshScore(true);
       if (selectedTimeline) {
         fetchTotalGoalProgress(timelineGoals);
       }
@@ -463,7 +464,7 @@ export default function Goals() {
 
   useEffect(() => {
     fetchAllTimelines();
-    fetchAuthenticScore();
+    refreshScore();
     fetchNorthStarData();
 
     // Cleanup undo timeout on unmount
@@ -527,18 +528,6 @@ export default function Goals() {
     return currentWeekIndex;
   };
 
-  const fetchAuthenticScore = async () => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const score = await calculateAuthenticScore(supabase, user.id);
-      setAuthenticScore(score);
-    } catch (error) {
-      console.error('Error calculating authentic score:', error);
-    }
-  };
 
   const fetchAllTimelines = async () => {
     try {
@@ -1314,7 +1303,7 @@ export default function Goals() {
         onClose={() => setWithdrawalFormVisible(false)}
         onSubmitSuccess={() => {
           setWithdrawalFormVisible(false);
-          fetchAuthenticScore();
+          refreshScore(true);
         }}
       />
 
