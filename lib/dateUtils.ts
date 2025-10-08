@@ -292,3 +292,38 @@ export function isDateInCurrentWeek(date: string, weekStartDay: 'sunday' | 'mond
 
   return date >= weekStartStr && date <= weekEndStr;
 }
+
+/**
+ * Calculates which week number a date falls into for a given timeline
+ * Returns null if the date is outside the timeline range
+ */
+export function getCurrentWeekNumber(
+  timelineStartDate: string,
+  targetDate?: string,
+  weekStartDay: 'sunday' | 'monday' = 'sunday'
+): number | null {
+  if (!isValidISODate(timelineStartDate)) {
+    return null;
+  }
+
+  const today = targetDate ? parseLocalDate(targetDate) : new Date();
+  const todayStr = formatLocalDate(today);
+
+  const cycleStart = parseLocalDate(timelineStartDate);
+  const alignedStart = getWeekStart(cycleStart, weekStartDay);
+  const alignedStartStr = formatLocalDate(alignedStart);
+
+  // Check if today is before the timeline starts
+  if (todayStr < alignedStartStr) {
+    return null;
+  }
+
+  // Calculate the difference in days
+  const diffTime = today.getTime() - alignedStart.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  // Calculate week number (1-indexed)
+  const weekNumber = Math.floor(diffDays / 7) + 1;
+
+  return weekNumber;
+}

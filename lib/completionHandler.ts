@@ -79,7 +79,9 @@ export async function handleActionCompletion(
     }
 
     if (occ) {
-      await Promise.all([
+      console.log('[handleActionCompletion] Copying universal joins for occurrence:', occ.id);
+
+      const [rolesResult, domainsResult, goalsResult] = await Promise.all([
         supabase.rpc('ap_copy_universal_roles_to_task', {
           from_parent_id: actionId,
           to_task_id: occ.id,
@@ -94,7 +96,15 @@ export async function handleActionCompletion(
         }),
       ]);
 
-      console.log('[handleActionCompletion] Universal joins copied successfully');
+      if (rolesResult.error) console.error('[handleActionCompletion] Error copying roles:', rolesResult.error);
+      if (domainsResult.error) console.error('[handleActionCompletion] Error copying domains:', domainsResult.error);
+      if (goalsResult.error) console.error('[handleActionCompletion] Error copying goals:', goalsResult.error);
+
+      console.log('[handleActionCompletion] Universal joins copied successfully', {
+        roles: !rolesResult.error,
+        domains: !domainsResult.error,
+        goals: !goalsResult.error
+      });
     }
 
     if (weeklyTarget && timeline) {

@@ -92,32 +92,79 @@ export default function Dashboard() {
         if (timelineBasedTasks.length > 0) {
           const timelineTaskIds = timelineBasedTasks.map(t => t.id);
 
-          // Fetch week plans and find current week number
+          // Get unique timeline IDs
+          const globalTimelineIds = [...new Set(timelineBasedTasks.map(t => t.user_global_timeline_id).filter(Boolean))];
+          const customTimelineIds = [...new Set(timelineBasedTasks.map(t => t.custom_timeline_id).filter(Boolean))];
+
+          // Fetch timeline start dates
+          const timelineStartDates = new Map();
+
+          if (globalTimelineIds.length > 0) {
+            const { data: globalTimelines } = await supabase
+              .from('0008-ap-user-global-timelines')
+              .select('id, start_date')
+              .in('id', globalTimelineIds);
+
+            globalTimelines?.forEach(tl => {
+              timelineStartDates.set(tl.id, tl.start_date);
+            });
+          }
+
+          if (customTimelineIds.length > 0) {
+            const { data: customTimelines } = await supabase
+              .from('0008-ap-user-custom-timelines')
+              .select('id, start_date')
+              .in('id', customTimelineIds);
+
+            customTimelines?.forEach(tl => {
+              timelineStartDates.set(tl.id, tl.start_date);
+            });
+          }
+
+          // Fetch week plans
           const { data: weekPlans, error: weekPlansError } = await supabase
             .from('0008-ap-task-week-plan')
             .select('task_id, week_number, target_days, user_global_timeline_id, user_custom_timeline_id')
-            .in('task_id', timelineTaskIds);
+            .in('task_id', timelineTaskIds)
+            .is('deleted_at', null);
 
           if (weekPlansError) throw weekPlansError;
 
-          // Map task IDs to their current week plans
-          const taskWeekData = new Map();
-          for (const plan of weekPlans || []) {
-            if (!taskWeekData.has(plan.task_id)) {
-              taskWeekData.set(plan.task_id, []);
-            }
-            taskWeekData.get(plan.task_id).push(plan);
-          }
+          // Calculate current week number for each task
+          const { getCurrentWeekNumber } = await import('@/lib/dateUtils');
 
-          // TODO: Calculate current week number based on timeline start date
-          // For now, include all timeline-based tasks with week plans
-          tasksWithCurrentWeek = timelineBasedTasks.filter(task =>
-            taskWeekData.has(task.id) && taskWeekData.get(task.id).length > 0
-          ).map(task => ({
-            ...task,
-            weekPlans: taskWeekData.get(task.id),
-            currentWeekPlan: taskWeekData.get(task.id)[0], // Use first plan for now
-          }));
+          tasksWithCurrentWeek = timelineBasedTasks.map(task => {
+            const timelineId = task.user_global_timeline_id || task.custom_timeline_id;
+            const startDate = timelineStartDates.get(timelineId);
+
+            if (!startDate) {
+              console.warn('[Dashboard] No start date found for timeline:', timelineId);
+              return null;
+            }
+
+            const currentWeekNum = getCurrentWeekNumber(startDate);
+
+            if (!currentWeekNum) {
+              console.warn('[Dashboard] Task is outside timeline range:', task.id);
+              return null;
+            }
+
+            // Find the week plan for the current week
+            const currentWeekPlan = weekPlans?.find(
+              wp => wp.task_id === task.id && wp.week_number === currentWeekNum
+            );
+
+            if (!currentWeekPlan) {
+              return null; // Task not scheduled for current week
+            }
+
+            return {
+              ...task,
+              currentWeekNumber: currentWeekNum,
+              currentWeekPlan,
+              weekPlans: weekPlans?.filter(wp => wp.task_id === task.id) || []
+            };
+          }).filter(Boolean);
         }
 
         // Combine standalone and timeline-based tasks
@@ -460,17 +507,22 @@ export default function Dashboard() {
           );
         }
       } else {
-        setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-
+        // For standalone tasks, update status first, then remove from UI
         const { error } = await supabase
           .from('0008-ap-tasks')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', task.id);
+
         if (error) throw error;
+
+        // Only remove from UI after successful database update
+        setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
       }
 
-      console.log('[Dashboard] Refreshing score');
-      refreshScore(true);
+      console.log('[Dashboard] Waiting for database commits, then refreshing score');
+      // Small delay to ensure all database writes (including RPC joins) complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await refreshScore(true);
     } catch (error) {
       console.error('[Dashboard] Error completing task:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to complete action.');

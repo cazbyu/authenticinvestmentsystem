@@ -314,7 +314,9 @@ export default function Goals() {
         );
       }
 
-      console.log('[Goals] Refreshing score and total goal progress');
+      console.log('[Goals] Waiting for database commits, then refreshing score and total goal progress');
+      // Small delay to ensure all database writes (including RPC joins) complete
+      await new Promise(resolve => setTimeout(resolve, 200));
       await refreshScore(true);
       if (selectedTimeline) {
         await fetchTotalGoalProgress(timelineGoals);

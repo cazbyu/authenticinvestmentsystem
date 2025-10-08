@@ -59,9 +59,12 @@ export async function calculateAuthenticScore(
 
     const taskIds = tasksData.map(t => t.id);
 
-    // 2. Roles + Domains via join tables
-    const [{ data: rolesData, error: rolesErr }, { data: domainsData, error: domainsErr }] =
-      await Promise.all([
+    // 2. Roles + Domains + Goals via join tables
+    const [
+      { data: rolesData, error: rolesErr },
+      { data: domainsData, error: domainsErr },
+      { data: goalsData, error: goalsErr }
+    ] = await Promise.all([
         supabase
           .from('0008-ap-universal-roles-join')
           .select('parent_id, role:0008-ap-roles(id, label)')
@@ -72,10 +75,16 @@ export async function calculateAuthenticScore(
           .select('parent_id, domain:0008-ap-domains(id, name)')
           .in('parent_id', taskIds)
           .eq('parent_type', 'task'),
+        supabase
+          .from('0008-ap-universal-goals-join')
+          .select('parent_id, goal_type, twelve_wk_goal:0008-ap-goals-12wk(id, title, status), custom_goal:0008-ap-goals-custom(id, title, status)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
       ]);
 
     if (rolesErr) throw rolesErr;
     if (domainsErr) throw domainsErr;
+    if (goalsErr) throw goalsErr;
 
     // 3. Calculate deposits
     let totalDeposits = 0;
@@ -85,7 +94,25 @@ export async function calculateAuthenticScore(
       const domains =
         domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) ?? [];
 
-      const pts = calculateTaskPoints(task, roles, domains, []);
+      // Transform polymorphic goals
+      const taskGoals = goalsData?.filter(g => g.parent_id === task.id).map(g => {
+        if (g.goal_type === 'twelve_wk_goal' && g.twelve_wk_goal) {
+          const goal = g.twelve_wk_goal;
+          if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+            return null;
+          }
+          return { ...goal, goal_type: '12week' };
+        } else if (g.goal_type === 'custom_goal' && g.custom_goal) {
+          const goal = g.custom_goal;
+          if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+            return null;
+          }
+          return { ...goal, goal_type: 'custom' };
+        }
+        return null;
+      }).filter(Boolean) || [];
+
+      const pts = calculateTaskPoints(task, roles, domains, taskGoals);
       totalDeposits += pts;
 
     }
@@ -163,9 +190,12 @@ export async function calculateAuthenticScoreForRole(
 
     const taskIds = tasksData.map(t => t.id);
 
-    // 2. Roles + Domains via join tables
-    const [{ data: rolesData, error: rolesErr }, { data: domainsData, error: domainsErr }] =
-      await Promise.all([
+    // 2. Roles + Domains + Goals via join tables
+    const [
+      { data: rolesData, error: rolesErr },
+      { data: domainsData, error: domainsErr },
+      { data: goalsData, error: goalsErr }
+    ] = await Promise.all([
         supabase
           .from('0008-ap-universal-roles-join')
           .select('parent_id, role:0008-ap-roles(id, label)')
@@ -176,10 +206,16 @@ export async function calculateAuthenticScoreForRole(
           .select('parent_id, domain:0008-ap-domains(id, name)')
           .in('parent_id', taskIds)
           .eq('parent_type', 'task'),
+        supabase
+          .from('0008-ap-universal-goals-join')
+          .select('parent_id, goal_type, twelve_wk_goal:0008-ap-goals-12wk(id, title, status), custom_goal:0008-ap-goals-custom(id, title, status)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
       ]);
 
     if (rolesErr) throw rolesErr;
     if (domainsErr) throw domainsErr;
+    if (goalsErr) throw goalsErr;
 
     // 3. Filter tasks that have the specified role
     const roleTaskIds = rolesData?.filter(r => r.role?.id === roleId).map(r => r.parent_id) || [];
@@ -193,7 +229,25 @@ export async function calculateAuthenticScoreForRole(
       const domains =
         domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) ?? [];
 
-      const pts = calculateTaskPoints(task, roles, domains, []);
+      // Transform polymorphic goals
+      const taskGoals = goalsData?.filter(g => g.parent_id === task.id).map(g => {
+        if (g.goal_type === 'twelve_wk_goal' && g.twelve_wk_goal) {
+          const goal = g.twelve_wk_goal;
+          if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+            return null;
+          }
+          return { ...goal, goal_type: '12week' };
+        } else if (g.goal_type === 'custom_goal' && g.custom_goal) {
+          const goal = g.custom_goal;
+          if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+            return null;
+          }
+          return { ...goal, goal_type: 'custom' };
+        }
+        return null;
+      }).filter(Boolean) || [];
+
+      const pts = calculateTaskPoints(task, roles, domains, taskGoals);
       totalDeposits += pts;
     }
 
@@ -248,9 +302,12 @@ export async function calculateAuthenticScoreForDomain(
 
     const taskIds = tasksData.map(t => t.id);
 
-    // 2. Roles + Domains via join tables
-    const [{ data: rolesData, error: rolesErr }, { data: domainsData, error: domainsErr }] =
-      await Promise.all([
+    // 2. Roles + Domains + Goals via join tables
+    const [
+      { data: rolesData, error: rolesErr },
+      { data: domainsData, error: domainsErr },
+      { data: goalsData, error: goalsErr }
+    ] = await Promise.all([
         supabase
           .from('0008-ap-universal-roles-join')
           .select('parent_id, role:0008-ap-roles(id, label)')
@@ -261,10 +318,16 @@ export async function calculateAuthenticScoreForDomain(
           .select('parent_id, domain:0008-ap-domains(id, name)')
           .in('parent_id', taskIds)
           .eq('parent_type', 'task'),
+        supabase
+          .from('0008-ap-universal-goals-join')
+          .select('parent_id, goal_type, twelve_wk_goal:0008-ap-goals-12wk(id, title, status), custom_goal:0008-ap-goals-custom(id, title, status)')
+          .in('parent_id', taskIds)
+          .eq('parent_type', 'task'),
       ]);
 
     if (rolesErr) throw rolesErr;
     if (domainsErr) throw domainsErr;
+    if (goalsErr) throw goalsErr;
 
     // 3. Filter tasks that have the specified domain
     const domainTaskIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
@@ -278,7 +341,25 @@ export async function calculateAuthenticScoreForDomain(
       const domains =
         domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) ?? [];
 
-      const pts = calculateTaskPoints(task, roles, domains, []);
+      // Transform polymorphic goals
+      const taskGoals = goalsData?.filter(g => g.parent_id === task.id).map(g => {
+        if (g.goal_type === 'twelve_wk_goal' && g.twelve_wk_goal) {
+          const goal = g.twelve_wk_goal;
+          if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+            return null;
+          }
+          return { ...goal, goal_type: '12week' };
+        } else if (g.goal_type === 'custom_goal' && g.custom_goal) {
+          const goal = g.custom_goal;
+          if (!goal || goal.status === 'archived' || goal.status === 'cancelled') {
+            return null;
+          }
+          return { ...goal, goal_type: 'custom' };
+        }
+        return null;
+      }).filter(Boolean) || [];
+
+      const pts = calculateTaskPoints(task, roles, domains, taskGoals);
       totalDeposits += pts;
     }
 
