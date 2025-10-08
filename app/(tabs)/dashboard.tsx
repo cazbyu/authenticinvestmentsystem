@@ -17,6 +17,7 @@ import { DraggableFab } from '@/components/DraggableFab';
 import { formatLocalDate } from '@/lib/dateUtils';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import { handleActionCompletion } from '@/lib/completionHandler';
+import { getWeeklyCompletionCount, syncCompletionAcrossViews, completionEvents, CompletionEvent } from '@/lib/completionSync';
 import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 // --- Main Dashboard Screen Component ---
@@ -129,23 +130,23 @@ export default function Dashboard() {
           return;
         }
 
-        // Fetch completion counts for timeline-based actions this week
+        // Fetch completion counts for timeline-based actions this week using shared function
         const timelineTaskIdsWithWeek = tasksWithCurrentWeek.map(t => t.id);
         let completionCounts = new Map();
 
         if (timelineTaskIdsWithWeek.length > 0) {
-          const { data: completions, error: completionsError } = await supabase
-            .from('0008-ap-tasks')
-            .select('parent_task_id')
-            .in('parent_task_id', timelineTaskIdsWithWeek)
-            .gte('due_date', weekStartStr)
-            .lte('due_date', weekEndStr)
-            .eq('status', 'completed');
-
-          if (!completionsError && completions) {
-            for (const completion of completions) {
-              const count = completionCounts.get(completion.parent_task_id) || 0;
-              completionCounts.set(completion.parent_task_id, count + 1);
+          for (const taskId of timelineTaskIdsWithWeek) {
+            try {
+              const countResult = await getWeeklyCompletionCount(
+                supabase,
+                taskId,
+                weekStartStr,
+                weekEndStr
+              );
+              completionCounts.set(taskId, countResult.completedCount);
+            } catch (error) {
+              console.error('[Dashboard] Error fetching completion count for task:', taskId, error);
+              completionCounts.set(taskId, 0);
             }
           }
         }
@@ -321,15 +322,55 @@ export default function Dashboard() {
     fetchData();
   }, [activeView, sortOption]);
 
+  useEffect(() => {
+    console.log('[Dashboard] Setting up completion event listener');
+    const unsubscribe = completionEvents.subscribeToAll((event: CompletionEvent) => {
+      console.log('[Dashboard] Received completion event:', event.type, event.taskId);
+
+      if (activeView === 'deposits' && event.type === 'week_progress_updated' && event.completionCount) {
+        const { taskId, completionCount } = event;
+
+        setTasks(prevTasks => {
+          const taskIndex = prevTasks.findIndex(t => t.id === taskId);
+
+          if (taskIndex !== -1) {
+            const updatedTasks = [...prevTasks];
+            updatedTasks[taskIndex] = {
+              ...updatedTasks[taskIndex],
+              weeklyCompletedCount: completionCount.completedCount,
+              weeklyTargetCount: completionCount.targetCount
+            };
+
+            if (completionCount.isComplete) {
+              return updatedTasks.filter(t => t.id !== taskId);
+            }
+
+            return updatedTasks;
+          } else if (!completionCount.isComplete && event.completionCount.completedCount < event.completionCount.targetCount) {
+            fetchData();
+          }
+
+          return prevTasks;
+        });
+
+        refreshScore(true);
+      }
+    });
+
+    return () => {
+      console.log('[Dashboard] Cleaning up completion event listener');
+      unsubscribe();
+    };
+  }, [activeView, refreshScore]);
+
   const handleCompleteTask = async (task: Task) => {
     try {
+      console.log('[Dashboard] Completing task:', task.id, task.title);
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Check if this is a recurring task linked to a timeline
       if (task.recurrence_rule && (task.user_global_timeline_id || task.custom_timeline_id)) {
-        // Calculate current week boundaries
         const today = new Date();
         const dayOfWeek = today.getDay();
         const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1);
@@ -340,34 +381,29 @@ export default function Dashboard() {
         const weekStartStr = formatLocalDate(weekStart);
         const weekEndStr = formatLocalDate(weekEnd);
 
-        // Get all completed dates for this task in the current week
         const { getWeekCompletionStatus } = await import('@/lib/taskUtils');
         const completedDates = await getWeekCompletionStatus(supabase, task.id, weekStartStr, weekEndStr);
 
-        // Use backward-fill logic to find the next date to complete
         const { getMostRecentIncompleteDate } = await import('@/lib/dateUtils');
         const dateToComplete = getMostRecentIncompleteDate(completedDates, weekStartStr, weekEndStr);
 
         if (!dateToComplete) {
-          // All dates up to today are already complete
-          console.log('[handleCompleteTask] All dates in current week are already complete');
-          // Optimistically remove the task from the list
+          console.log('[Dashboard] All dates in current week are already complete');
           setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
           Alert.alert('Complete', 'All available completions for this week are done!');
           return;
         }
 
-        // Optimistically remove the task from the list
-        setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-
-        // Determine timeline info
         const timeline = task.custom_timeline_id
           ? { id: task.custom_timeline_id, source: 'custom' as const }
           : task.user_global_timeline_id
             ? { id: task.user_global_timeline_id, source: 'global' as const }
             : null;
 
-        // Use the shared completion handler
+        if (!timeline) {
+          throw new Error('No timeline found for recurring task');
+        }
+
         const result = await handleActionCompletion(
           supabase,
           user.id,
@@ -381,13 +417,49 @@ export default function Dashboard() {
           throw new Error(result.error || 'Failed to complete action');
         }
 
-        // If the action shouldn't be removed (not yet at target), re-add it to the list
-        if (!result.shouldRemoveFromUI) {
-          fetchData();
+        console.log('[Dashboard] Action completed, recalculating count');
+        const countResult = await getWeeklyCompletionCount(
+          supabase,
+          task.id,
+          weekStartStr,
+          weekEndStr
+        );
+
+        const goalId = task.goals && task.goals.length > 0 ? task.goals[0].id : undefined;
+
+        setTasks(prevTasks => {
+          const updatedTasks = prevTasks.map(t => {
+            if (t.id === task.id) {
+              return {
+                ...t,
+                weeklyCompletedCount: countResult.completedCount,
+                weeklyTargetCount: task.weeklyTargetCount || 0
+              };
+            }
+            return t;
+          });
+
+          if (result.shouldRemoveFromUI || countResult.completedCount >= (task.weeklyTargetCount || 0)) {
+            return updatedTasks.filter(t => t.id !== task.id);
+          }
+
+          return updatedTasks;
+        });
+
+        if (timeline && goalId) {
+          const currentWeekNumber = Math.ceil((today.getTime() - new Date(weekStartStr).getTime()) / (7 * 24 * 60 * 60 * 1000));
+          await syncCompletionAcrossViews(
+            supabase,
+            task.id,
+            goalId,
+            currentWeekNumber,
+            weekStartStr,
+            weekEndStr,
+            timeline,
+            true
+          );
         }
       } else {
-        // For non-recurring tasks or tasks not linked to timelines, mark as completed
-        // Optimistically remove the task from the list immediately
         setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
 
         const { error } = await supabase
@@ -397,12 +469,11 @@ export default function Dashboard() {
         if (error) throw error;
       }
 
-      // Refresh authentic score in background with force refresh
+      console.log('[Dashboard] Refreshing score');
       refreshScore(true);
     } catch (error) {
-      console.error('Error completing task:', error);
+      console.error('[Dashboard] Error completing task:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to complete action.');
-      // Revert optimistic update on error
       fetchData();
     }
   };

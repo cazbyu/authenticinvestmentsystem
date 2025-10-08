@@ -30,6 +30,7 @@ export function AuthenticScoreProvider({ children }: { children: React.ReactNode
       return;
     }
 
+    console.log('[AuthenticScoreContext] Refreshing score, force:', force);
     setIsLoading(true);
     try {
       const supabase = getSupabaseClient();

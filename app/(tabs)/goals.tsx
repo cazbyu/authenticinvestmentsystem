@@ -20,6 +20,7 @@ import { fetchGoalActionsForWeek } from '@/hooks/fetchGoalActionsForWeek';
 import { calculateAuthenticScore, calculateTotalGoalProgress } from '@/lib/taskUtils';
 import { formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 import { handleActionCompletion, handleActionUncompletion } from '@/lib/completionHandler';
+import { getWeeklyCompletionCountWithTarget, syncCompletionAcrossViews, completionEvents } from '@/lib/completionSync';
 import { Plus, ChevronLeft, ChevronRight, Target, Users, Minus, X } from 'lucide-react-native';
 import { DraggableFab } from '@/components/DraggableFab';
 import { router } from 'expo-router';
@@ -153,7 +154,7 @@ export default function Goals() {
 
   const handleToggleCompletion = async (actionId: string, date: string, completed: boolean) => {
     try {
-      console.log('Toggling completion:', { actionId, date, completed, selectedTimeline });
+      console.log('[Goals] Toggling completion:', { actionId, date, completed, selectedTimeline });
 
       if (!selectedTimeline) {
         throw new Error('No timeline selected');
@@ -163,55 +164,40 @@ export default function Goals() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const currentWeek = timelineWeeks[currentWeekIndex];
+      if (!currentWeek) {
+        throw new Error('No current week found');
+      }
+
+      let goalIdForAction: string | undefined;
+      let weeklyTarget = 0;
+
+      for (const goalId in weekGoalActions) {
+        const action = weekGoalActions[goalId]?.find(a => a.id === actionId);
+        if (action) {
+          goalIdForAction = goalId;
+          weeklyTarget = action.weeklyTarget;
+          break;
+        }
+      }
+
       if (completed) {
-        // Optimistically update the UI immediately
-        setWeekGoalActions(prevActions => {
-          const updatedActions = { ...prevActions };
-
-          for (const goalId in updatedActions) {
-            const goalActions = updatedActions[goalId];
-            const actionIndex = goalActions.findIndex(action => action.id === actionId);
-
-            if (actionIndex !== -1) {
-              const updatedAction = { ...goalActions[actionIndex] };
-              const updatedLogs = updatedAction.logs.filter(log => log.measured_on !== date);
-
-              updatedAction.logs = updatedLogs;
-              updatedAction.weeklyActual = Math.min(
-                updatedLogs.filter(log => log.completed).length,
-                updatedAction.weeklyTarget
-              );
-
-              updatedActions[goalId] = [
-                ...goalActions.slice(0, actionIndex),
-                updatedAction,
-                ...goalActions.slice(actionIndex + 1)
-              ];
-
-              break;
-            }
-          }
-
-          return updatedActions;
-        });
-
         const result = await handleActionUncompletion(supabase, actionId, date);
 
         if (!result.success) {
           throw new Error(result.error || 'Failed to uncomplete action');
         }
-      } else {
-        // Find the weekly target for this action to pass to the completion handler
-        let weeklyTarget = 0;
-        for (const goalId in weekGoalActions) {
-          const action = weekGoalActions[goalId]?.find(a => a.id === actionId);
-          if (action) {
-            weeklyTarget = action.weeklyTarget;
-            break;
-          }
-        }
 
-        // Optimistically update the UI immediately
+        console.log('[Goals] Action uncompleted, recalculating count');
+        const countResult = await getWeeklyCompletionCountWithTarget(
+          supabase,
+          actionId,
+          currentWeek.week_number,
+          currentWeek.start_date,
+          currentWeek.end_date,
+          selectedTimeline
+        );
+
         setWeekGoalActions(prevActions => {
           const updatedActions = { ...prevActions };
 
@@ -221,30 +207,8 @@ export default function Goals() {
 
             if (actionIndex !== -1) {
               const updatedAction = { ...goalActions[actionIndex] };
-              const updatedLogs = [...updatedAction.logs];
-
-              const logIndex = updatedLogs.findIndex(log => log.measured_on === date);
-
-              if (logIndex !== -1) {
-                updatedLogs[logIndex] = { ...updatedLogs[logIndex], completed: true };
-              } else {
-                updatedLogs.push({
-                  id: `temp-${Date.now()}`,
-                  task_id: actionId,
-                  measured_on: date,
-                  week_number: timelineWeeks[currentWeekIndex]?.week_number || 1,
-                  day_of_week: new Date(date).getDay(),
-                  value: 1,
-                  completed: true,
-                  created_at: new Date().toISOString(),
-                });
-              }
-
-              updatedAction.logs = updatedLogs;
-              updatedAction.weeklyActual = Math.min(
-                updatedLogs.filter(log => log.completed).length,
-                updatedAction.weeklyTarget
-              );
+              updatedAction.logs = updatedAction.logs.filter(log => log.measured_on !== date);
+              updatedAction.weeklyActual = countResult.completedCount;
 
               updatedActions[goalId] = [
                 ...goalActions.slice(0, actionIndex),
@@ -259,6 +223,17 @@ export default function Goals() {
           return updatedActions;
         });
 
+        await syncCompletionAcrossViews(
+          supabase,
+          actionId,
+          goalIdForAction,
+          currentWeek.week_number,
+          currentWeek.start_date,
+          currentWeek.end_date,
+          selectedTimeline,
+          false
+        );
+      } else {
         const result = await handleActionCompletion(
           supabase,
           user.id,
@@ -272,27 +247,82 @@ export default function Goals() {
           throw new Error(result.error || 'Failed to complete action');
         }
 
-        if (result.shouldRemoveFromUI) {
-          setWeekGoalActions(prevActions => {
-            const updatedActions = { ...prevActions };
-            for (const goalId in updatedActions) {
-              updatedActions[goalId] = updatedActions[goalId].filter(a => a.id !== actionId);
+        console.log('[Goals] Action completed, recalculating count');
+        const countResult = await getWeeklyCompletionCountWithTarget(
+          supabase,
+          actionId,
+          currentWeek.week_number,
+          currentWeek.start_date,
+          currentWeek.end_date,
+          selectedTimeline
+        );
+
+        setWeekGoalActions(prevActions => {
+          const updatedActions = { ...prevActions };
+
+          for (const goalId in updatedActions) {
+            const goalActions = updatedActions[goalId];
+            const actionIndex = goalActions.findIndex(action => action.id === actionId);
+
+            if (actionIndex !== -1) {
+              const updatedAction = { ...goalActions[actionIndex] };
+
+              const logIndex = updatedAction.logs.findIndex(log => log.measured_on === date);
+              if (logIndex !== -1) {
+                updatedAction.logs[logIndex] = { ...updatedAction.logs[logIndex], completed: true };
+              } else {
+                updatedAction.logs.push({
+                  id: `temp-${Date.now()}`,
+                  task_id: actionId,
+                  measured_on: date,
+                  week_number: currentWeek.week_number,
+                  day_of_week: new Date(date).getDay(),
+                  value: 1,
+                  completed: true,
+                  created_at: new Date().toISOString(),
+                });
+              }
+
+              updatedAction.weeklyActual = countResult.completedCount;
+
+              updatedActions[goalId] = [
+                ...goalActions.slice(0, actionIndex),
+                updatedAction,
+                ...goalActions.slice(actionIndex + 1)
+              ];
+
+              if (result.shouldRemoveFromUI || countResult.isComplete) {
+                updatedActions[goalId] = updatedActions[goalId].filter(a => a.id !== actionId);
+              }
+
+              break;
             }
-            return updatedActions;
-          });
-        }
+          }
+
+          return updatedActions;
+        });
+
+        await syncCompletionAcrossViews(
+          supabase,
+          actionId,
+          goalIdForAction,
+          currentWeek.week_number,
+          currentWeek.start_date,
+          currentWeek.end_date,
+          selectedTimeline,
+          true
+        );
       }
 
-      // Update the authentic score and total goal progress without refreshing
+      console.log('[Goals] Refreshing score and total goal progress');
       await refreshScore(true);
       if (selectedTimeline) {
-        fetchTotalGoalProgress(timelineGoals);
+        await fetchTotalGoalProgress(timelineGoals);
       }
     } catch (error) {
-      console.error('Error toggling completion:', error);
+      console.error('[Goals] Error toggling completion:', error);
       Alert.alert('Error', (error as Error).message || 'Failed to update completion status');
 
-      // Revert the optimistic update on error
       await fetchWeekActions(timelineGoals);
     }
   };
