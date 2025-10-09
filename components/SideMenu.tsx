@@ -8,8 +8,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 
 const menuItems = [
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
-  { id: 'followup', title: 'Follow Up', icon: Bell, route: '/followup' },
   { id: 'reflections', title: 'Reflections', icon: BookOpen, route: '/reflections' },
+  { id: 'followup', title: 'Follow Up', icon: Bell, route: '/followup' },
   { id: 'coach', title: 'Coach Chat', icon: MessageCircle, route: '/coach' },
   { id: 'settings', title: 'Settings', icon: Settings, route: '/settings' },
 ];

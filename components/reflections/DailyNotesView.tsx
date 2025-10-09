@@ -338,11 +338,14 @@ export default function DailyNotesView() {
     });
   };
 
-  const formatWeekRange = () => {
-    const start = new Date(weekRange.start);
-    const end = new Date(weekRange.end);
-
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const formatCurrentDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
 
   const renderCheckboxGrid = (
@@ -416,7 +419,7 @@ export default function DailyNotesView() {
     >
       <View style={styles.content}>
         <Text style={[styles.weekTitle, { color: colors.text }]}>
-          Daily Reflection - {formatWeekRange()}
+          Daily Reflection - {formatCurrentDate()}
         </Text>
 
         {aggregationData && (

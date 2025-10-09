@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, FlatList, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Header } from '@/components/Header';
 import { Task, TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { getSupabaseClient } from '@/lib/supabase';
-import { X, ArrowUpDown } from 'lucide-react-native';
+import { X, ArrowUpDown, ArrowLeft } from 'lucide-react-native';
 import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 
 export default function FollowUpScreen() {
+  const router = useRouter();
   const { authenticScore, refreshScore } = useAuthenticScore();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
@@ -214,7 +216,13 @@ export default function FollowUpScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.headerContainer}>
-        <View style={styles.headerContent}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={24} color="#ffffff" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Follow Up</Text>
           <TouchableOpacity
             style={styles.sortButton}
@@ -339,16 +347,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.2)',
   },
-  headerContent: {
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
+  backButton: {
+    padding: 4,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 8,
   },
   sortButton: {
     flexDirection: 'row',

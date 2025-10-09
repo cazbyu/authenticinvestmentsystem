@@ -134,7 +134,7 @@ export default function ReflectionsScreen() {
               { color: activeTab === 'daily' ? '#ffffff' : colors.textSecondary }
             ]}
           >
-            Daily Notes
+            Daily Reflection
           </Text>
         </TouchableOpacity>
 
