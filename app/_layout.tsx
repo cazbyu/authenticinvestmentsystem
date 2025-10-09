@@ -29,6 +29,7 @@ export default function RootLayout() {
         >
           <Drawer.Screen name="(tabs)" />
           <Drawer.Screen name="calendar" />
+          <Drawer.Screen name="followup" />
           <Drawer.Screen name="reflections" />
           <Drawer.Screen name="settings" />
           <Drawer.Screen name="coach" />
