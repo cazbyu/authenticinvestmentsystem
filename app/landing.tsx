@@ -70,6 +70,25 @@ export default function LandingPage() {
             </Text>
           </View>
         </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            By signing in, you agree to our{' '}
+            <Text
+              style={styles.footerLink}
+              onPress={() => router.push('/terms')}
+            >
+              Terms of Service
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={styles.footerLink}
+              onPress={() => router.push('/privacy')}
+            >
+              Privacy Policy
+            </Text>
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -202,5 +221,21 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 24,
     textAlign: 'center',
+  },
+  footer: {
+    paddingTop: 32,
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  footerLink: {
+    color: '#0078d4',
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });

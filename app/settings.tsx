@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, TextInput, Image, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,6 +23,7 @@ const redirectUri = AuthSession.makeRedirectUri({
 });
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
@@ -607,6 +609,39 @@ export default function SettingsScreen() {
               thumbColor={notificationsEnabled ? colors.surface : colors.surface}
             />
           </View>
+        </View>
+
+        {/* Legal & Support Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Legal & Support</Text>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/privacy')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Privacy Policy</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/terms')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Terms of Service</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/about')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>About Authentic Intelligence Labs</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/contact')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Contact Support</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 

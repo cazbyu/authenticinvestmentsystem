@@ -202,19 +202,38 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.switchButton}
             onPress={() => {
               setIsSignUp(!isSignUp);
             }}
           >
             <Text style={styles.switchButtonText}>
-              {isSignUp 
-                ? 'Already have an account? Sign In' 
+              {isSignUp
+                ? 'Already have an account? Sign In'
                 : "Don't have an account? Sign Up"
               }
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              By signing in, you agree to our{' '}
+              <Text
+                style={styles.footerLink}
+                onPress={() => router.push('/terms')}
+              >
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text
+                style={styles.footerLink}
+                onPress={() => router.push('/privacy')}
+              >
+                Privacy Policy
+              </Text>
+            </Text>
+          </View>
           </View>
         </View>
       </ScrollView>
@@ -345,5 +364,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginHorizontal: 16,
     fontWeight: '500',
+  },
+  footer: {
+    marginTop: 24,
+    paddingTop: 16,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  footerLink: {
+    color: '#0078d4',
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });

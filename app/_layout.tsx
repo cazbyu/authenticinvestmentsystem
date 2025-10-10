@@ -33,6 +33,10 @@ export default function RootLayout() {
           <Drawer.Screen name="reflections" />
           <Drawer.Screen name="settings" />
           <Drawer.Screen name="coach" />
+          <Drawer.Screen name="terms" />
+          <Drawer.Screen name="privacy" />
+          <Drawer.Screen name="about" />
+          <Drawer.Screen name="contact" />
           <Drawer.Screen name="+not-found" />
         </Drawer>
         <StatusBar style="auto" />
