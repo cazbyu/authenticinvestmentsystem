@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,19 +21,28 @@ export function SuggestionForm({ onSubmitSuccess }: SuggestionFormProps) {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
-    if (content.trim().length < 10) {
-      Alert.alert('Too Short', 'Please provide at least 10 characters for your suggestion.');
+  const minChars = 10;
+  const maxChars = 1000;
+
+  const handleContentChange = useCallback((text: string) => {
+    setContent(text);
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    const trimmedContent = content.trim();
+
+    if (trimmedContent.length < minChars) {
+      Alert.alert('Too Short', `Please provide at least ${minChars} characters for your suggestion.`);
       return;
     }
 
-    if (content.length > 1000) {
-      Alert.alert('Too Long', 'Suggestion must be less than 1000 characters.');
+    if (content.length > maxChars) {
+      Alert.alert('Too Long', `Suggestion must be less than ${maxChars} characters.`);
       return;
     }
 
     setIsSubmitting(true);
-    const result = await submitSuggestion(content);
+    const result = await submitSuggestion(trimmedContent);
     setIsSubmitting(false);
 
     if (result.success) {
@@ -49,12 +58,12 @@ export function SuggestionForm({ onSubmitSuccess }: SuggestionFormProps) {
     } else {
       Alert.alert('Error', result.error || 'Failed to submit suggestion. Please try again.');
     }
-  };
+  }, [content, minChars, maxChars, submitSuggestion, onSubmitSuccess]);
 
   const characterCount = content.length;
-  const minChars = 10;
-  const maxChars = 1000;
-  const isValid = characterCount >= minChars && characterCount <= maxChars;
+  const isValid = useMemo(() => {
+    return characterCount >= minChars && characterCount <= maxChars;
+  }, [characterCount, minChars, maxChars]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -70,7 +79,7 @@ export function SuggestionForm({ onSubmitSuccess }: SuggestionFormProps) {
           },
         ]}
         value={content}
-        onChangeText={setContent}
+        onChangeText={handleContentChange}
         placeholder="Share your ideas, feedback, or suggestions..."
         placeholderTextColor={colors.textSecondary}
         multiline
