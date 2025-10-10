@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,12 @@ export function SuggestionForm({ onSubmitSuccess }: SuggestionFormProps) {
   const minChars = 10;
   const maxChars = 1000;
 
-  const handleContentChange = useCallback((text: string) => {
+  const handleContentChange = (text: string) => {
+    console.log('Content changed:', text, 'Length:', text.length);
     setContent(text);
-  }, []);
+  };
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async () => {
     const trimmedContent = content.trim();
 
     if (trimmedContent.length < minChars) {
@@ -58,12 +59,12 @@ export function SuggestionForm({ onSubmitSuccess }: SuggestionFormProps) {
     } else {
       Alert.alert('Error', result.error || 'Failed to submit suggestion. Please try again.');
     }
-  }, [content, minChars, maxChars, submitSuggestion, onSubmitSuccess]);
+  };
 
   const characterCount = content.length;
-  const isValid = useMemo(() => {
-    return characterCount >= minChars && characterCount <= maxChars;
-  }, [characterCount, minChars, maxChars]);
+  const isValid = characterCount >= minChars && characterCount <= maxChars;
+
+  console.log('Render - Content:', content, 'Length:', characterCount, 'IsValid:', isValid);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -112,10 +113,12 @@ export function SuggestionForm({ onSubmitSuccess }: SuggestionFormProps) {
             styles.submitButton,
             {
               backgroundColor: isValid && !isSubmitting ? colors.primary : colors.border,
+              opacity: isValid && !isSubmitting ? 1 : 0.5,
             },
           ]}
           onPress={handleSubmit}
           disabled={!isValid || isSubmitting}
+          activeOpacity={0.7}
         >
           {isSubmitting ? (
             <ActivityIndicator color="#ffffff" size="small" />
