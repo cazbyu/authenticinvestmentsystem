@@ -21,7 +21,7 @@ export function SuggestionForm({ onSubmitSuccess }: SuggestionFormProps) {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const minChars = 10;
+  const minChars = 5;
   const maxChars = 1000;
 
   const handleContentChange = (text: string) => {

@@ -67,8 +67,8 @@ export function useSuggestions(refreshTrigger?: number): UseSuggestionsResult {
         return { success: false, error: 'User not authenticated' };
       }
 
-      if (!content || content.trim().length < 10) {
-        return { success: false, error: 'Suggestion must be at least 10 characters' };
+      if (!content || content.trim().length < 5) {
+        return { success: false, error: 'Suggestion must be at least 5 characters' };
       }
 
       if (content.length > 1000) {
