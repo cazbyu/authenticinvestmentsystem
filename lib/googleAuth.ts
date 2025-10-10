@@ -8,9 +8,11 @@ WebBrowser.maybeCompleteAuthSession();
 export async function signInWithGoogle() {
   const supabase = getSupabaseClient();
 
-  const redirectTo = makeRedirectUri({
-    path: '/(tabs)/dashboard',
-  });
+  const redirectTo = Platform.OS === 'web'
+    ? 'https://www.authenticintelligencelabs.com/auth/callback'
+    : makeRedirectUri({
+        path: '/(tabs)/dashboard',
+      });
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -53,9 +55,11 @@ export async function signInWithGoogle() {
 export async function linkGoogleAccount() {
   const supabase = getSupabaseClient();
 
-  const redirectTo = makeRedirectUri({
-    path: '/settings',
-  });
+  const redirectTo = Platform.OS === 'web'
+    ? 'https://www.authenticintelligencelabs.com/settings'
+    : makeRedirectUri({
+        path: '/settings',
+      });
 
   const { data, error } = await supabase.auth.linkIdentity({
     provider: 'google',
