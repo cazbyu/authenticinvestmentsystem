@@ -1,8 +1,14 @@
 /*
-  # Create Withdrawals and Snapshots System
+  # Create Withdrawals and Snapshots System with withdrawn_at
+
+  ## Overview
+  Creates the withdrawals tracking system with proper timestamp column naming.
+
+  ## Changes Made
 
   1. New Tables
      - `0008-ap-withdrawals` - Withdrawal records with amount and reason
+       - Uses `withdrawn_at` (timestamptz) instead of `withdrawal_date` for proper timestamp tracking
      - `0008-ap-snapshots` - Weekly balance snapshots per user/scope
 
   2. Security
@@ -10,16 +16,19 @@
      - Add policies for authenticated users to manage their own data
 
   3. Triggers
-     - Auto-update timestamps for withdrawals
+     - Auto-update timestamps for withdrawals and snapshots
+
+  4. Performance
+     - Indexes on user_id and withdrawn_at for efficient queries
 */
 
--- Create the withdrawals table
+-- Create the withdrawals table with withdrawn_at
 CREATE TABLE IF NOT EXISTS "0008-ap-withdrawals" (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id),
   title text NOT NULL,
   amount numeric(10,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
-  withdrawal_date date NOT NULL DEFAULT CURRENT_DATE,
+  withdrawn_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -29,7 +38,7 @@ CREATE TABLE IF NOT EXISTS "0008-ap-snapshots" (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id),
   scope_type text NOT NULL CHECK (scope_type IN ('user', 'role', 'key_relationship', 'domain')),
-  scope_id uuid, -- NULL for user scope, otherwise references the specific role/kr/domain
+  scope_id uuid,
   week_start_date date NOT NULL,
   deposits_total numeric(10,2) DEFAULT 0,
   withdrawals_total numeric(10,2) DEFAULT 0,
@@ -46,35 +55,45 @@ ALTER TABLE "0008-ap-snapshots" ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for withdrawals
 CREATE POLICY "Users can select their own withdrawals" ON "0008-ap-withdrawals"
   FOR SELECT
+  TO authenticated
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own withdrawals" ON "0008-ap-withdrawals"
   FOR INSERT
+  TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own withdrawals" ON "0008-ap-withdrawals"
   FOR UPDATE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete their own withdrawals" ON "0008-ap-withdrawals"
   FOR DELETE
+  TO authenticated
   USING (auth.uid() = user_id);
 
 -- RLS Policies for snapshots
 CREATE POLICY "Users can select their own snapshots" ON "0008-ap-snapshots"
   FOR SELECT
+  TO authenticated
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert their own snapshots" ON "0008-ap-snapshots"
   FOR INSERT
+  TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update their own snapshots" ON "0008-ap-snapshots"
   FOR UPDATE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete their own snapshots" ON "0008-ap-snapshots"
   FOR DELETE
+  TO authenticated
   USING (auth.uid() = user_id);
 
 -- Create trigger function for auto-updating withdrawal timestamps
@@ -125,6 +144,6 @@ END $$;
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON "0008-ap-withdrawals"(user_id);
-CREATE INDEX IF NOT EXISTS idx_withdrawals_date ON "0008-ap-withdrawals"(withdrawal_date);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_withdrawn_at ON "0008-ap-withdrawals"(withdrawn_at);
 CREATE INDEX IF NOT EXISTS idx_snapshots_user_scope ON "0008-ap-snapshots"(user_id, scope_type, scope_id);
 CREATE INDEX IF NOT EXISTS idx_snapshots_week ON "0008-ap-snapshots"(week_start_date);

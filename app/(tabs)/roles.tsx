@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
+import { DraggableFab } from '@/components/DraggableFab';
 import { TaskCard, Task } from '@/components/tasks/TaskCard';
 import { DepositIdeaCard } from '@/components/depositIdeas/DepositIdeaCard';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
@@ -13,11 +14,13 @@ import { EditKRModal } from '@/components/settings/EditKRModal';
 import { JournalView } from '@/components/journal/JournalView';
 import { getSupabaseClient } from '@/lib/supabase';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
-import { Plus, Users, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
+import { Plus, Users, CreditCard as Edit, UserX, Ban, Menu } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
-import { useGoalProgress } from '@/hooks/useGoalProgress';
+import { useGoals } from '@/hooks/useGoals';
+import { calculateAuthenticScore as calculateScore, calculateAuthenticScoreForRole, calculateGoalProgress, GoalProgressData } from '@/lib/taskUtils';
+import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -39,6 +42,7 @@ interface KeyRelationship {
 
 export default function Roles() {
   const navigation = useNavigation<DrawerNavigation>();
+  const { authenticScore, refreshScoreForRole } = useAuthenticScore();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
@@ -46,10 +50,15 @@ export default function Roles() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchState, setFetchState] = useState<'idle' | 'loading-role' | 'loading-data' | 'complete'>('idle');
+  const [krLoading, setKRLoading] = useState(false);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
   const [krView, setKRView] = useState<'deposits' | 'ideas'>('deposits');
   const [krJournalView, setKRJournalView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
-  
+
+  // Main tab navigation state
+  const [activeMainTab, setActiveMainTab] = useState<'roles' | 'keyrelationships'>('roles');
+
   // Modal states
   const [manageRolesVisible, setManageRolesVisible] = useState(false);
   const [editRoleVisible, setEditRoleVisible] = useState(false);
@@ -57,24 +66,55 @@ export default function Roles() {
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [taskDetailVisible, setTaskDetailVisible] = useState(false);
   const [depositIdeaDetailVisible, setDepositIdeaDetailVisible] = useState(false);
-  
+
   // Selected items
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingKR, setEditingKR] = useState<KeyRelationship | null>(null);
-  const [authenticScore, setAuthenticScore] = useState(0);
+  const [roleAuthenticScore, setRoleAuthenticScore] = useState(0);
+  const [isCalculatingScore, setIsCalculatingScore] = useState(false);
+  const [isLoadingRole, setIsLoadingRole] = useState(false);
+  const fetchAbortController = useRef<AbortController | null>(null);
+  const roleClickTimeout = useRef<NodeJS.Timeout | null>(null);
+  const previousRoleIdRef = useRef<string | null>(null);
+  const fetchInProgressRef = useRef<boolean>(false);
+
+  // Memoize the scope object to prevent unnecessary re-renders
+  const goalsScope = useMemo(() => {
+    if (!selectedRole) return undefined;
+    // Only return new object if role ID actually changed
+    if (previousRoleIdRef.current === selectedRole.id) {
+      return goalsScope;
+    }
+    previousRoleIdRef.current = selectedRole.id;
+    return { type: 'role' as const, id: selectedRole.id };
+  }, [selectedRole?.id]);
 
   // 12-Week Goals for selected role
-  const { 
-    goals: twelveWeekGoals, 
-    goalProgress, 
-    loading: goalsLoading, 
-    refreshGoals 
-  } = useGoalProgress({
-    scope: selectedRole ? { type: 'role', id: selectedRole.id } : undefined
+  const {
+    twelveWeekGoals,
+    loading: goalsLoading,
+    refreshGoals
+  } = useGoals({
+    scope: goalsScope
   });
+
+  // Goal progress state
+  const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgressData>>({});
+  const [loadingGoalProgress, setLoadingGoalProgress] = useState(false);
+
+  // Memoize scope objects for JournalView and AnalyticsView to prevent unnecessary re-fetches
+  const journalScope = useMemo(() => {
+    if (!selectedRole) return null;
+    return { type: 'role' as const, id: selectedRole.id, name: selectedRole.label };
+  }, [selectedRole?.id, selectedRole?.label]);
+
+  const krJournalScope = useMemo(() => {
+    if (!selectedKR || !selectedRole) return null;
+    return { type: 'key_relationship' as const, id: selectedKR.id, name: selectedKR.name };
+  }, [selectedKR?.id, selectedKR?.name, selectedRole?.id]);
 
   const handleJournalEntryPress = (entry: any) => {
     if (entry.source_type === 'task') {
@@ -91,72 +131,56 @@ export default function Roles() {
     }
   };
 
-  const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
-    let points = 0;
-    if (roles && roles.length > 0) points += roles.length;
-    if (domains && domains.length > 0) points += domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
-  };
+  const calculateAuthenticScoreLocal = async (roleId?: string) => {
+    if (isCalculatingScore) return;
 
-  const calculateAuthenticScore = async () => {
+    setIsCalculatingScore(true);
     try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Calculate deposits from completed tasks
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .not('completed_at', 'is', null);
-
-      if (tasksError) throw tasksError;
-
-      let totalDeposits = 0;
-      if (tasksData && tasksData.length > 0) {
-        const taskIds = tasksData.map(t => t.id);
-        const [
-          { data: rolesData },
-          { data: domainsData }
-        ] = await Promise.all([
-          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
-        ]);
-
-        for (const task of tasksData) {
-          const taskWithData = {
-            ...task,
-            roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-            domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-          };
-          totalDeposits += calculateTaskPoints(task, taskWithData.roles, taskWithData.domains);
-        }
+      let score: number;
+      if (roleId) {
+        score = await refreshScoreForRole(roleId, true);
+      } else {
+        score = authenticScore;
       }
-
-      // Calculate withdrawals
-      const { data: withdrawalsData, error: withdrawalsError } = await supabase
-        .from('0008-ap-withdrawals')
-        .select('amount')
-        .eq('user_id', user.id);
-
-      if (withdrawalsError) throw withdrawalsError;
-
-      const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
-      
-      const balance = totalDeposits - totalWithdrawals;
-      setAuthenticScore(Math.round(balance * 10) / 10);
+      setRoleAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
+    } finally {
+      setIsCalculatingScore(false);
     }
   };
+
+  const fetchGoalProgressData = useCallback(async () => {
+    if (!twelveWeekGoals || twelveWeekGoals.length === 0) {
+      setGoalProgress({});
+      return;
+    }
+
+    setLoadingGoalProgress(true);
+    try {
+      const supabase = getSupabaseClient();
+      const progressData: Record<string, GoalProgressData> = {};
+
+      await Promise.all(
+        twelveWeekGoals.map(async (goal) => {
+          const progress = await calculateGoalProgress(
+            supabase,
+            goal.id,
+            '12week',
+            goal.weekly_target || 3,
+            goal.total_target || 36
+          );
+          progressData[goal.id] = progress;
+        })
+      );
+
+      setGoalProgress(progressData);
+    } catch (error) {
+      console.error('Error fetching goal progress:', error);
+    } finally {
+      setLoadingGoalProgress(false);
+    }
+  }, [twelveWeekGoals]);
 
   const fetchRoles = async () => {
     try {
@@ -173,20 +197,25 @@ export default function Roles() {
 
       if (error) throw error;
       setRoles(data || []);
-      
-      // Don't auto-select first role - show accounts page by default
-      await calculateAuthenticScore();
+
+      // Calculate score asynchronously without blocking
+      setTimeout(() => calculateAuthenticScoreLocal(), 0);
     } catch (error) {
       console.error('Error fetching roles:', error);
       Alert.alert('Error', (error as Error).message);
     }
   };
 
-  const fetchKeyRelationships = async (roleId: string) => {
+  const fetchKeyRelationships = useCallback(async (roleId: string) => {
+    setKRLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setKeyRelationships([]);
+        setKRLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('0008-ap-key-relationships')
@@ -197,14 +226,18 @@ export default function Roles() {
 
       if (error) throw error;
       setKeyRelationships(data || []);
-      setSelectedKR(null); // Don't auto-select first KR
+      setSelectedKR(null);
     } catch (error) {
       console.error('Error fetching key relationships:', error);
-      Alert.alert('Error', (error as Error).message);
+      setKeyRelationships([]);
+    } finally {
+      setKRLoading(false);
     }
-  };
+  }, []);
 
-  const fetchRoleTasks = async (roleId: string, view: 'deposits' | 'ideas' = activeView) => {
+  const fetchRoleTasks = useCallback(async (roleId: string, view: 'deposits' | 'ideas') => {
+    if (loading) return;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
@@ -215,8 +248,9 @@ export default function Roles() {
         // Fetch all tasks/events for this user first
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-          .select('*')
+          .select('*, custom_timeline_id')
           .eq('user_id', user.id)
+          .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event']);
 
@@ -328,9 +362,11 @@ export default function Roles() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading]);
 
-  const fetchKRTasks = async (krId: string, view: 'deposits' | 'ideas' = krView) => {
+  const fetchKRTasks = useCallback(async (krId: string, view: 'deposits' | 'ideas') => {
+    if (loading) return;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
@@ -343,6 +379,7 @@ export default function Roles() {
           .from('0008-ap-tasks')
           .select('*')
           .eq('user_id', user.id)
+          .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event']);
 
@@ -458,24 +495,117 @@ export default function Roles() {
     } finally {
       setLoading(false);
     }
+  }, [loading]);
+
+  const fetchAllKeyRelationships = async () => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('0008-ap-key-relationships')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (error) throw error;
+      setKeyRelationships(data || []);
+    } catch (error) {
+      console.error('Error fetching all key relationships:', error);
+    }
   };
 
   useEffect(() => {
     fetchRoles();
+    fetchAllKeyRelationships();
+
+    return () => {
+      if (roleClickTimeout.current) {
+        clearTimeout(roleClickTimeout.current);
+      }
+      if (fetchAbortController.current) {
+        fetchAbortController.current.abort();
+      }
+    };
   }, []);
 
   useEffect(() => {
-    if (selectedRole) {
-      fetchKeyRelationships(selectedRole.id);
-      fetchRoleTasks(selectedRole.id, activeView);
+    if (selectedRole && !isLoadingRole && !fetchInProgressRef.current) {
+      const controller = new AbortController();
+      fetchAbortController.current = controller;
+
+      const fetchRoleData = async () => {
+        try {
+          fetchInProgressRef.current = true;
+          setFetchState('loading-data');
+
+          // Fetch in parallel for better performance
+          const krPromise = fetchKeyRelationships(selectedRole.id);
+          const tasksPromise = fetchRoleTasks(selectedRole.id, activeView);
+          const scorePromise = calculateAuthenticScoreLocal(selectedRole.id);
+
+          await Promise.all([krPromise, tasksPromise, scorePromise]);
+
+          if (!controller.signal.aborted) {
+            setFetchState('complete');
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            console.error('Error fetching role data:', error);
+            setFetchState('complete');
+          }
+        } finally {
+          if (!controller.signal.aborted) {
+            fetchInProgressRef.current = false;
+          }
+        }
+      };
+
+      fetchRoleData();
+
+      return () => {
+        controller.abort();
+        fetchInProgressRef.current = false;
+      };
+    } else if (!selectedRole && !isLoadingRole) {
+      // When no role is selected, show total authentic score
+      calculateAuthenticScoreLocal();
     }
-  }, [selectedRole, activeView]);
+  }, [selectedRole?.id, activeView, isLoadingRole]);
 
   useEffect(() => {
-    if (selectedKR) {
-      fetchKRTasks(selectedKR.id, krView);
+    if (selectedKR && !isLoadingRole && !fetchInProgressRef.current) {
+      const controller = new AbortController();
+      fetchAbortController.current = controller;
+
+      const fetchKRData = async () => {
+        try {
+          fetchInProgressRef.current = true;
+          await fetchKRTasks(selectedKR.id, krView);
+        } catch (error) {
+          if (!controller.signal.aborted) {
+            console.error('Error fetching KR data:', error);
+          }
+        } finally {
+          fetchInProgressRef.current = false;
+        }
+      };
+
+      fetchKRData();
+
+      return () => {
+        controller.abort();
+      };
     }
-  }, [selectedKR, krView]);
+  }, [selectedKR?.id, krView, isLoadingRole]);
+
+  useEffect(() => {
+    if (selectedRole && !goalsLoading && twelveWeekGoals.length > 0 && fetchState === 'complete') {
+      // Only fetch goal progress after role data is fully loaded
+      fetchGoalProgressData();
+    }
+  }, [selectedRole?.id, goalsLoading, twelveWeekGoals.length, fetchState]);
 
   const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
@@ -556,6 +686,23 @@ export default function Roles() {
     }
   };
 
+  const handleActivateDepositIdea = async (depositIdea: any) => {
+    try {
+      // For now, just open the form to create a task based on the deposit idea
+      const editData = {
+        ...depositIdea,
+        type: 'task', // Convert to task
+        title: depositIdea.title,
+        selectedRoleIds: depositIdea.roles?.map(r => r.id) || [],
+        selectedDomainIds: depositIdea.domains?.map(d => d.id) || [],
+        selectedKeyRelationshipIds: depositIdea.keyRelationships?.map(kr => kr.id) || [],
+      };
+      setEditingTask(editData);
+      setTaskFormVisible(true);
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to activate deposit idea.');
+    }
+  };
   const handleTaskDoublePress = (task: Task) => {
     setSelectedTask(task);
     setTaskDetailVisible(true);
@@ -617,10 +764,24 @@ export default function Roles() {
     setEditingTask(null);
   };
 
-  const handleRolePress = (role: Role) => {
+  const handleRolePress = useCallback((role: Role) => {
+    // Cancel any pending role selection
+    if (roleClickTimeout.current) {
+      clearTimeout(roleClickTimeout.current);
+    }
+
+    // Abort any in-flight requests
+    if (fetchAbortController.current) {
+      fetchAbortController.current.abort();
+    }
+
+    // Immediately update selected role without blocking on loading states
     setSelectedRole(role);
     setSelectedKR(null);
-  };
+    setIsLoadingRole(false);
+    setFetchState('loading-data');
+    fetchInProgressRef.current = false;
+  }, []);
 
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
@@ -638,10 +799,15 @@ export default function Roles() {
     setEditingRole(null);
   };
 
+  const handleManageRolesUpdate = () => {
+    fetchRoles();
+  };
+
   const handleKRUpdate = () => {
     if (selectedRole) {
       fetchKeyRelationships(selectedRole.id);
     }
+    fetchAllKeyRelationships();
     setEditKRVisible(false);
     setEditingKR(null);
   };
@@ -664,8 +830,15 @@ export default function Roles() {
 
       if (error) throw error;
 
+      // Find and set the selected role
+      const role = roles.find(r => r.id === roleId);
+      if (role && !selectedRole) {
+        setSelectedRole(role);
+      }
+
       // Refresh KRs and open edit modal for the new one
       await fetchKeyRelationships(roleId);
+      await fetchAllKeyRelationships();
       setEditingKR(data);
       setEditKRVisible(true);
     } catch (error) {
@@ -679,11 +852,165 @@ export default function Roles() {
     try {
       const supabase = getSupabaseClient();
       const { data } = supabase.storage.from(bucket).getPublicUrl(imagePath);
-      return data.publicUrl;
+      const url = data.publicUrl;
+      console.log('[RoleBank] Generated image URL:', { imagePath, bucket, url });
+      return url;
     } catch (error) {
-      console.error('Error getting image URL:', error);
+      console.error('[RoleBank] Error getting image URL:', error);
       return null;
     }
+  };
+
+  // Memoize image URLs to prevent recalculating on every render
+  const roleImageUrls = useMemo(() => {
+    const urls: Record<string, string | null> = {};
+    roles.forEach(role => {
+      if (role.image_path) {
+        urls[role.id] = getImageUrl(role.image_path);
+      }
+    });
+    return urls;
+  }, [roles]);
+
+  const krImageUrls = useMemo(() => {
+    const urls: Record<string, string | null> = {};
+    keyRelationships.forEach(kr => {
+      if (kr.image_path) {
+        urls[kr.id] = getImageUrl(kr.image_path, '0008-key-relationship-images');
+      }
+    });
+    return urls;
+  }, [keyRelationships]);
+
+  // Render custom header
+  const renderRoleBankHeader = () => {
+    if (selectedKR) {
+      // Key Relationship detail header
+      return (
+        <View style={[styles.customHeader, { backgroundColor: selectedRole?.color || '#0078d4' }]}>
+          <View style={styles.customHeaderTop}>
+            <TouchableOpacity
+              style={styles.customBackButton}
+              onPress={() => setSelectedKR(null)}
+            >
+              <Text style={styles.customBackButtonText}>← Back to Role</Text>
+            </TouchableOpacity>
+            <View style={styles.customHeaderCenter}>
+              <Text style={styles.customHeaderTitle}>{selectedKR.name}</Text>
+              <Text style={styles.customHeaderSubtitle}>Key Relationship in {selectedRole?.label}</Text>
+            </View>
+            <View style={styles.customScoreContainer}>
+              <Text style={styles.customScoreLabel}>Authentic Score</Text>
+              <Text style={styles.customScoreValue}>{authenticScore}</Text>
+            </View>
+          </View>
+          <View style={styles.customHeaderBottom}>
+            <View style={styles.customToggleGroup}>
+              {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
+                <TouchableOpacity
+                  key={view}
+                  style={[styles.customToggleButton, krJournalView === view && styles.customActiveToggle]}
+                  onPress={() => handleKRJournalViewChange(view)}
+                >
+                  <Text style={[styles.customToggleText, krJournalView === view && styles.customActiveToggleText]}>
+                    {view.charAt(0).toUpperCase() + view.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (selectedRole) {
+      // Individual role detail header
+      return (
+        <View style={[styles.customHeader, { backgroundColor: selectedRole.color || '#0078d4' }]}>
+          <View style={styles.customHeaderTop}>
+            <TouchableOpacity
+              style={styles.customBackButton}
+              onPress={() => setSelectedRole(null)}
+            >
+              <Text style={styles.customBackButtonText}>← Back to Role Bank</Text>
+            </TouchableOpacity>
+            <View style={styles.customHeaderCenter}>
+              <Text style={styles.customHeaderTitle}>{selectedRole.label}</Text>
+            </View>
+            <View style={styles.customScoreContainer}>
+              <Text style={styles.customScoreLabel}>Authentic Score</Text>
+              <Text style={styles.customScoreValue}>{authenticScore}</Text>
+            </View>
+          </View>
+          <View style={styles.customHeaderBottom}>
+            <View style={styles.customToggleGroup}>
+              {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
+                <TouchableOpacity
+                  key={view}
+                  style={[styles.customToggleButton, activeView === view && styles.customActiveToggle]}
+                  onPress={() => handleViewChange(view)}
+                >
+                  <Text style={[styles.customToggleText, activeView === view && styles.customActiveToggleText]}>
+                    {view.charAt(0).toUpperCase() + view.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // Main Role Bank header with tabs
+    return (
+      <View style={styles.customHeader}>
+        <View style={styles.customHeaderTop}>
+          <TouchableOpacity
+            style={styles.customMenuButton}
+            onPress={() => navigation.openDrawer()}
+          >
+            <Menu size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={styles.customHeaderCenter}>
+            <Text style={styles.customHeaderTitle}>Role Bank</Text>
+          </View>
+          <View style={styles.customScoreContainer}>
+            <Text style={styles.customScoreLabel}>Authentic Score</Text>
+            <Text style={styles.customScoreValue}>{authenticScore}</Text>
+          </View>
+        </View>
+        <View style={styles.customHeaderBottom}>
+          <View style={styles.customMainTabsContainer}>
+            <View style={styles.customMainToggleGroup}>
+              <TouchableOpacity
+                style={[styles.customToggleButton, activeMainTab === 'roles' && styles.customActiveToggle]}
+                onPress={() => setActiveMainTab('roles')}
+              >
+                <Text style={[styles.customToggleText, activeMainTab === 'roles' && styles.customActiveToggleText]}>
+                  Roles
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.customToggleButton]}
+                onPress={() => setManageRolesVisible(true)}
+              >
+                <Text style={[styles.customToggleText]}>
+                  Manage Roles
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.customSingleButton, activeMainTab === 'keyrelationships' && styles.customActiveSingleButton]}
+              onPress={() => setActiveMainTab('keyrelationships')}
+            >
+              <Text style={[styles.customSingleButtonText, activeMainTab === 'keyrelationships' && styles.customActiveSingleButtonText]}>
+                Key Relationships
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   const renderContent = () => {
@@ -691,62 +1018,22 @@ export default function Roles() {
       // Key Relationship view
       return (
         <View style={styles.content}>
-          <View style={[styles.header, { backgroundColor: selectedRole?.color || '#0078d4' }]}>
-            <View style={styles.headerContent}>
-              <View style={styles.headerLeft}>
-                <TouchableOpacity 
-                  style={styles.backButton}
-                  onPress={() => setSelectedKR(null)}
-                >
-                  <Text style={styles.backButtonText}>← Back to Role</Text>
-                </TouchableOpacity>
-                <View style={styles.headerInfo}>
-                  <Text style={styles.headerTitle}>{selectedKR.name}</Text>
-                  <Text style={styles.headerSubtitle}>Key Relationship in {selectedRole?.label}</Text>
-                </View>
-              </View>
-              <View style={styles.headerRight}>
-                {selectedKR.image_path && (
-                  <Image 
-                    source={{ uri: getImageUrl(selectedKR.image_path, '0008-key-relationship-images') }} 
-                    style={styles.headerImage} 
-                  />
-                )}
-                <TouchableOpacity 
-                  style={styles.editButton}
-                  onPress={() => handleEditKR(selectedKR)}
-                >
-                  <Edit size={20} color="#ffffff" />
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            <View style={styles.toggleContainer}>
-              {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
-                <TouchableOpacity
-                  key={view}
-                  style={[styles.toggleButton, krJournalView === view && styles.activeToggle]}
-                  onPress={() => handleKRJournalViewChange(view)}
-                >
-                  <Text style={[styles.toggleText, krJournalView === view && styles.activeToggleText]}>
-                    {view.charAt(0).toUpperCase() + view.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
 
           <ScrollView style={styles.taskList}>
             {krJournalView === 'journal' ? (
-              <JournalView
-                scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
-                onEntryPress={handleJournalEntryPress}
-              />
+              krJournalScope && (
+                <JournalView
+                  scope={krJournalScope}
+                  onEntryPress={handleJournalEntryPress}
+                />
+              )
             ) : krJournalView === 'analytics' ? (
-              <AnalyticsView
-                scope={{ type: 'key_relationship', id: selectedKR.id, name: selectedKR.name }}
-              />
-            ) : loading ? (
+              krJournalScope && (
+                <AnalyticsView
+                  scope={krJournalScope}
+                />
+              )
+            ) : (loading && fetchState === 'loading-data') ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
@@ -795,60 +1082,61 @@ export default function Roles() {
       // Role view
       return (
         <View style={styles.content}>
-          <Header
-            title={selectedRole.label}
-            activeView={activeView}
-            onViewChange={handleViewChange}
-            authenticScore={authenticScore}
-            backgroundColor={selectedRole.color}
-            onEditPress={() => handleEditRole(selectedRole)}
-            onBackPress={() => setSelectedRole(null)}
-          />
 
-          {/* 12-Week Goals Strip */}
-          {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
+          {/* 12-Week Goals Strip - Only show when data is stable */}
+          {activeView === 'deposits' && twelveWeekGoals.length > 0 && fetchState === 'complete' && (
             <View style={styles.goalsStrip}>
               <Text style={styles.goalsStripTitle}>12-Week Goals</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.goalsStripContent}>
-                  {twelveWeekGoals.map(goal => {
-                    const progress = goalProgress[goal.id];
-                    if (!progress) return null;
-                    
-                    return (
-                      <GoalProgressCard
-                        key={goal.id}
-                        goal={goal}
-                        progress={progress}
-                        compact={true}
-                        onAddTask={() => {
-                          setEditingTask({
-                            type: 'task',
-                            selectedGoalIds: [goal.id],
-                            twelveWeekGoalChecked: true,
-                            countsTowardWeeklyProgress: true,
-                            selectedRoleIds: [selectedRole.id],
-                          } as any);
-                          setTaskFormVisible(true);
-                        }}
-                      />
-                    );
-                  })}
+              {loadingGoalProgress ? (
+                <View style={styles.goalsStripLoading}>
+                  <Text style={styles.goalsStripLoadingText}>Loading goals...</Text>
                 </View>
-              </ScrollView>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.goalsStripContent}>
+                    {twelveWeekGoals.map(goal => {
+                      const progress = goalProgress[goal.id];
+                      if (!progress) return null;
+
+                      return (
+                        <GoalProgressCard
+                          key={`goal-${goal.id}-${selectedRole.id}`}
+                          goal={goal}
+                          progress={progress}
+                          compact={true}
+                          onAddAction={() => {
+                            setEditingTask({
+                              type: 'task',
+                              selectedGoalIds: [goal.id],
+                              twelveWeekGoalChecked: true,
+                              countsTowardWeeklyProgress: true,
+                              selectedRoleIds: [selectedRole.id],
+                            } as any);
+                            setTaskFormVisible(true);
+                          }}
+                        />
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              )}
             </View>
           )}
           <ScrollView style={styles.taskList}>
             {activeView === 'journal' ? (
-              <JournalView
-                scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
-                onEntryPress={handleJournalEntryPress}
-              />
+              journalScope && (
+                <JournalView
+                  scope={journalScope}
+                  onEntryPress={handleJournalEntryPress}
+                />
+              )
             ) : activeView === 'analytics' ? (
-              <AnalyticsView
-                scope={{ type: 'role', id: selectedRole.id, name: selectedRole.label }}
-              />
-            ) : loading ? (
+              journalScope && (
+                <AnalyticsView
+                  scope={journalScope}
+                />
+              )
+            ) : (loading && fetchState === 'loading-data') ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
@@ -890,18 +1178,28 @@ export default function Roles() {
             )}
           </ScrollView>
 
-          {keyRelationships.length > 0 && (
-            <View style={styles.keyRelationshipsSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Key Relationships</Text>
-                <TouchableOpacity
-                  style={styles.addKRButton}
-                  onPress={() => handleAddKR(selectedRole.id)}
-                >
-                  <Plus size={16} color="#0078d4" />
-                  <Text style={styles.addKRButtonText}>Add KR</Text>
-                </TouchableOpacity>
+          {/* Key Relationships Section - Always visible when a role is selected */}
+          <View style={styles.keyRelationshipsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Key Relationships</Text>
+              <TouchableOpacity
+                style={styles.addKRButton}
+                onPress={() => handleAddKR(selectedRole.id)}
+                disabled={krLoading}
+              >
+                <Plus size={16} color="#0078d4" />
+                <Text style={styles.addKRButtonText}>Add KR</Text>
+              </TouchableOpacity>
+            </View>
+            {krLoading ? (
+              <View style={styles.krLoadingContainer}>
+                <Text style={styles.krLoadingText}>Loading key relationships...</Text>
               </View>
+            ) : keyRelationships.length === 0 ? (
+              <View style={styles.emptyKRContainer}>
+                <Text style={styles.emptyKRText}>No key relationships yet</Text>
+              </View>
+            ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.keyRelationshipsList}>
                   {keyRelationships.map(kr => (
@@ -910,10 +1208,13 @@ export default function Roles() {
                       style={styles.keyRelationshipCard}
                       onPress={() => setSelectedKR(kr)}
                     >
-                      {kr.image_path ? (
-                        <Image 
-                          source={{ uri: getImageUrl(kr.image_path, '0008-key-relationship-images') }} 
-                          style={styles.krImage} 
+                      {kr.image_path && krImageUrls[kr.id] ? (
+                        <Image
+                          source={{ uri: krImageUrls[kr.id] || undefined }}
+                          style={styles.krImage}
+                          onError={(error) => {
+                            console.error('[RoleBank] Failed to load KR image:', kr.image_path, error.nativeEvent.error);
+                          }}
                         />
                       ) : (
                         <View style={styles.krImagePlaceholder}>
@@ -925,129 +1226,182 @@ export default function Roles() {
                   ))}
                 </View>
               </ScrollView>
-            </View>
-          )}
-
-          {/* Show Add KR button even when no KRs exist */}
-          {keyRelationships.length === 0 && (
-            <View style={styles.keyRelationshipsSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Key Relationships</Text>
-                <TouchableOpacity
-                  style={styles.addKRButton}
-                  onPress={() => handleAddKR(selectedRole.id)}
-                >
-                  <Plus size={16} color="#0078d4" />
-                  <Text style={styles.addKRButtonText}>Add KR</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.emptyKRText}>No key relationships yet</Text>
-            </View>
-          )}
+            )}
+          </View>
         </View>
       );
     }
 
-    // Roles list view
+    // Main Role Bank view with tabs
     return (
       <View style={styles.content}>
-        <Header 
-          title="Role Bank" 
-          authenticScore={authenticScore}
-        />
-        
-        <ScrollView style={styles.rolesList}>
-          {roles.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No active roles found</Text>
-              <TouchableOpacity 
-                style={styles.manageButton}
-                onPress={() => setManageRolesVisible(true)}
-              >
-                <Text style={styles.manageButtonText}>Manage Roles</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.rolesGrid}>
-              {roles.map(role => (
-                <View
-                  key={role.id}
-                  style={[
-                    styles.roleCard,
-                    styles.roleCardHalf,
-                    { borderLeftColor: role.color || '#0078d4' }
-                  ]}
+        {activeMainTab === 'roles' && (
+          <ScrollView style={styles.rolesList}>
+            {roles.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No active roles found</Text>
+                <TouchableOpacity
+                  style={styles.manageButton}
+                  onPress={() => setManageRolesVisible(true)}
                 >
-                  <View style={styles.roleCardContent}>
-                    {/* LEFT side = navigate into the Role */}
-                    <TouchableOpacity
-                      style={styles.roleCardLeft}
-                      onPress={() => handleRolePress(role)}
-                      activeOpacity={0.8}
-                    >
-                      {role.image_path ? (
-                        <Image 
-                          source={{ uri: getImageUrl(role.image_path) }} 
-                          style={styles.roleImage} 
-                        />
+                  <Text style={styles.manageButtonText}>Manage Roles</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.rolesGrid}>
+                {roles.map(role => (
+                  <TouchableOpacity
+                    key={role.id}
+                    style={[
+                      styles.roleCard,
+                      styles.roleCardHalf,
+                      { borderLeftColor: role.color || '#0078d4' }
+                    ]}
+                    onPress={() => handleRolePress(role)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.roleCardContent}>
+                      <View style={styles.roleCardMain}>
+                        {role.image_path && roleImageUrls[role.id] ? (
+                          <Image
+                            source={{ uri: roleImageUrls[role.id] || undefined }}
+                            style={styles.roleImage}
+                            onError={(error) => {
+                              console.error('[RoleBank] Failed to load role image:', role.label, role.image_path, error.nativeEvent.error);
+                            }}
+                          />
+                        ) : (
+                          <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
+                            <Text style={styles.roleImageText}>
+                              {role.label.charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={styles.roleInfo}>
+                          <Text style={styles.roleName} numberOfLines={2}>{role.label}</Text>
+                          {role.category && (
+                            <Text style={styles.roleCategory} numberOfLines={1}>{role.category}</Text>
+                          )}
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.editRoleButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleEditRole(role);
+                        }}
+                        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                      >
+                        <Edit size={16} color="#6b7280" />
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {activeMainTab === 'keyrelationships' && (
+          <ScrollView style={styles.krContent}>
+            <View style={styles.krHeader}>
+              <Text style={styles.krTitle}>All Key Relationships</Text>
+              <Text style={styles.krSubtitle}>Organized by role</Text>
+            </View>
+            {roles.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No roles found. Create roles first to add key relationships.</Text>
+              </View>
+            ) : (
+              <View style={styles.krList}>
+                {roles.map(role => {
+                  const roleKRs = keyRelationships.filter(kr => kr.role_id === role.id);
+                  return (
+                    <View key={role.id} style={styles.krRoleSection}>
+                      <View style={styles.krRoleHeader}>
+                        <View style={[styles.krRoleIndicator, { backgroundColor: role.color || '#0078d4' }]} />
+                        <Text style={styles.krRoleName}>{role.label}</Text>
+                        <TouchableOpacity
+                          style={styles.krAddButton}
+                          onPress={() => handleAddKR(role.id)}
+                        >
+                          <Plus size={16} color="#0078d4" />
+                          <Text style={styles.krAddButtonText}>Add KR</Text>
+                        </TouchableOpacity>
+                      </View>
+                      {roleKRs.length === 0 ? (
+                        <View style={styles.krEmptySection}>
+                          <Text style={styles.krEmptyText}>No key relationships yet</Text>
+                        </View>
                       ) : (
-                        <View style={[styles.roleImagePlaceholder, { backgroundColor: role.color || '#0078d4' }]}>
-                          <Text style={styles.roleImageText}>
-                            {role.label.charAt(0).toUpperCase()}
-                          </Text>
+                        <View style={styles.krItems}>
+                          {roleKRs.map(kr => (
+                            <TouchableOpacity
+                              key={kr.id}
+                              style={styles.krItem}
+                              onPress={() => {
+                                setSelectedRole(role);
+                                setSelectedKR(kr);
+                              }}
+                            >
+                              {kr.image_path && krImageUrls[kr.id] ? (
+                                <Image
+                                  source={{ uri: krImageUrls[kr.id] || undefined }}
+                                  style={styles.krItemImage}
+                                />
+                              ) : (
+                                <View style={styles.krItemImagePlaceholder}>
+                                  <Users size={20} color="#6b7280" />
+                                </View>
+                              )}
+                              <View style={styles.krItemInfo}>
+                                <Text style={styles.krItemName}>{kr.name}</Text>
+                                {kr.description && (
+                                  <Text style={styles.krItemDescription} numberOfLines={1}>
+                                    {kr.description}
+                                  </Text>
+                                )}
+                              </View>
+                              <TouchableOpacity
+                                style={styles.krItemEditButton}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  handleEditKR(kr);
+                                }}
+                              >
+                                <Edit size={16} color="#6b7280" />
+                              </TouchableOpacity>
+                            </TouchableOpacity>
+                          ))}
                         </View>
                       )}
-
-                      <View style={styles.roleInfo}>
-                        <Text style={styles.roleName}>{role.label}</Text>
-                        {role.category && (
-                          <Text style={styles.roleCategory}>{role.category}</Text>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* RIGHT side = edit role settings (image/color) */}
-                    <TouchableOpacity 
-                      style={styles.editRoleButton}
-                      onPress={() => handleEditRole(role)}
-                      hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                    >
-                      <Edit size={16} color="#6b7280" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        )}
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {renderRoleBankHeader()}
       {renderContent()}
 
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => setTaskFormVisible(true)}
-      >
+      <DraggableFab onPress={() => setTaskFormVisible(true)}>
         <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={styles.manageFab} 
-        onPress={() => setManageRolesVisible(true)}
-      >
-        <Users size={20} color="#ffffff" />
-      </TouchableOpacity>
+      </DraggableFab>
 
       {/* Modals */}
       <ManageRolesModal
         visible={manageRolesVisible}
         onClose={() => setManageRolesVisible(false)}
-        onUpdate={fetchRoles}
+        onUpdate={handleManageRolesUpdate}
       />
 
       <EditRoleModal
@@ -1199,7 +1553,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 12,
+  },
+  roleCardMain: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
   },
   rolesGrid: {
     flexDirection: 'row',
@@ -1210,25 +1570,19 @@ const styles = StyleSheet.create({
   },
   roleCardHalf: {
     width: '48%',
-  },
-  roleCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    minHeight: 120,
   },
   roleImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   roleImagePlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
   roleImageText: {
     color: '#ffffff',
@@ -1236,20 +1590,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   roleInfo: {
-    flex: 1,
+    width: '100%',
+    alignItems: 'center',
   },
   roleName: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 2,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   roleCategory: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6b7280',
+    textAlign: 'center',
   },
   editRoleButton: {
     padding: 8,
+    position: 'absolute',
+    top: 4,
+    right: 4,
   },
   taskList: {
     flex: 1,
@@ -1289,11 +1649,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0078d4',
   },
+  emptyKRContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
   emptyKRText: {
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  krLoadingContainer: {
+    paddingVertical: 20,
     paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  krLoadingText: {
+    fontSize: 14,
+    color: '#6b7280',
     fontStyle: 'italic',
   },
   keyRelationshipsList: {
@@ -1361,38 +1735,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#0078d4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  manageFab: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#7c3aed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   goalsStrip: {
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
@@ -1410,5 +1752,244 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 12,
+  },
+  goalsStripLoading: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  goalsStripLoadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  roleCardDisabled: {
+    opacity: 0.5,
+  },
+  // Custom header styles
+  customHeader: {
+    backgroundColor: '#0078d4',
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  customHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  customMenuButton: {
+    padding: 4,
+  },
+  customBackButton: {
+    paddingVertical: 4,
+  },
+  customBackButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  customHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  customHeaderTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  customHeaderSubtitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    opacity: 0.9,
+  },
+  customScoreContainer: {
+    alignItems: 'flex-end',
+  },
+  customScoreLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 2,
+  },
+  customScoreValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  customHeaderBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customMainTabsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  customMainToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  customActiveToggle: {
+    backgroundColor: '#ffffff',
+  },
+  customToggleText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  customActiveToggleText: {
+    color: '#0078d4',
+  },
+  customSingleButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+  },
+  customActiveSingleButton: {
+    backgroundColor: '#ffffff',
+  },
+  customSingleButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  customActiveSingleButtonText: {
+    color: '#0078d4',
+  },
+  // Key Relationships tab styles
+  krContent: {
+    flex: 1,
+    padding: 16,
+  },
+  krHeader: {
+    marginBottom: 20,
+  },
+  krTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  krSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  krList: {
+    gap: 20,
+  },
+  krRoleSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  krRoleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  krRoleIndicator: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+  },
+  krRoleName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+  },
+  krAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#0078d4',
+  },
+  krAddButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0078d4',
+  },
+  krEmptySection: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  krEmptyText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  krItems: {
+    gap: 8,
+  },
+  krItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    gap: 12,
+  },
+  krItemImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  krItemImagePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  krItemInfo: {
+    flex: 1,
+  },
+  krItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  krItemDescription: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  krItemEditButton: {
+    padding: 8,
   },
 });

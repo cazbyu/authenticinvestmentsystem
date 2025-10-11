@@ -2,14 +2,16 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Calendar, MessageCircle, Settings, LogOut, BookOpen } from 'lucide-react-native';
+import { Calendar, MessageCircle, Settings, LogOut, BookOpen, Bell, Lightbulb } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const menuItems = [
   { id: 'calendar', title: 'Calendar View', icon: Calendar, route: '/calendar' },
   { id: 'reflections', title: 'Reflections', icon: BookOpen, route: '/reflections' },
+  { id: 'followup', title: 'Follow Up', icon: Bell, route: '/followup' },
   { id: 'coach', title: 'Coach Chat', icon: MessageCircle, route: '/coach' },
+  { id: 'suggestions', title: 'Suggestions', icon: Lightbulb, route: '/suggestions' },
   { id: 'settings', title: 'Settings', icon: Settings, route: '/settings' },
 ];
 

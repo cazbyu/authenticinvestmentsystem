@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, TextInput, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert, TextInput, Image, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as ImagePicker from 'expo-image-picker';
 import { Header } from '@/components/Header';
 import { ManageRolesModal } from '@/components/settings/ManageRolesModal';
+import { ArchivedTimelinesView } from '@/components/settings/ArchivedTimelinesView';
+import { LinkedAccountsManager } from '@/components/settings/LinkedAccountsManager';
+import { NorthStarEditor } from '@/components/northStar/NorthStarEditor';
 import { ManageCustomTimelinesModal } from '@/components/timelines/ManageCustomTimelinesModal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -19,12 +23,15 @@ const redirectUri = AuthSession.makeRedirectUri({
 });
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { isDarkMode, toggleDarkMode, colors } = useTheme();
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isRolesModalVisible, setIsRolesModalVisible] = useState(false);
+  const [showNorthStarEditor, setShowNorthStarEditor] = useState(false);
+  const [showTimelineArchive, setShowTimelineArchive] = useState(false);
   const [authenticScore, setAuthenticScore] = useState(0);
   const [profile, setProfile] = useState({
     first_name: '',
@@ -86,11 +93,22 @@ export default function SettingsScreen() {
         setProfile(data);
 
         if (data.profile_image) {
-          const { data: signed } = await supabase
-            .storage
-            .from('0008-ap-profile-images')
-            .createSignedUrl(data.profile_image, 60 * 60);
-          setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+          try {
+            const { data: signed, error: signError } = await supabase
+              .storage
+              .from('0008-ap-profile-images')
+              .createSignedUrl(data.profile_image, 60 * 60);
+
+            if (signError) {
+              console.error('Error creating signed URL:', signError);
+              setProfileImageUrl(null);
+            } else {
+              setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+            }
+          } catch (imageError) {
+            console.error('Error loading profile image:', imageError);
+            setProfileImageUrl(null);
+          }
         } else {
           setProfileImageUrl(null);
         }
@@ -119,46 +137,8 @@ export default function SettingsScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .not('completed_at', 'is', null);
-
-      if (tasksError) throw tasksError;
-
-      let totalDeposits = 0;
-      if (tasksData && tasksData.length > 0) {
-        const taskIds = tasksData.map(t => t.id);
-        const [
-          { data: rolesData },
-          { data: domainsData }
-        ] = await Promise.all([
-          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
-        ]);
-
-        for (const task of tasksData) {
-          const taskWithData = {
-            ...task,
-            roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-            domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-          };
-          totalDeposits += calculateTaskPoints(task, taskWithData.roles, taskWithData.domains);
-        }
-      }
-
-      const { data: withdrawalsData, error: withdrawalsError } = await supabase
-        .from('0008-ap-withdrawals')
-        .select('amount')
-        .eq('user_id', user.id);
-
-      if (withdrawalsError) throw withdrawalsError;
-
-      const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
-      const balance = totalDeposits - totalWithdrawals;
-      setAuthenticScore(Math.round(balance * 10) / 10);
+      const score = await calculateAuthenticScore(supabase, user.id);
+      setAuthenticScore(score);
     } catch (error) {
       console.error('Error calculating authentic score:', error);
     }
@@ -258,9 +238,13 @@ export default function SettingsScreen() {
         .upload(fileName, blob, { contentType, upsert: true });
       if (uploadError) throw uploadError;
 
-      const { data: signed } = await supabase.storage
+      const { data: signed, error: signError } = await supabase.storage
         .from('0008-ap-profile-images')
         .createSignedUrl(fileName, 60 * 60);
+
+      if (signError) {
+        console.error('Error creating signed URL after upload:', signError);
+      }
 
       await updateProfile({ profile_image: fileName });
       setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
@@ -296,10 +280,21 @@ export default function SettingsScreen() {
       setProfile(prev => ({ ...prev, ...updates }));
 
       if (updates.profile_image) {
-        const { data: signed } = await supabase.storage
-          .from('0008-ap-profile-images')
-          .createSignedUrl(updates.profile_image, 60 * 60);
-        setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+        try {
+          const { data: signed, error: signError } = await supabase.storage
+            .from('0008-ap-profile-images')
+            .createSignedUrl(updates.profile_image, 60 * 60);
+
+          if (signError) {
+            console.error('Error creating signed URL in updateProfile:', signError);
+            setProfileImageUrl(null);
+          } else {
+            setProfileImageUrl(signed?.signedUrl ? `${signed.signedUrl}&cb=${Date.now()}` : null);
+          }
+        } catch (imageError) {
+          console.error('Error loading updated profile image:', imageError);
+          setProfileImageUrl(null);
+        }
       }
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -468,7 +463,7 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.settingButton}
             onPress={() => setIsRolesModalVisible(true)}
           >
@@ -480,12 +475,39 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Linked Accounts Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <LinkedAccountsManager />
+        </View>
+
+        {/* North Star Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>North Star</Text>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => setShowNorthStarEditor(true)}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Mission & Vision Statements</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => setShowNorthStarEditor(true)}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>1-Year Goals</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Goal Bank Settings Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Goal Bank Settings</Text>
 
-          <TouchableOpacity style={styles.settingButton}>
-            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Goal Timelines</Text>
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => setShowTimelineArchive(true)}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Timeline Archive</Text>
           </TouchableOpacity>
 
           <View style={styles.settingRow}>
@@ -507,7 +529,7 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.settingButton}
             onPress={() => Alert.alert('Info', 'Custom timelines can be managed from the Goal Bank screen')}
           >
@@ -588,12 +610,71 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+
+        {/* Legal & Support Section */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Legal & Support</Text>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/privacy')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Privacy Policy</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/terms')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Terms of Service</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/about')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>About Authentic Intelligence Labs</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingButton}
+            onPress={() => router.push('/contact')}
+          >
+            <Text style={[styles.settingButtonText, { color: colors.primary }]}>Contact Support</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <ManageRolesModal
         visible={isRolesModalVisible}
         onClose={() => setIsRolesModalVisible(false)}
       />
+
+      <Modal visible={showNorthStarEditor} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>North Star</Text>
+            <TouchableOpacity onPress={() => setShowNorthStarEditor(false)}>
+              <Text style={styles.closeModalButton}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <NorthStarEditor onUpdate={() => {
+            console.log('[Settings] North Star data updated');
+          }} />
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={showTimelineArchive} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Timeline Archive</Text>
+            <TouchableOpacity onPress={() => setShowTimelineArchive(false)}>
+              <Text style={styles.closeModalButton}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <ArchivedTimelinesView onUpdate={() => {}} />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -643,4 +724,16 @@ const styles = StyleSheet.create({
   connectButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
   disconnectButton: { backgroundColor: '#dc2626' },
   disconnectButtonText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  modalContainer: { flex: 1, backgroundColor: '#f8fafc' },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+  },
+  modalTitle: { fontSize: 18, fontWeight: '600', color: '#1f2937' },
+  closeModalButton: { fontSize: 16, fontWeight: '600', color: '#0078d4' },
 });

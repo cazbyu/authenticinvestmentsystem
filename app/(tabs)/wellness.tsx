@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/Header';
@@ -10,11 +10,14 @@ import { JournalView } from '@/components/journal/JournalView';
 import TaskEventForm from '@/components/tasks/TaskEventForm';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Plus, Heart, CreditCard as Edit, UserX, Ban } from 'lucide-react-native';
+import { Plus, Heart, CreditCard as Edit, UserX, Ban, Menu } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { GoalProgressCard } from '@/components/goals/GoalProgressCard';
 import { useGoalProgress } from '@/hooks/useGoalProgress';
+import { DraggableFab } from '@/components/DraggableFab';
+import { calculateAuthenticScore as calculateAuthenticScoreUtil, calculateAuthenticScoreForDomain } from '@/lib/taskUtils';
+import { useAuthenticScore } from '@/contexts/AuthenticScoreContext';
 
 type DrawerNavigation = DrawerNavigationProp<any>;
 
@@ -25,102 +28,74 @@ interface Domain {
 }
 
 export default function Wellness() {
+  const navigation = useNavigation<DrawerNavigation>();
+  const { authenticScore, refreshScoreForDomain } = useAuthenticScore();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [depositIdeas, setDepositIdeas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState<'deposits' | 'ideas' | 'journal' | 'analytics'>('deposits');
-  
+
+  // Main tab navigation state
+  const [activeMainTab, setActiveMainTab] = useState<'domains' | 'manage'>('domains');
+
   // Modal states
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [taskDetailVisible, setTaskDetailVisible] = useState(false);
   const [depositIdeaDetailVisible, setDepositIdeaDetailVisible] = useState(false);
-  
+
   // Selected items
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedDepositIdea, setSelectedDepositIdea] = useState<any>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [authenticScore, setAuthenticScore] = useState(0);
+  const [domainAuthenticScore, setDomainAuthenticScore] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const scoreAbortControllerRef = useRef<AbortController | null>(null);
 
-  // 12-Week Goals for selected domain
-  const { 
-    goals: twelveWeekGoals, 
-    goalProgress, 
-    loading: goalsLoading, 
-    refreshGoals 
+  // 12-Week Goals for selected domain (only fetch when domain is selected)
+  const goalProgressScope = useMemo(() =>
+    selectedDomain ? { type: 'domain' as const, id: selectedDomain.id } : undefined,
+    [selectedDomain?.id]
+  );
+
+  const {
+    goals: twelveWeekGoals,
+    goalProgress,
+    loading: goalsLoading,
+    refreshGoals
   } = useGoalProgress({
-    scope: selectedDomain ? { type: 'domain', id: selectedDomain.id } : undefined
+    scope: goalProgressScope
   });
 
-  const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
-    let points = 0;
-    if (roles && roles.length > 0) points += roles.length;
-    if (domains && domains.length > 0) points += domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
-  };
+  const fetchAuthenticScoreLocal = useCallback(async (forceRefresh = false, domainId?: string) => {
+    // Cancel any in-flight score calculation
+    if (scoreAbortControllerRef.current) {
+      scoreAbortControllerRef.current.abort();
+    }
 
-  const calculateAuthenticScore = async () => {
+    const controller = new AbortController();
+    scoreAbortControllerRef.current = controller;
+
     try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Calculate deposits from completed tasks
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('0008-ap-tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .not('completed_at', 'is', null);
-
-      if (tasksError) throw tasksError;
-
-      let totalDeposits = 0;
-      if (tasksData && tasksData.length > 0) {
-        const taskIds = tasksData.map(t => t.id);
-        const [
-          { data: rolesData },
-          { data: domainsData }
-        ] = await Promise.all([
-          supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
-        ]);
-
-        for (const task of tasksData) {
-          const taskWithData = {
-            ...task,
-            roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-            domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-          };
-          totalDeposits += calculateTaskPoints(task, taskWithData.roles, taskWithData.domains);
-        }
+      let score: number;
+      if (domainId) {
+        score = await refreshScoreForDomain(domainId, forceRefresh);
+      } else {
+        score = authenticScore;
       }
 
-      // Calculate withdrawals
-      const { data: withdrawalsData, error: withdrawalsError } = await supabase
-        .from('0008-ap-withdrawals')
-        .select('amount')
-        .eq('user_id', user.id);
-
-      if (withdrawalsError) throw withdrawalsError;
-
-      const totalWithdrawals = withdrawalsData?.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0) || 0;
-      
-      const balance = totalDeposits - totalWithdrawals;
-      setAuthenticScore(Math.round(balance * 10) / 10);
+      if (!controller.signal.aborted) {
+        setDomainAuthenticScore(score);
+      }
     } catch (error) {
-      console.error('Error calculating authentic score:', error);
+      if (!controller.signal.aborted) {
+        console.error('Error calculating authentic score:', error);
+      }
     }
-  };
+  }, [authenticScore, refreshScoreForDomain]);
 
-  const fetchDomains = async () => {
+  const fetchDomains = useCallback(async () => {
     try {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
@@ -130,26 +105,42 @@ export default function Wellness() {
 
       if (error) throw error;
       setDomains(data || []);
-      await calculateAuthenticScore();
+      // Fetch score in background without blocking
+      fetchAuthenticScoreLocal(false);
     } catch (error) {
       console.error('Error fetching domains:', error);
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [fetchAuthenticScoreLocal]);
 
-  const fetchDomainTasks = async (domainId: string, view: 'deposits' | 'ideas' = activeView) => {
+  const fetchDomainTasks = useCallback(async (domainId: string, view: 'deposits' | 'ideas' = activeView) => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this fetch
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Check if aborted
+      if (controller.signal.aborted) {
+        return;
+      }
+
       if (view === 'deposits') {
         // Fetch all tasks/events for this user first
         const { data: tasksData, error: tasksError } = await supabase
           .from('0008-ap-tasks')
-          .select('*')
+          .select('*, custom_timeline_id')
           .eq('user_id', user.id)
+          .is('deleted_at', null)
           .not('status', 'in', '(completed,cancelled)')
           .in('type', ['task', 'event']);
 
@@ -162,6 +153,11 @@ export default function Wellness() {
           return;
         }
 
+        // Check if aborted
+        if (controller.signal.aborted) {
+          return;
+        }
+
         const taskIds = tasksData.map(t => t.id);
 
         const [
@@ -169,14 +165,12 @@ export default function Wellness() {
           { data: domainsData, error: domainsError },
           { data: goalsData, error: goalsError },
           { data: notesData, error: notesError },
-          { data: delegatesData, error: delegatesError },
           { data: keyRelationshipsData, error: keyRelationshipsError }
         ] = await Promise.all([
           supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-goals-join').select('parent_id, goal:0008-ap-goals-12wk(id, title)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
           supabase.from('0008-ap-universal-key-relationships-join').select('parent_id, key_relationship:0008-ap-key-relationships(id, name)').in('parent_id', taskIds).eq('parent_type', 'task')
         ]);
 
@@ -184,8 +178,12 @@ export default function Wellness() {
         if (domainsError) throw domainsError;
         if (goalsError) throw goalsError;
         if (notesError) throw notesError;
-        if (delegatesError) throw delegatesError;
         if (keyRelationshipsError) throw keyRelationshipsError;
+
+        // Check if aborted before processing
+        if (controller.signal.aborted) {
+          return;
+        }
 
         // Filter tasks that have the selected domain
         const domainTaskIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
@@ -198,7 +196,7 @@ export default function Wellness() {
           goals: goalsData?.filter(g => g.parent_id === task.id).map(g => g.goal).filter(Boolean) || [],
           keyRelationships: keyRelationshipsData?.filter(kr => kr.parent_id === task.id).map(kr => kr.key_relationship).filter(Boolean) || [],
           has_notes: notesData?.some(n => n.parent_id === task.id),
-          has_delegates: delegatesData?.some(d => d.parent_id === task.id),
+          has_delegates: false,
           has_attachments: false,
         }));
 
@@ -223,6 +221,11 @@ export default function Wellness() {
           return;
         }
 
+        // Check if aborted
+        if (controller.signal.aborted) {
+          return;
+        }
+
         const depositIdeaIds = depositIdeasData.map(di => di.id);
 
         const [
@@ -242,6 +245,11 @@ export default function Wellness() {
         if (krError) throw krError;
         if (notesError) throw notesError;
 
+        // Check if aborted before processing
+        if (controller.signal.aborted) {
+          return;
+        }
+
         // Filter deposit ideas that have the selected domain
         const domainDepositIdeaIds = domainsData?.filter(d => d.domain?.id === domainId).map(d => d.parent_id) || [];
         const filteredDepositIdeas = depositIdeasData.filter(di => domainDepositIdeaIds.includes(di.id));
@@ -260,31 +268,54 @@ export default function Wellness() {
       }
 
     } catch (error) {
+      // Don't show errors if request was aborted
+      if (controller.signal.aborted) {
+        return;
+      }
       console.error(`Error fetching domain ${view}:`, error);
       Alert.alert('Error', (error as Error).message);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  };
+  }, [activeView]);
 
   useEffect(() => {
     fetchDomains();
-  }, []);
+  }, [fetchDomains]);
 
   useEffect(() => {
-    if (selectedDomain && (activeView === 'deposits' || activeView === 'ideas')) {
-      fetchDomainTasks(selectedDomain.id, activeView);
+    if (selectedDomain) {
+      if (activeView === 'deposits' || activeView === 'ideas') {
+        fetchDomainTasks(selectedDomain.id, activeView);
+      }
+      // Calculate domain-specific score
+      fetchAuthenticScoreLocal(true, selectedDomain.id);
+    } else {
+      // Calculate total score when no domain is selected
+      fetchAuthenticScoreLocal(false);
     }
-  }, [selectedDomain, activeView]);
 
-  const handleViewChange = (view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
+    // Cleanup on unmount
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (scoreAbortControllerRef.current) {
+        scoreAbortControllerRef.current.abort();
+      }
+    };
+  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScoreLocal]);
+
+  const handleViewChange = useCallback((view: 'deposits' | 'ideas' | 'journal' | 'analytics') => {
     setActiveView(view);
     if (selectedDomain && (view === 'deposits' || view === 'ideas')) {
       fetchDomainTasks(selectedDomain.id, view);
     }
-  };
+  }, [selectedDomain, fetchDomainTasks]);
 
-  const handleCompleteTask = async (taskId: string) => {
+  const handleCompleteTask = useCallback(async (taskId: string) => {
     try {
       const supabase = getSupabaseClient();
       const { error } = await supabase
@@ -293,16 +324,18 @@ export default function Wellness() {
         .eq('id', taskId);
 
       if (error) throw error;
-      
+
       if (selectedDomain) {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
+      // Refresh score after task completion
+      fetchAuthenticScoreLocal(true);
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [selectedDomain, activeView, fetchDomainTasks, fetchAuthenticScoreLocal]);
 
-  const handleUpdateDepositIdea = async (depositIdea: any) => {
+  const handleUpdateDepositIdea = useCallback((depositIdea: any) => {
     const editData = {
       ...depositIdea,
       type: 'depositIdea'
@@ -310,9 +343,9 @@ export default function Wellness() {
     setEditingTask(editData);
     setDepositIdeaDetailVisible(false);
     setTaskFormVisible(true);
-  };
+  }, []);
 
-  const handleCancelDepositIdea = async (depositIdea: any) => {
+  const handleCancelDepositIdea = useCallback(async (depositIdea: any) => {
     try {
       const supabase = getSupabaseClient();
       const { error } = await supabase
@@ -325,37 +358,54 @@ export default function Wellness() {
         .eq('id', depositIdea.id);
 
       if (error) throw error;
-      
+
       if (selectedDomain) {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [selectedDomain, activeView, fetchDomainTasks]);
 
-  const handleTaskDoublePress = (task: Task) => {
+  const handleActivateDepositIdea = useCallback(async (depositIdea: any) => {
+    try {
+      // For now, just open the form to create a task based on the deposit idea
+      const editData = {
+        ...depositIdea,
+        type: 'task', // Convert to task
+        title: depositIdea.title,
+        selectedRoleIds: depositIdea.roles?.map(r => r.id) || [],
+        selectedDomainIds: depositIdea.domains?.map(d => d.id) || [],
+        selectedKeyRelationshipIds: depositIdea.keyRelationships?.map(kr => kr.id) || [],
+      };
+      setEditingTask(editData);
+      setTaskFormVisible(true);
+    } catch (error) {
+      Alert.alert('Error', (error as Error).message || 'Failed to activate deposit idea.');
+    }
+  }, []);
+  const handleTaskDoublePress = useCallback((task: Task) => {
     setSelectedTask(task);
     setTaskDetailVisible(true);
-  };
+  }, []);
 
-  const handleDepositIdeaDoublePress = (depositIdea: any) => {
+  const handleDepositIdeaDoublePress = useCallback((depositIdea: any) => {
     setSelectedDepositIdea(depositIdea);
     setDepositIdeaDetailVisible(true);
-  };
+  }, []);
 
-  const handleUpdateTask = (task: Task) => {
+  const handleUpdateTask = useCallback((task: Task) => {
     setEditingTask(task);
     setTaskDetailVisible(false);
     setTimeout(() => setTaskFormVisible(true), 100);
-  };
+  }, []);
 
-  const handleDelegateTask = (task: Task) => {
+  const handleDelegateTask = useCallback((task: Task) => {
     Alert.alert('Delegate', 'Delegation functionality coming soon!');
     setTaskDetailVisible(false);
-  };
+  }, []);
 
-  const handleCancelTask = async (task: Task) => {
+  const handleCancelTask = useCallback(async (task: Task) => {
     try {
       const supabase = getSupabaseClient();
       const { error } = await supabase
@@ -366,34 +416,36 @@ export default function Wellness() {
       if (error) throw error;
       Alert.alert('Success', 'Task has been cancelled');
       setTaskDetailVisible(false);
-      
+
       if (selectedDomain) {
         fetchDomainTasks(selectedDomain.id, activeView);
       }
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     }
-  };
+  }, [selectedDomain, activeView, fetchDomainTasks]);
 
-  const handleFormSubmitSuccess = () => {
+  const handleFormSubmitSuccess = useCallback(() => {
     setTaskFormVisible(false);
     setEditingTask(null);
     if (selectedDomain) {
       fetchDomainTasks(selectedDomain.id, activeView);
     }
     refreshGoals();
-  };
+    // Refresh score after task creation/update
+    fetchAuthenticScoreLocal(true);
+  }, [selectedDomain, activeView, fetchDomainTasks, refreshGoals, fetchAuthenticScoreLocal]);
 
-  const handleFormClose = () => {
+  const handleFormClose = useCallback(() => {
     setTaskFormVisible(false);
     setEditingTask(null);
-  };
+  }, []);
 
-  const handleDomainPress = (domain: Domain) => {
+  const handleDomainPress = useCallback((domain: Domain) => {
     setSelectedDomain(domain);
-  };
+  }, []);
 
-  const handleJournalEntryPress = (entry: any) => {
+  const handleJournalEntryPress = useCallback((entry: any) => {
     if (entry.source_type === 'task') {
       setSelectedTask(entry.source_data);
       setTaskDetailVisible(true);
@@ -406,10 +458,10 @@ export default function Wellness() {
       setEditingTask(editData);
       setTaskFormVisible(true);
     }
-  };
+  }, []);
 
-  const getDomainColor = (domainName: string) => {
-    const colors = {
+  const getDomainColor = useCallback((domainName: string) => {
+    const colors: Record<string, string> = {
       'Community': '#7c3aed',
       'Financial': '#059669',
       'Physical': '#16a34a',
@@ -420,6 +472,88 @@ export default function Wellness() {
       'Spiritual': '#7c3aed',
     };
     return colors[domainName] || '#6b7280';
+  }, []);
+
+  // Render custom header
+  const renderWellnessBankHeader = () => {
+    if (selectedDomain) {
+      // Individual domain detail header
+      return (
+        <View style={[styles.customHeader, { backgroundColor: getDomainColor(selectedDomain.name) }]}>
+          <View style={styles.customHeaderTop}>
+            <TouchableOpacity
+              style={styles.customBackButton}
+              onPress={() => setSelectedDomain(null)}
+            >
+              <Text style={styles.customBackButtonText}>← Back to Wellness Bank</Text>
+            </TouchableOpacity>
+            <View style={styles.customHeaderCenter}>
+              <Text style={styles.customHeaderTitle}>{selectedDomain.name}</Text>
+            </View>
+            <View style={styles.customScoreContainer}>
+              <Text style={styles.customScoreLabel}>Authentic Score</Text>
+              <Text style={styles.customScoreValue}>{authenticScore}</Text>
+            </View>
+          </View>
+          <View style={styles.customHeaderBottom}>
+            <View style={styles.customToggleGroup}>
+              {(['deposits', 'ideas', 'journal', 'analytics'] as const).map((view) => (
+                <TouchableOpacity
+                  key={view}
+                  style={[styles.customToggleButton, activeView === view && styles.customActiveToggle]}
+                  onPress={() => handleViewChange(view)}
+                >
+                  <Text style={[styles.customToggleText, activeView === view && styles.customActiveToggleText]}>
+                    {view.charAt(0).toUpperCase() + view.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // Main Wellness Bank header with tabs
+    return (
+      <View style={styles.customHeader}>
+        <View style={styles.customHeaderTop}>
+          <TouchableOpacity
+            style={styles.customMenuButton}
+            onPress={() => navigation.openDrawer()}
+          >
+            <Menu size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={styles.customHeaderCenter}>
+            <Text style={styles.customHeaderTitle}>Wellness Bank</Text>
+          </View>
+          <View style={styles.customScoreContainer}>
+            <Text style={styles.customScoreLabel}>Authentic Score</Text>
+            <Text style={styles.customScoreValue}>{authenticScore}</Text>
+          </View>
+        </View>
+        <View style={styles.customHeaderBottom}>
+          <View style={styles.customMainToggleGroup}>
+            <TouchableOpacity
+              style={[styles.customToggleButton, activeMainTab === 'domains' && styles.customActiveToggle]}
+              onPress={() => setActiveMainTab('domains')}
+            >
+              <Text style={[styles.customToggleText, activeMainTab === 'domains' && styles.customActiveToggleText]}>
+                Domains
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.customToggleButton, activeMainTab === 'manage' && styles.customActiveToggle]}
+              onPress={() => setActiveMainTab('manage')}
+            >
+              <Text style={[styles.customToggleText, activeMainTab === 'manage' && styles.customActiveToggleText]}>
+                Manage Domains
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   const renderContent = () => {
@@ -427,14 +561,6 @@ export default function Wellness() {
       // Domain view
       return (
         <View style={styles.content}>
-          <Header
-            title={selectedDomain.name}
-            activeView={activeView}
-            onViewChange={handleViewChange}
-            authenticScore={authenticScore}
-            backgroundColor={getDomainColor(selectedDomain.name)}
-            onBackPress={() => setSelectedDomain(null)}
-          />
 
           {/* 12-Week Goals Section */}
           {activeView === 'deposits' && twelveWeekGoals.length > 0 && (
@@ -454,9 +580,8 @@ export default function Wellness() {
                         setEditingTask({
                           type: 'task',
                           selectedGoalIds: [goal.id],
-                          twelveWeekGoalChecked: true,
-                          countsTowardWeeklyProgress: true,
-                          selectedDomainIds: [selectedDomain.id],
+                          isGoal: true,
+                          selectedDomainIds: selectedDomain ? [selectedDomain.id] : [],
                         } as any);
                         setTaskFormVisible(true);
                       }}
@@ -477,9 +602,7 @@ export default function Wellness() {
                 scope={{ type: 'domain', id: selectedDomain.id, name: selectedDomain.name }}
               />
             ) : loading ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading...</Text>
-              </View>
+              null
             ) : activeView === 'deposits' ? (
               tasks.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -521,68 +644,89 @@ export default function Wellness() {
       );
     }
 
-    // Domains list view
+    // Main Wellness Bank view with tabs
     return (
       <View style={styles.content}>
-        <Header 
-          title="Wellness Bank" 
-          authenticScore={authenticScore}
-        />
-        
-        <ScrollView style={styles.domainsList}>
-          {domains.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No domains found</Text>
-            </View>
-          ) : (
-            <View style={styles.domainsGrid}>
-              {domains.map(domain => (
-                <TouchableOpacity
-                  key={domain.id}
-                  style={[
-                    styles.domainCard,
-                    { borderLeftColor: getDomainColor(domain.name) }
-                  ]}
-                  onPress={() => handleDomainPress(domain)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.domainCardContent}>
-                    <View style={[styles.domainIcon, { backgroundColor: getDomainColor(domain.name) }]}>
-                      <Heart size={24} color="#ffffff" />
+        {activeMainTab === 'domains' && (
+          <ScrollView style={styles.domainsList}>
+            {domains.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No domains found</Text>
+              </View>
+            ) : (
+              <View style={styles.domainsGrid}>
+                {domains.map(domain => (
+                  <TouchableOpacity
+                    key={domain.id}
+                    style={[
+                      styles.domainCard,
+                      { borderLeftColor: getDomainColor(domain.name) }
+                    ]}
+                    onPress={() => handleDomainPress(domain)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.domainCardContent}>
+                      <View style={[styles.domainIcon, { backgroundColor: getDomainColor(domain.name) }]}>
+                        <Heart size={24} color="#ffffff" />
+                      </View>
+                      <View style={styles.domainInfo}>
+                        <Text style={styles.domainName}>{domain.name}</Text>
+                        {domain.description && (
+                          <Text style={styles.domainDescription} numberOfLines={2}>
+                            {domain.description}
+                          </Text>
+                        )}
+                      </View>
                     </View>
-                    <View style={styles.domainInfo}>
-                      <Text style={styles.domainName}>{domain.name}</Text>
-                      {domain.description && (
-                        <Text style={styles.domainDescription} numberOfLines={2}>
-                          {domain.description}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {activeMainTab === 'manage' && (
+          <ScrollView style={styles.manageContent}>
+            <View style={styles.manageHeader}>
+              <Text style={styles.manageTitle}>Manage Wellness Domains</Text>
             </View>
-          )}
-        </ScrollView>
+            <View style={styles.managePlaceholder}>
+              <Heart size={48} color="#9ca3af" />
+              <Text style={styles.managePlaceholderTitle}>Domain Management Coming Soon</Text>
+              <Text style={styles.managePlaceholderText}>
+                Future updates will allow you to customize domain names, add custom domains, and set priorities.
+              </Text>
+            </View>
+          </ScrollView>
+        )}
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {renderWellnessBankHeader()}
       {renderContent()}
 
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={() => setTaskFormVisible(true)}
-      >
+      <DraggableFab onPress={() => {
+        if (selectedDomain) {
+          setEditingTask({
+            type: 'task',
+            selectedDomainIds: [selectedDomain.id],
+          } as any);
+          setTaskFormVisible(true);
+        } else {
+          setEditingTask(null);
+          setTaskFormVisible(true);
+        }
+      }}>
         <Plus size={24} color="#ffffff" />
-      </TouchableOpacity>
+      </DraggableFab>
 
       {/* Modals */}
       <Modal visible={taskFormVisible} animationType="slide" presentationStyle="pageSheet">
         <TaskEventForm
-          mode={editingTask ? "edit" : "create"}
+          mode={editingTask?.id ? "edit" : "create"}
           initialData={editingTask || undefined}
           onSubmitSuccess={handleFormSubmitSuccess}
           onClose={handleFormClose}
@@ -690,41 +834,135 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#0078d4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   goalsSection: {
     backgroundColor: '#ffffff',
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   goalsSectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: 12,
+    padding: 16,
+    paddingBottom: 8,
   },
   goalsList: {
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  // Custom header styles
+  customHeader: {
+    backgroundColor: '#0078d4',
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  customHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  customMenuButton: {
+    padding: 4,
+  },
+  customBackButton: {
+    paddingVertical: 4,
+  },
+  customBackButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  customHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  customHeaderTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  customScoreContainer: {
+    alignItems: 'flex-end',
+  },
+  customScoreLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 2,
+  },
+  customScoreValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  customHeaderBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  customMainToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+  },
+  customToggleButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  customActiveToggle: {
+    backgroundColor: '#ffffff',
+  },
+  customToggleText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  customActiveToggleText: {
+    color: '#0078d4',
+  },
+  // Manage Domains tab styles
+  manageContent: {
+    flex: 1,
+    padding: 16,
+  },
+  manageHeader: {
+    marginBottom: 20,
+  },
+  manageTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  managePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  managePlaceholderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  managePlaceholderText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

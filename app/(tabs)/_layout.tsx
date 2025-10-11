@@ -20,6 +20,11 @@ export default function TabLayout() {
           fontSize: 12,
           fontWeight: '500',
         },
+        tabBarItemStyle: {
+          backgroundColor: 'transparent',
+        },
+        tabBarPressColor: 'transparent',
+        tabBarPressOpacity: 1,
       }}>
       <Tabs.Screen
         name="dashboard"

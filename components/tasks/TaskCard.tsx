@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Check, FileText, Paperclip, Users } from 'lucide-react-native';
+import { Check, FileText, Paperclip, Users, X, Trash2 } from 'lucide-react-native';
 
 // Interface for a Task
 export interface Task {
@@ -12,7 +12,8 @@ export interface Task {
   start_time?: string;
   end_time?: string;
   recurrence_rule?: string;
-  recurrence_rule?: string;
+  user_global_timeline_id?: string;
+  custom_timeline_id?: string;
   is_urgent?: boolean;
   is_important?: boolean;
   status?: string;
@@ -21,18 +22,21 @@ export interface Task {
   is_twelve_week_goal?: boolean;
   roles?: Array<{id: string; label: string}>;
   domains?: Array<{id: string; name: string}>;
-  goals?: Array<{id: string; title: string}>;
+  goals?: Array<{id: string; title: string; goal_type?: string}>;
   has_notes?: boolean;
   has_attachments?: boolean;
   has_delegates?: boolean;
-  logs?: Array<{ log_date: string; completed: boolean }>; // Added for GoalProgressCard
+  logs?: Array<{ log_date: string; completed: boolean }>;
   keyRelationships?: Array<{id: string; name: string}>;
+  weeklyCompletedCount?: number;
+  weeklyTargetCount?: number;
 }
 
 // Props for the TaskCard component
 interface TaskCardProps {
   task: Task;
-  onComplete: (taskId: string) => void;
+  onComplete: (task: Task) => void;
+  onDelete?: (task: Task) => void;
   onLongPress?: () => void;
   onDoublePress?: (task: Task) => void;
   isDragging?: boolean;
@@ -41,7 +45,7 @@ interface TaskCardProps {
 // --- TaskCard Component ---
 // Renders a single task item in the list
 export const TaskCard = React.forwardRef<View, TaskCardProps>(
-  ({ task, onComplete, onLongPress, onDoublePress, isDragging }, ref) => {
+  ({ task, onComplete, onDelete, onLongPress, onDoublePress, isDragging }, ref) => {
     const [lastTap, setLastTap] = useState(0);
 
   // Determines the border color based on task priority
@@ -63,7 +67,10 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
     else if (!task.is_urgent && task.is_important) points += 3;
     else if (task.is_urgent && !task.is_important) points += 1;
     else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
+
+    const activeGoals = (task.goals || []).filter((g: any) => g.goal_type !== 'deleted' && g.status !== 'archived' && g.status !== 'cancelled');
+    if (activeGoals.length > 0 && task.is_twelve_week_goal) points += 2;
+
     return Math.round(points * 10) / 10;
   };
 
@@ -100,9 +107,15 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
 
   // Handles the completion of a task
   const handleComplete = () => {
-    onComplete(task.id);
+    onComplete(task);
   };
 
+  // Handles the deletion of a task
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(task);
+    }
+  };
   const points = calculatePoints();
 
   return (
@@ -117,12 +130,11 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
           <View style={styles.taskHeader}>
             <Text style={styles.taskTitle} numberOfLines={2}>
   {task.title}
-  {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
-  {task.goals && task.goals[0] && (
-    <Text style={styles.inlineGoalChip}>  •  {task.goals[0].title}</Text>
+  {task.weeklyTargetCount && task.weeklyTargetCount > 0 && (
+    <Text style={styles.completionCounter}> ({task.weeklyCompletedCount || 0} of {task.weeklyTargetCount})</Text>
   )}
+  {task.due_date && <Text style={styles.dueDate}> ({formatDueDate(task.due_date)})</Text>}
 </Text>
-
           </View>
           <View style={styles.taskBody}>
             <View style={styles.leftSection}>
@@ -162,12 +174,13 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
                   </View>
                 </View>
               )}
+              
               {task.goals && task.goals.length > 0 && (
                 <View style={styles.tagRow}>
                   <Text style={styles.tagRowLabel}>Goals:</Text>
                   <View style={styles.tagContainer}>
                     {task.goals.slice(0, 3).map((goal, index) => (
-                      <View key={goal.id} style={[styles.pillTag, styles.goalPillTag]}>
+                      <View key={goal.id} style={[styles.pillTag, goal.goal_type === 'deleted' ? styles.deletedGoalPillTag : styles.goalPillTag]}>
                         <Text style={styles.pillTagText}>{goal.title}</Text>
                       </View>
                     ))}
@@ -183,19 +196,33 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
           </View>
         </View>
         <View style={styles.rightSection}>
-          <View style={styles.statusIcons}>
-            {task.has_notes && <FileText size={12} color="#6b7280" />}
-            {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
-            {task.has_delegates && <Users size={12} color="#6b7280" />}
-          </View>
-          <View style={styles.taskActions}>
-            <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
-              <View style={styles.checkmarkContainer}>
-                <Check size={20} color="#16a34a" strokeWidth={3} />
-              </View>
+          <View style={styles.topActionRow}>
+            <View style={styles.statusIcons}>
+              {task.has_notes && <FileText size={12} color="#6b7280" />}
+              {task.has_attachments && <Paperclip size={12} color="#6b7280" />}
+              {task.has_delegates && <Users size={12} color="#6b7280" />}
+            </View>
+
+            <TouchableOpacity
+              style={styles.completeButton}
+              onPress={handleComplete}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Check size={16} color="#16a34a" strokeWidth={3} />
             </TouchableOpacity>
-            <Text style={styles.scoreText}>+{points}</Text>
+
+            {onDelete && (
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={handleDelete}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Trash2 size={14} color="#dc2626" />
+              </TouchableOpacity>
+            )}
           </View>
+          
+          <Text style={styles.scoreText}>+{points}</Text>
         </View>
     </TouchableOpacity>
   );
@@ -229,6 +256,12 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         fontWeight: '600',
         color: '#1f2937',
         lineHeight: 22,
+        flex: 1,
+      },
+      completionCounter: {
+        fontSize: 14,
+        color: '#6b7280',
+        fontWeight: '400',
       },
       dueDate: {
         fontSize: 14,
@@ -295,8 +328,12 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         borderColor: '#fdba74',
       },
       goalPillTag: {
-        backgroundColor: '#bfdbfe',
+        backgroundColor: '#dbeafe',
         borderColor: '#93c5fd',
+      },
+      deletedGoalPillTag: {
+        backgroundColor: '#f3f4f6',
+        borderColor: '#d1d5db',
       },
       morePillTag: {
         backgroundColor: '#f3f4f6',
@@ -311,31 +348,38 @@ export const TaskCard = React.forwardRef<View, TaskCardProps>(
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        marginBottom: 8,
       },
-      taskActions: {
+      topActionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
+        marginBottom: 6,
+      },
+      deleteButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#fef2f2',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#dc2626',
       },
       scoreText: {
         fontSize: 14,
         fontWeight: '600',
         color: '#0078d4',
+        textAlign: 'center',
       },
       completeButton: {
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: 'transparent',
+        backgroundColor: '#f0fdf4',
         justifyContent: 'center',
         alignItems: 'center',
-        position: 'relative',
-      },
-      checkmarkContainer: {
-        position: 'relative',
-        justifyContent: 'center',
-        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#16a34a',
       },
       draggingItem: {
         opacity: 0.8,

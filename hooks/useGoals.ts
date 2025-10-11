@@ -1,4 +1,4 @@
-// useGoals.ts
+// hooks/useGoals.ts
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '../lib/supabase';
 import { Alert } from 'react-native';
@@ -6,7 +6,6 @@ import { generateCycleWeeks, formatLocalDate, parseLocalDate } from '../lib/date
 
 /* ================================
  * DB TABLE / VIEW CONSTANTS (single source of truth)
- * Adjust here if your DB names differ.
  * ================================ */
 const DB = {
   // Timelines
@@ -23,6 +22,9 @@ const DB = {
   NOTES: '0008-ap-notes',
   NOTES_JOIN: '0008-ap-universal-notes-join',
 
+  // Task logs
+  TASK_LOG: '0008-ap-task-log',
+
   // Joins
   UNIVERSAL_GOALS_JOIN: '0008-ap-universal-goals-join',
   UNIVERSAL_ROLES_JOIN: '0008-ap-universal-roles-join',
@@ -33,18 +35,10 @@ const DB = {
   ROLES: '0008-ap-roles',
   DOMAINS: '0008-ap-domains',
   KEY_REL: '0008-ap-key-relationships',
-
-  // Views (weeks + days-left); columns must expose: week_number, week_start, week_end, timeline_id
-  V_GLOBAL_WEEKS: 'v_user_global_timeline_weeks',
-  V_CUSTOM_WEEKS: 'v_custom_timeline_weeks',
-
-  // Views (days-left); columns must expose: timeline_id, days_left, pct_elapsed
-  V_GLOBAL_DAYS_LEFT: 'v_user_global_timeline_days_left',
-  V_CUSTOM_DAYS_LEFT: 'v_custom_timeline_days_left',
 };
 
 /* ================================
- * INTERFACES
+ * INTERFACES - CRUD + NORMALIZATION FOCUSED
  * ================================ */
 export interface TwelveWeekGoal {
   id: string;
@@ -56,7 +50,7 @@ export interface TwelveWeekGoal {
   total_target: number;
   start_date?: string;
   end_date?: string;
-  user_global_timeline_id?: string; // FK to 12wk timeline
+  user_global_timeline_id?: string; // Updated FK
   created_at: string;
   updated_at: string;
   domains?: Array<{ id: string; name: string }>;
@@ -74,7 +68,9 @@ export interface CustomGoal {
   end_date: string;
   status: string;
   progress: number;
-  custom_timeline_id?: string; // FK to custom timeline
+  weekly_target?: number;
+  total_target?: number;
+  custom_timeline_id?: string; // Updated FK
   created_at: string;
   updated_at: string;
   domains?: Array<{ id: string; name: string }>;
@@ -86,208 +82,44 @@ export interface CustomGoal {
 
 export type Goal = TwelveWeekGoal | CustomGoal;
 
-export interface UserCycle {
+export interface Timeline {
   id: string;
   user_id: string;
   source: 'custom' | 'global';
-  title?: string | null;
+  title?: string;
   start_date: string | null;
   end_date: string | null;
   status: 'active' | 'completed' | 'archived';
+  timeline_type?: 'cycle' | 'project' | 'challenge' | 'custom';
+  week_start_day?: 'sunday' | 'monday';
+  global_cycle_id?: string | null;
   created_at: string;
   updated_at: string;
-  timezone?: string | null;
-  week_start_day?: 'sunday' | 'monday';
-}
-
-export interface CycleWeek {
-  week_number: number;
-  week_start: string; // YYYY-MM-DD
-  week_end: string;   // YYYY-MM-DD
-  user_cycle_id: string; // we store timeline_id here for convenience
-}
-
-export interface DaysLeftData {
-  days_left: number;
-  pct_elapsed: number;
-  timeline_id: string;
 }
 
 export interface TaskWeekPlan {
   id: string;
   task_id: string;
-  user_cycle_id: string; // NOTE: we store the timeline id here
+  user_global_timeline_id?: string;  // Updated for global timelines
+  user_custom_timeline_id?: string;  // Updated for custom timelines
   week_number: number;
   target_days: number;
   created_at: string;
 }
 
-export interface TaskLog {
+export interface UniversalGoalJoin {
   id: string;
-  task_id: string;
-  measured_on: string; // YYYY-MM-DD
-  week_number: number;
-  day_of_week?: number;
-  value: number;
+  user_id: string;
+  parent_type: string;
+  parent_id: string;
+  goal_type: 'twelve_wk_goal' | 'custom_goal';
+  twelve_wk_goal_id?: string;
+  custom_goal_id?: string;
   created_at: string;
 }
 
-export interface TaskWithLogs extends Goal {
-  logs: TaskLog[];
-  weeklyActual: number;
-  weeklyTarget: number;
-}
-
-export interface WeekData {
-  weekNumber: number;
-  startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD
-}
-
-export interface WeeklyTaskData {
-  task: any;
-  weekPlan: TaskWeekPlan | null;
-  logs: TaskLog[];
-  completed: number;
-  target: number;
-  weeklyScore: number;
-}
-
-export interface GoalProgress {
-  goalId: string;
-  currentWeek: number;
-  daysRemaining: number;
-  weeklyActual: number;
-  weeklyTarget: number;
-  overallActual: number;
-  overallTarget: number;
-  overallProgress: number; // 0..100
-}
-
-export interface CycleEffortData {
-  totalActual: number;
-  totalTarget: number;
-  overallPercentage: number;
-}
-
 /* ================================
- * EXPORTED UTILITY (kept compatible)
- * ================================ */
-export async function fetchGoalActionsForWeek(
-  goalIds: string[],
-  weekNumber: number,
-  cycleWeeks: CycleWeek[],
-  customTimelineWeeks: WeekData[] = []
-): Promise<Record<string, TaskWithLogs[]>> {
-  try {
-    const supabase = getSupabaseClient();
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-    if (!user || goalIds.length === 0) return {};
-
-    const week =
-      cycleWeeks.find(w => w.week_number === weekNumber) ||
-      customTimelineWeeks.find(
-        (w: any) => w.week_number === weekNumber || (w as any).weekNumber === weekNumber
-      );
-
-    const weekStartDate = (week as any)?.week_start ?? (week as any)?.startDate;
-    const weekEndDate = (week as any)?.week_end ?? (week as any)?.endDate;
-    if (!weekStartDate || !weekEndDate) return {};
-
-    const { data: goalJoins } = await supabase
-      .from(DB.UNIVERSAL_GOALS_JOIN)
-      .select('parent_id, twelve_wk_goal_id, custom_goal_id, goal_type')
-      .or(`twelve_wk_goal_id.in.(${goalIds.join(',')}),custom_goal_id.in.(${goalIds.join(',')})`)
-      .eq('parent_type', 'task');
-
-    const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
-    if (taskIds.length === 0) return {};
-
-    const { data: tasksData, error: tasksError } = await supabase
-      .from(DB.TASKS)
-      .select('*')
-      .eq('user_id', user.id)
-      .in('id', taskIds)
-      .eq('input_kind', 'count')
-      .not('status', 'in', '(completed,cancelled)');
-
-    if (tasksError) throw tasksError;
-    if (!tasksData || tasksData.length === 0) return {};
-
-    const { data: weekPlansData, error: weekPlansError } = await supabase
-      .from(DB.TASK_WEEK_PLAN)
-      .select('*')
-      .in('task_id', taskIds)
-      .eq('week_number', weekNumber);
-
-    if (weekPlansError) throw weekPlansError;
-
-    const tasksWithWeekPlans = tasksData.filter(task =>
-      weekPlansData?.some(wp => wp.task_id === task.id)
-    );
-
-    const { data: occurrenceData, error: occurrenceError } = await supabase
-      .from(DB.TASKS)
-      .select('*')
-      .in('parent_task_id', tasksWithWeekPlans.map(t => t.id))
-      .eq('status', 'completed')
-      .gte('due_date', weekStartDate)
-      .lte('due_date', weekEndDate);
-
-    if (occurrenceError) throw occurrenceError;
-
-    const groupedActions: Record<string, TaskWithLogs[]> = {};
-
-    for (const task of tasksWithWeekPlans) {
-      const goalJoin = goalJoins?.find(gj => gj.parent_id === task.id);
-      if (!goalJoin) continue;
-
-      const weekPlan = weekPlansData?.find(wp => wp.task_id === task.id);
-      if (!weekPlan) continue;
-
-      const goalId = goalJoin.twelve_wk_goal_id || goalJoin.custom_goal_id;
-      if (!goalId) continue;
-
-      const relevantOccurrences =
-        occurrenceData?.filter(occ => occ.parent_task_id === task.id) || [];
-
-      const taskLogs = relevantOccurrences.map(occ => ({
-        id: occ.id,
-        task_id: task.id,
-        measured_on: occ.due_date,
-        week_number: weekNumber,
-        day_of_week: new Date(occ.due_date).getDay(),
-        value: 1,
-        created_at: occ.created_at,
-      }));
-
-      const weeklyActual = taskLogs.length;
-      const weeklyTarget = weekPlan.target_days ?? 0;
-      const cappedWeeklyActual = Math.min(weeklyActual, weeklyTarget);
-
-      const taskWithLogs: TaskWithLogs = {
-        ...(task as any),
-        goal_type: goalJoin.goal_type === 'twelve_wk_goal' ? '12week' : 'custom',
-        logs: taskLogs,
-        weeklyActual: cappedWeeklyActual,
-        weeklyTarget,
-      };
-
-      if (!groupedActions[goalId]) groupedActions[goalId] = [];
-      groupedActions[goalId].push(taskWithLogs);
-    }
-
-    return groupedActions;
-  } catch (error) {
-    console.error('Error fetching goal actions for week:', error);
-    return {};
-  }
-}
-
-/* ================================
- * HOOK
+ * HOOK OPTIONS
  * ================================ */
 interface UseGoalsOptions {
   scope?: {
@@ -296,46 +128,54 @@ interface UseGoalsOptions {
   };
 }
 
+/* ================================
+ * MAIN HOOK - CRUD + NORMALIZATION ONLY
+ * ================================ */
 export function useGoals(options: UseGoalsOptions = {}) {
   const [twelveWeekGoals, setTwelveWeekGoals] = useState<TwelveWeekGoal[]>([]);
   const [customGoals, setCustomGoals] = useState<CustomGoal[]>([]);
   const [allGoals, setAllGoals] = useState<Goal[]>([]);
-  const [currentCycle, setCurrentCycle] = useState<UserCycle | null>(null);
-  const [cycleWeeks, setCycleWeeks] = useState<CycleWeek[]>([]);
-  const [daysLeftData, setDaysLeftData] = useState<DaysLeftData | null>(null);
-  const [goalProgress, setGoalProgress] = useState<Record<string, GoalProgress>>({});
-  const [cycleEffortData, setCycleEffortData] = useState<CycleEffortData>({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
-  const [weekGoalActions, setWeekGoalActions] = useState<Record<string, TaskWithLogs[]>>({});
+  const [currentTimeline, setCurrentTimeline] = useState<Timeline | null>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingWeekActions, setLoadingWeekActions] = useState(false);
 
   /* --------------------------------
-   * Helpers
+   * UNIVERSAL JOIN HELPER - CENTRALIZED
    * -------------------------------- */
-  const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
-    let points = 0;
-    if (roles?.length) points += roles.length;
-    if (domains?.length) points += domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
+  const insertUniversalJoins = async (
+    supabase: any,
+    userId: string,
+    parentId: string,
+    parentType: string,
+    foreignKeyField: string,
+    selectedIds?: string[],
+    tableName: string
+  ) => {
+    if (!selectedIds?.length) return;
+
+    const joins = selectedIds.map(id => ({
+      parent_id: parentId,
+      parent_type: parentType,
+      [foreignKeyField]: id,
+      user_id: userId,
+    }));
+
+    const { error } = await supabase
+      .from(tableName)
+      .insert(joins);
+    if (error) throw error;
   };
 
   /* --------------------------------
    * Fetch current active timeline (global first, then custom)
    * -------------------------------- */
-  const fetchUserCycle = async (): Promise<UserCycle | null> => {
+  const fetchCurrentTimeline = async (): Promise<Timeline | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user }, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
       if (!user) return null;
 
-      // Prefer an active global (12wk) timeline
+      // Prefer an active global timeline
       const { data: globalTimeline, error: gErr } = await supabase
         .from(DB.USER_GLOBAL_TIMELINES)
         .select('*')
@@ -347,14 +187,14 @@ export function useGoals(options: UseGoalsOptions = {}) {
       if (gErr) throw gErr;
 
       if (globalTimeline) {
-        const hydrated: UserCycle = {
+        const hydrated: Timeline = {
           ...globalTimeline,
           source: 'global',
           title: globalTimeline.title ?? '12 Week Timeline',
           start_date: globalTimeline.start_date,
           end_date: globalTimeline.end_date,
         };
-        setCurrentCycle(hydrated);
+        setCurrentTimeline(hydrated);
         return hydrated;
       }
 
@@ -370,88 +210,22 @@ export function useGoals(options: UseGoalsOptions = {}) {
       if (cErr) throw cErr;
 
       if (customTimeline) {
-        const hydrated: UserCycle = {
+        const hydrated: Timeline = {
           ...customTimeline,
           source: 'custom',
           title: customTimeline.title ?? 'Custom Timeline',
           start_date: customTimeline.start_date,
           end_date: customTimeline.end_date,
         };
-        setCurrentCycle(hydrated);
+        setCurrentTimeline(hydrated);
         return hydrated;
       }
 
-      setCurrentCycle(null);
+      setCurrentTimeline(null);
       return null;
     } catch (error) {
-      console.error('Error fetching user cycle:', error);
-      setCurrentCycle(null);
-      return null;
-    }
-  };
-
-  /* --------------------------------
-   * Weeks for the active timeline
-   * -------------------------------- */
-  const fetchCycleWeeks = async (timelineId: string, source: 'global' | 'custom') => {
-    try {
-      const supabase = getSupabaseClient();
-      const view = source === 'custom' ? DB.V_CUSTOM_WEEKS : DB.V_GLOBAL_WEEKS;
-
-      const selectColumns =
-        source === 'custom'
-          ? 'week_number, start_date, end_date, custom_timeline_id'
-          : 'week_number, week_start, week_end, timeline_id';
-
-      const timelineColumn = source === 'custom' ? 'custom_timeline_id' : 'timeline_id';
-
-      const { data: dbWeeks, error } = await supabase
-        .from(view)
-        .select(selectColumns)
-        .eq(timelineColumn, timelineId)
-        .order('week_number', { ascending: true });
-
-      if (error) throw error;
-
-      const mappedWeeks: CycleWeek[] = (dbWeeks ?? []).map((w: any) => ({
-        week_number: w.week_number,
-        week_start: source === 'custom' ? w.start_date : w.week_start,
-        week_end: source === 'custom' ? w.end_date : w.week_end,
-        user_cycle_id:
-          source === 'custom'
-            ? (w.custom_timeline_id as string | undefined) ?? timelineId
-            : (w.timeline_id as string | undefined) ?? timelineId,
-      }));
-
-      setCycleWeeks(mappedWeeks);
-      return mappedWeeks;
-    } catch (error) {
-      console.error('Error fetching cycle weeks:', error);
-      setCycleWeeks([]);
-      return [];
-    }
-  };
-
-  /* --------------------------------
-   * Days left for the active timeline
-   * -------------------------------- */
-  const fetchDaysLeftData = async (timelineId: string, source: 'global' | 'custom') => {
-    try {
-      const supabase = getSupabaseClient();
-      const view = source === 'custom' ? DB.V_CUSTOM_DAYS_LEFT : DB.V_GLOBAL_DAYS_LEFT;
-
-      const { data, error } = await supabase
-        .from(view)
-        .select('*')
-        .eq('timeline_id', timelineId)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      setDaysLeftData(data ?? null);
-      return data ?? null;
-    } catch (error) {
-      console.error('Error fetching days left data:', error);
-      setDaysLeftData(null);
+      console.error('Error fetching current timeline:', error);
+      setCurrentTimeline(null);
       return null;
     }
   };
@@ -459,36 +233,37 @@ export function useGoals(options: UseGoalsOptions = {}) {
   /* --------------------------------
    * Fetch goals for the active timeline (strict filtering by FK)
    * -------------------------------- */
-  const fetchGoals = async (timelineId?: string) => {
+  const fetchGoals = async (timeline?: Timeline) => {
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const activeTimeline = timeline || currentTimeline;
       let twelveWeekData: any[] = [];
       let customData: any[] = [];
 
-      if (timelineId && currentCycle) {
-        if (currentCycle.source === 'global') {
+      if (activeTimeline) {
+        if (activeTimeline.source === 'global') {
           // Only 12wk goals for global timeline
           const { data, error } = await supabase
             .from(DB.GOALS_12WK)
             .select('*')
             .eq('user_id', user.id)
-            .eq('user_global_timeline_id', timelineId) // strict
+            .eq('user_global_timeline_id', activeTimeline.id) // Updated FK
             .eq('status', 'active')
             .order('created_at', { ascending: false });
           if (error) throw error;
           twelveWeekData = data || [];
           customData = [];
-        } else if (currentCycle.source === 'custom') {
+        } else if (activeTimeline.source === 'custom') {
           // Only custom goals for custom timeline
           const { data, error } = await supabase
             .from(DB.GOALS_CUSTOM)
             .select('*')
             .eq('user_id', user.id)
-            .eq('custom_timeline_id', timelineId) // strict
+            .eq('custom_timeline_id', activeTimeline.id) // Updated FK
             .eq('status', 'active')
             .order('created_at', { ascending: false });
           if (error) throw error;
@@ -506,7 +281,6 @@ export function useGoals(options: UseGoalsOptions = {}) {
         setTwelveWeekGoals([]);
         setCustomGoals([]);
         setAllGoals([]);
-        setGoalProgress({});
         return;
       }
 
@@ -582,6 +356,8 @@ export function useGoals(options: UseGoalsOptions = {}) {
         .map(goal => ({
           ...goal,
           progress: goal.progress ?? 0,
+          weekly_target: 3, // Default weekly target for custom goals
+          total_target: 100, // Default total target for custom goals
           goal_type: 'custom' as const,
           domains: domainsData?.filter(d => d.parent_id === goal.id).map(d => d.domain).filter(Boolean) || [],
           roles: rolesData?.filter(r => r.parent_id === goal.id).map(r => r.role).filter(Boolean) || [],
@@ -592,11 +368,6 @@ export function useGoals(options: UseGoalsOptions = {}) {
       setCustomGoals(transformedCustomGoals);
       setAllGoals([...transformedTwelveWeekGoals, ...transformedCustomGoals]);
 
-      await calculateGoalProgress(
-        transformedTwelveWeekGoals,
-        transformedCustomGoals,
-        timelineId
-      );
     } catch (error: any) {
       console.error('Error fetching goals:', error);
       Alert.alert('Error', error?.message ?? 'Failed to fetch goals');
@@ -606,392 +377,43 @@ export function useGoals(options: UseGoalsOptions = {}) {
   };
 
   /* --------------------------------
-   * Progress calculations (weekly + overall)
-   * -------------------------------- */
-  const calculateGoalProgress = async (
-    twelveWeekGoalsIn: TwelveWeekGoal[],
-    customGoalsIn: CustomGoal[],
-    timelineId?: string
-  ) => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const progressData: Record<string, GoalProgress> = {};
-      const has12wk = Boolean(timelineId && twelveWeekGoalsIn.length > 0);
-      const hasCustom = customGoalsIn.length > 0;
-
-      if (!has12wk && !hasCustom) {
-        setGoalProgress({});
-        setCycleEffortData({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
-        return;
-      }
-
-      const todayString = formatLocalDate(new Date());
-      const normalizedToday = parseLocalDate(todayString);
-
-      // ---- 12wk goals ----
-      if (has12wk && currentCycle?.source === 'global') {
-        // Current week in global context
-        const currentWeek = getCurrentWeekNumber();
-        const daysRemaining = daysLeftData?.days_left || 0;
-
-        for (const goal of twelveWeekGoalsIn) {
-          // Find tasks linked to this goal
-          const { data: goalJoins } = await supabase
-            .from(DB.UNIVERSAL_GOALS_JOIN)
-            .select('parent_id')
-            .eq('twelve_wk_goal_id', goal.id)
-            .eq('parent_type', 'task');
-
-          const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
-
-          if (taskIds.length === 0) {
-            progressData[goal.id] = {
-              goalId: goal.id,
-              currentWeek,
-              daysRemaining,
-              weeklyActual: 0,
-              weeklyTarget: goal.weekly_target ?? 0,
-              overallActual: 0,
-              overallTarget: goal.total_target ?? 0,
-              overallProgress: 0,
-            };
-            continue;
-          }
-
-          const currentWeekData = cycleWeeks.find(w => w.week_number === currentWeek);
-          let weeklyActual = 0;
-
-          if (currentWeekData) {
-            const { data: weeklyOccurrences } = await supabase
-              .from(DB.TASKS)
-              .select('id')
-              .in('parent_task_id', taskIds)
-              .eq('status', 'completed')
-              .gte('due_date', currentWeekData.week_start)
-              .lte('due_date', currentWeekData.week_end);
-
-            weeklyActual = weeklyOccurrences?.length || 0;
-          }
-
-          // Overall across active 12wk timeline
-          const { data: overallOccurrences } = await supabase
-            .from(DB.TASKS)
-            .select('id')
-            .in('parent_task_id', taskIds)
-            .eq('status', 'completed')
-            .gte('due_date', currentCycle?.start_date || '1900-01-01')
-            .lte('due_date', currentCycle?.end_date || '2100-12-31');
-
-          const { data: weekPlansData } = await supabase
-            .from(DB.TASK_WEEK_PLAN)
-            .select('target_days')
-            .in('task_id', taskIds)
-            .eq('user_cycle_id', timelineId); // we use timeline id here as "user_cycle_id"
-
-          const overallActual = overallOccurrences?.length || 0;
-          const overallTarget = weekPlansData?.reduce((sum, wp) => sum + (wp.target_days || 0), 0) || 0;
-
-          const cappedOverallActual = Math.min(overallActual, overallTarget);
-          const overallProgress = overallTarget > 0 ? Math.round((cappedOverallActual / overallTarget) * 100) : 0;
-
-          progressData[goal.id] = {
-            goalId: goal.id,
-            currentWeek,
-            daysRemaining,
-            weeklyActual,
-            weeklyTarget: goal.weekly_target ?? 0,
-            overallActual: cappedOverallActual,
-            overallTarget,
-            overallProgress,
-          };
-        }
-      }
-
-      // ---- custom goals ----
-      if (hasCustom) {
-        for (const goal of customGoalsIn) {
-          const customWeeks = goal.start_date
-            ? generateCycleWeeks(goal.start_date, currentCycle?.week_start_day || 'monday', goal.end_date)
-            : [];
-
-          const totalWeeks = customWeeks.length > 0 ? customWeeks.length : 1;
-
-          let currentWeek = 1;
-          if (customWeeks.length > 0) {
-            const matchingWeekIndex = customWeeks.findIndex(
-              w => todayString >= w.start_date && todayString <= w.end_date
-            );
-            if (matchingWeekIndex >= 0) currentWeek = matchingWeekIndex + 1;
-            else if (todayString > customWeeks[customWeeks.length - 1].end_date) {
-              currentWeek = customWeeks[customWeeks.length - 1].week_number;
-            } else if (todayString < customWeeks[0].start_date) {
-              currentWeek = customWeeks[0].week_number;
-            }
-          }
-
-          const currentWeekData = customWeeks.find(w => w.week_number === currentWeek);
-          const weekStartDate = currentWeekData?.start_date;
-          const weekEndDate = currentWeekData?.end_date;
-
-          let daysRemaining = 0;
-          if (goal.end_date) {
-            const parsedEnd = parseLocalDate(goal.end_date);
-            if (!isNaN(parsedEnd.getTime())) {
-              const diffDays = Math.ceil((parsedEnd.getTime() - normalizedToday.getTime()) / (1000 * 60 * 60 * 24));
-              daysRemaining = Math.max(0, diffDays);
-            }
-          }
-
-          const { data: goalJoins } = await supabase
-            .from(DB.UNIVERSAL_GOALS_JOIN)
-            .select('parent_id')
-            .eq('custom_goal_id', goal.id)
-            .eq('parent_type', 'task');
-
-          const taskIds = goalJoins?.map(gj => gj.parent_id) || [];
-
-          if (taskIds.length === 0) {
-            progressData[goal.id] = {
-              goalId: goal.id,
-              currentWeek,
-              daysRemaining,
-              weeklyActual: 0,
-              weeklyTarget: 0,
-              overallActual: 0,
-              overallTarget: 0,
-              overallProgress: 0,
-            };
-            continue;
-          }
-
-          let weeklyActual = 0;
-          if (weekStartDate && weekEndDate) {
-            const { data: weeklyOccurrences } = await supabase
-              .from(DB.TASKS)
-              .select('id')
-              .in('parent_task_id', taskIds)
-              .eq('status', 'completed')
-              .gte('due_date', weekStartDate)
-              .lte('due_date', weekEndDate);
-
-            weeklyActual = weeklyOccurrences?.length || 0;
-          }
-
-          // For custom, weekly target = number of actions planned per week (simple heuristic)
-          const weeklyTarget = taskIds.length;
-          const cappedWeeklyActual = Math.min(weeklyActual, weeklyTarget);
-
-          const { data: overallOccurrences } = await supabase
-            .from(DB.TASKS)
-            .select('id')
-            .in('parent_task_id', taskIds)
-            .eq('status', 'completed')
-            .gte('due_date', goal.start_date || '1900-01-01')
-            .lte('due_date', goal.end_date || '2100-12-31');
-
-          const overallActual = overallOccurrences?.length || 0;
-          const overallTarget = weeklyTarget * totalWeeks;
-          const cappedOverallActual = Math.min(overallActual, overallTarget);
-          const overallProgress = overallTarget > 0 ? Math.round((cappedOverallActual / overallTarget) * 100) : 0;
-
-          progressData[goal.id] = {
-            goalId: goal.id,
-            currentWeek,
-            daysRemaining,
-            weeklyActual: cappedWeeklyActual,
-            weeklyTarget,
-            overallActual: cappedOverallActual,
-            overallTarget,
-            overallProgress,
-          };
-        }
-      }
-
-      setGoalProgress(progressData);
-
-      const totalActual = Object.values(progressData).reduce((sum, p) => sum + Math.min(p.overallActual, p.overallTarget), 0);
-      const totalTarget = Object.values(progressData).reduce((sum, p) => sum + p.overallTarget, 0);
-      const overallPercentage = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
-
-      setCycleEffortData({ totalActual, totalTarget, overallPercentage });
-    } catch (error) {
-      console.error('Error calculating goal progress:', error);
-    }
-  };
-
-  /* --------------------------------
-   * Week helpers
-   * -------------------------------- */
-  const getCurrentWeekNumber = useCallback((): number => {
-    if (!currentCycle || cycleWeeks.length === 0) return 1;
-    const now = new Date();
-    const currentDateString = formatLocalDate(now);
-    const currentWeekData = cycleWeeks.find(
-      week => currentDateString >= week.week_start && currentDateString <= week.week_end
-    );
-    return currentWeekData?.week_number || 1;
-  }, [currentCycle, cycleWeeks]);
-
-  const getCurrentWeekIndex = useCallback((): number => {
-    if (!cycleWeeks || cycleWeeks.length === 0) return -1;
-    const today = new Date().toISOString().slice(0, 10);
-    const index = cycleWeeks.findIndex(w => today >= w.week_start && today <= w.week_end);
-    if (index !== -1) return index;
-    const firstWeek = cycleWeeks[0];
-    const lastWeek = cycleWeeks[cycleWeeks.length - 1];
-    if (today < firstWeek.week_start) return 0;
-    if (today > lastWeek.week_end) return cycleWeeks.length - 1;
-    return -1;
-  }, [cycleWeeks]);
-
-  const getWeekData = useCallback((weekIndex: number): WeekData | null => {
-    const week = cycleWeeks[weekIndex];
-    if (!week) return null;
-    return {
-      weekNumber: week.week_number,
-      startDate: week.week_start,
-      endDate: week.week_end,
-    };
-  }, [cycleWeeks]);
-
-  const fetchGoalActionsForWeekForState = (
-    goalIds: string[],
-    weekNumber: number,
-    customWeeks?: WeekData[]
-  ) => fetchGoalActionsForWeek(goalIds, weekNumber, cycleWeeks, customWeeks || []);
-
-  /* --------------------------------
-   * Refresh orchestration
-   * -------------------------------- */
-  const refreshAllData = async () => {
-    try {
-      const cycle = await fetchUserCycle();
-      if (!cycle) {
-        setCycleWeeks([]);
-        setDaysLeftData(null);
-        setTwelveWeekGoals([]);
-        setCustomGoals([]);
-        setAllGoals([]);
-        setGoalProgress({});
-        setCycleEffortData({ totalActual: 0, totalTarget: 0, overallPercentage: 0 });
-        return;
-      }
-
-      const [weeks] = await Promise.all([
-        fetchCycleWeeks(cycle.id, cycle.source),
-        fetchDaysLeftData(cycle.id, cycle.source),
-      ]);
-
-      await fetchGoals(cycle.id);
-    } catch (error) {
-      console.error('Error refreshing all data:', error);
-    }
-  };
-
-  const refreshGoals = async () => {
-    if (currentCycle) await fetchGoals(currentCycle.id);
-    else await fetchGoals();
-  };
-
-  /* --------------------------------
-   * Action helpers (complete/undo)
-   * -------------------------------- */
-  const completeActionSuggestion = async ({
-    parentTaskId,
-    whenISO,
-  }: { parentTaskId: string; whenISO: string; }): Promise<string> => {
-    const supabase = getSupabaseClient();
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr) throw userErr;
-    if (!user || !currentCycle) throw new Error('Missing user or current cycle');
-
-    const { data: parent, error: pErr } = await supabase
-      .from(DB.TASKS)
-      .select('id, title')
-      .eq('id', parentTaskId)
-      .single();
-    if (pErr || !parent) throw pErr ?? new Error('Parent task not found');
-
-    const { data: occ, error: oErr } = await supabase
-      .from(DB.TASKS)
-      .insert({
-        user_id: user.id,
-        timeline_id: currentCycle.id, // keep a direct reference to active timeline
-        title: parent.title,
-        type: 'task',
-        status: 'completed',
-        due_date: whenISO,
-        completed_at: new Date().toISOString(),
-        parent_task_id: parentTaskId,
-        is_twelve_week_goal: currentCycle.source === 'global', // preserve your old behavior
-      })
-      .select('id')
-      .single();
-    if (oErr || !occ) throw oErr ?? new Error('Failed to insert occurrence');
-    const occId = occ.id as string;
-
-    // copy joins
-    await Promise.all([
-      supabase.rpc('ap_copy_universal_roles_to_task', { from_parent_id: parentTaskId, to_task_id: occId }),
-      supabase.rpc('ap_copy_universal_domains_to_task', { from_parent_id: parentTaskId, to_task_id: occId }),
-      supabase.rpc('ap_copy_universal_goals_to_task', { from_parent_id: parentTaskId, to_task_id: occId }),
-    ]);
-
-    return occId;
-  };
-
-  const undoActionOccurrence = async ({
-    parentTaskId,
-    whenISO,
-  }: { parentTaskId: string; whenISO: string; }): Promise<number> => {
-    const supabase = getSupabaseClient();
-    const { error, count } = await supabase
-      .from(DB.TASKS)
-      .delete({ count: 'exact' })
-      .eq('parent_task_id', parentTaskId)
-      .eq('due_date', whenISO)
-      .eq('status', 'completed');
-
-    if (error) throw error;
-    return typeof count === 'number' ? count : 0;
-  };
-
-  /* --------------------------------
-   * Creation flows (goals, tasks)
+   * GOAL CREATION FUNCTIONS - CENTRALIZED
    * -------------------------------- */
   const createTwelveWeekGoal = async (goalData: {
     title: string;
     description?: string;
     weekly_target?: number;
     total_target?: number;
-  }): Promise<TwelveWeekGoal | null> => {
+  }, selectedTimeline?: Timeline): Promise<TwelveWeekGoal | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !currentCycle || currentCycle.source !== 'global') return null;
+      if (!user) return null;
+
+      const timeline = selectedTimeline || currentTimeline;
+      if (!timeline || timeline.source !== 'global') {
+        throw new Error('Global timeline required for 12-week goals');
+      }
 
       const { data, error } = await supabase
         .from(DB.GOALS_12WK)
         .insert({
           user_id: user.id,
-          user_global_timeline_id: currentCycle.id, // strict FK
+          user_global_timeline_id: timeline.id, // Updated FK
           title: goalData.title,
           description: goalData.description,
           weekly_target: goalData.weekly_target ?? 3,
           total_target: goalData.total_target ?? 36,
           status: 'active',
           progress: 0,
-          start_date: currentCycle.start_date,
-          end_date: currentCycle.end_date,
+          start_date: timeline.start_date,
+          end_date: timeline.end_date,
         })
         .select('*')
         .single();
 
       if (error) throw error;
-      await fetchGoals(currentCycle.id);
+      await fetchGoals(timeline);
       return { ...data, goal_type: '12week' };
     } catch (error) {
       console.error('Error creating 12-week goal:', error);
@@ -1002,38 +424,57 @@ export function useGoals(options: UseGoalsOptions = {}) {
   const createCustomGoal = async (goalData: {
     title: string;
     description?: string;
-    start_date: string;
-    end_date: string;
-  }): Promise<CustomGoal | null> => {
+    weekly_target?: number;
+    total_target?: number;
+  }, selectedTimeline?: Timeline): Promise<CustomGoal | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !currentCycle || currentCycle.source !== 'custom') return null;
+      if (!user) return null;
+
+      const timeline = selectedTimeline || currentTimeline;
+      if (!timeline) {
+        throw new Error('Timeline required for custom goals');
+      }
+
+      const startDate = timeline?.start_date;
+      const endDate = timeline?.end_date;
+
+      if (!startDate || !endDate) throw new Error('Start date and end date are required for custom goals');
 
       const { data, error } = await supabase
         .from(DB.GOALS_CUSTOM)
         .insert({
           user_id: user.id,
+          custom_timeline_id: timeline.id, // Updated FK
           title: goalData.title,
           description: goalData.description,
-          start_date: goalData.start_date,
-          end_date: goalData.end_date,
+          start_date: startDate,
+          end_date: endDate,
           status: 'active',
           progress: 0,
-          custom_timeline_id: currentCycle.id, // strict FK
         })
-        .select('*')
+        .select()
         .single();
 
       if (error) throw error;
-      await fetchGoals(currentCycle.id);
-      return { ...data, goal_type: 'custom' };
+      await fetchGoals(timeline);
+
+      return { 
+        ...data, 
+        goal_type: 'custom',
+        weekly_target: goalData.weekly_target || 3,
+        total_target: goalData.total_target || 100,
+      };
     } catch (error) {
       console.error('Error creating custom goal:', error);
       throw error;
     }
   };
 
+  /* --------------------------------
+   * TASK CREATION WITH WEEK PLAN - CENTRALIZED
+   * -------------------------------- */
   const createTaskWithWeekPlan = async (taskData: {
     title: string;
     description?: string;
@@ -1045,32 +486,72 @@ export function useGoals(options: UseGoalsOptions = {}) {
     selectedDomainIds?: string[];
     selectedKeyRelationshipIds?: string[];
     selectedWeeks: Array<{ weekNumber: number; targetDays: number }>;
-  }): Promise<{ id: string } | null> => {
+    id?: string; // For editing existing tasks
+  }, selectedTimeline?: Timeline): Promise<{ id: string } | null> => {
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !currentCycle) return null;
+      if (!user) return null;
 
-      // Create parent task
-      const { data: insertedTask, error: taskError } = await supabase
-        .from(DB.TASKS)
-        .insert({
+      const timeline = selectedTimeline || currentTimeline;
+      if (!timeline) throw new Error('Timeline required for task creation');
+
+      let taskId: string;
+      
+      if (taskData.id) {
+        // Update existing task
+        const updateTaskPayload: any = {
+          title: taskData.title,
+          recurrence_rule: taskData.recurrenceRule,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: taskError } = await supabase
+          .from(DB.TASKS)
+          .update(updateTaskPayload)
+          .eq('id', taskData.id);
+
+        if (taskError) throw taskError;
+        taskId = taskData.id;
+
+        // Clear existing joins for update
+        await Promise.all([
+          supabase.from(DB.UNIVERSAL_ROLES_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+          supabase.from(DB.UNIVERSAL_DOMAINS_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+          supabase.from(DB.UNIVERSAL_KEY_REL_JOIN).delete().eq('parent_id', taskId).eq('parent_type', 'task'),
+          supabase.from(DB.TASK_WEEK_PLAN).delete().eq('task_id', taskId),
+        ]);
+      } else {
+        // Create new task
+        const insertTaskPayload: any = {
           user_id: user.id,
-          user_cycle_id: currentCycle.id, // we store timeline id here
           title: taskData.title,
           type: 'task',
           input_kind: 'count',
           unit: 'days',
           status: 'pending',
-          is_twelve_week_goal: currentCycle.source === 'global',
+          due_date: null, // Parent tasks should not have a due_date
+          is_twelve_week_goal: timeline.source === 'global',
           recurrence_rule: taskData.recurrenceRule,
-        })
-        .select('*')
-        .single();
-      if (taskError) throw taskError;
+          
+          // --- THIS IS THE FIX ---
+          // Conditionally add the correct timeline foreign key to the main task record
+          ...(timeline.source === 'global' && { user_global_timeline_id: timeline.id }),
+          ...(timeline.source === 'custom' && { custom_timeline_id: timeline.id }),
+        };
+
+        const { data: insertedTask, error: taskError } = await supabase
+          .from(DB.TASKS)
+          .insert(insertTaskPayload)
+          .select('*')
+          .single();
+
+        if (taskError) throw taskError;
+        taskId = insertedTask.id;
+      }
 
       // Optional note
-      if (taskData.description?.trim()) {
+      if (taskData.description?.trim() && !taskData.id) {
         const { data: insertedNote, error: noteError } = await supabase
           .from(DB.NOTES)
           .insert({
@@ -1084,7 +565,7 @@ export function useGoals(options: UseGoalsOptions = {}) {
         const { error: noteJoinError } = await supabase
           .from(DB.NOTES_JOIN)
           .insert({
-            parent_id: insertedTask.id,
+            parent_id: taskId,
             parent_type: 'task',
             note_id: insertedNote.id,
             user_id: user.id,
@@ -1092,88 +573,259 @@ export function useGoals(options: UseGoalsOptions = {}) {
         if (noteJoinError) throw noteJoinError;
       }
 
-      // Week plans
+      // Week plans with conditional timeline FK
       const weekPlanInserts = taskData.selectedWeeks.map(week => ({
-        task_id: insertedTask.id,
-        user_cycle_id: currentCycle.id, // timeline id
+        task_id: taskId,
         week_number: week.weekNumber,
         target_days: week.targetDays,
+        // Use conditional timeline FK based on timeline source
+        ...(timeline.source === 'global' 
+          ? { user_global_timeline_id: timeline.id }
+          : { user_custom_timeline_id: timeline.id }
+        ),
       }));
+
       const { error: weekPlanError } = await supabase
         .from(DB.TASK_WEEK_PLAN)
         .insert(weekPlanInserts);
       if (weekPlanError) throw weekPlanError;
 
-      // Link to goal
-      if (taskData.twelve_wk_goal_id) {
+      // Link to goal with conditional goal FK
+      if (taskData.twelve_wk_goal_id || taskData.custom_goal_id) {
+        const goalJoinPayload: any = {
+          parent_id: taskId,
+          parent_type: 'task',
+          user_id: user.id,
+          // Conditional goal FK and type injection
+          goal_type: taskData.goal_type || (timeline.source === 'global' ? 'twelve_wk_goal' : 'custom_goal'),
+          twelve_wk_goal_id: taskData.twelve_wk_goal_id || null,
+          custom_goal_id: taskData.custom_goal_id || null,
+        };
+
         const { error: goalJoinError } = await supabase
           .from(DB.UNIVERSAL_GOALS_JOIN)
-          .insert({
-            parent_id: insertedTask.id,
-            parent_type: 'task',
-            twelve_wk_goal_id: taskData.twelve_wk_goal_id,
-            goal_type: 'twelve_wk_goal',
-            user_id: user.id,
-          });
-        if (goalJoinError) throw goalJoinError;
-      } else if (taskData.custom_goal_id) {
-        const { error: goalJoinError } = await supabase
-          .from(DB.UNIVERSAL_GOALS_JOIN)
-          .insert({
-            parent_id: insertedTask.id,
-            parent_type: 'task',
-            custom_goal_id: taskData.custom_goal_id,
-            goal_type: 'custom_goal',
-            user_id: user.id,
-          });
+          .insert(goalJoinPayload);
         if (goalJoinError) throw goalJoinError;
       }
 
       // Link roles, domains, key relationships
-      if (taskData.selectedRoleIds?.length) {
-        const roleJoins = taskData.selectedRoleIds.map(roleId => ({
-          parent_id: insertedTask.id,
-          parent_type: 'task',
-          role_id: roleId,
-          user_id: user.id,
-        }));
-        const { error: roleJoinError } = await supabase
-          .from(DB.UNIVERSAL_ROLES_JOIN)
-          .insert(roleJoins);
-        if (roleJoinError) throw roleJoinError;
-      }
+      await Promise.all([
+        insertUniversalJoins(supabase, user.id, taskId, 'task', 'role_id', taskData.selectedRoleIds, DB.UNIVERSAL_ROLES_JOIN),
+        insertUniversalJoins(supabase, user.id, taskId, 'task', 'domain_id', taskData.selectedDomainIds, DB.UNIVERSAL_DOMAINS_JOIN),
+        insertUniversalJoins(supabase, user.id, taskId, 'task', 'key_relationship_id', taskData.selectedKeyRelationshipIds, DB.UNIVERSAL_KEY_REL_JOIN),
+      ]);
 
-      if (taskData.selectedDomainIds?.length) {
-        const domainJoins = taskData.selectedDomainIds.map(domainId => ({
-          parent_id: insertedTask.id,
-          parent_type: 'task',
-          domain_id: domainId,
-          user_id: user.id,
-        }));
-        const { error: domainJoinError } = await supabase
-          .from(DB.UNIVERSAL_DOMAINS_JOIN)
-          .insert(domainJoins);
-        if (domainJoinError) throw domainJoinError;
-      }
-
-      if (taskData.selectedKeyRelationshipIds?.length) {
-        const krJoins = taskData.selectedKeyRelationshipIds.map(krId => ({
-          parent_id: insertedTask.id,
-          parent_type: 'task',
-          key_relationship_id: krId,
-          user_id: user.id,
-        }));
-        const { error: krJoinError } = await supabase
-          .from(DB.UNIVERSAL_KEY_REL_JOIN)
-          .insert(krJoins);
-        if (krJoinError) throw krJoinError;
-      }
-
-      return { id: insertedTask.id as string };
+      await fetchGoals(timeline);
+      return { id: taskId };
     } catch (error) {
       console.error('Error creating task with week plan:', error);
       throw error;
     }
+  };
+
+  /* --------------------------------
+   * TASK DELETION - CENTRALIZED
+   * -------------------------------- */
+  const deleteTask = async (taskId: string): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Verify task ownership before deletion
+      const { data: task, error: taskError } = await supabase
+        .from(DB.TASKS)
+        .select('id, user_id')
+        .eq('id', taskId)
+        .single();
+
+      if (taskError) throw taskError;
+      if (!task || task.user_id !== user.id) {
+        throw new Error('Task not found or access denied');
+      }
+
+      // Soft delete the task by setting deleted_at timestamp
+      const { error: deleteError } = await supabase
+        .from(DB.TASKS)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', taskId);
+
+      if (deleteError) throw deleteError;
+
+      console.log('Task soft deleted successfully:', taskId);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
+   * DELETE TASK FOR SPECIFIC WEEK ONLY
+   * -------------------------------- */
+  const deleteTaskWeekPlan = async (taskId: string, weekNumber: number, timeline: Timeline): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Build the query with the correct timeline FK
+      const timelineColumn = timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id';
+
+      // Soft delete the week plan by setting deleted_at timestamp
+      const { error: deleteError } = await supabase
+        .from(DB.TASK_WEEK_PLAN)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('task_id', taskId)
+        .eq('week_number', weekNumber)
+        .eq(timelineColumn, timeline.id);
+
+      if (deleteError) throw deleteError;
+
+      console.log('Task week plan soft deleted successfully:', { taskId, weekNumber });
+
+      // Check if all week plans for this task are now deleted
+      const { data: remainingWeekPlans, error: checkError } = await supabase
+        .from(DB.TASK_WEEK_PLAN)
+        .select('id')
+        .eq('task_id', taskId)
+        .is('deleted_at', null);
+
+      if (checkError) throw checkError;
+
+      // If no week plans remain, soft delete the parent task as well
+      if (!remainingWeekPlans || remainingWeekPlans.length === 0) {
+        console.log('No remaining week plans, soft deleting parent task:', taskId);
+        await deleteTask(taskId);
+      }
+    } catch (error) {
+      console.error('Error deleting task week plan:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
+   * UNDO TASK DELETION
+   * -------------------------------- */
+  const undoDeleteTask = async (taskId: string): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Restore the task by clearing deleted_at timestamp
+      const { error: restoreError } = await supabase
+        .from(DB.TASKS)
+        .update({ deleted_at: null })
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+
+      if (restoreError) throw restoreError;
+
+      console.log('Task restored successfully:', taskId);
+    } catch (error) {
+      console.error('Error restoring task:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
+   * UNDO TASK WEEK PLAN DELETION
+   * -------------------------------- */
+  const undoDeleteTaskWeekPlan = async (taskId: string, weekNumber: number, timeline: Timeline): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Build the query with the correct timeline FK
+      const timelineColumn = timeline.source === 'global' ? 'user_global_timeline_id' : 'user_custom_timeline_id';
+
+      // Restore the week plan by clearing deleted_at timestamp
+      const { error: restoreError } = await supabase
+        .from(DB.TASK_WEEK_PLAN)
+        .update({ deleted_at: null })
+        .eq('task_id', taskId)
+        .eq('week_number', weekNumber)
+        .eq(timelineColumn, timeline.id);
+
+      if (restoreError) throw restoreError;
+
+      // Also restore the parent task if it was deleted
+      await undoDeleteTask(taskId);
+
+      console.log('Task week plan restored successfully:', { taskId, weekNumber });
+    } catch (error) {
+      console.error('Error restoring task week plan:', error);
+      throw error;
+    }
+  };
+
+  /* --------------------------------
+   * GOAL DELETION - CENTRALIZED
+   * -------------------------------- */
+  const deleteGoal = async (goalId: string, goalType: '12week' | 'custom'): Promise<void> => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Determine the correct table based on goal type
+      const tableName = goalType === '12week' ? DB.GOALS_12WK : DB.GOALS_CUSTOM;
+
+      // Verify goal ownership before deletion
+      const { data: goal, error: goalError } = await supabase
+        .from(tableName)
+        .select('id, user_id')
+        .eq('id', goalId)
+        .single();
+
+      if (goalError) throw goalError;
+      if (!goal || goal.user_id !== user.id) {
+        throw new Error('Goal not found or access denied');
+      }
+
+      // Soft delete the goal by setting status to 'cancelled'
+      const { error: deleteError } = await supabase
+        .from(tableName)
+        .update({ 
+          status: 'cancelled',
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', goalId);
+
+      if (deleteError) throw deleteError;
+
+      console.log('Goal soft deleted successfully:', goalId);
+      
+      // Refresh goals to update the UI
+      await refreshGoals();
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      throw error;
+    }
+  };
+  /* --------------------------------
+   * Refresh orchestration
+   * -------------------------------- */
+  const refreshAllData = async () => {
+    try {
+      const timeline = await fetchCurrentTimeline();
+      if (!timeline) {
+        setTwelveWeekGoals([]);
+        setCustomGoals([]);
+        setAllGoals([]);
+        return;
+      }
+
+      await fetchGoals(timeline);
+    } catch (error) {
+      console.error('Error refreshing all data:', error);
+    }
+  };
+
+  const refreshGoals = async () => {
+    if (currentTimeline) await fetchGoals(currentTimeline);
+    else await fetchGoals();
   };
 
   /* --------------------------------
@@ -1184,61 +836,34 @@ export function useGoals(options: UseGoalsOptions = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.scope]);
 
-  // Recompute days-left nightly at midnight
-  useEffect(() => {
-    if (!currentCycle) return;
-
-    const updateDaysLeft = () => {
-      fetchDaysLeftData(currentCycle.id, currentCycle.source);
-    };
-
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    const msUntilMidnight = tomorrow.getTime() - now.getTime();
-
-    const midnightTimeout = setTimeout(() => {
-      updateDaysLeft();
-      const dailyInterval = setInterval(updateDaysLeft, 24 * 60 * 60 * 1000);
-      return () => clearInterval(dailyInterval);
-    }, msUntilMidnight);
-
-    return () => clearTimeout(midnightTimeout);
-  }, [currentCycle]);
-
   /* --------------------------------
-   * Return API
+   * Return API - CRUD + NORMALIZATION ONLY
    * -------------------------------- */
   return {
+    // State
     twelveWeekGoals,
     customGoals,
     allGoals,
-    currentCycle,
-    cycleWeeks,
-    daysLeftData,
-    goalProgress,
-    cycleEffortData,
+    currentTimeline,
     loading,
-    loadingWeekActions,
-    setLoadingWeekActions,
 
-    refreshGoals,
-    refreshAllData,
-
-    fetchGoalActionsForWeek: fetchGoalActionsForWeekForState,
-    completeActionSuggestion,
-    undoActionOccurrence,
-
+    // CRUD operations
     createTwelveWeekGoal,
     createCustomGoal,
     createTaskWithWeekPlan,
+    deleteTask,
+    deleteTaskWeekPlan,
+    deleteGoal,
+    undoDeleteTask,
+    undoDeleteTaskWeekPlan,
 
-    getCurrentWeekNumber,
-    getCurrentWeekIndex,
-    getWeekData,
+    // Data refresh
+    refreshGoals,
+    refreshAllData,
 
-    weekGoalActions,
-    setWeekGoalActions,
+    // Utilities
+    fetchCurrentTimeline,
+    insertUniversalJoins,
   };
 }
+

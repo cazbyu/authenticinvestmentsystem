@@ -25,6 +25,7 @@ interface DepositIdeaDetailModalProps {
   onClose: () => void;
   onUpdate: (depositIdea: DepositIdea) => void;
   onCancel: (depositIdea: DepositIdea) => void;
+  onActivate: (depositIdea: DepositIdea) => void;
 }
 
 export function DepositIdeaDetailModal({ 
@@ -32,7 +33,8 @@ export function DepositIdeaDetailModal({
   depositIdea, 
   onClose, 
   onUpdate, 
-  onCancel 
+  onCancel,
+  onActivate
 }: DepositIdeaDetailModalProps) {
   const [notes, setNotes] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -70,6 +72,25 @@ export function DepositIdeaDetailModal({
       Alert.alert('Error', (error as Error).message);
     } finally {
       setLoadingNotes(false);
+    }
+  };
+
+  const handleActivate = () => {
+    try {
+      onActivate(depositIdea);
+      onClose();
+    } catch (error) {
+      console.error('Error in activation:', error);
+    }
+  };
+
+  const handleDelete = (depositIdea: DepositIdea) => {
+    try {
+      onCancel(depositIdea);
+      onClose();
+    } catch (error) {
+      console.error('Error in deletion:', error);
+      onClose();
     }
   };
 
@@ -201,15 +222,23 @@ export function DepositIdeaDetailModal({
             onPress={() => onUpdate(depositIdea)}
           >
             <Edit size={16} color="#ffffff" />
-            <Text style={styles.buttonText}>Update/Activate</Text>
+            <Text style={styles.buttonText}>Update</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.button, styles.cancelButton]} 
-            onPress={() => onCancel(depositIdea)}
+            style={[styles.button, styles.activateButton]} 
+            onPress={handleActivate}
+          >
+            <Play size={16} color="#ffffff" />
+            <Text style={styles.buttonText}>Activate as is</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.button, styles.deleteButton]} 
+            onPress={() => handleDelete(depositIdea)}
           >
             <Ban size={16} color="#ffffff" />
-            <Text style={styles.buttonText}>Cancel</Text>
+            <Text style={styles.buttonText}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -334,12 +363,15 @@ const styles = StyleSheet.create({
   activateButton: { 
     backgroundColor: '#16a34a' 
   },
+  deleteButton: { 
+    backgroundColor: '#dc2626' 
+  },
   cancelButton: { 
     backgroundColor: '#dc2626' 
   },
   buttonText: { 
     color: '#ffffff', 
     fontSize: 14, 
-    fontWeight: '600' 
+    fontWeight: '600'
   },
 });

@@ -21,8 +21,8 @@ interface WithdrawalFormProps {
     id?: string;
     title?: string;
     amount?: number;
-    withdrawal_date?: string;
-    notes?: string;
+    withdrawn_at?: string;
+    notes?: string | Array<{id: string; content: string; created_at: string}>;
     roles?: Array<{id: string; label: string}>;
     domains?: Array<{id: string; name: string}>;
     keyRelationships?: Array<{id: string; name: string}>;
@@ -59,21 +59,35 @@ export function WithdrawalForm({
   const [keyRelationships, setKeyRelationships] = useState<KeyRelationship[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [existingNotes, setExistingNotes] = useState<Array<{id: string; content: string; created_at: string}>>([]);
 
   useEffect(() => {
     if (visible) {
       if (initialData) {
+        // Handle notes - can be string or array of note objects
+        let notesArray: Array<{id: string; content: string; created_at: string}> = [];
+        let notesString = '';
+
+        if (Array.isArray(initialData.notes)) {
+          notesArray = initialData.notes;
+        } else if (typeof initialData.notes === 'string') {
+          notesString = initialData.notes;
+        }
+
+        setExistingNotes(notesArray);
+
         setFormData({
           title: initialData.title || '',
           amount: initialData.amount?.toString() || '',
-          withdrawalDate: initialData.withdrawal_date ? new Date(initialData.withdrawal_date) : new Date(),
-          notes: initialData.notes || '',
+          withdrawalDate: initialData.withdrawn_at ? new Date(initialData.withdrawn_at) : new Date(),
+          notes: notesString,
           selectedRoleIds: initialData.roles?.map(r => r.id) || [],
           selectedDomainIds: initialData.domains?.map(d => d.id) || [],
           selectedKeyRelationshipIds: initialData.keyRelationships?.map(kr => kr.id) || [],
         });
       } else {
         // Reset form for new withdrawal
+        setExistingNotes([]);
         setFormData({
           title: '',
           amount: '',
@@ -139,7 +153,7 @@ export function WithdrawalForm({
         user_id: user.id,
         title: formData.title.trim(),
         amount: parseFloat(formData.amount),
-        withdrawal_date: formData.withdrawalDate.toISOString().split('T')[0],
+        withdrawn_at: formData.withdrawalDate.toISOString(),
         updated_at: new Date().toISOString(),
       };
 
@@ -373,11 +387,35 @@ export function WithdrawalForm({
 
             <View style={styles.field}>
               <Text style={styles.label}>Notes</Text>
+
+              {/* Display existing notes in stacked format */}
+              {existingNotes.length > 0 && (
+                <View style={styles.existingNotesContainer}>
+                  {existingNotes.map((note) => (
+                    <View key={note.id} style={styles.existingNoteItem}>
+                      <Text style={styles.existingNoteContent}>{note.content}</Text>
+                      <Text style={styles.existingNoteDate}>
+                        {new Date(note.created_at).toLocaleDateString('en-US', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric'
+                        })} ({new Date(note.created_at).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })})
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Add new note */}
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={formData.notes}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, notes: text }))}
-                placeholder="Optional notes about this withdrawal..."
+                placeholder={existingNotes.length > 0 ? "Add another note..." : "Optional notes about this withdrawal..."}
                 placeholderTextColor="#9ca3af"
                 multiline
                 numberOfLines={3}
@@ -579,5 +617,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1f2937',
+  },
+  existingNotesContainer: {
+    marginBottom: 12,
+  },
+  existingNoteItem: {
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#dc2626',
+  },
+  existingNoteContent: {
+    fontSize: 14,
+    color: '#1f2937',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  existingNoteDate: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
 });

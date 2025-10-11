@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit } from 'lucide-react-native';
+import { Target, Calendar, Plus, TrendingUp, Check, CreditCard as Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { GoalProgress } from '@/hooks/useGoalProgress';
 import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 
@@ -38,6 +38,9 @@ interface GoalProgressCardProps {
   onPress?: () => void;
   compact?: boolean;
   selectedWeekNumber?: number;
+  onEditAction?: (action: TaskWithLogs) => void; // New prop for editing actions
+  onDeleteAction?: (actionId: string, weekNumber: number) => void; // New prop for deleting actions
+  onToggleExpanded?: () => void; // New prop for toggling collapse/expand
 }
 
 export function GoalProgressCard({
@@ -52,7 +55,10 @@ export function GoalProgressCard({
   onEdit, // New prop
   onPress,
   compact = false,
-  selectedWeekNumber
+  selectedWeekNumber,
+  onEditAction, // New prop
+  onDeleteAction, // New prop
+  onToggleExpanded, // New prop
 }: GoalProgressCardProps) {
   const weekActions = weekActionsProp ?? [];
   const getProgressColor = (percentage: number) => {
@@ -108,11 +114,6 @@ export function GoalProgressCard({
       return days;
     }
 
-    console.log('=== GENERATE WEEK DAYS DEBUG ===');
-    console.log('Input start date string:', startDateString);
-    console.log('Parsed start date:', start.toISOString());
-    console.log('Start day of week:', start.getDay()); // 0=Sunday, 1=Monday, etc.
-
     // Generate 7 consecutive days starting from the provided start date
     for (let i = 0; i < 7; i++) {
       const day = new Date(start);
@@ -124,9 +125,6 @@ export function GoalProgressCard({
         dayOfWeek: day.getDay(),
       });
     }
-
-    console.log('Generated days:', days);
-    console.log('=== END GENERATE WEEK DAYS DEBUG ===');
 
     return days;
   };
@@ -219,18 +217,39 @@ export function GoalProgressCard({
               <Text style={styles.title} numberOfLines={2}>
                 {goal.title}
               </Text>
-              <Text style={styles.subtitle}>
-                {getGoalTypeLabel()}
-              </Text>
+              <TouchableOpacity
+                style={styles.subtitleRow}
+                onPress={hasWeekContext ? onToggleExpanded : undefined}
+                activeOpacity={hasWeekContext ? 0.7 : 1}
+              >
+                <Text style={styles.subtitle}>
+                  {getGoalTypeLabel()}
+                </Text>
+                {hasWeekContext && (
+                  <>
+                    <Text style={styles.subtitleDot}> • </Text>
+                    <Text style={styles.subtitle}>
+                      {weekActions.length} {weekActions.length === 1 ? 'Action' : 'Actions'}
+                    </Text>
+                    {onToggleExpanded && (
+                      expanded ? (
+                        <ChevronUp size={14} color="#6b7280" style={styles.chevronIcon} />
+                      ) : (
+                        <ChevronDown size={14} color="#6b7280" style={styles.chevronIcon} />
+                      )
+                    )}
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
-          
+
           {onEdit && (
             <TouchableOpacity style={styles.editButton} onPress={onEdit}>
               <Edit size={16} color="#6b7280" />
             </TouchableOpacity>
           )}
-          
+
           {/* Individual Goal Total Score */}
           <View style={styles.goalTotalScore}>
             <Text style={[
@@ -281,52 +300,8 @@ export function GoalProgressCard({
           </View>
         )}
 
-        {/* Custom Goal Date Range */}
-        {goal.goal_type === 'custom' && (
-          <View style={styles.progressSection}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Timeline</Text>
-              <Text style={styles.progressValue}>
-                {(() => {
-                  const startDate = parseLocalDate(goal.start_date);
-                  const endDate = parseLocalDate(goal.end_date);
-                  const now = new Date();
-                  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                    return 'Invalid dates';
-                  }
-                  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                  const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                  return `${daysRemaining}/${totalDays} days`;
-                })()}
-              </Text>
-            </View>
-            
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${(() => {
-                      const startDate = parseLocalDate(goal.start_date);
-                      const endDate = parseLocalDate(goal.end_date);
-                      const now = new Date();
-                      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-                        return 0;
-                      }
-                      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                      const daysPassed = Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-                      return Math.min(100, (daysPassed / totalDays) * 100);
-                    })()}%`,
-                    backgroundColor: '#0078d4',
-                  }
-                ]}
-              />
-            </View>
-          </View>
-        )}
-
         {/* Week-specific Actions (when week prop is provided) */}
-        {shouldRenderWeekActions && week && (
+        {shouldRenderWeekActions && week && expanded && (
           <View style={styles.weekActionsSection}>
             <View style={styles.weekActionsHeader}>
               {onAddAction && (
@@ -339,24 +314,11 @@ export function GoalProgressCard({
                 </TouchableOpacity>
               )}
             </View>
-            
+
             {loadingWeekActions ? (
               <View style={styles.loadingActions}>
-                <ActivityIndicator size="small" color={cardColor} />
+                <ActivityIndicator size="small" color="#6b7280" />
                 <Text style={styles.loadingActionsText}>Loading actions...</Text>
-              </View>
-            ) : weekActions.length === 0 && onAddAction ? (
-              <View style={styles.emptyActions}>
-                <Text style={styles.emptyActionsText}>No actions this week</Text>
-                {onAddAction && (
-                  <TouchableOpacity
-                    style={[styles.addActionButton, { borderColor: cardColor }]}
-                    onPress={onAddAction}
-                  >
-                    <Plus size={12} color={cardColor} />
-                    <Text style={[styles.addActionButtonText, { color: cardColor }]}>Add action</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             ) : (
               <View style={styles.actionsList}>
@@ -366,16 +328,38 @@ export function GoalProgressCard({
                   return (
                     <View key={action.id} style={styles.actionItem}>
                       <View style={styles.actionHeader}>
-                        <Text style={styles.actionTitle} numberOfLines={1}>
-                          {action.title}
-                        </Text>
-                        {action.input_kind === 'count' && (
-                          <Text style={styles.actionCount}>
-                            {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
+                        <View style={styles.actionTitleContainer}>
+                          <Text style={styles.actionTitle} numberOfLines={1}>
+                            {action.title}
                           </Text>
-                        )}
+                        </View>
+                        <View style={styles.actionHeaderRight}>
+                          {action.input_kind === 'count' && (
+                            <Text style={styles.actionCount}>
+                              {Math.min(action.weeklyActual, action.weeklyTarget)}/{action.weeklyTarget}
+                            </Text>
+                          )}
+                          {onEditAction && (
+                            <TouchableOpacity
+                              style={styles.editActionButton}
+                              onPress={() => onEditAction(action)}
+                              activeOpacity={0.7}
+                            >
+                              <Edit size={14} color="#0078d4" />
+                            </TouchableOpacity>
+                          )}
+                          {onDeleteAction && week && (
+                            <TouchableOpacity
+                              style={styles.deleteIconButton}
+                              onPress={() => onDeleteAction(action.id, week.weekNumber)}
+                              activeOpacity={0.7}
+                            >
+                              <Trash2 size={16} color="#6b7280" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
-                      
+
                       {/* Day labels above circles for this action */}
                       <View style={styles.dayLabelsRow}>
                         {weekDays.map(day => (
@@ -384,26 +368,25 @@ export function GoalProgressCard({
                           </Text>
                         ))}
                       </View>
-                      
+
                       <View style={styles.dayDots}>
                         {weekDays.map(day => {
                            const hasLog = action.logs.some(
                              log => log.measured_on === day.date && log.completed
                            );
 
-                           console.log(`Day ${day.date}: hasLog=${hasLog}, logs for action:`, action.logs.map(l => ({ measured_on: l.measured_on, completed: l.completed })));
-
                            return (
                              <TouchableOpacity
                                key={day.date}
                                style={[styles.dayDot, hasLog && styles.dayDotCompleted]}
-                               onPress={onToggleCompletion ? () => {
-                                 console.log('=== DAY DOT CLICKED ===');
-                                 console.log('Action ID:', action.id);
-                                 console.log('Date:', day.date);
-                                 console.log('Current hasLog status:', hasLog);
-                                 console.log('Action logs:', action.logs);
-                                 onToggleCompletion(action.id, day.date, hasLog);
+                               onPress={onToggleCompletion ? async () => {
+                                 console.log('[GoalProgressCard] Day dot clicked:', { actionId: action.id, date: day.date, hasLog });
+                                 try {
+                                   await onToggleCompletion(action.id, day.date, hasLog);
+                                   console.log('[GoalProgressCard] Toggle completed successfully');
+                                 } catch (error) {
+                                   console.error('[GoalProgressCard] Error in day dot toggle:', error);
+                                 }
                                } : undefined}
                                activeOpacity={onToggleCompletion ? 0.7 : 1}
                              >
@@ -520,10 +503,23 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   subtitle: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
+  },
+  subtitleDot: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  chevronIcon: {
+    marginLeft: 4,
   },
   addTaskButtonLarge: {
     flexDirection: 'row',
@@ -679,17 +675,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
+  actionTitleContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
   actionTitle: {
     fontSize: 12,
     fontWeight: '500',
     color: '#1f2937',
-    flex: 1,
-    marginRight: 8,
+  },
+  actionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   actionCount: {
     fontSize: 11,
     fontWeight: '600',
     color: '#6b7280',
+  },
+  editActionButton: {
+    padding: 4,
+    borderRadius: 4,
+  },
+  deleteIconButton: {
+    padding: 4,
+    borderRadius: 4,
   },
   dayDots: {
     flexDirection: 'row',

@@ -34,7 +34,7 @@ interface UserRole {
   category?: string;
 }
 
-export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
+export function ManageRolesModal({ visible, onClose, onUpdate }: ManageRolesModalProps) {
   const [presetRoles, setPresetRoles] = useState<PresetRole[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [customRoleLabel, setCustomRoleLabel] = useState('');
@@ -158,9 +158,6 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
         setUserRoles(prev => prev.map(role =>
           role.id === tempRole.id ? data : role
         ));
-        
-        // Notify parent component of the update
-        onUpdate?.();
       } catch (error) {
         console.error('Error adding custom role:', error);
         Alert.alert('Error', 'Failed to add custom role');
@@ -183,14 +180,11 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
       const existingUserRole = userRoles.find(r => r.preset_role_id === presetRole.id);
       const newActiveState = existingUserRole ? !existingUserRole.is_active : true;
 
+      console.log('Toggle preset role:', presetRole.label, 'Current active:', existingUserRole?.is_active, 'New active:', newActiveState);
+
       // Optimistic update - immediately update UI
       if (existingUserRole) {
-        setUserRoles(prev => prev.map(role =>
-          role.id === existingUserRole.id
-            ? { ...role, is_active: newActiveState }
-            : role
-        ));
-
+        // First, update the database
         try {
           const { error } = await supabase
             .from('0008-ap-roles')
@@ -198,18 +192,18 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
             .eq('id', existingUserRole.id);
 
           if (error) throw error;
-          
-          // Notify parent component of the update
-          onUpdate?.();
+
+          console.log('Database updated successfully');
+
+          // After successful database update, update the UI
+          setUserRoles(prev => prev.map(role =>
+            role.id === existingUserRole.id
+              ? { ...role, is_active: newActiveState }
+              : role
+          ));
         } catch (error) {
           console.error('Error updating preset role:', error);
           Alert.alert('Error', 'Failed to update role');
-          // Revert optimistic update
-          setUserRoles(prev => prev.map(role =>
-            role.id === existingUserRole.id
-              ? { ...role, is_active: !newActiveState }
-              : role
-          ));
         }
       } else {
         // Create temporary role for immediate UI feedback
@@ -243,9 +237,6 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
           setUserRoles(prev => prev.map(role =>
             role.id === tempRole.id ? data : role
           ));
-          
-          // Notify parent component of the update
-          onUpdate?.();
         } catch (error) {
           console.error('Error creating preset role:', error);
           Alert.alert('Error', 'Failed to activate role');
@@ -269,12 +260,20 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
 
   const customRoles = userRoles.filter(role => !role.preset_role_id);
 
+  const handleClose = () => {
+    onClose();
+    // Notify parent to refresh after modal closes
+    if (onUpdate) {
+      onUpdate();
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Manage Roles</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
             <X size={24} color="#1f2937" />
           </TouchableOpacity>
         </View>
@@ -350,9 +349,6 @@ export function ManageRolesModal({ visible, onClose }: ManageRolesModalProps) {
                                   .eq('id', role.id);
 
                                 if (error) throw error;
-                                
-                                // Notify parent component of the update
-                                onUpdate?.();
                               } catch (error) {
                                 console.error('Error updating custom role:', error);
                                 Alert.alert('Error', 'Failed to update role');

@@ -21,11 +21,12 @@ interface KeyRelationship { id: string; name: string; role_id: string; }
 interface EditGoalModalProps {
   visible: boolean;
   onClose: () => void;
-  onUpdate: () => void; // Callback to refresh data in parent
+  onUpdate: () => void;
   goal: TwelveWeekGoal | null;
+  deleteGoal: (goalId: string, goalType: '12week' | 'custom') => Promise<void>;
 }
 
-export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModalProps) {
+export function EditGoalModal({ visible, onClose, onUpdate, goal, deleteGoal }: EditGoalModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [newNoteText, setNewNoteText] = useState(''); // For adding new notes
@@ -64,13 +65,33 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
 
   const loadGoalData = async () => {
     if (!goal) return;
+
+    console.log('[EditGoalModal] Loading goal data:', {
+      id: goal.id,
+      title: goal.title,
+      goal_type: goal.goal_type,
+      roles: goal.roles,
+      domains: goal.domains,
+      keyRelationships: goal.keyRelationships
+    });
+
     setTitle(goal.title);
     setDescription(goal.description || '');
-    
+
     // Load existing associations
-    setSelectedRoleIds(goal.roles?.map(r => r.id) || []);
-    setSelectedDomainIds(goal.domains?.map(d => d.id) || []);
-    setSelectedKeyRelationshipIds(goal.keyRelationships?.map(kr => kr.id) || []);
+    const roleIds = goal.roles?.map(r => r.id) || [];
+    const domainIds = goal.domains?.map(d => d.id) || [];
+    const krIds = goal.keyRelationships?.map(kr => kr.id) || [];
+
+    console.log('[EditGoalModal] Setting selected IDs:', {
+      roleIds,
+      domainIds,
+      krIds
+    });
+
+    setSelectedRoleIds(roleIds);
+    setSelectedDomainIds(domainIds);
+    setSelectedKeyRelationshipIds(krIds);
   };
 
   const fetchOptions = async () => {
@@ -124,15 +145,24 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       return;
     }
 
+    console.log('[EditGoalModal] Saving goal:', {
+      id: goal.id,
+      title: title.trim(),
+      goal_type: goal.goal_type
+    });
+
     setSaving(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not found');
 
-      // 1. Update main goal data
+      // 1. Update main goal data - use correct table based on goal type
+      const tableName = goal.goal_type === '12week' ? '0008-ap-goals-12wk' : '0008-ap-goals-custom';
+      console.log('[EditGoalModal] Updating table:', tableName);
+
       const { error: goalUpdateError } = await supabase
-        .from('0008-ap-goals-12wk')
+        .from(tableName)
         .update({
           title: title.trim(),
           description: description.trim() || null,
@@ -140,18 +170,27 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
         })
         .eq('id', goal.id);
 
-      if (goalUpdateError) throw goalUpdateError;
+      if (goalUpdateError) {
+        console.error('[EditGoalModal] Goal update error:', goalUpdateError);
+        throw goalUpdateError;
+      }
+      console.log('[EditGoalModal] Goal updated successfully');
 
       // 2. Handle Joins (Roles, Domains, Key Relationships)
       const updateJoins = async (
-        tableName: string, 
-        parentIdField: string, 
-        childIdField: string, 
-        currentLinkedIds: string[], 
+        tableName: string,
+        parentIdField: string,
+        childIdField: string,
+        currentLinkedIds: string[],
         newLinkedIds: string[]
       ) => {
         const toAdd = newLinkedIds.filter(id => !currentLinkedIds.includes(id));
         const toRemove = currentLinkedIds.filter(id => !newLinkedIds.includes(id));
+
+        console.log('[EditGoalModal] Updating joins for', tableName, ':', {
+          toAdd: toAdd.length,
+          toRemove: toRemove.length
+        });
 
         if (toRemove.length > 0) {
           const { error } = await supabase
@@ -163,9 +202,10 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
         }
 
         if (toAdd.length > 0) {
+          const parentType = goal.goal_type === '12week' ? 'goal' : 'custom_goal';
           const inserts = toAdd.map(id => ({
             parent_id: goal.id,
-            parent_type: 'goal',
+            parent_type: parentType,
             [childIdField]: id,
             user_id: user.id,
           }));
@@ -177,10 +217,13 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       };
 
       // Fetch current joins for comparison
+      const parentType = goal.goal_type === '12week' ? 'goal' : 'custom_goal';
+      console.log('[EditGoalModal] Fetching current joins with parent_type:', parentType);
+
       const [{ data: currentRolesJoins }, { data: currentDomainsJoins }, { data: currentKRsJoins }] = await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').select('role_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-domains-join').select('domain_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-key-relationships-join').select('key_relationship_id').eq('parent_id', goal.id).eq('parent_type', 'goal'),
+        supabase.from('0008-ap-universal-roles-join').select('role_id').eq('parent_id', goal.id).eq('parent_type', parentType),
+        supabase.from('0008-ap-universal-domains-join').select('domain_id').eq('parent_id', goal.id).eq('parent_type', parentType),
+        supabase.from('0008-ap-universal-key-relationships-join').select('key_relationship_id').eq('parent_id', goal.id).eq('parent_type', parentType),
       ]);
 
       const currentRoleIds = currentRolesJoins?.map(j => j.role_id) || [];
@@ -195,19 +238,22 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
 
       // 3. Add new note if provided
       if (newNoteText.trim()) {
+        console.log('[EditGoalModal] Adding new note');
         const { data: newNote, error: newNoteError } = await supabase
-          .from('0008-ap-notes') 
+          .from('0008-ap-notes')
           .insert({ user_id: user.id, content: newNoteText.trim() })
           .select('id')
           .single();
         if (newNoteError) throw newNoteError;
 
+        const noteParentType = goal.goal_type === '12week' ? 'goal' : 'custom_goal';
         const { error: noteJoinError } = await supabase
           .from('0008-ap-universal-notes-join')
-          .insert({ parent_id: goal.id, parent_type: 'goal', note_id: newNote.id, user_id: user.id });
+          .insert({ parent_id: goal.id, parent_type: noteParentType, note_id: newNote.id, user_id: user.id });
         if (noteJoinError) throw noteJoinError;
       }
 
+      console.log('[EditGoalModal] Goal save completed successfully');
       Alert.alert('Success', 'Goal updated successfully!');
       onUpdate();
       onClose();
@@ -234,71 +280,17 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       setShowConfirmDeleteModal(false);
       console.log('Set saving to true');
       
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not found');
-      console.log('User authenticated:', user.id);
-      
-      // Delete all join table entries for this goal
-      console.log('Deleting join table entries...');
-      await Promise.all([
-        supabase.from('0008-ap-universal-roles-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-domains-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-key-relationships-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-        supabase.from('0008-ap-universal-notes-join').delete().eq('parent_id', goal.id).eq('parent_type', 'goal'),
-      ]);
-      console.log('Join table entries deleted');
+      // Use the soft delete function
+      await deleteGoal(goal.id, goal.goal_type);
+      console.log('Goal soft deleted successfully');
 
-      // Find and delete any tasks linked to this goal
-      console.log('Finding tasks linked to goal...');
-      const { data: goalTaskJoins, error: goalTaskJoinsError } = await supabase
-        .from('0008-ap-universal-goals-join')
-        .select('parent_id')
-        .eq('twelve_wk_goal_id', goal.id)
-        .eq('parent_type', 'task');
-
-      if (goalTaskJoinsError) throw goalTaskJoinsError;
-      console.log('Found linked tasks:', goalTaskJoins);
-
-      const taskIds = goalTaskJoins?.map(gtj => gtj.parent_id) || [];
-      
-      if (taskIds.length > 0) {
-        console.log('Deleting linked tasks and their data...');
-        await Promise.all([
-          supabase.from('0008-ap-task-week-plan').delete().in('task_id', taskIds),
-          supabase.from('0008-ap-task-log').delete().in('task_id', taskIds),
-          supabase.from('0008-ap-universal-roles-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-domains-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-key-relationships-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-notes-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-universal-goals-join').delete().in('parent_id', taskIds).eq('parent_type', 'task'),
-          supabase.from('0008-ap-tasks').delete().in('id', taskIds)
-        ]);
-        console.log('Linked tasks deleted');
-      }
-      
-      // Delete any remaining goal joins (deposit ideas, etc.)
-      console.log('Deleting remaining goal joins...');
-      await supabase.from('0008-ap-universal-goals-join').delete().eq('twelve_wk_goal_id', goal.id);
-      console.log('Remaining goal joins deleted');
-      
-      // Now delete the goal itself
-      console.log('Deleting goal itself...');
-      const { error } = await supabase
-        .from('0008-ap-goals-12wk')
-        .delete()
-        .eq('id', goal.id);
-
-      if (error) throw error;
-      console.log('Goal deleted successfully');
-
-      Alert.alert('Success', 'Goal deleted successfully!');
+      Alert.alert('Success', 'Goal cancelled successfully!');
       onUpdate();
       onClose();
     } catch (error) {
       console.error('Error deleting goal:', error);
       console.log('Delete error details:', error);
-      Alert.alert('Error', (error as Error).message || 'Failed to delete goal.');
+      Alert.alert('Error', (error as Error).message || 'Failed to cancel goal.');
     } finally {
       console.log('Setting saving to false');
       setSaving(false);
@@ -316,7 +308,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Edit 12-Week Goal</Text>
+            <Text style={styles.headerTitle}>Edit Goal</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={24} color="#1f2937" />
             </TouchableOpacity>
@@ -498,7 +490,7 @@ export function EditGoalModal({ visible, onClose, onUpdate, goal }: EditGoalModa
             <View style={styles.confirmContainer}>
               <Text style={styles.confirmTitle}>Delete Goal</Text>
               <Text style={styles.confirmMessage}>
-                Are you sure you want to delete this goal? This action cannot be undone.
+                Are you sure you want to delete this goal? This will mark it as cancelled and remove it from your active goals.
               </Text>
               <View style={styles.confirmActions}>
                 <TouchableOpacity

@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FileText, Plus } from 'lucide-react-native';
 import { getSupabaseClient } from '@/lib/supabase';
 
 interface JournalEntry {
   id: string;
-  date: string;
+  date: string; // completed_at (task) or withdrawn_at (withdrawal)
   description: string;
   type: 'deposit' | 'withdrawal';
-  amount: number;
-  balance: number;
+  amount: number; // deposit points or withdrawal amount
+  balance: number; // running balance
   has_notes: boolean;
   source_id: string; // task_id or withdrawal_id
   source_type: 'task' | 'withdrawal';
-  source_data?: any; // Full task or withdrawal data for editing
+  source_data?: any;
 }
 
 interface JournalViewProps {
@@ -32,287 +32,73 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
   const [filter, setFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'all'>('month');
   const [totalBalance, setTotalBalance] = useState(0);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const fetchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const previousScopeRef = React.useRef<string>('');
 
+  // --- deterministic, simple points so deposits are not 0.0 ---
   const calculateTaskPoints = (task: any) => {
-    const roles = task.roles || [];
-    const domains = task.domains || [];
-    
-    let points = 0;
-    if (roles.length > 0) points += roles.length;
-    if (domains.length > 0) points += domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
+    const roleCount = Array.isArray(task?.roles) ? task.roles.length : 0;
+    const domainCount = Array.isArray(task?.domains) ? task.domains.length : 0;
+    const base = 1;      // every completed task is at least 1 point
+    const perRole = 1;   // +1 per role
+    const perDomain = 0.5; // +0.5 per domain
+    return base + roleCount * perRole + domainCount * perDomain;
   };
 
-  const buildScopeFilter = (tableName: string) => {
-    if (scope.type === 'user' || !scope.id) {
-      return null; // No additional filtering needed
-    }
+  // helper to group records by parent_id for fast lookup
+  const groupByParentId = <T extends { parent_id: string }>(rows: T[] | null | undefined) => {
+    const map = new Map<string, T[]>();
+    (rows ?? []).forEach((r) => {
+      const arr = map.get(r.parent_id) ?? [];
+      arr.push(r);
+      map.set(r.parent_id, arr);
+    });
+    return map;
+  };
 
-    switch (scope.type) {
-      case 'role':
-        return `${tableName}_roles!inner(role_id.eq.${scope.id})`;
-      case 'key_relationship':
-        return `${tableName}_key_relationships!inner(key_relationship_id.eq.${scope.id})`;
-      case 'domain':
-        return `${tableName}_domains!inner(domain_id.eq.${scope.id})`;
-      default:
-        return null;
-    }
+  // calculate start date for the range filter (YYYY-MM-DD)
+  const getDateFilter = (): string | '' => {
+    if (dateRange === 'all') return '';
+    const now = new Date();
+    const days = dateRange === 'week' ? 7 : 30;
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    return since.toISOString().split('T')[0];
   };
 
   const fetchJournalEntries = async () => {
+    // Create new AbortController for this fetch
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Calculate date filter
-      let dateFilter = '';
-      const now = new Date();
-      if (dateRange === 'week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        dateFilter = weekAgo.toISOString().split('T')[0];
-      } else if (dateRange === 'month') {
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        dateFilter = monthAgo.toISOString().split('T')[0];
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setEntries([]);
+        setTotalBalance(0);
+        setLoading(false);
+        return;
       }
 
+      // Check if aborted
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      const dateFilter = getDateFilter();
       const journalEntries: JournalEntry[] = [];
 
-      // Fetch deposits (completed tasks/events) with all related data in one query
+      // ---------------------------------------------------------
+      // 1) Deposits = completed tasks
+      // ---------------------------------------------------------
       if (filter === 'all' || filter === 'deposits') {
         let tasksQuery = supabase
           .from('0008-ap-tasks')
-          .select(`
-            *,
-            task_roles:0008-ap-universal-roles-join!inner(
-              role:0008-ap-roles(id, label)
-            ),
-            task_domains:0008-ap-universal-domains-join(
-              domain:0008-ap-domains(id, name)
-            ),
-            task_goals:0008-ap-universal-goals-join(
-              goal:0008-ap-goals-12wk(id, title)
-            ),
-            task_key_relationships:0008-ap-universal-key-relationships-join(
-              key_relationship:0008-ap-key-relationships(id, name)
-            ),
-            task_notes:0008-ap-universal-notes-join(
-              note:0008-ap-notes(id, content, created_at)
-            )
-          `)
-          .eq('user_id', user.id)
-          .eq('status', 'completed')
-          .not('completed_at', 'is', null)
-          .eq('0008-ap-universal-roles-join.parent_type', 'task')
-          .eq('0008-ap-universal-domains-join.parent_type', 'task')
-          .eq('0008-ap-universal-goals-join.parent_type', 'task')
-          .eq('0008-ap-universal-key-relationships-join.parent_type', 'task')
-          .eq('0008-ap-universal-notes-join.parent_type', 'task');
-
-        // Apply scope filtering at database level
-        if (scope.type !== 'user' && scope.id) {
-          switch (scope.type) {
-            case 'role':
-              tasksQuery = tasksQuery.eq('0008-ap-universal-roles-join.role_id', scope.id);
-              break;
-            case 'key_relationship':
-              tasksQuery = tasksQuery.eq('0008-ap-universal-key-relationships-join.key_relationship_id', scope.id);
-              break;
-            case 'domain':
-              tasksQuery = tasksQuery.eq('0008-ap-universal-domains-join.domain_id', scope.id);
-              break;
-          }
-        }
-
-        if (dateFilter) {
-          tasksQuery = tasksQuery.gte('completed_at', dateFilter);
-        }
-
-        const { data: tasksData, error: tasksError } = await tasksQuery;
-        if (tasksError) {
-          console.error('Tasks query error:', tasksError);
-          // If the complex query fails, fall back to simpler approach
-          await fetchJournalEntriesSimple();
-          return;
-        }
-
-        if (tasksData) {
-          for (const task of tasksData) {
-            // Transform nested data to flat structure
-            const taskWithData = {
-              ...task,
-              roles: task.task_roles?.map(tr => tr.role).filter(Boolean) || [],
-              domains: task.task_domains?.map(td => td.domain).filter(Boolean) || [],
-              goals: task.task_goals?.map(tg => tg.goal).filter(Boolean) || [],
-              keyRelationships: task.task_key_relationships?.map(tkr => tkr.key_relationship).filter(Boolean) || [],
-            };
-
-            const points = calculateTaskPoints(taskWithData);
-            const hasNotes = task.task_notes && task.task_notes.length > 0;
-
-            journalEntries.push({
-              id: task.id,
-              date: task.completed_at?.split('T')[0] || task.due_date,
-              description: task.title,
-              type: 'deposit',
-              amount: points,
-              balance: 0, // Will be calculated later
-              has_notes: hasNotes,
-              source_id: task.id,
-              source_type: 'task',
-              source_data: taskWithData,
-            });
-          }
-        }
-      }
-
-      // Fetch withdrawals with all related data in one query
-      if (filter === 'all' || filter === 'withdrawals') {
-        let withdrawalsQuery = supabase
-          .from('0008-ap-withdrawals')
-          .select(`
-            *,
-            withdrawal_roles:0008-ap-universal-roles-join(
-              role:0008-ap-roles(id, label)
-            ),
-            withdrawal_domains:0008-ap-universal-domains-join(
-              domain:0008-ap-domains(id, name)
-            ),
-            withdrawal_key_relationships:0008-ap-universal-key-relationships-join(
-              key_relationship:0008-ap-key-relationships(id, name)
-            ),
-            withdrawal_notes:0008-ap-universal-notes-join(
-              note:0008-ap-notes(id, content, created_at)
-            )
-          `)
-          .eq('user_id', user.id)
-          .eq('0008-ap-universal-roles-join.parent_type', 'withdrawal')
-          .eq('0008-ap-universal-domains-join.parent_type', 'withdrawal')
-          .eq('0008-ap-universal-key-relationships-join.parent_type', 'withdrawal')
-          .eq('0008-ap-universal-notes-join.parent_type', 'withdrawal');
-
-        // Apply scope filtering at database level
-        if (scope.type !== 'user' && scope.id) {
-          switch (scope.type) {
-            case 'role':
-              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-roles-join.role_id', scope.id);
-              break;
-            case 'key_relationship':
-              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-key-relationships-join.key_relationship_id', scope.id);
-              break;
-            case 'domain':
-              withdrawalsQuery = withdrawalsQuery.eq('0008-ap-universal-domains-join.domain_id', scope.id);
-              break;
-          }
-        }
-
-        if (dateFilter) {
-          withdrawalsQuery = withdrawalsQuery.gte('withdrawn_at', dateFilter);
-        }
-
-        const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
-        if (withdrawalsError) {
-          console.error('Withdrawals query error:', withdrawalsError);
-          // Continue without withdrawals if query fails
-        } else if (withdrawalsData) {
-          for (const withdrawal of withdrawalsData) {
-            // Transform nested data to flat structure
-            const withdrawalWithData = {
-              ...withdrawal,
-              roles: withdrawal.withdrawal_roles?.map(wr => wr.role).filter(Boolean) || [],
-              domains: withdrawal.withdrawal_domains?.map(wd => wd.domain).filter(Boolean) || [],
-              keyRelationships: withdrawal.withdrawal_key_relationships?.map(wkr => wkr.key_relationship).filter(Boolean) || [],
-            };
-
-            const hasNotes = withdrawal.withdrawal_notes && withdrawal.withdrawal_notes.length > 0;
-
-            journalEntries.push({
-              id: withdrawal.id,
-              date: withdrawal.withdrawn_at,
-              description: withdrawal.title,
-              type: 'withdrawal',
-              amount: parseFloat(withdrawal.amount.toString()),
-              balance: 0, // Will be calculated later
-              has_notes: hasNotes,
-              source_id: withdrawal.id,
-              source_type: 'withdrawal',
-              source_data: withdrawalWithData,
-            });
-          }
-        }
-      }
-
-      // Sort by date and calculate running balance
-      journalEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      let runningBalance = 0;
-      // Calculate balance in chronological order (oldest first) but display newest first
-      const chronologicalEntries = [...journalEntries].reverse();
-      for (const entry of chronologicalEntries) {
-        if (entry.type === 'deposit') {
-          runningBalance += entry.amount;
-        } else {
-          runningBalance -= entry.amount;
-        }
-      }
-      
-      // Now assign balances in reverse chronological order (newest first)
-      let currentBalance = runningBalance;
-      for (const entry of journalEntries) {
-        entry.balance = currentBalance;
-        if (entry.type === 'deposit') {
-          currentBalance -= entry.amount;
-        } else {
-          currentBalance += entry.amount;
-        }
-      }
-
-      setTotalBalance(runningBalance);
-      setEntries(journalEntries);
-
-    } catch (error) {
-      console.error('Error fetching journal entries:', error);
-      Alert.alert('Error', (error as Error).message);
-      // Fall back to simple approach if optimized query fails
-      await fetchJournalEntriesSimple();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fallback method using the original approach if optimized queries fail
-  const fetchJournalEntriesSimple = async () => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Calculate date filter
-      let dateFilter = '';
-      const now = new Date();
-      if (dateRange === 'week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        dateFilter = weekAgo.toISOString().split('T')[0];
-      } else if (dateRange === 'month') {
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        dateFilter = monthAgo.toISOString().split('T')[0];
-      }
-
-      const journalEntries: JournalEntry[] = [];
-
-      // Fetch deposits (completed tasks/events) - simplified version
-      if (filter === 'all' || filter === 'deposits') {
-        let tasksQuery = supabase
-          .from('0008-ap-tasks')
-          .select('*')
+          .select('id, title, completed_at')
           .eq('user_id', user.id)
           .eq('status', 'completed')
           .not('completed_at', 'is', null);
@@ -322,66 +108,137 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
         }
 
         const { data: tasksData, error: tasksError } = await tasksQuery;
-        if (tasksError) throw tasksError;
+        if (tasksError) {
+          console.error('Tasks query error:', tasksError);
+          throw tasksError;
+        }
 
-        if (tasksData && tasksData.length > 0) {
-          const taskIds = tasksData.map(t => t.id);
+        if (tasksData && tasksData.length) {
+          const taskIds = tasksData.map((t: any) => t.id);
 
+          // pull role/domain/keyRel/notes/goals for these tasks
           const [
-            { data: rolesData },
-            { data: domainsData },
-            { data: notesData }
+            rolesRes,
+            domainsRes,
+            keyRelsRes,
+            notesRes,
+            goalsRes,
           ] = await Promise.all([
-            supabase.from('0008-ap-universal-roles-join').select('parent_id, role:0008-ap-roles(id, label)').in('parent_id', taskIds).eq('parent_type', 'task'),
-            supabase.from('0008-ap-universal-domains-join').select('parent_id, domain:0008-ap-domains(id, name)').in('parent_id', taskIds).eq('parent_type', 'task'),
-            supabase.from('0008-ap-universal-notes-join').select('parent_id, note_id').in('parent_id', taskIds).eq('parent_type', 'task')
+            supabase
+              .from('0008-ap-universal-roles-join')
+              .select('parent_id, role_id, role:0008-ap-roles(id,label)')
+              .in('parent_id', taskIds)
+              .eq('parent_type', 'task'),
+            supabase
+              .from('0008-ap-universal-domains-join')
+              .select('parent_id, domain_id, domain:0008-ap-domains(id,name)')
+              .in('parent_id', taskIds)
+              .eq('parent_type', 'task'),
+            supabase
+              .from('0008-ap-universal-key-relationships-join')
+              .select('parent_id, key_relationship_id, key_relationship:0008-ap-key-relationships(id,name)')
+              .in('parent_id', taskIds)
+              .eq('parent_type', 'task'),
+            supabase
+              .from('0008-ap-universal-notes-join')
+              .select('parent_id, note:0008-ap-notes(id,content,created_at)')
+              .in('parent_id', taskIds)
+              .eq('parent_type', 'task'),
+            supabase
+              .from('0008-ap-universal-goals-join')
+              .select(`
+                parent_id,
+                goal_type,
+                twelve_wk_goal_id,
+                custom_goal_id,
+                tw:0008-ap-goals-12wk(id,title),
+                cg:0008-ap-goals-custom(id,title)
+              `)
+              .in('parent_id', taskIds)
+              .eq('parent_type', 'task'),
           ]);
 
-          // Apply scope filtering
-          let scopeFilteredTaskIds = taskIds;
+          const taskRoles = rolesRes.data ?? [];
+          const taskDomains = domainsRes.data ?? [];
+          const taskKeyRels = keyRelsRes.data ?? [];
+          const taskNotes = notesRes.data ?? [];
+          const taskGoals = goalsRes.data ?? [];
+
+          // scope filter for tasks (role/domain/key_relationship)
+          let allowedTaskIds = new Set(taskIds);
           if (scope.type !== 'user' && scope.id) {
-            switch (scope.type) {
-              case 'role':
-                scopeFilteredTaskIds = rolesData?.filter(r => r.role?.id === scope.id).map(r => r.parent_id) || [];
-                break;
-              case 'domain':
-                scopeFilteredTaskIds = domainsData?.filter(d => d.domain?.id === scope.id).map(d => d.parent_id) || [];
-                break;
+            if (scope.type === 'role') {
+              allowedTaskIds = new Set(
+                taskRoles
+                  .filter((r: any) => r.role?.id === scope.id || r.role_id === scope.id)
+                  .map((r: any) => r.parent_id)
+              );
+            } else if (scope.type === 'domain') {
+              allowedTaskIds = new Set(
+                taskDomains
+                  .filter((d: any) => d.domain?.id === scope.id || d.domain_id === scope.id)
+                  .map((d: any) => d.parent_id)
+              );
+            } else if (scope.type === 'key_relationship') {
+              allowedTaskIds = new Set(
+                taskKeyRels
+                  .filter((k: any) => k.key_relationship?.id === scope.id || k.key_relationship_id === scope.id)
+                  .map((k: any) => k.parent_id)
+              );
             }
           }
 
-          const tasksWithNotes = new Set(notesData?.map(n => n.parent_id) || []);
-          const scopedTasks = tasksData.filter(task => scopeFilteredTaskIds.includes(task.id));
-          
-          for (const task of scopedTasks) {
-            const taskWithData = {
-              ...task,
-              roles: rolesData?.filter(r => r.parent_id === task.id).map(r => r.role).filter(Boolean) || [],
-              domains: domainsData?.filter(d => d.parent_id === task.id).map(d => d.domain).filter(Boolean) || [],
-            };
+          // index lookups
+          const rolesByTask = groupByParentId(taskRoles);
+          const domainsByTask = groupByParentId(taskDomains);
+          const keyRelsByTask = groupByParentId(taskKeyRels);
+          const notesByTask = groupByParentId(taskNotes);
+          const goalsByTask = groupByParentId(taskGoals);
 
-            const points = calculateTaskPoints(taskWithData);
+          for (const t of tasksData) {
+            if (!allowedTaskIds.has(t.id)) continue;
+
+            const roles = (rolesByTask.get(t.id) ?? []).map((r: any) => r.role).filter(Boolean);
+            const domains = (domainsByTask.get(t.id) ?? []).map((d: any) => d.domain).filter(Boolean);
+            const keyRelationships = (keyRelsByTask.get(t.id) ?? [])
+              .map((k: any) => k.key_relationship)
+              .filter(Boolean);
+            const notes = (notesByTask.get(t.id) ?? []).map((n: any) => n.note).filter(Boolean);
+            const goals = (goalsByTask.get(t.id) ?? []).map((g: any) => {
+              if (g.goal_type === 'twelve_wk_goal') return { type: '12wk', id: g.tw?.id, title: g.tw?.title };
+              if (g.goal_type === 'custom_goal') return { type: 'custom', id: g.cg?.id, title: g.cg?.title };
+              // fallback if goal_type isn't set but IDs exist:
+              if (g.tw?.id) return { type: '12wk', id: g.tw.id, title: g.tw.title };
+              if (g.cg?.id) return { type: 'custom', id: g.cg.id, title: g.cg.title };
+              return null;
+            }).filter(Boolean);
+
+            const source_data = { ...t, roles, domains, keyRelationships, notes, goals };
+            const points = calculateTaskPoints({ roles, domains });
+
             journalEntries.push({
-              id: task.id,
-              date: task.completed_at?.split('T')[0] || task.due_date,
-              description: task.title,
+              id: t.id,
+              date: t.completed_at, // <-- completed_at for tasks
+              description: t.title,
               type: 'deposit',
               amount: points,
               balance: 0,
-              has_notes: tasksWithNotes.has(task.id),
-              source_id: task.id,
+              has_notes: notes.length > 0,
+              source_id: t.id,
               source_type: 'task',
-              source_data: taskWithData,
+              source_data,
             });
           }
         }
       }
 
-      // Fetch withdrawals - simplified version
+      // ---------------------------------------------------------
+      // 2) Withdrawals
+      // ---------------------------------------------------------
       if (filter === 'all' || filter === 'withdrawals') {
         let withdrawalsQuery = supabase
           .from('0008-ap-withdrawals')
-          .select('*')
+          .select('id, title, amount, withdrawn_at, user_id')
           .eq('user_id', user.id);
 
         if (dateFilter) {
@@ -389,68 +246,189 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
         }
 
         const { data: withdrawalsData, error: withdrawalsError } = await withdrawalsQuery;
-        if (withdrawalsError) throw withdrawalsError;
+        if (withdrawalsError) {
+          console.error('Withdrawals query error:', withdrawalsError);
+          throw withdrawalsError;
+        }
 
-        if (withdrawalsData && withdrawalsData.length > 0) {
-          for (const withdrawal of withdrawalsData) {
+        if (withdrawalsData && withdrawalsData.length) {
+          const wIds = withdrawalsData.map((w: any) => w.id);
+
+          const [wRolesRes, wDomainsRes, wKeyRelsRes, wNotesRes] = await Promise.all([
+            supabase
+              .from('0008-ap-universal-roles-join')
+              .select('parent_id, role_id, role:0008-ap-roles(id,label)')
+              .in('parent_id', wIds)
+              .eq('parent_type', 'withdrawal'),
+            supabase
+              .from('0008-ap-universal-domains-join')
+              .select('parent_id, domain_id, domain:0008-ap-domains(id,name)')
+              .in('parent_id', wIds)
+              .eq('parent_type', 'withdrawal'),
+            supabase
+              .from('0008-ap-universal-key-relationships-join')
+              .select('parent_id, key_relationship_id, key_relationship:0008-ap-key-relationships(id,name)')
+              .in('parent_id', wIds)
+              .eq('parent_type', 'withdrawal'),
+            supabase
+              .from('0008-ap-universal-notes-join')
+              .select('parent_id, note:0008-ap-notes(id,content,created_at)')
+              .in('parent_id', wIds)
+              .eq('parent_type', 'withdrawal'),
+          ]);
+
+          const wRoles = wRolesRes.data ?? [];
+          const wDomains = wDomainsRes.data ?? [];
+          const wKeyRels = wKeyRelsRes.data ?? [];
+          const wNotes = wNotesRes.data ?? [];
+
+          // scope filter for withdrawals
+          let allowedWids = new Set(wIds);
+          if (scope.type !== 'user' && scope.id) {
+            if (scope.type === 'role') {
+              allowedWids = new Set(
+                wRoles
+                  .filter((r: any) => r.role?.id === scope.id || r.role_id === scope.id)
+                  .map((r: any) => r.parent_id)
+              );
+            } else if (scope.type === 'domain') {
+              allowedWids = new Set(
+                wDomains
+                  .filter((d: any) => d.domain?.id === scope.id || d.domain_id === scope.id)
+                  .map((d: any) => d.parent_id)
+              );
+            } else if (scope.type === 'key_relationship') {
+              allowedWids = new Set(
+                wKeyRels
+                  .filter((k: any) => k.key_relationship?.id === scope.id || k.key_relationship_id === scope.id)
+                  .map((k: any) => k.parent_id)
+              );
+            }
+          }
+
+          const rolesByW = groupByParentId(wRoles);
+          const domainsByW = groupByParentId(wDomains);
+          const keyRelsByW = groupByParentId(wKeyRels);
+          const notesByW = groupByParentId(wNotes);
+
+          for (const w of withdrawalsData) {
+            if (!allowedWids.has(w.id)) continue;
+
+            const roles = (rolesByW.get(w.id) ?? []).map((r: any) => r.role).filter(Boolean);
+            const domains = (domainsByW.get(w.id) ?? []).map((d: any) => d.domain).filter(Boolean);
+            const keyRelationships = (keyRelsByW.get(w.id) ?? [])
+              .map((k: any) => k.key_relationship)
+              .filter(Boolean);
+            const notes = (notesByW.get(w.id) ?? []).map((n: any) => n.note).filter(Boolean);
+            const amountNum = parseFloat(String(w.amount ?? 0)) || 0;
+
             journalEntries.push({
-              id: withdrawal.id,
-              date: withdrawal.withdrawn_at,
-              description: withdrawal.title,
+              id: w.id,
+              date: w.withdrawn_at, // <-- withdrawn_at for withdrawals
+              description: w.title,
               type: 'withdrawal',
-              amount: parseFloat(withdrawal.amount.toString()),
+              amount: amountNum,
               balance: 0,
-              has_notes: false,
-              source_id: withdrawal.id,
+              has_notes: notes.length > 0,
+              source_id: w.id,
               source_type: 'withdrawal',
-              source_data: withdrawal,
+              source_data: { ...w, roles, domains, keyRelationships, notes },
             });
           }
         }
       }
 
-      // Sort by date and calculate running balance
-      journalEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
+      // ---------------------------------------------------------
+      // 3) Sort & compute running balance
+      // ---------------------------------------------------------
+      journalEntries.sort((a, b) => {
+        const ta = new Date(a.date).getTime();
+        const tb = new Date(b.date).getTime();
+        return tb - ta;
+      });
+
+      // compute balance across time (oldest->newest), then assign (newest-first view)
       let runningBalance = 0;
-      const chronologicalEntries = [...journalEntries].reverse();
-      for (const entry of chronologicalEntries) {
-        if (entry.type === 'deposit') {
-          runningBalance += entry.amount;
-        } else {
-          runningBalance -= entry.amount;
-        }
-      }
-      
-      let currentBalance = runningBalance;
-      for (const entry of journalEntries) {
-        entry.balance = currentBalance;
-        if (entry.type === 'deposit') {
-          currentBalance -= entry.amount;
-        } else {
-          currentBalance += entry.amount;
-        }
+      const chronological = [...journalEntries].reverse();
+      chronological.forEach((e) => {
+        if (e.type === 'deposit') runningBalance += e.amount;
+        else runningBalance -= e.amount;
+      });
+
+      let current = runningBalance;
+      journalEntries.forEach((e) => {
+        e.balance = current;
+        if (e.type === 'deposit') current -= e.amount;
+        else current += e.amount;
+      });
+
+      // Final abort check before setting state
+      if (controller.signal.aborted) {
+        return;
       }
 
-      setTotalBalance(runningBalance);
       setEntries(journalEntries);
-
-    } catch (error) {
-      console.error('Error in fallback journal fetch:', error);
-      Alert.alert('Error', (error as Error).message);
+      setTotalBalance(runningBalance);
+    } catch (err: any) {
+      // Don't show errors if request was aborted
+      if (controller.signal.aborted) {
+        return;
+      }
+      console.error('Error fetching journal entries:', err);
+      Alert.alert('Error loading journal', err?.message ?? String(err));
+      setEntries([]);
+      setTotalBalance(0);
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchJournalEntries();
+    // Create a stable scope key for comparison
+    const scopeKey = JSON.stringify(scope);
+
+    // Only fetch if scope actually changed
+    if (scopeKey === previousScopeRef.current && !filter && !dateRange) {
+      return;
+    }
+
+    previousScopeRef.current = scopeKey;
+
+    // Clear any pending fetch timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Abort any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Debounce the fetch to prevent rapid consecutive calls
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchJournalEntries();
+    }, 300);
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, filter, dateRange]);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
-      year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+      year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
     });
   };
 
@@ -459,9 +437,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
     return `${prefix}${balance.toFixed(1)}`;
   };
 
-  const getBalanceColor = (balance: number) => {
-    return balance >= 0 ? '#16a34a' : '#dc2626';
-  };
+  const getBalanceColor = (balance: number) => (balance >= 0 ? '#16a34a' : '#dc2626');
 
   const getHeaderTitle = () => {
     switch (scope.type) {
@@ -488,43 +464,31 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
               {(['all', 'deposits', 'withdrawals'] as const).map((filterOption) => (
                 <TouchableOpacity
                   key={filterOption}
-                  style={[
-                    styles.filterButton,
-                    filter === filterOption && styles.activeFilterButton
-                  ]}
+                  style={[styles.filterButton, filter === filterOption && styles.activeFilterButton]}
                   onPress={() => setFilter(filterOption)}
                 >
-                  <Text style={[
-                    styles.filterButtonText,
-                    filter === filterOption && styles.activeFilterButtonText
-                  ]}>
+                  <Text style={[styles.filterButtonText, filter === filterOption && styles.activeFilterButtonText]}>
                     {filterOption.charAt(0).toUpperCase() + filterOption.slice(1)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            
+
             <View style={styles.filterGroup}>
               {(['week', 'month', 'all'] as const).map((rangeOption) => (
                 <TouchableOpacity
                   key={rangeOption}
-                  style={[
-                    styles.filterButton,
-                    dateRange === rangeOption && styles.activeFilterButton
-                  ]}
+                  style={[styles.filterButton, dateRange === rangeOption && styles.activeFilterButton]}
                   onPress={() => setDateRange(rangeOption)}
                 >
-                  <Text style={[
-                    styles.filterButtonText,
-                    dateRange === rangeOption && styles.activeFilterButtonText
-                  ]}>
+                  <Text style={[styles.filterButtonText, dateRange === rangeOption && styles.activeFilterButtonText]}>
                     {rangeOption.charAt(0).toUpperCase() + rangeOption.slice(1)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-        
+
           {/* Add Withdrawal Button */}
           {onAddWithdrawal && (
             <TouchableOpacity style={styles.addWithdrawalButton} onPress={onAddWithdrawal}>
@@ -559,31 +523,21 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
           entries.map((entry, index) => (
             <TouchableOpacity
               key={`${entry.source_type}-${entry.id}`}
-              style={[
-                styles.journalRow,
-                index % 2 === 0 ? styles.evenRow : styles.oddRow
-              ]}
+              style={[styles.journalRow, index % 2 === 0 ? styles.evenRow : styles.oddRow]}
               onPress={() => onEntryPress(entry)}
             >
               <Text style={styles.cellDate}>{formatDate(entry.date)}</Text>
               <Text style={styles.cellDescription} numberOfLines={2}>
                 {entry.description}
               </Text>
-              <View style={styles.cellNotes}>
-                {entry.has_notes && (
-                  <FileText size={14} color="#6b7280" />
-                )}
-              </View>
+              <View style={styles.cellNotes}>{entry.has_notes && <FileText size={14} color="#6b7280" />}</View>
               <Text style={styles.cellDeposit}>
                 {entry.type === 'deposit' ? `+${entry.amount.toFixed(1)}` : ''}
               </Text>
               <Text style={styles.cellWithdrawal}>
                 {entry.type === 'withdrawal' ? entry.amount.toFixed(1) : ''}
               </Text>
-              <Text style={[
-                styles.cellBalance,
-                { color: getBalanceColor(entry.balance) }
-              ]}>
+              <Text style={[styles.cellBalance, { color: getBalanceColor(entry.balance) }]}>
                 {formatBalance(entry.balance)}
               </Text>
             </TouchableOpacity>
@@ -595,10 +549,7 @@ export function JournalView({ scope, onEntryPress, onAddWithdrawal }: JournalVie
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   filterContainer: {
     backgroundColor: '#f8fafc',
     paddingHorizontal: 16,
@@ -606,22 +557,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
-  filterRow: {
-    flexDirection: 'column',
-    gap: 12,
-  },
-  filterRowContent: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-  },
-  filterGroup: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 2,
-  },
+  filterRow: { flexDirection: 'column', gap: 12 },
+  filterRowContent: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 },
+  filterGroup: { flexDirection: 'row', backgroundColor: '#ffffff', borderRadius: 8, padding: 2 },
   addWithdrawalButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -634,27 +572,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: 6,
   },
-  addWithdrawalText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#dc2626',
-  },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  activeFilterButton: {
-    backgroundColor: '#0078d4',
-  },
-  filterButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  activeFilterButtonText: {
-    color: '#ffffff',
-  },
+  addWithdrawalText: { fontSize: 14, fontWeight: '600', color: '#dc2626' },
+  filterButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  activeFilterButton: { backgroundColor: '#0078d4' },
+  filterButtonText: { fontSize: 12, fontWeight: '500', color: '#6b7280' },
+  activeFilterButtonText: { color: '#ffffff' },
   journalHeader: {
     flexDirection: 'row',
     backgroundColor: '#f8fafc',
@@ -663,51 +585,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#d1d5db',
   },
-  headerDate: {
-    width: 70,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'center',
-  },
-  headerDescription: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    paddingHorizontal: 8,
-  },
-  headerNotes: {
-    width: 40,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'center',
-  },
-  headerDeposit: {
-    width: 60,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'right',
-  },
-  headerWithdrawal: {
-    width: 70,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'right',
-  },
-  headerBalance: {
-    width: 70,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'right',
-  },
-  journalContent: {
-    flex: 1,
-  },
+  headerDate: { width: 70, fontSize: 12, fontWeight: '600', color: '#374151', textAlign: 'center' },
+  headerDescription: { flex: 1, fontSize: 12, fontWeight: '600', color: '#374151', paddingHorizontal: 8 },
+  headerNotes: { width: 40, fontSize: 12, fontWeight: '600', color: '#374151', textAlign: 'center' },
+  headerDeposit: { width: 60, fontSize: 12, fontWeight: '600', color: '#374151', textAlign: 'right' },
+  headerWithdrawal: { width: 70, fontSize: 12, fontWeight: '600', color: '#374151', textAlign: 'right' },
+  headerBalance: { width: 70, fontSize: 12, fontWeight: '600', color: '#374151', textAlign: 'right' },
+  journalContent: { flex: 1 },
   journalRow: {
     flexDirection: 'row',
     paddingVertical: 12,
@@ -716,65 +600,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  evenRow: {
-    backgroundColor: '#ffffff',
-  },
-  oddRow: {
-    backgroundColor: '#f1f5f9',
-  },
-  cellDate: {
-    width: 70,
-    fontSize: 12,
-    color: '#374151',
-    textAlign: 'center',
-  },
-  cellDescription: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1f2937',
-    paddingHorizontal: 8,
-    lineHeight: 18,
-  },
-  cellNotes: {
-    width: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cellDeposit: {
-    width: 60,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#16a34a',
-    textAlign: 'right',
-  },
-  cellWithdrawal: {
-    width: 70,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#dc2626',
-    textAlign: 'right',
-  },
-  cellBalance: {
-    width: 70,
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#6b7280',
-    fontSize: 16,
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#6b7280',
-    fontSize: 16,
-    textAlign: 'center',
-  },
+  evenRow: { backgroundColor: '#ffffff' },
+  oddRow: { backgroundColor: '#f1f5f9' },
+  cellDate: { width: 70, fontSize: 12, color: '#374151', textAlign: 'center' },
+  cellDescription: { flex: 1, fontSize: 14, color: '#1f2937', paddingHorizontal: 8, lineHeight: 18 },
+  cellNotes: { width: 40, alignItems: 'center', justifyContent: 'center' },
+  cellDeposit: { width: 60, fontSize: 14, fontWeight: '600', color: '#16a34a', textAlign: 'right' },
+  cellWithdrawal: { width: 70, fontSize: 14, fontWeight: '600', color: '#dc2626', textAlign: 'right' },
+  cellBalance: { width: 70, fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  loadingContainer: { padding: 40, alignItems: 'center' },
+  loadingText: { color: '#6b7280', fontSize: 16 },
+  emptyContainer: { padding: 40, alignItems: 'center' },
+  emptyText: { color: '#6b7280', fontSize: 16, textAlign: 'center' },
 });

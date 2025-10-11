@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { getSupabaseClient } from '@/lib/supabase';
+import { signInWithGoogle } from '@/lib/googleAuth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export default function LoginScreen() {
@@ -27,6 +28,7 @@ export default function LoginScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
@@ -46,7 +48,6 @@ export default function LoginScreen() {
   };
 
   const handleSignUp = async () => {
-    // Basic validation to make sure fields are not empty
     if (!email || !password || !confirmPassword || !firstName || !lastName) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
@@ -57,14 +58,12 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    
-    // Step 1: Create the user in Supabase's secure "auth.users" table
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
         data: {
-          // Pass the names so our database trigger can use them
           first_name: firstName.trim(),
           last_name: lastName.trim()
         }
@@ -74,37 +73,75 @@ export default function LoginScreen() {
     if (authError) {
       Alert.alert('Sign Up Error', authError.message);
     } else if (authData.user) {
-      // The trigger we created in Supabase will automatically create the profile.
-      // We just need to let the user know and reset the form.
       Alert.alert(
-        'Success!', 
+        'Success!',
         'Please check your email to verify your account, then you can sign in.'
       );
-      // Reset the form fields and switch to the login view
       setEmail('');
       setPassword('');
       setConfirmPassword('');
       setFirstName('');
       setLastName('');
-      setIsSignUp(false); 
+      setIsSignUp(false);
     }
-    
+
     setLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+      router.replace('/(tabs)/dashboard');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign in with Google';
+      if (errorMessage !== 'Sign in was cancelled') {
+        Alert.alert('Google Sign In Error', errorMessage);
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.content}>
-          <Text style={styles.title}>
-            {isSignUp ? 'Create Account' : 'Welcome Back'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {isSignUp 
-              ? 'Sign up to start your authentic investment journey' 
-              : 'Sign in to continue your authentic investment journey'
-            }
-          </Text>
+        <View style={styles.formWrapper}>
+          <View style={styles.content}>
+            <Text style={styles.title}>
+              {isSignUp ? 'Create Account' : 'Welcome Back'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isSignUp
+                ? 'Sign up to start your authentic investment journey'
+                : 'Sign in to continue your authentic investment journey'
+              }
+            </Text>
+
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={handleGoogleSignIn}
+            disabled={googleLoading || loading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#4285F4" />
+            ) : (
+              <>
+                <View style={styles.googleIconContainer}>
+                  <Text style={styles.googleIcon}>G</Text>
+                </View>
+                <Text style={styles.googleButtonText}>
+                  Continue with Google
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.dividerContainer}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.divider} />
+          </View>
 
           {isSignUp && (
             <>
@@ -165,19 +202,39 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.switchButton}
             onPress={() => {
               setIsSignUp(!isSignUp);
             }}
           >
             <Text style={styles.switchButtonText}>
-              {isSignUp 
-                ? 'Already have an account? Sign In' 
+              {isSignUp
+                ? 'Already have an account? Sign In'
                 : "Don't have an account? Sign Up"
               }
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              By signing in, you agree to our{' '}
+              <Text
+                style={styles.footerLink}
+                onPress={() => router.push('/terms')}
+              >
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text
+                style={styles.footerLink}
+                onPress={() => router.push('/privacy')}
+              >
+                Privacy Policy
+              </Text>
+            </Text>
+          </View>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -192,9 +249,15 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formWrapper: {
+    width: '100%',
+    maxWidth: 450,
+    paddingHorizontal: 24,
   },
   content: {
-    padding: 24,
+    paddingVertical: 24,
   },
   title: {
     fontSize: 28,
@@ -250,5 +313,72 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     textAlign: 'center',
     padding: 16,
+  },
+  googleButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dadce0',
+    padding: 14,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  googleIconContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  googleIcon: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  googleButtonText: {
+    color: '#3c4043',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#d1d5db',
+  },
+  dividerText: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginHorizontal: 16,
+    fontWeight: '500',
+  },
+  footer: {
+    marginTop: 24,
+    paddingTop: 16,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  footerLink: {
+    color: '#0078d4',
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });

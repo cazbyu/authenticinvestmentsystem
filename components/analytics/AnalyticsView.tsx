@@ -52,6 +52,9 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState<'4weeks' | '12weeks' | '26weeks'>('12weeks');
   const [filter, setFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const fetchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const previousScopeRef = React.useRef<string>('');
 
   const getDateRangeWeeks = () => {
     switch (dateRange) {
@@ -63,16 +66,12 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
   };
 
   const calculateTaskPoints = (task: any, roles: any[] = [], domains: any[] = []) => {
-    let points = 0;
-    if (roles && roles.length > 0) points += roles.length;
-    if (domains && domains.length > 0) points += domains.length;
-    if (task.is_authentic_deposit) points += 2;
-    if (task.is_urgent && task.is_important) points += 1.5;
-    else if (!task.is_urgent && task.is_important) points += 3;
-    else if (task.is_urgent && !task.is_important) points += 1;
-    else points += 0.5;
-    if (task.is_twelve_week_goal) points += 2;
-    return Math.round(points * 10) / 10;
+    const roleCount = roles?.length || 0;
+    const domainCount = domains?.length || 0;
+    const base = 1;
+    const perRole = 1;
+    const perDomain = 0.5;
+    return base + roleCount * perRole + domainCount * perDomain;
   };
 
   const getQuadrantWeight = (isUrgent: boolean, isImportant: boolean) => {
@@ -83,11 +82,23 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
   };
 
   const fetchAnalyticsData = async () => {
+    // Create new AbortController for this fetch
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      // Check if aborted
+      if (controller.signal.aborted) {
+        return;
+      }
 
       const weeksBack = getDateRangeWeeks();
       const startDate = new Date();
@@ -230,6 +241,11 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
         }
       }
 
+      // Check if aborted before final state updates
+      if (controller.signal.aborted) {
+        return;
+      }
+
       // Sort by date (most recent first)
       analyticsEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setEntries(analyticsEntries);
@@ -238,10 +254,16 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
       calculateMetrics(analyticsEntries, weeksBack);
 
     } catch (error) {
+      // Don't show errors if request was aborted
+      if (controller.signal.aborted) {
+        return;
+      }
       console.error('Error fetching analytics data:', error);
       Alert.alert('Error', (error as Error).message);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -450,7 +472,39 @@ export function AnalyticsView({ scope }: AnalyticsViewProps) {
   };
 
   useEffect(() => {
-    fetchAnalyticsData();
+    // Create a stable scope key for comparison
+    const scopeKey = JSON.stringify(scope);
+
+    // Only fetch if scope actually changed
+    if (scopeKey === previousScopeRef.current && !filter && !dateRange) {
+      return;
+    }
+
+    previousScopeRef.current = scopeKey;
+
+    // Clear any pending fetch timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Abort any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Debounce the fetch to prevent rapid consecutive calls
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchAnalyticsData();
+    }, 300);
+
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [scope, dateRange, filter]);
 
   const getScoreColor = (score: number) => {
