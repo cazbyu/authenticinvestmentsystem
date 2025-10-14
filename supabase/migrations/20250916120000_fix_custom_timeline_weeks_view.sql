@@ -1,3 +1,5 @@
+DROP VIEW IF EXISTS v_custom_timeline_weeks;
+
 -- Ensure v_custom_timeline_weeks exposes the expected week boundaries
 CREATE OR REPLACE VIEW v_custom_timeline_weeks AS
 SELECT
@@ -29,3 +31,5 @@ CROSS JOIN LATERAL (
   SELECT (ct.start_date + ((gs.week_number - 1) * INTERVAL '7 days'))::date AS base_date
 ) AS derived
 WHERE ct.status = 'active';
+
+GRANT SELECT ON v_custom_timeline_weeks TO authenticated;
